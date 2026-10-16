@@ -755,7 +755,7 @@ export function buildHyperframesHtml(data: VideoSummaryData): string {
   </head>
   <body>
     <!-- Root Composition -->
-    <div id="root" data-composition-id="root" data-width="1920" data-height="1080">
+    <div id="root" data-composition-id="root" data-start="0" data-duration="${totalDuration}" data-width="1920" data-height="1080">
       
       <!-- Ambient Background Layer -->
       <div class="bg-grid"></div>
@@ -834,6 +834,7 @@ export function buildHyperframesHtml(data: VideoSummaryData): string {
         // Register timeline for HyperFrames
         window.__timelines = window.__timelines || {};
         window.__timelines["root"] = tl;
+        window.__timelines["main"] = tl;
         tl.seek(0, false);
         syncClipVisibility(0);
       })();

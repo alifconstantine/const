@@ -8,7 +8,11 @@ description: >
   Route fresh creation through hyperframes before using this skill.
 ---
 
+**Plugin installs:** Before setup or freshness commands, follow [plugin execution rules](../hyperframes/references/plugin-installation.md) when this skill is inside a HyperFrames plugin. Standalone installs keep the update instructions below.
+
 # General video
+
+Run `npx hyperframes usage --json` at the start unless the workflow just read it, then check again at milestones such as after drafting and before rendering. Read the available windows and reset times. If usage is unknown, say so without guessing allowance; keep scope and workflow choices with the user.
 
 Before relying on this workflow, run:
 
@@ -48,11 +52,11 @@ Then write `BRIEF.md` at the project root using `../hyperframes/references/brief
 
 Use only the canonical terms from `../hyperframes/references/brief-contract.md`:
 
-| Field          | Meaning                               | Effect                                                                              |
-| -------------- | ------------------------------------- | ----------------------------------------------------------------------------------- |
-| `flow`         | Who drives                            | `automation`: choose and execute the route. `companion`: co-create in conversation. |
-| `storyboard`   | Plan, sketch, and review before build | `yes`: run plan and sketch review (`storyboard.html`). `no`: build without it.      |
-| derived `mode` | How checkpoint gates behave           | Follow the brief contract. Never ask the user to name a mode.                       |
+| Field          | Meaning                               | Effect                                                                                                                                                     |
+| -------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow`         | Who drives                            | `automation`: choose and execute the route. `companion`: co-create in conversation.                                                                        |
+| `storyboard`   | Plan, sketch, and review before build | `yes`: run plan and sketch review (`boards/storyboard.html`, format in `../hyperframes-creative/references/storyboard-recipe.md`). `no`: build without it. |
+| derived `mode` | How checkpoint gates behave           | Follow the brief contract. Never ask the user to name a mode.                                                                                              |
 
 Do not invent synonyms for these states. An ongoing “just build it” signal is handled by the intent layer and arrives as `flow: automation`, `storyboard: no`.
 
@@ -62,8 +66,7 @@ Do not invent synonyms for these states. An ongoing “just build it” signal i
 For a hard cut, trim, splice, or reorder of existing footage, duplicate the same
 video source into multiple clip elements. On each copy, set the source range
 with `data-media-start` plus `data-duration`, then set authored placement/order
-with `data-start`. Separately authored audio follows the identical clip ranges
-and timing on matching `<audio>` elements. `/hyperframes-core` owns this temporal
+with `data-start`. Each video segment keeps its sound: the sound stays on the clip (`data-has-audio="true"`), so cutting the video cuts its sound. `/hyperframes-core` owns this temporal
 edit; use `/hyperframes-keyframes` only for visual-property animation such as
 zoom, punch, pan, crop, mask, or `clip-path` on an inner wrapper.
 Copy the full contracts from `../hyperframes-core/references/creator-editing-recipes.md`.
@@ -89,7 +92,7 @@ These reads are mandatory when their condition matches:
 | Any non-trivial creation or visual treatment                                                                      | `/hyperframes-creative` → `references/house-style.md` and `references/video-composition.md`                                                                                                                                            |
 | Any motion, animation, or scene transition                                                                        | `/hyperframes-animation`; follow its routing to the matching rules, adapters, blueprints, or transition references                                                                                                                     |
 | `storyboard: yes`                                                                                                 | `../hyperframes/references/storyboard-format.md` and `../hyperframes/references/review-loop.md`                                                                                                                                        |
-| Any media asset or operation, including narration, BGM, SFX, captions, grading, or transforms                     | `/media-use`; for framework playback and placement also read `/hyperframes-core` → `references/variables-and-media.md`                                                                                                                 |
+| Any media asset or operation, including narration, BGM, SFX, captions, grading, or transforms                     | `/media-use` (a host app's own music and sound-effect tools come first for those); for framework playback and placement also read `/hyperframes-core` → `references/variables-and-media.md`                                            |
 | Multi-scene assembly                                                                                              | `../hyperframes/references/production-loop.md`                                                                                                                                                                                         |
 | `flow: companion`, before the first plan                                                                          | `/hyperframes-creative` → `references/story-spine.md` and `references/house-style.md`; the nearest genre lens and the full `../hyperframes/references/capability-menu.md` — the ceiling treatment is designed from these, not recalled |
 | A companion capability offer, capture, beat grid, generative video, map, publishing, or cross-workflow capability | `../hyperframes/references/capability-menu.md`                                                                                                                                                                                         |
@@ -110,12 +113,12 @@ Use this dependency order. Skip a stage only when its input is absent.
 
    `node <SKILL_DIR>/scripts/frame-packets.mjs --project "$PROJECT_DIR" --storyboard "$PROJECT_DIR/STORYBOARD.md"`
 
-   The builder writes one bounded packet per scene under `.hyperframes/frame-packets/` (the scene's exact storyboard block + the blueprint body + every cited rule recipe, inlined) and `_role.md` (`../hyperframes/references/frame-worker-core.md` + this skill's `sub-agents/frame-worker.md`, concatenated verbatim — the complete worker role). Dispatch the workers — 2–3 scene packets each, all in one wave (`../hyperframes/references/subagent-dispatch.md`); each worker's prompt carries `_role.md` and its packets — paste them in full, or hand the file paths for the worker to read first (equivalent either way) — plus a dispatch context with `PROJECT_DIR`, its `frame_id`s, and canvas size. WAIT on every scene's `compositions/<frame_id>.html` + `compositions/<frame_id>.motion.json`. Workers read only their packets and the design truth file; they never open `STORYBOARD.md` or the skill documents. With no delegation channel, fall back serially: process one packet at a time in this context, still working from the packet alone.
+   The builder writes one bounded packet per scene under `.hyperframes/frame-packets/` (the scene's exact storyboard block + the blueprint body + every cited rule recipe, inlined) and `_role.md` (`../hyperframes/references/frame-worker-core.md` + this skill's `sub-agents/frame-worker.md`, concatenated verbatim — the complete worker role). Dispatch the workers — 2–3 scene packets each, all in one wave (`../hyperframes/references/subagent-dispatch.md`); each worker's prompt carries `_role.md` and its packets — paste them in full, or hand the file paths for the worker to read first (equivalent either way) — plus a dispatch context with `PROJECT_DIR`, its `frame_id`s, and canvas size. WAIT on every scene's exact storyboard `src` (e.g. `compositions/frames/<frame_id>.html`) and the adjacent `<frame_id>.motion.json` sidecar. Workers read only their packets and the design truth file; they never open `STORYBOARD.md` or the skill documents. With no delegation channel, fall back serially: process one packet at a time in this context, still working from the packet alone.
 
-5. **Merge motion sidecars.** Collect the workers' `compositions/<frame_id>.motion.json` files and carry their durations and exit/entry vectors into assembly; where the doctrine chain (`/motion-doctrine`) is installed, translate them into the project ledger before stamping seams.
+5. **Merge motion sidecars.** Collect the workers' `<frame_id>.motion.json` files adjacent to each storyboard `src` and carry their durations and exit/entry vectors into assembly; where the doctrine chain (`/motion-doctrine`) is installed, translate them into the project ledger before stamping seams.
 6. **Assemble.** Mount scenes, media, transitions, captions, and audio using the production loop. Real voice duration overrides estimates. When a music bed plays under any voice track, carve the bed before verifying: `/hyperframes-audio` → `scripts/carve.mjs --comp index.html`. A volume duck alone does not finish the mix.
 7. **Verify.** Use `npx hyperframes lint` for fast feedback after the first HTML pass and structural changes. For the final gate, run `npx hyperframes check`; it reruns lint internally, so do not run a redundant standalone lint immediately before it. For sub-compositions, inspect midpoint snapshots. For multi-scene work, review the animation map.
-8. **Final approval.** Open the final Studio preview only after checks pass. Ask whether to render or revise. Render only after approval.
+8. **Final approval.** Once checks pass, open the final Studio preview — in autonomous mode too, before any render: opening it asks nothing. Ask whether to render or revise (autonomous: the one kept question). Render only after approval.
 
 ## 6. Gates that always apply
 

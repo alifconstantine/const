@@ -1693,6 +1693,10 @@ export class ConstAgent {
                 onEvent({ type: "artifact_created", artifact });
               },
               browserHandler: this.config.browserHandler,
+              voiceConfig: this.config.voiceConfig,
+              imageConfig: this.config.imageConfig,
+              speechHandler: this.config.speechHandler,
+              imageHandler: this.config.imageHandler,
             }
           );
 

@@ -114,6 +114,49 @@ function renderAt(time) {
 
 If several mixers exist, seek all of them from the same `time`.
 
+## Camera Cuts Inside One Canvas
+
+When one scene switches camera shots by time, declare each cut once and read that constant everywhere: in the camera's shot selector and in every object's visibility window. A window written as its own literal near the cut (`t > 22.9` against a cut at `t < 23`) shows the next shot's objects in the last frames of the previous shot. At 30 fps that is a two-frame pop-in, which one still per shot will not show.
+
+```js
+const CUT_B = 23;
+const CUT_C = 35;
+
+function shotFor(t) {
+  if (t < CUT_B) return shotA(t);
+  if (t < CUT_C) return shotB(t);
+  return shotC(t);
+}
+
+function renderAt(t) {
+  const shot = shotFor(t);
+  camera.position.copy(shot.position);
+  camera.lookAt(shot.target);
+  shotBProps.forEach((mesh) => {
+    mesh.visible = t >= CUT_B && t < CUT_C;
+  });
+  renderer.render(scene, camera);
+}
+```
+
+Verify each cut on the last frame before it and the first frame after it, not only somewhere inside each shot. The last frame before a cut is `(Math.ceil(cut * fps) - 1) / fps`: for a cut at 23 s in a 30 fps render, `npx hyperframes snapshot --at 22.9667,23 --no-end`.
+
+## Lighting Lit Meshes
+
+A `MeshStandardMaterial` lit by one `PointLight` or `DirectionalLight`, with no ambient light, environment map or emissive color, gets no light on its unlit side. When the camera faces that light, the mesh shows only that side and renders as a flat black cutout. Add a fill that stands in for the environment's bounce light, such as a `HemisphereLight` in the colors of the surrounding glow. If the key light's brightness changes over time, drive both lights from the same source at a fixed ratio, tuned by eye. Their intensity units differ, so do not copy the key light's number onto the fill.
+
+## Shader Numeric Domains
+
+Clamp a cosine before subtracting it from one and passing it to GLSL `pow`:
+
+```glsl
+float rim = pow(1.0 - clamp(dot(normal, view), 0.0, 1.0), 1.6);
+```
+
+`max(dot(normal, view), 0.0)` only protects the lower end. Interpolation and GPU rounding can put the dot product above one even when vectors were normalized at vertices. A negative `pow` base is undefined in GLSL, including with integer exponents. Invalid color values from an opaque glow shader can enter glass transmission textures and spread through mipmaps or bloom; inspect the source shaders before disabling glass or replacing bad pixels with black.
+
+`hyperframes lint` warns with `shader_unbounded_cosine_pow` for this direct cosine-power pattern in static shader strings and GLSL script blocks. Project lint also reads directly linked local authored `.js`, `.mjs`, and `.cjs` files, excluding minified/vendor scripts. Dynamic shader assembly and imported modules are outside this narrow check. A clean lint or software-renderer frame does not certify GPU arithmetic: inspect the reported times and before/after frames on the affected hardware in both preview and export.
+
 ## Good Uses
 
 - Deterministic 3D objects, product spins, particles with seeded data, and shader plates.
@@ -143,3 +186,4 @@ npx hyperframes check
 - Why `data-duration` is required here specifically (no auto-inference for this adapter): `packages/core/src/runtime/init.ts` (`resolveAdapterDurationFloorSeconds`) and the CSS/WAAPI/Lottie adapters' `getInferredDurationSeconds`, which the `three` adapter deliberately does not implement.
 - Three.js `WebGLRenderer` docs: https://threejs.org/docs/pages/WebGLRenderer.html
 - Three.js `AnimationMixer.setTime()` docs: https://threejs.org/docs/pages/AnimationMixer.html
+- GLSL `pow` domain: https://docs.vulkan.org/glsl/latest/chapters/builtinfunctions.html

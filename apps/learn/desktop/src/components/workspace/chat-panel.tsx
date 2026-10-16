@@ -52,7 +52,8 @@ import {
   VoiceInput,
   Checkbox,
 } from "@const/ui";
-import { useVoiceRecognition } from "../../lib/voice";
+import { useVoiceRecognition, getStoredVoiceConfig } from "../../lib/voice";
+import { getActiveImageModel } from "../../lib/image";
 import { getConnectedConnectorIds } from "../../lib/connectors-service";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
@@ -2134,6 +2135,18 @@ export function ChatPanel({
           temperature: carriedSources.length > 0 ? 0.2 : 0.7,
           thinkingLevel: currentModel.supportsThinking ? thinkingLevel : undefined,
           mcpServers: parsedMcpServers,
+          voiceConfig: getStoredVoiceConfig(),
+          imageConfig: (() => {
+            const activeImg = getActiveImageModel();
+            return {
+              provider: activeImg.provider,
+              model: activeImg.model,
+              apiKey: activeImg.provider?.apiKey,
+              baseUrl: activeImg.provider?.baseUrl,
+              protocol: activeImg.provider?.protocol,
+              activeModelId: activeImg.model?.id,
+            };
+          })(),
         });
 
         const finalDuration = streamStartTimeRef.current

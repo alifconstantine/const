@@ -13,6 +13,9 @@ import {
 } from "./composio";
 import { getStoredMcpConfig } from "./mcp-connectors";
 import { isConnectorActive } from "./connectors-service";
+import { getStoredVoiceConfig, synthesizeSpeechChunked } from "./voice/service";
+import { getActiveImageModel } from "./image/storage";
+import { generateImage } from "./image/service";
 
 export interface MobileModel {
   id: string;
@@ -289,6 +292,75 @@ export const YOUTUBE_TOOL = {
   },
 };
 
+export const GENERATE_SPEECH_TOOL = {
+  type: "function",
+  function: {
+    name: "generate_speech",
+    description:
+      "Synthesizes natural spoken speech audio from text using the user's configured voice provider (Inworld TTS or OpenAI-compatible Speech API). Use this for narration, explanations, audio summaries, or voice responses. Defaults to the user's selected active voice/model unless explicitly overridden.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The speech script or narration text to synthesize.",
+        },
+        voice: {
+          type: "string",
+          description: "Optional voice character name or voice ID override (e.g. 'Ashley', 'Dennis', 'Hektor', 'Olivia', 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'). Defaults to user's selected voice.",
+        },
+        model: {
+          type: "string",
+          description: "Optional model override (e.g. 'inworld-tts-2', 'inworld-tts-2-flash', 'tts-1', 'tts-1-hd'). Defaults to user's active model.",
+        },
+        speed: {
+          type: "number",
+          description: "Optional speaking speed multiplier (e.g. 1.0, 1.25, 0.9). Defaults to 1.0.",
+        },
+        delivery: {
+          type: "string",
+          description: "Optional delivery mode or emotional steering (e.g. 'conversational', 'expressive', 'neutral', 'formal').",
+        },
+        language: {
+          type: "string",
+          description: "Language code (e.g. 'id-ID', 'en-US').",
+        },
+      },
+      required: ["text"],
+    },
+  },
+};
+
+export const GENERATE_IMAGE_TOOL = {
+  type: "function",
+  function: {
+    name: "generate_image",
+    description:
+      "Generates visual diagrams, conceptual artwork, infographics, educational illustrations, or scene art using the user's configured image generation provider (OpenRouter or OpenAI-compatible). Defaults to user's active image model unless explicitly overridden.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Detailed description of the image to generate.",
+        },
+        aspect_ratio: {
+          type: "string",
+          description: "Aspect ratio for the image: '16:9', '1:1', '4:3', '9:16'.",
+        },
+        size: {
+          type: "string",
+          description: "Image size: '1024x1024', '1792x1024', '1024x1792', '512x512'.",
+        },
+        model: {
+          type: "string",
+          description: "Optional model ID override (e.g. 'recraft/recraft-v3', 'black-forest-labs/flux-1-schnell', 'dall-e-3'). Defaults to user's active model.",
+        },
+      },
+      required: ["prompt"],
+    },
+  },
+};
 
 export const DEFAULT_MOBILE_MODELS: MobileModel[] = [
   {
@@ -521,6 +593,8 @@ export async function streamChatCompletion({
     if (hasClassroom) activeTools.push(GOOGLE_CLASSROOM_TOOL);
     if (hasForms) activeTools.push(GOOGLE_FORMS_TOOL);
     if (hasYoutube) activeTools.push(YOUTUBE_TOOL);
+    activeTools.push(GENERATE_SPEECH_TOOL);
+    activeTools.push(GENERATE_IMAGE_TOOL);
   }
 
   const toolsAvailable = activeTools.length > 0;
@@ -528,6 +602,10 @@ export async function streamChatCompletion({
   let effectiveSystemPrompt = systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT;
   if (toolsAvailable) {
     effectiveSystemPrompt += "\n\n[CONNECTED EDUCATIONAL TOOLS & MCP CONNECTORS]:";
+    effectiveSystemPrompt +=
+      "\n- 'generate_speech': Synthesizes natural spoken speech audio from text using user's configured voice engine (Inworld TTS / OpenAI Speech). Defaults to user's selected active voice/model unless explicitly overridden. Always invoke this whenever speech or narration is needed.";
+    effectiveSystemPrompt +=
+      "\n- 'generate_image': Generates educational diagrams, charts, illustrations, and visuals using user's configured image generation model. Always invoke this whenever an image or visual artwork is requested.";
     if (hasSandbox) {
       effectiveSystemPrompt +=
         "\n- 'code_interpreter' (Cloud Sandbox): Execute Python 3 code to compute math, algebra, statistics, simulate models, and process numerical data.";
@@ -1225,6 +1303,123 @@ export async function streamChatCompletion({
           });
           toolItem.isError = false;
           toolItem.durationMs = Math.max(Date.now() - startTime, 200);
+        } else if (toolItem.name === "generate_speech") {
+          const startTime = Date.now();
+          const voiceCfg = getStoredVoiceConfig();
+          const provider =
+            voiceCfg.providers.find((p) => p.id === voiceCfg.activeProviderId) ||
+            voiceCfg.providers[0];
+
+          if (!provider || !provider.apiKey?.trim()) {
+            toolItem.result = JSON.stringify({
+              status: "error",
+              error:
+                "Voice provider or API key is not configured. Please open Settings > Voice & Models to configure your Inworld or OpenAI Speech API key.",
+            });
+            toolItem.isError = true;
+            toolItem.durationMs = Math.max(Date.now() - startTime, 100);
+          } else {
+            const effectiveProvider = { ...provider };
+            if (parsedArgs.voice) {
+              effectiveProvider.voice = parsedArgs.voice;
+              effectiveProvider.voiceName = parsedArgs.voice;
+            }
+            if (parsedArgs.model) {
+              effectiveProvider.model = parsedArgs.model;
+            }
+            if (parsedArgs.speed && typeof parsedArgs.speed === "number") {
+              effectiveProvider.speed = parsedArgs.speed;
+            }
+
+            try {
+              const res = await synthesizeSpeechChunked({
+                provider: effectiveProvider,
+                text: parsedArgs.text,
+              });
+
+              if (res.success && (res.audioUrl || res.audioBase64)) {
+                toolItem.result = JSON.stringify({
+                  status: "success",
+                  provider: effectiveProvider.name,
+                  model: effectiveProvider.model,
+                  voice: effectiveProvider.voice,
+                  speed: effectiveProvider.speed,
+                  audioUrl: res.audioUrl,
+                  audioBase64: res.audioBase64,
+                  message: `Audio narration successfully generated with voice "${effectiveProvider.voice}" (${effectiveProvider.model}).`,
+                });
+                toolItem.isError = false;
+              } else {
+                toolItem.result = JSON.stringify({
+                  status: "error",
+                  error: res.error || "Failed to synthesize speech audio.",
+                });
+                toolItem.isError = true;
+              }
+            } catch (speechErr: any) {
+              toolItem.result = JSON.stringify({
+                status: "error",
+                error: speechErr?.message || String(speechErr),
+              });
+              toolItem.isError = true;
+            }
+            toolItem.durationMs = Math.max(Date.now() - startTime, 200);
+          }
+        } else if (toolItem.name === "generate_image") {
+          const startTime = Date.now();
+          const { provider, model } = getActiveImageModel();
+
+          if (!provider || !provider.apiKey?.trim()) {
+            toolItem.result = JSON.stringify({
+              status: "error",
+              error:
+                "Image generation provider or API key is not configured. Please open Settings > Voice & Models to configure your Image provider.",
+            });
+            toolItem.isError = true;
+            toolItem.durationMs = Math.max(Date.now() - startTime, 100);
+          } else {
+            const effectiveModelId = parsedArgs.model?.trim() || model?.id || "recraft/recraft-v3";
+            const effectiveSize =
+              parsedArgs.size ||
+              (parsedArgs.aspect_ratio === "16:9"
+                ? "1792x1024"
+                : parsedArgs.aspect_ratio === "9:16"
+                ? "1024x1792"
+                : "1024x1024");
+
+            try {
+              const res = await generateImage({
+                provider,
+                modelId: effectiveModelId,
+                prompt: parsedArgs.prompt,
+                size: effectiveSize,
+              });
+
+              if (res.success && res.imageUrl) {
+                toolItem.result = JSON.stringify({
+                  status: "success",
+                  provider: provider.name,
+                  model: effectiveModelId,
+                  imageUrl: res.imageUrl,
+                  message: "Visual image successfully generated.",
+                });
+                toolItem.isError = false;
+              } else {
+                toolItem.result = JSON.stringify({
+                  status: "error",
+                  error: res.error || "Failed to generate image.",
+                });
+                toolItem.isError = true;
+              }
+            } catch (imgErr: any) {
+              toolItem.result = JSON.stringify({
+                status: "error",
+                error: imgErr?.message || String(imgErr),
+              });
+              toolItem.isError = true;
+            }
+            toolItem.durationMs = Math.max(Date.now() - startTime, 200);
+          }
         } else {
           toolItem.result = "Tool execution unsupported.";
           toolItem.isError = true;
@@ -1246,6 +1441,9 @@ export async function streamChatCompletion({
         try {
           const resObj = typeof t.result === "string" ? JSON.parse(t.result) : t.result;
           if (resObj && typeof resObj === "object") {
+            if (resObj.imageUrl) {
+              linkDirectives.push(`![Gambar Hasil Generasi](${resObj.imageUrl})`);
+            }
             if (resObj.presentationUrl && resObj.presentationId) {
               linkDirectives.push(`[Buka Presentasi di Google Slides](${resObj.presentationUrl})`);
             }

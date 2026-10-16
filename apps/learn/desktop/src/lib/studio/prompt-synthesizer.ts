@@ -102,15 +102,17 @@ Your task is to take the user's presentation options and sources, and synthesize
 Guidelines:
 1. Always begin with skill triggers: /taste-presentation /pdf
 2. Autonomous Aesthetics: Instruct the agent to analyze the content and determine the best visual theme, color palette, typography hierarchy, and slide layout archetypes according to /taste-presentation standards (1 main concept per slide, strong typography, generous negative space, dynamic data layouts).
-3. Enforce a direct, non-looping execution pipeline using available tools (write, python, run_command):
-   - Step 1: Write a complete, standalone 16:9 HTML slide deck ('slides.html') with Google Fonts and CSS styles.
-   - Step 2: Convert directly to PDF ('${targetPdfFileName}') using chromium/google-chrome headless: 'chromium --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="${targetPdfFullPath}" slides.html' or python weasyprint/playwright.
-   - Step 3: Ensure the compiled PDF is saved directly to '${targetPdfFullPath}'.
-   - Step 4: Output the completion summary with the absolute file path '${targetPdfFullPath}'.
+3. Enforce a direct, non-looping execution pipeline using available tools (write, run_command, generate_image):
+   - Step 1: Read 'sources.md' in workspace for complete grounded material.
+   - Step 2: Write a complete, standalone 16:9 HTML slide deck ('slides.html') with Google Fonts, CSS styles, and any generated diagram/artwork via 'generate_image'.
+   - Step 3: Convert directly to PDF ('${targetPdfFileName}') using chromium/google-chrome headless: 'chromium --headless --disable-gpu --no-pdf-header-footer --print-to-pdf="${targetPdfFullPath}" slides.html' or python weasyprint/playwright.
+   - Step 4: Ensure the compiled PDF is saved directly to '${targetPdfFullPath}'.
+   - Step 5: Output the completion summary with the absolute file path '${targetPdfFullPath}'.
 4. STRICT CRITICAL RULES:
    - "DO NOT invoke the 'create_studio_artifact' tool. Slides must NOT be created via create_studio_artifact."
    - "DO NOT run pdftoppm or extract images for visual QA loops."
    - "DO NOT create dummy test scripts in /tmp."
+   - "The complete grounded material is provided in 'sources.md' in the workspace. Build slides strictly grounded on those sources."
    - "Directly execute tool calls (write, run_command) to produce and save the final PDF."
 5. Language: ${isIndo ? "Indonesian (Bahasa Indonesia)" : "English"}.
 6. Output ONLY the finalized prompt ready to execute. No conversational intro.`;
@@ -122,7 +124,7 @@ Guidelines:
 - Target Output PDF Path: ${targetPdfFullPath}
 - User Guidance: ${customInstructions?.trim() || "None"}
 - Sources: ${sources.map((s) => s.title).join(", ")}
-- Brief Context Sample: ${groundedContext.formattedContext.slice(0, 1000)}`;
+- Brief Context Sample: ${groundedContext.formattedContext.slice(0, 3000)}`;
 
   let aiResult = "";
   const controller = new AbortController();
@@ -233,6 +235,7 @@ export async function synthesizeVideoSummaryPrompt(
     );
   }
 
+  const groundedContext = buildGroundedContext(sources);
   const activeModelId =
     (typeof localStorage !== "undefined" &&
       localStorage.getItem("const_learn_active_model")) ||
@@ -241,17 +244,28 @@ export async function synthesizeVideoSummaryPrompt(
   const systemPrompt = `You are Const Learn AI Video Director & Prompt Architect.
 Your task is to take the user's video summary options and study sources, and synthesize an optimal, strict, and direct execution prompt to run in an isolated SideChat harness.
 Guidelines:
-1. Always begin with skill triggers: /hyperframes-core /hyperframes-creative /hyperframes-animation /hyperframes-audio
-2. Enforce a direct, non-looping execution pipeline using available tools (write, python, run_command):
-   - Step 1: Write structured scenes with storyboard and narration scripts based on the study sources.
-   - Step 2: Generate narration audio for each scene using Inworld TTS API (model: ${voiceModel}, voice: ${voiceName}, lang: ${effectiveAudioLang}, speed: ${speed}x, delivery: ${deliveryMode}). Write a python script or call Inworld API directly to produce MP3 audio tracks.
-   - Step 3: Compose and render video scenes into high quality 60fps MP4 using ffmpeg or python moviepy.
-   - Step 4: Save the final compiled video directly to '${targetMp4FullPath}'.
-   - Step 5: Output the completion summary with the absolute file path '${targetMp4FullPath}'.
+1. Always begin with skill triggers: /hyperframes /faceless-explainer /hyperframes-core /hyperframes-creative /hyperframes-animation /hyperframes-audio /hyperframes-cli
+2. Enforce a direct, non-looping HyperFrames execution pipeline using available tools (write, run_command, generate_speech, generate_image):
+   - Step 1: Read 'sources.md' in workspace for complete study material and source grounding.
+   - Step 2: Write structured scenes with storyboard and narration scripts based strictly on the study sources (following the /faceless-explainer workflow: invent kinetic typography, data charts, glass cards, and crisp narrative beats).
+   - Step 3: Generate narration audio for each scene by invoking the native tool call 'generate_speech' (e.g. text: "narration text...", output_path: "audio/scene_1.mp3", voice: "${voiceName}", model: "${voiceModel}", speed: ${speed}). For any visual diagrams or scene hero art, invoke 'generate_image' (e.g. output_path: "images/bg_scene_1.png"). DO NOT write custom Python scripts for TTS, and DO NOT try to import 'inworld_tts'.
+   - Step 4: Write 'index.html' adhering strictly to the official HyperFrames specification:
+     * Valid HTML5 with <meta name="viewport" content="width=1920, height=1080" /> and GSAP script tag (https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js).
+     * Root container: <div id="root" data-composition-id="main" data-start="0" data-duration="<totalDurationSeconds>" data-width="1920" data-height="1080">
+     * Each scene inside #root: <section id="scene-N" class="clip" data-start="<start>" data-duration="<duration>" data-track-index="1">
+     * Aesthetic: Faceless Explainer modern dark theme (#060913 canvas, #0f172a / #1e293b glass cards, crisp typography, accent color badges, stat highlights, subtitles).
+     * Paused GSAP timeline: const tl = gsap.timeline({ paused: true }); registered to window.__timelines = window.__timelines || {}; window.__timelines.main = tl; window.__timelines.root = tl; with fluid seekable animations.
+     * Include scene audio: <audio id="audio-N" src="audio/scene_N.mp3" data-start="..." data-duration="..." data-media-start="0"></audio>
+   - Step 5: Render the final video directly via the official HyperFrames CLI using 'run_command':
+     Command: npx --yes hyperframes render . -o "${targetMp4FullPath}"
+   - Step 6: Output the completion summary with the absolute file path '${targetMp4FullPath}'.
 3. STRICT CRITICAL RULES:
+   - "DO NOT write Python scripts (NO PIL, NO matplotlib, NO build_all_frames.py, NO render_complete_video.py, NO generate_tts.py). You MUST author the video as a HyperFrames HTML composition in 'index.html'."
+   - "DO NOT manually call raw ffmpeg commands to stitch static PNGs. Video rendering must be performed by running 'npx --yes hyperframes render . -o \\"${targetMp4FullPath}\\"' via run_command."
    - "DO NOT invoke the 'create_studio_artifact' tool. Video summaries must NOT be created via create_studio_artifact."
    - "DO NOT get stuck in repetitive planning loops."
-   - "Directly invoke write, python, and run_command tools to generate the audio, video, and final MP4 file."
+   - "The workspace contains 'sources.md' with complete source texts. Ground all scenes and narration strictly on those sources."
+   - "Directly invoke write, generate_speech, generate_image, and run_command tools to produce the audio, video composition, and final MP4 file."
 4. Language: ${isIndo ? "Indonesian (Bahasa Indonesia)" : "English"}.
 5. Output ONLY the finalized prompt ready to execute. No conversational intro.`;
 
@@ -261,7 +275,8 @@ Guidelines:
 - Voice: Inworld TTS (${voiceName}, ${voiceModel}, ${effectiveAudioLang}, speed: ${speed}x, delivery: ${deliveryMode})
 - Target Output MP4 Path: ${targetMp4FullPath}
 - User Guidance: ${customInstructions?.trim() || "None"}
-- Sources: ${sources.map((s) => s.title).join(", ")}`;
+- Sources: ${sources.map((s) => s.title).join(", ")}
+- Brief Context Sample: ${groundedContext.formattedContext.slice(0, 3000)}`;
 
   let aiResult = "";
   const controller = new AbortController();
@@ -299,8 +314,11 @@ Guidelines:
   }
 
   let sanitized = trimmed;
-  if (!sanitized.includes("/hyperframes-core")) {
-    sanitized = `/hyperframes-core /hyperframes-creative /hyperframes-animation /hyperframes-audio\n\n${sanitized}`;
+  if (
+    !sanitized.includes("/faceless-explainer") &&
+    !sanitized.includes("/hyperframes-core")
+  ) {
+    sanitized = `/hyperframes /faceless-explainer /hyperframes-core /hyperframes-creative /hyperframes-animation /hyperframes-audio /hyperframes-cli\n\n${sanitized}`;
   }
   return sanitized;
 }

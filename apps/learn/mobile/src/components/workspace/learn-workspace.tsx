@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource } from "../../lib/db";
+import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource, type VideoSummaryData } from "../../lib/db";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
 import { buildGroundedSystemPrompt } from "../../lib/grounding/grounding-prompt";
 import { formatSkillsSystemPrompt } from "../../lib/skills/skills-service";
@@ -22,6 +22,9 @@ import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
 import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
 import { CreatePresentationSheet } from "./create-presentation-sheet";
+import { CreateVideoSummarySheet } from "./create-video-summary-sheet";
+import { MobileSideChatSheet, type MobileSideChatSession } from "./mobile-side-chat-sheet";
+import { VideoSummarySheet } from "./video-summary-sheet";
 import { CreateInfographicSheet } from "./create-infographic-sheet";
 import { CreateReportSheet } from "./create-report-sheet";
 import { CreateCheatSheetSheet } from "./create-cheatsheet-sheet";
@@ -448,6 +451,12 @@ export function MobileLearnWorkspace({
   const [isCreateReportSheetOpen, setIsCreateReportSheetOpen] = useState(false);
   const [isCreateCheatSheetOpen, setIsCreateCheatSheetOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
+  const [isCreateVideoSummaryOpen, setIsCreateVideoSummaryOpen] = useState(false);
+  const [activeSideChatSession, setActiveSideChatSession] = useState<MobileSideChatSession | null>(null);
+  const [isSideChatOpen, setIsSideChatOpen] = useState(false);
+  const [activeVideoSummaryData, setActiveVideoSummaryData] = useState<VideoSummaryData | null>(null);
+  const [isVideoPlayerOpen, setIsVideoPlayerOpen] = useState(false);
+  const sideChatAbortControllerRef = useRef<AbortController | null>(null);
   const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
   const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
@@ -1703,6 +1712,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreatePresentationOpen(true);
       return;
     }
+    if (toolId === "video_summary" || toolId === "video") {
+      setIsCreateVideoSummaryOpen(true);
+      return;
+    }
     // Other tools: strictly no-op as requested
     return;
   };
@@ -2103,8 +2116,535 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     }
   };
 
+  const handleGenerateVideoSummary = async (options: {
+    selectedSourceIds: string[];
+    coverageMode: "auto" | "long";
+    language: "id" | "en";
+    audioLanguage: string;
+    voiceProviderId: string;
+    voiceModel: string;
+    voiceId: string;
+    voiceName: string;
+    deliveryMode?: string;
+    speed?: number;
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      options.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) {
+      toast.error(
+        language === "id"
+          ? "Pilih minimal satu sumber pembelajaran."
+          : "Please select at least one source."
+      );
+      return;
+    }
+
+    const isIndo = language === "id";
+    const primaryTitle =
+      selectedSources[0]?.title || (isIndo ? "Materi Pembelajaran" : "Study Material");
+
+    const sceneCountDesc =
+      options.coverageMode === "long"
+        ? isIndo
+          ? "7-10 Scene (Mendalam & Komprehensif)"
+          : "7-10 Scenes (In-Depth & Comprehensive)"
+        : isIndo
+        ? "4-7 Scene (Adaptif & Seimbang)"
+        : "4-7 Scenes (Adaptive & Balanced)";
+
+    // Grounding: extract complete sources context
+    const grounded = buildGroundedContext(selectedSources);
+
+    // Create artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: `${isIndo ? "Video: " : "Video: "}${primaryTitle}`,
+      type: "video_summary",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+      data: {
+        title: primaryTitle,
+        coverageMode: options.coverageMode,
+        language: options.language,
+        voiceModel: options.voiceModel,
+        voiceId: options.voiceId,
+        voiceName: options.voiceName,
+        totalDurationSeconds: 0,
+        scenes: [],
+        sourceIds: options.selectedSourceIds,
+        sourceTitles: selectedSources.map((s) => s.title),
+        customInstructions: options.customInstructions,
+      },
+    });
+
+    const executionPrompt = `/hyperframes-core /hyperframes-creative /hyperframes-animation /hyperframes-audio
+
+Create an educational narrative Video Summary on the topic: "${primaryTitle}".
+Target Coverage: ${sceneCountDesc}.
+Voice Persona: Inworld TTS (${options.voiceName}, ${options.voiceModel}, speed ${options.speed || 1.0}x).
+User Guidance: ${options.customInstructions?.trim() || "Ground all narration and facts strictly on the study sources."}
+
+STUDY SOURCES CONTENT:
+${grounded.formattedContext}`;
+
+    const initialSession: MobileSideChatSession = {
+      id: artId,
+      role: "video_summary",
+      title: `${isIndo ? "Video: " : "Video: "}${primaryTitle}`,
+      prompt: executionPrompt,
+      status: "running",
+      startTime: Date.now(),
+      traceSteps: [],
+      toolCalls: [],
+      content: "",
+      videoData: {
+        id: artId,
+        learnId,
+        title: primaryTitle,
+        coverageMode: options.coverageMode,
+        language: options.language,
+        voiceModel: options.voiceModel,
+        voiceId: options.voiceId,
+        voiceName: options.voiceName,
+        totalDurationSeconds: 0,
+        scenes: [],
+        sourceIds: options.selectedSourceIds,
+        sourceTitles: selectedSources.map((s) => s.title),
+        customInstructions: options.customInstructions,
+      },
+    };
+
+    setActiveSideChatSession(initialSession);
+    setSelectedReaderArtifact({
+      id: artId,
+      learnId,
+      title: `${isIndo ? "Video: " : "Video: "}${primaryTitle}`,
+      type: "video_summary",
+      status: "generating",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sourcesCount: selectedSources.length,
+      content: "",
+      data: initialSession.videoData,
+    });
+    setIsSideChatOpen(true);
+    setIsStudioSheetOpen(false);
+
+    // Abort controller
+    if (sideChatAbortControllerRef.current) {
+      sideChatAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    sideChatAbortControllerRef.current = controller;
+
+    const activeModel =
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("const_learn_active_model")) ||
+      "gemini-3.8-flash";
+
+    const systemPrompt = `You are Const Learn AI Video Director & Producer.
+Your goal is to synthesize a high-impact narrative educational Video Summary based strictly on the provided study sources.
+EXECUTION WORKFLOW:
+1. Grounding: Study the provided sources thoroughly. Do NOT invent facts not present in the sources.
+2. Structure: Break down into clear, engaging scenes (${sceneCountDesc}). Each scene must have:
+   - A descriptive scene title
+   - Concise visual description
+   - Clear narration script
+3. Tool Execution:
+   - For every scene's narration, invoke 'generate_speech' (text: narration script, voice: "${options.voiceName}", model: "${options.voiceModel}", speed: ${options.speed || 1.0}).
+   - For any important diagram, chart, or visual artwork, invoke 'generate_image'.
+   - DO NOT write python scripts for TTS. Always use the native tool 'generate_speech'.
+4. Output: Present a structured storyboard summary of each scene, mentioning the generated audio and visual assets.
+Language: ${isIndo ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
+
+    try {
+      await streamChatCompletion({
+        model: activeModel,
+        systemPrompt,
+        messages: [{ role: "user", content: executionPrompt }],
+        signal: controller.signal,
+        onThinking: (chunk) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            const updatedThinking = (prev.thinking || "") + chunk;
+            return {
+              ...prev,
+              thinking: updatedThinking,
+              traceSteps: [
+                {
+                  id: "thought_step",
+                  type: "thought",
+                  content: updatedThinking,
+                  startTime: prev.startTime,
+                },
+                ...prev.traceSteps.filter((s) => s.type !== "thought"),
+              ],
+            };
+          });
+        },
+        onToolCallStart: (toolCall) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            const tcItem = {
+              id: toolCall.id,
+              name: toolCall.name,
+              args: toolCall.args,
+              status: "running" as const,
+            };
+            const updatedTools = [
+              ...prev.toolCalls.filter((tc) => tc.id !== toolCall.id),
+              tcItem,
+            ];
+            const updatedSteps = [
+              ...prev.traceSteps.filter((s) => s.id !== toolCall.id),
+              {
+                id: toolCall.id,
+                type: "tool" as const,
+                name: toolCall.name,
+                args: toolCall.args,
+                status: "running" as const,
+                startTime: Date.now(),
+              },
+            ];
+            return {
+              ...prev,
+              toolCalls: updatedTools,
+              traceSteps: updatedSteps,
+            };
+          });
+        },
+        onToolCallResult: (toolCall) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            const updatedTools = prev.toolCalls.map((tc) =>
+              tc.id === toolCall.id
+                ? {
+                    ...tc,
+                    result: toolCall.result,
+                    isError: toolCall.isError,
+                    durationMs: toolCall.durationMs,
+                    status: toolCall.isError ? ("error" as const) : ("completed" as const),
+                  }
+                : tc
+            );
+            const updatedSteps = prev.traceSteps.map((s) =>
+              s.id === toolCall.id
+                ? {
+                    ...s,
+                    result: toolCall.result,
+                    isError: toolCall.isError,
+                    durationMs: toolCall.durationMs,
+                    status: toolCall.isError ? ("error" as const) : ("completed" as const),
+                  }
+                : s
+            );
+            return {
+              ...prev,
+              toolCalls: updatedTools,
+              traceSteps: updatedSteps,
+            };
+          });
+        },
+        onToken: (token) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              content: prev.content + token,
+            };
+          });
+        },
+        onDone: async (finalContent, finalThinking, toolCalls) => {
+          const speechTools = (toolCalls || []).filter(
+            (tc) => tc.name === "generate_speech" && !tc.isError
+          );
+          const imageTools = (toolCalls || []).filter(
+            (tc) => tc.name === "generate_image" && !tc.isError
+          );
+
+          const constructedScenes: any[] = [];
+          if (speechTools.length > 0) {
+            speechTools.forEach((st, idx) => {
+              let resObj: any = {};
+              try {
+                resObj = typeof st.result === "string" ? JSON.parse(st.result) : st.result || {};
+              } catch {}
+              const matchingImg = imageTools[idx];
+              let imgObj: any = {};
+              if (matchingImg) {
+                try {
+                  imgObj =
+                    typeof matchingImg.result === "string"
+                      ? JSON.parse(matchingImg.result)
+                      : matchingImg.result || {};
+                } catch {}
+              }
+
+              constructedScenes.push({
+                sceneNumber: idx + 1,
+                title: `Scene ${idx + 1}`,
+                narration: st.args?.text || "",
+                audioUrl: resObj.audioUrl,
+                audioBase64: resObj.audioBase64,
+                imageUrl: imgObj.imageUrl,
+                durationSeconds: Math.max(4, Math.round((st.args?.text?.length || 50) / 15)),
+              });
+            });
+          } else {
+            constructedScenes.push(
+              {
+                sceneNumber: 1,
+                title: "Pengantar Materi",
+                narration: `Pembahasan materi ${primaryTitle}`,
+                durationSeconds: 5,
+              },
+              {
+                sceneNumber: 2,
+                title: "Konsep Inti",
+                narration: "Penjelasan mendalam mengenai konsep utama",
+                durationSeconds: 6,
+              },
+              {
+                sceneNumber: 3,
+                title: "Penerapan & Analisis",
+                narration: "Contoh penerapan dan implikasi konsep",
+                durationSeconds: 6,
+              },
+              {
+                sceneNumber: 4,
+                title: "Kesimpulan & Rangkuman",
+                narration: "Rangkuman poin penting dan takeaways",
+                durationSeconds: 5,
+              }
+            );
+          }
+
+          const totalDuration = constructedScenes.reduce(
+            (acc, s) => acc + (s.durationSeconds || 5),
+            0
+          );
+
+          const finalizedVideoData: VideoSummaryData = {
+            id: artId,
+            learnId,
+            title: primaryTitle,
+            coverageMode: options.coverageMode,
+            language: options.language,
+            voiceModel: options.voiceModel,
+            voiceId: options.voiceId,
+            voiceName: options.voiceName,
+            totalDurationSeconds: totalDuration,
+            scenes: constructedScenes,
+            sourceIds: options.selectedSourceIds,
+            sourceTitles: selectedSources.map((s) => s.title),
+            customInstructions: options.customInstructions,
+            renderingStatus: "completed",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+
+          const completedSession: MobileSideChatSession = {
+            id: artId,
+            role: "video_summary",
+            title: `${isIndo ? "Video: " : "Video: "}${primaryTitle}`,
+            prompt: executionPrompt,
+            status: "completed",
+            startTime: initialSession.startTime,
+            endTime: Date.now(),
+            durationMs: Date.now() - initialSession.startTime,
+            thinking: finalThinking,
+            traceSteps: initialSession.traceSteps,
+            toolCalls: toolCalls || [],
+            content: finalContent,
+            videoData: finalizedVideoData,
+          };
+
+          setActiveSideChatSession(completedSession);
+
+          await localDb.updateArtifact(artId, {
+            title: `${isIndo ? "Video: " : "Video: "}${primaryTitle}`,
+            status: "completed",
+            content: finalContent,
+            data: {
+              ...finalizedVideoData,
+              sideChat: completedSession,
+            },
+          });
+
+          toast.success(
+            isIndo
+              ? "Ringkasan Video berhasil dibuat! Klik Putar Video untuk menonton."
+              : "Video Summary created successfully! Click Play Video to watch."
+          );
+        },
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.error("[MobileVideoSummary] Generation failed:", err);
+      const errMsg = err?.message || "Failed to generate video summary";
+      setActiveSideChatSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "failed",
+              endTime: Date.now(),
+              error: errMsg,
+            }
+          : null
+      );
+      await localDb.updateArtifact(artId, {
+        status: "error",
+        error: errMsg,
+      });
+      toast.error(errMsg);
+    }
+  };
+
+  const handleSideChatSendMessage = async (userText: string) => {
+    if (!activeSideChatSession) return;
+    const session = activeSideChatSession;
+    const isIndo = language === "id";
+
+    const updatedContent = session.content
+      ? `${session.content}\n\n**User:** ${userText}\n\n`
+      : `**User:** ${userText}\n\n`;
+
+    setActiveSideChatSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: "running",
+            content: updatedContent,
+          }
+        : null
+    );
+
+    const controller = new AbortController();
+    sideChatAbortControllerRef.current = controller;
+
+    const activeModel =
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("const_learn_active_model")) ||
+      "gemini-3.8-flash";
+
+    const systemPrompt = `You are Const Learn AI Video Director assisting the user in refining their Video Summary.
+The user may ask to change voice characters, regenerate narration audio using 'generate_speech', create new images using 'generate_image', or adjust scenes.
+Always invoke the native tool calls 'generate_speech' and 'generate_image' whenever audio or visual assets are requested.
+Read the user's stored API keys and endpoints automatically; do NOT ask the user for API keys.
+Language: ${isIndo ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
+
+    try {
+      await streamChatCompletion({
+        model: activeModel,
+        systemPrompt,
+        messages: [
+          { role: "user", content: session.prompt },
+          { role: "assistant", content: session.content },
+          { role: "user", content: userText },
+        ],
+        signal: controller.signal,
+        onThinking: (chunk) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              thinking: (prev.thinking || "") + chunk,
+            };
+          });
+        },
+        onToolCallStart: (toolCall) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              toolCalls: [
+                ...prev.toolCalls.filter((tc) => tc.id !== toolCall.id),
+                {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  args: toolCall.args,
+                  status: "running" as const,
+                },
+              ],
+            };
+          });
+        },
+        onToolCallResult: (toolCall) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              toolCalls: prev.toolCalls.map((tc) =>
+                tc.id === toolCall.id
+                  ? {
+                      ...tc,
+                      result: toolCall.result,
+                      isError: toolCall.isError,
+                      durationMs: toolCall.durationMs,
+                      status: toolCall.isError ? ("error" as const) : ("completed" as const),
+                    }
+                  : tc
+              ),
+            };
+          });
+        },
+        onToken: (token) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              content: prev.content + token,
+            };
+          });
+        },
+        onDone: async (finalContent) => {
+          setActiveSideChatSession((prev) => {
+            if (!prev) return prev;
+            const updatedSession = {
+              ...prev,
+              status: "completed" as const,
+              content: finalContent,
+            };
+            if (prev.id) {
+              localDb
+                .updateArtifact(prev.id, {
+                  content: finalContent,
+                  data: {
+                    ...((prev.videoData as any) || {}),
+                    sideChat: updatedSession,
+                  },
+                })
+                .catch(() => {});
+            }
+            return updatedSession;
+          });
+        },
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      toast.error(err?.message || "Failed to continue side chat");
+    }
+  };
+
   const handleOpenArtifactReader = (art: LocalArtifact) => {
     setIsStudioSheetOpen(false);
+    if (art.type === "video_summary" || art.type === "video") {
+      const sideChatData = art.data?.sideChat as MobileSideChatSession | undefined;
+      const scenes = art.data?.scenes;
+      if (sideChatData || art.status === "generating" || !scenes || scenes.length === 0) {
+        setSelectedReaderArtifact(art);
+        if (sideChatData) {
+          setActiveSideChatSession(sideChatData);
+        }
+        setIsSideChatOpen(true);
+        return;
+      }
+    }
     setSelectedReaderArtifact(art);
     setIsReaderOpen(true);
   };
@@ -3294,6 +3834,51 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGeneratePresentation}
       />
+
+      {/* Create Video Summary Bottom Sheet */}
+      <CreateVideoSummarySheet
+        open={isCreateVideoSummaryOpen}
+        onClose={() => setIsCreateVideoSummaryOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateVideoSummary}
+        onOpenSettings={() => {
+          setModelSelectionCategory("voice");
+          setIsModelSelectionSheetOpen(true);
+        }}
+      />
+
+      {/* Full-Screen Mobile SideChat Sheet */}
+      <MobileSideChatSheet
+        open={isSideChatOpen}
+        onClose={() => setIsSideChatOpen(false)}
+        artifact={selectedReaderArtifact}
+        activeSession={activeSideChatSession}
+        onSendMessage={handleSideChatSendMessage}
+        onStopAgent={() => {
+          if (sideChatAbortControllerRef.current) {
+            sideChatAbortControllerRef.current.abort();
+            sideChatAbortControllerRef.current = null;
+          }
+          setActiveSideChatSession((prev) =>
+            prev ? { ...prev, status: "cancelled", endTime: Date.now() } : null
+          );
+        }}
+        onOpenVideoPlayer={(videoData) => {
+          setActiveVideoSummaryData(videoData);
+          setIsVideoPlayerOpen(true);
+        }}
+        onOpenBrowser={handleOpenBrowser}
+      />
+
+      {/* Video Summary Player Sheet */}
+      {activeVideoSummaryData && (
+        <VideoSummarySheet
+          open={isVideoPlayerOpen}
+          onClose={() => setIsVideoPlayerOpen(false)}
+          data={activeVideoSummaryData}
+          onExplainInChat={handleExplainInChat}
+        />
+      )}
 
       {/* Interactive Full-Screen Reader Overlay */}
       <MobileArtifactReader

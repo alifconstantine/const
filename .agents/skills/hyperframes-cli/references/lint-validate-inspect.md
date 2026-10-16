@@ -30,7 +30,7 @@ Lints `index.html` and all files in `compositions/`. Reports errors (must fix), 
 ```bash
 npx hyperframes check                    # current directory: the full browser gate
 npx hyperframes check ./my-project       # specific project
-npx hyperframes check --json             # agent-readable envelope {ok, lint, runtime, layout, motion, contrast, hdr, snapshots}
+npx hyperframes check --json             # agent-readable envelope {ok, browserSkipped, lint, runtime, layout, motion, contrast, hdr, snapshots}
 npx hyperframes check --snapshots        # also write overview frames (annotated) + per-finding crops
 npx hyperframes check --samples 15       # denser timeline sweep (default 9)
 npx hyperframes check --at 1.5,4,7.25    # explicit hero-frame timestamps
@@ -41,16 +41,16 @@ npx hyperframes check --no-contrast      # skip the WCAG audit while iterating
 npx hyperframes check --strict           # exit non-zero on warnings too (default: only errors)
 ```
 
-One command, one Chrome boot. `check` runs the linter first and skips the browser entirely when lint reports errors. Then it loads the bundled composition once, wires runtime listeners before navigation, and sweeps one seek grid running every audit per sample:
+One command, one Chrome boot. `check` runs the linter first and skips the browser entirely when lint reports errors. When the browser never ran (lint errors, a linter crash, or a browser launch failure), `browserSkipped` is `true` and the `layout`, `motion` and `contrast` sections are empty, not clean. Otherwise it loads the bundled composition once, wires runtime listeners before navigation, and sweeps one seek grid running every audit per sample:
 
 - **Runtime**: JavaScript console errors, unhandled exceptions, failed network requests (media-file `ERR_ABORTED` filtered out), HTTP 4xx/5xx.
-- **Layout**: text extending outside its container or the canvas, text clipped by its own box, held text overlaps and occlusion (with an approximate covered fraction), children escaping clipping containers.
+- **Layout**: text extending outside its container or the canvas, text clipped by its own box, held text overlaps and occlusion (with an approximate covered fraction), children escaping clipping containers. Text under a transparent `<video>` (a `remove-background` cutout) is measured per word against the frame's alpha: partial cover is info with the share hidden, a word 80% hidden or two neighbouring words each half hidden is an error, and a frame that cannot be read falls back to opaque with a `video_alpha_unread` note.
 - **Motion**: `*.motion.json` sidecar assertions against the same seeked timeline (see below).
 - **Contrast**: WCAG AA on visible text, sampled at 5 grid points. Failures are **errors** and each finding carries the sampled fg/bg colors, measured vs required ratio, and a suggested compliant color in the same palette direction, so most contrast fixes need no screenshot at all.
 
 Every finding carries a selector, the element's `data-*` identity, the composition source file, a bbox, and the sample time: jump straight from the JSON to the HTML you must edit and re-run.
 
-**Severity is persistence-aware.** A dynamic issue observed at a single grid sample (an entrance/exit transient) demotes to info and never gates. Issues held across samples gate the exit code, a held `content_overlap` is an error, and a held, partially-visible `canvas_overflow` breaching ≥5% of the canvas promotes to warning. Coordinate-frame findings (`escaped_container`, `panel_out_of_canvas`, `connector_detached`) flag geometry computed in one frame but rendered in another — an element far outside its offset parent, a painted panel stuck across the canvas edge, a connector line detached from every node. If a 3s+ composition shows zero geometry change across every sample, `check` fails with `sweep_static`: a frozen timeline makes every green verdict unreliable, so it refuses to pass. The fingerprint includes per-element opacity, so opacity-only reveals (code typing, staggered fades) count as motion — but only while they're still in flight at the sampled times. The classic trap is a reveal that completes early and then holds a static frame for the rest of the duration: every sample lands on the settled state and the run fails. Spread the reveal across the timeline or keep one continuously animated element alive (a blinking caret is idiomatic for code typing) — don't bolt on a slow position drift just to appease the check.
+**Severity is persistence-aware.** A dynamic issue observed at a single grid sample (an entrance/exit transient) demotes to info and never gates. Issues held across samples gate the exit code, a held `content_overlap` is an error, and a held, partially-visible `canvas_overflow` breaching ≥5% of the canvas promotes to warning. Coordinate-frame findings (`escaped_container`, `panel_out_of_canvas`, `connector_detached`) flag geometry computed in one frame but rendered in another — an element far outside its offset parent, a painted panel stuck across the canvas edge, a connector line detached from every node. Text drawn into a `<canvas>` has no DOM box, so `canvas_overflow` cannot see it; `canvas_content_at_edge` warns when a canvas's pixels show sharp content (drawn text, hard shapes) along the frame edge — mark intentional full-bleed art (particles, photos) with `data-layout-allow-overflow`. If a 3s+ composition shows no visible change across every sample, `check` fails with `sweep_static`: a frame that never changes while a GSAP timeline or tween, or a CSS or Web animation, holds the same time without ever finishing means the seek is not driving the page, so it refuses to pass. Any other frame that never changes (a still title card, an audio-only advance) is a warning that `--strict` fails; a composition meant to be still can take `data-no-timeline` on its root to skip it. The fingerprint includes per-element opacity, so opacity-only reveals (code typing, staggered fades) count as motion — but only while they're still in flight at the sampled times. The classic trap is a reveal that completes early and then holds a static frame for the rest of the duration: every sample lands on the settled state and check warns that nothing on screen moved (`--strict` fails it). Spread the reveal across the timeline or keep one continuously animated element alive (a blinking caret is idiomatic for code typing) — don't bolt on a slow position drift just to appease the check.
 
 **Escape hatches** (mark intent in the HTML, then re-run):
 
@@ -104,9 +104,21 @@ Drop a `*.motion.json` sidecar next to the composition (matching the html basena
 npx hyperframes snapshot                       # 5 key frames as PNG
 npx hyperframes snapshot ./my-project          # specific project
 npx hyperframes snapshot --frames 10           # evenly-spaced N frames
+npx hyperframes snapshot --range 3:5 --frames 8 # 8 frames within root-timeline seconds 3–5
+npx hyperframes snapshot --composition intro --frames 8 # 8 frames within this data-composition-id
 ```
 
-Captures still PNGs from the composition for visual diffing, thumbnails, or attaching to a PR. Faster than rendering a video when you only need a few hero frames. Output lands in the project's snapshots directory. Not deprecated: it remains the standalone capture utility, while `check --snapshots` covers the gate's needs (overview frames annotated with labeled finding boxes, plus `finding-NN-<code>.png` crops for every error finding with a bbox).
+Still PNGs. Each run writes `.hyperframes/artifacts/snapshots/<id>/` unless `--output` is set. `snapshot` is the standalone capture; `check --snapshots` is the gate.
+
+One of `--at`, `--range START:END` (seconds), or `--composition <data-composition-id>` (not a CSS selector). `--frames` defaults to 5. Range and composition sample just before the end and add no extra end frame; `--at` adds one unless `--no-end`.
+
+### Keep verification clean and inspect the actual pixels
+
+Inspect full-resolution frames in the opening 30 seconds, each mounted scene, and every reported problem interval. Contact sheets locate moments; use close-ups to judge thin edges, glass, particles, and WebGL geometry. Check the live preview and decoded render at matching times. Canvas shader defects can survive a successful DOM/layout audit. Record the browser/GPU and capture path when results differ across machines; isolate the failing material or pass before changing rendering defaults.
+
+Managed snapshot storage keeps the newest 10 run folders, the newest evidence for the current revision and retained rendered revisions, and the latest snapshot. Live captures and folders younger than 24 hours are also preserved. Automatic cleanup removes whole eligible old UUID folders, including contact sheets and descriptions; arbitrary `--output` folders are untouched. Save intentional before/after evidence outside this managed storage.
+
+For disposable checks, allocate a temporary output folder and remove that folder after inspecting it. Use `hyperframes clean --dry-run` to inspect broader cleanup. `clean --snapshots` explicitly discards snapshot evidence; use it only when that evidence is no longer needed. Never recommend removing all of `.hyperframes`, which also contains project history and other state.
 
 ### Zooming into a reported finding
 

@@ -58,6 +58,10 @@ export interface ExecuteToolOptions {
   onSourceCreated?: (source: any) => void;
   onArtifactCreated?: (artifact: any) => void;
   browserHandler?: BrowserToolHandler;
+  voiceConfig?: any;
+  imageConfig?: any;
+  speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
+  imageHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
 }
 
 export type BrowserToolHandler = (
@@ -791,11 +795,101 @@ export const REFLECT_TOOL: NativeToolDefinition = {
 };
 
 // ---------------------------------------------------------------------------
+// Speech & Image Generation Tool Definitions (TTS & Visual Synthesis)
+// ---------------------------------------------------------------------------
+
+export const GENERATE_SPEECH_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "generate_speech",
+    description:
+      "Generate high-fidelity speech audio (TTS) from text using the user's configured voice engine (Inworld AI, OpenAI TTS, or custom speech model). Saves the output audio file (.mp3) directly into the workspace. By default, uses the user's active voice and model settings, but voice, model, speed, delivery, and language can be customized conversationally.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The text or narration script to synthesize into spoken audio.",
+        },
+        output_path: {
+          type: "string",
+          description:
+            "Relative workspace path to save the generated audio file (e.g. 'audio/scene_1.mp3', 'narration.mp3').",
+        },
+        voice: {
+          type: "string",
+          description:
+            "Optional voice name or ID override (e.g. 'Ashley', 'Dennis', 'Hektor', 'Olivia', 'alloy', 'echo'). Defaults to user's active voice setting.",
+        },
+        model: {
+          type: "string",
+          description:
+            "Optional speech model ID override (e.g. 'inworld-tts-2', 'inworld-tts-2-flash', 'tts-1', 'tts-1-hd'). Defaults to user's active model setting.",
+        },
+        speed: {
+          type: "number",
+          description: "Speaking rate multiplier (e.g. 1.0 for normal, 1.1 for slightly faster).",
+        },
+        delivery: {
+          type: "string",
+          description:
+            "Optional delivery style or emotion for Inworld TTS (e.g. 'NEUTRAL', 'HAPPY', 'SERIOUS', 'EXCITED', 'BALANCED').",
+        },
+        language: {
+          type: "string",
+          description: "Optional language code (e.g. 'id-ID', 'en-US', 'ja-JP').",
+        },
+      },
+      required: ["text", "output_path"],
+    },
+  },
+};
+
+export const GENERATE_IMAGE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "generate_image",
+    description:
+      "Generate an illustration, educational diagram visual, or scene artwork from a descriptive prompt using the user's configured image generation model (e.g. FLUX, Stable Diffusion, DALL-E). Saves the output image (.png) directly into the workspace. Defaults to user's active image model and endpoint settings, but model and aspect ratio can be customized.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Detailed descriptive prompt for the image to generate.",
+        },
+        output_path: {
+          type: "string",
+          description:
+            "Relative workspace path to save the generated image file (e.g. 'images/diagram.png', 'assets/hero.png').",
+        },
+        aspect_ratio: {
+          type: "string",
+          enum: ["16:9", "1:1", "9:16", "4:3", "3:4"],
+          description: "Aspect ratio for the generated image (default: '16:9').",
+        },
+        size: {
+          type: "string",
+          description: "Optional explicit image dimensions (e.g. '1024x1024', '1792x1024', '1024x1792').",
+        },
+        model: {
+          type: "string",
+          description: "Optional image generation model ID override. Defaults to user's active image model.",
+        },
+      },
+      required: ["prompt", "output_path"],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Native Tool Definitions (Pi Standard 4 Core Tools + Aliases)
 // ---------------------------------------------------------------------------
 
 export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
   ...NATIVE_BROWSER_TOOLS,
+  GENERATE_SPEECH_TOOL,
+  GENERATE_IMAGE_TOOL,
   {
     type: "function",
     function: {
@@ -2250,6 +2344,8 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
   RETAIN_TOOL,
   RECALL_TOOL,
   REFLECT_TOOL,
+  GENERATE_SPEECH_TOOL,
+  GENERATE_IMAGE_TOOL,
   ...NATIVE_BROWSER_TOOLS,
 ];
 
@@ -6639,6 +6735,335 @@ export async function executeNativeTool(
     }
 
     // -----------------------------------------------------------------------
+    // Tool: generate_speech (TTS speech generation)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "generatespeech" ||
+      normalizedTool === "tts" ||
+      normalizedTool === "texttospeech" ||
+      normalizedTool === "speech"
+    ) {
+      if (options.speechHandler) {
+        return await options.speechHandler(args, workspacePath);
+      }
+
+      const text = String(
+        args.text || args.input || args.content || args.script || args.narration || ""
+      ).trim();
+      if (!text) {
+        return {
+          result: "Error: Missing 'text' parameter for generate_speech.",
+          isError: true,
+        };
+      }
+
+      const rawOutputPath = String(
+        args.output_path || args.outputPath || args.path || args.filename || `audio/speech_${Date.now()}.mp3`
+      ).trim();
+      const destPath = resolveSafePath(rawOutputPath, workspacePath);
+      await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+      const voiceCfg = options.voiceConfig || {};
+      const protocol = voiceCfg.protocol || (voiceCfg.baseUrl?.includes("inworld") ? "inworld" : "inworld");
+      const model = String(args.model || voiceCfg.model || "inworld-tts-2");
+      const voice = String(args.voice || args.speaker || voiceCfg.voice || voiceCfg.voiceName || "Ashley");
+      const speed = typeof args.speed === "number" ? args.speed : (voiceCfg.speed || 1.0);
+
+      let audioBuffer: Buffer | null = null;
+      let lastError = "";
+
+      if (protocol === "inworld") {
+        const apiKey = (voiceCfg.apiKey || process.env.INWORLD_API_KEY || "").trim();
+        if (!apiKey) {
+          return {
+            result:
+              "Error: Inworld API key is not configured. Please configure your Inworld API key in Settings > Models > Voice.",
+            isError: true,
+          };
+        }
+
+        let authHeader = apiKey;
+        if (authHeader.toLowerCase().startsWith("bearer ")) {
+          authHeader = `Basic ${authHeader.slice(7).trim()}`;
+        } else if (!authHeader.toLowerCase().startsWith("basic ")) {
+          if (authHeader.includes(":") && !authHeader.includes(" ")) {
+            authHeader = `Basic ${Buffer.from(authHeader).toString("base64")}`;
+          } else {
+            authHeader = `Basic ${authHeader}`;
+          }
+        }
+
+        // Try primary Inworld endpoint
+        try {
+          const res = await fetch("https://api.inworld.ai/tts/v1/voice", {
+            method: "POST",
+            headers: {
+              Authorization: authHeader,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text,
+              voiceId: voice,
+              modelId: model,
+              audioConfig: { audioEncoding: "MP3" },
+            }),
+          });
+
+          if (res.ok) {
+            const contentType = res.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+              const json: any = await res.json();
+              const b64 = json.audioContent || json.audio_content || json.audio;
+              if (b64) {
+                const cleanB64 = b64.includes(",") ? b64.split(",")[1]! : b64;
+                audioBuffer = Buffer.from(cleanB64, "base64");
+              }
+            } else {
+              audioBuffer = Buffer.from(await res.arrayBuffer());
+            }
+          } else {
+            const errBody = await res.text().catch(() => "");
+            lastError = `Inworld TTS (${res.status}): ${errBody || res.statusText}`;
+          }
+        } catch (fetchErr: any) {
+          lastError = fetchErr.message || "Failed to reach Inworld endpoint";
+        }
+
+        // Fallback to OpenAI-compatible speech endpoint
+        if (!audioBuffer) {
+          try {
+            const openAiRes = await fetch("https://api.inworld.ai/v1/audio/speech", {
+              method: "POST",
+              headers: {
+                Authorization: authHeader,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model,
+                voice,
+                input: text,
+                response_format: "mp3",
+                speed,
+              }),
+            });
+
+            if (openAiRes.ok) {
+              audioBuffer = Buffer.from(await openAiRes.arrayBuffer());
+            } else {
+              const errBody2 = await openAiRes.text().catch(() => "");
+              lastError = `Inworld Speech fallback (${openAiRes.status}): ${errBody2 || openAiRes.statusText}`;
+            }
+          } catch (openAiCatch: any) {
+            lastError = openAiCatch.message || "Failed to reach Inworld speech fallback";
+          }
+        }
+      } else if (protocol === "openai-speech") {
+        const cleanUrl = (voiceCfg.baseUrl || "").replace(/\/+$/, "");
+        if (!cleanUrl) {
+          return {
+            result: "Error: Base URL is not configured for Custom Speech provider in Settings > Models > Voice.",
+            isError: true,
+          };
+        }
+        const endpoint = cleanUrl.endsWith("/audio/speech")
+          ? cleanUrl
+          : cleanUrl.endsWith("/v1")
+          ? `${cleanUrl}/audio/speech`
+          : `${cleanUrl}/v1/audio/speech`;
+
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const cleanKey = (voiceCfg.apiKey || "").trim();
+        if (cleanKey) {
+          headers["Authorization"] = cleanKey.startsWith("Bearer ") ? cleanKey : `Bearer ${cleanKey}`;
+        }
+
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              model: model || "tts-1",
+              input: text,
+              voice: voice || "alloy",
+              speed,
+              response_format: "mp3",
+            }),
+          });
+          if (res.ok) {
+            audioBuffer = Buffer.from(await res.arrayBuffer());
+          } else {
+            const errBody = await res.text().catch(() => "");
+            lastError = `Custom Speech (${res.status}): ${errBody || res.statusText}`;
+          }
+        } catch (speechErr: any) {
+          lastError = speechErr.message || "Failed to reach custom speech endpoint";
+        }
+      }
+
+      if (!audioBuffer || audioBuffer.length === 0) {
+        return {
+          result: `generate_speech failed: ${lastError || "Could not synthesize audio."}`,
+          isError: true,
+        };
+      }
+
+      await fs.writeFile(destPath, audioBuffer);
+      const relPath = path.relative(workspacePath, destPath).replace(/\\/g, "/");
+
+      return {
+        result: JSON.stringify(
+          {
+            status: "success",
+            message: `Speech audio generated successfully and saved to '${relPath}'.`,
+            file_path: relPath,
+            voice,
+            model,
+            size_bytes: audioBuffer.length,
+          },
+          null,
+          2
+        ),
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: generate_image (Text-to-Image visual generation)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "generateimage" ||
+      normalizedTool === "imagegeneration" ||
+      normalizedTool === "texttoimage" ||
+      normalizedTool === "image"
+    ) {
+      if (options.imageHandler) {
+        return await options.imageHandler(args, workspacePath);
+      }
+
+      const prompt = String(args.prompt || args.description || args.text || "").trim();
+      if (!prompt) {
+        return {
+          result: "Error: Missing 'prompt' parameter for generate_image.",
+          isError: true,
+        };
+      }
+
+      const rawOutputPath = String(
+        args.output_path || args.outputPath || args.path || args.filename || `images/img_${Date.now()}.png`
+      ).trim();
+      const destPath = resolveSafePath(rawOutputPath, workspacePath);
+      await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+      const imageCfg = options.imageConfig || {};
+      const provider = imageCfg.provider || imageCfg;
+      const apiKey = (imageCfg.apiKey || provider.apiKey || process.env.OPENROUTER_API_KEY || "").trim();
+      const baseUrl = (imageCfg.baseUrl || provider.baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
+      const protocol = imageCfg.protocol || provider.protocol || "openrouter";
+      const model = String(args.model || imageCfg.activeModelId || imageCfg.model?.id || provider.model || "google/imagen-3");
+      const aspectRatio = String(args.aspect_ratio || "16:9");
+
+      let endpoint = baseUrl;
+      if (protocol === "openrouter" || baseUrl.includes("openrouter.ai")) {
+        endpoint = baseUrl.endsWith("/images") ? baseUrl : `${baseUrl}/images`;
+      } else {
+        endpoint = baseUrl.endsWith("/images/generations") ? baseUrl : `${baseUrl}/images/generations`;
+      }
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["Authorization"] = apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`;
+      }
+      if (protocol === "openrouter" || baseUrl.includes("openrouter.ai")) {
+        headers["HTTP-Referer"] = "https://const.education";
+        headers["X-Title"] = "Const Learn";
+      }
+
+      const bodyPayload: Record<string, any> = { model, prompt };
+      if (args.size) {
+        bodyPayload.size = args.size;
+      } else if (aspectRatio === "16:9") {
+        bodyPayload.size = "1792x1024";
+      } else if (aspectRatio === "9:16") {
+        bodyPayload.size = "1024x1792";
+      } else {
+        bodyPayload.size = "1024x1024";
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(bodyPayload),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          return {
+            result: `generate_image failed (${res.status}): ${errText || res.statusText}`,
+            isError: true,
+          };
+        }
+
+        const data: any = await res.json().catch(() => null);
+        const sample = Array.isArray(data?.data)
+          ? data.data[0]
+          : Array.isArray(data?.images)
+          ? data.images[0]
+          : null;
+
+        const b64 = sample?.b64_json || sample?.base64;
+        const rawUrl = sample?.url || sample?.image_url || sample?.image;
+
+        let imgBuffer: Buffer | null = null;
+        if (b64) {
+          const cleanB64 = b64.includes(",") ? b64.split(",")[1]! : b64;
+          imgBuffer = Buffer.from(cleanB64, "base64");
+        } else if (rawUrl) {
+          if (rawUrl.startsWith("data:")) {
+            const cleanB64 = rawUrl.split(",")[1]!;
+            imgBuffer = Buffer.from(cleanB64, "base64");
+          } else {
+            const dlRes = await fetch(rawUrl);
+            if (dlRes.ok) {
+              imgBuffer = Buffer.from(await dlRes.arrayBuffer());
+            }
+          }
+        }
+
+        if (!imgBuffer) {
+          return {
+            result: "generate_image failed: Provider returned no valid image data or URL.",
+            isError: true,
+          };
+        }
+
+        await fs.writeFile(destPath, imgBuffer);
+        const relPath = path.relative(workspacePath, destPath).replace(/\\/g, "/");
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              message: `Image generated successfully and saved to '${relPath}'.`,
+              file_path: relPath,
+              prompt,
+              model,
+              size_bytes: imgBuffer.length,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (genErr: any) {
+        return {
+          result: `generate_image error: ${genErr.message || String(genErr)}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Composio Connector Tools (Canva MCP, Google Suite, YouTube, Sandbox)
     // -----------------------------------------------------------------------
     if (
@@ -6658,7 +7083,7 @@ export async function executeNativeTool(
     }
 
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, run_command, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, wait, lsp, ast_grep, ast_edit, jfind, retain, recall, reflect, eval, gh, think, task, agent_status, kill_agent, run_python.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, run_command, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, wait, lsp, ast_grep, ast_edit, jfind, retain, recall, reflect, eval, gh, think, task, agent_status, kill_agent, run_python, generate_speech, generate_image.`,
       isError: true,
     };
   } catch (err: any) {

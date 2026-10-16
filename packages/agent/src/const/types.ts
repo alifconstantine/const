@@ -200,6 +200,10 @@ export interface AgentConfig {
   maxOutputTokens?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
   browserHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
+  voiceConfig?: any;
+  imageConfig?: any;
+  speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
+  imageHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
 }
 
 export type ConstAgentMessage = AgentMessage;

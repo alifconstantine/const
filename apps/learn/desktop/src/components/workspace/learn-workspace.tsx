@@ -56,6 +56,8 @@ import { WorkspaceTitle } from "./workspace-title";
 import { ErrorBoundary } from "../ui/error-boundary";
 import { STUDIO_TOOLS } from "./studio-panel";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
+import { getStoredVoiceConfig } from "../../lib/voice";
+import { getActiveImageModel } from "../../lib/image";
 import { streamChatCompletion } from "../../lib/ai-stream";
 import {
   generateStudioArtifact,
@@ -1364,18 +1366,45 @@ export function LearnWorkspace({
       // 4. Expand skills into effective system prompt
       const effectiveSystemPrompt = await buildSkillsSystemPromptForText(promptToRun);
 
-      // 5. Launch isolated side agent via Electron
+      // 5. Launch isolated side agent via Electron with full source grounding, voiceConfig & imageConfig
       const activeModelId = localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
       const defaultWorkspacePath = await window.electron?.getDefaultWorkspacePath?.(learnId);
 
+      const groundedContext = buildGroundedContext(selectedSources);
+      const storedVoiceConfig = getStoredVoiceConfig();
+      const activeVoiceProvider = storedVoiceConfig.providers.find(
+        (p) => p.id === (storedVoiceConfig.activeProviderId || "inworld")
+      ) || storedVoiceConfig.providers[0];
+      const effectiveVoiceConfig = {
+        ...activeVoiceProvider,
+        voice: params.voiceName || activeVoiceProvider?.voice || "Ashley",
+        model: params.voiceModel || activeVoiceProvider?.model || "inworld-tts-2",
+        speed: params.speed || activeVoiceProvider?.speed || 1.0,
+        deliveryMode: params.deliveryMode || activeVoiceProvider?.deliveryMode || "BALANCED",
+      };
+      const activeImg = getActiveImageModel();
+      const imageConfig = {
+        provider: activeImg.provider,
+        model: activeImg.model,
+        apiKey: activeImg.provider?.apiKey,
+        baseUrl: activeImg.provider?.baseUrl,
+        protocol: activeImg.provider?.protocol,
+        activeModelId: activeImg.model?.id,
+      };
+
+      const userMessageContent = `${promptToRun}\n\n[STUDY SOURCES & GROUNDED MATERIAL]:\n${groundedContext.formattedContext}`;
+
       window.electron?.agent?.sendMessage({
-        messages: [{ role: "user", content: promptToRun }],
+        messages: [{ role: "user", content: userMessageContent }],
         systemPrompt: effectiveSystemPrompt || undefined,
         model: activeModelId,
         workspacePath: defaultWorkspacePath,
         learnId,
         conversationId: artId,
         mode: "full_access",
+        voiceConfig: effectiveVoiceConfig,
+        imageConfig,
+        sourcesMarkdown: groundedContext.formattedContext,
       }).catch((err: any) => {
         console.error("Side agent video summary failed:", err);
         localDb.updateArtifact(artId, {
@@ -1485,18 +1514,38 @@ export function LearnWorkspace({
       // 4. Expand skills into effective system prompt
       const effectiveSystemPrompt = await buildSkillsSystemPromptForText(promptToRun);
 
-      // 5. Launch isolated side agent via Electron
+      // 5. Launch isolated side agent via Electron with full source grounding, voiceConfig & imageConfig
       const activeModelId = localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
       const defaultWorkspacePath = await window.electron?.getDefaultWorkspacePath?.(learnId);
 
+      const groundedContext = buildGroundedContext(selectedSources);
+      const storedVoiceConfig = getStoredVoiceConfig();
+      const activeVoiceProvider = storedVoiceConfig.providers.find(
+        (p) => p.id === (storedVoiceConfig.activeProviderId || "inworld")
+      ) || storedVoiceConfig.providers[0];
+      const activeImg = getActiveImageModel();
+      const imageConfig = {
+        provider: activeImg.provider,
+        model: activeImg.model,
+        apiKey: activeImg.provider?.apiKey,
+        baseUrl: activeImg.provider?.baseUrl,
+        protocol: activeImg.provider?.protocol,
+        activeModelId: activeImg.model?.id,
+      };
+
+      const userMessageContent = `${promptToRun}\n\n[STUDY SOURCES & GROUNDED MATERIAL]:\n${groundedContext.formattedContext}`;
+
       window.electron?.agent?.sendMessage({
-        messages: [{ role: "user", content: promptToRun }],
+        messages: [{ role: "user", content: userMessageContent }],
         systemPrompt: effectiveSystemPrompt || undefined,
         model: activeModelId,
         workspacePath: defaultWorkspacePath,
         learnId,
         conversationId: artId,
         mode: "full_access",
+        voiceConfig: activeVoiceProvider,
+        imageConfig,
+        sourcesMarkdown: groundedContext.formattedContext,
       }).catch((err: any) => {
         console.error("Side agent presentation failed:", err);
         localDb.updateArtifact(artId, {

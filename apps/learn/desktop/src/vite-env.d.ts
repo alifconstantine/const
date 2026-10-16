@@ -86,6 +86,9 @@ declare global {
           systemPrompt?: string;
           temperature?: number;
           mcpServers?: any;
+          voiceConfig?: any;
+          imageConfig?: any;
+          sourcesMarkdown?: string;
         }) => Promise<{ success: boolean; messages?: any[]; error?: string }>;
         abort: (conversationId?: string) => Promise<boolean>;
         answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;

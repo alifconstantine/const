@@ -1586,6 +1586,9 @@ app.on("second-instance", (_event, commandLine) => {
         systemPrompt?: string;
         temperature?: number;
         mcpServers?: any[];
+        voiceConfig?: any;
+        imageConfig?: any;
+        sourcesMarkdown?: string;
       }
     ) => {
       const config = loadUserConfig();
@@ -1628,6 +1631,15 @@ app.on("second-instance", (_event, commandLine) => {
         targetWorkspace = path.join(learnWorkspacesDir, folderName);
         if (!fs.existsSync(targetWorkspace)) {
           fs.mkdirSync(targetWorkspace, { recursive: true });
+        }
+      }
+
+      // Auto-write sources.md into the workspace for persistent grounding if provided
+      if (payload.sourcesMarkdown && targetWorkspace) {
+        try {
+          fs.writeFileSync(path.join(targetWorkspace, "sources.md"), payload.sourcesMarkdown, "utf-8");
+        } catch (srcErr) {
+          console.warn("[Electron Main] Could not write sources.md to workspace:", srcErr);
         }
       }
 
@@ -1684,13 +1696,14 @@ app.on("second-instance", (_event, commandLine) => {
 
       effectiveSystemPrompt =
         (effectiveSystemPrompt || "") +
-        `\n\n[STUDIO, SOURCES & SIDEPANEL BROWSER INTEGRATION]:` +
-        `\nYou have dedicated educational capabilities to save sources, build interactive studio study materials, and control the native sidepanel browser:` +
+        `\n\n[STUDIO, SOURCES & MULTIMEDIA GENERATION INTEGRATION]:` +
+        `\nYou have dedicated educational capabilities to save sources, build interactive studio study materials, control the browser, and synthesize multimedia:` +
         `\n1. 'add_source': Whenever the student asks to save research/notes, or when you synthesize comprehensive knowledge, formulas, or study notes, invoke 'add_source' with type='text' (for notes) or type='url' (for web links). This immediately saves the source to the Sources panel!` +
         `\n2. 'create_studio_artifact': When the student asks to create study materials (e.g. flashcards, quiz, mind map, cheatsheet, or report), invoke 'create_studio_artifact' with the complete structured data! The workspace Studio tab will automatically populate with your generated artifact so the user can study it interactively.` +
         `\n3. 'web_search' & 'web_fetch': Search live web resources and fetch full article contents for deep grounding whenever current facts or references are needed.` +
-        `\n4. Native Sidepanel Browser ('browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_key', 'browser_scroll', 'browser_screenshot', 'browser_console', 'browser_evaluate', 'browser_tabs', 'browser_request_help'): When the student asks to open a webpage in the browser, browse Wikipedia/arXiv/docs together, or interact with a live web app/simulation in the right sidepanel, invoke 'browser_navigate' (which automatically expands the right pane into Preview mode and opens/targets the active or last Browser tab) followed by 'browser_snapshot' to inspect the ARIA accessibility tree and interactive element refs ([e1], [e2], ...).` +
-        `\n5. Long-Term Memory ('retain', 'recall', 'reflect'): You have persistent durable memory across chat sessions and learning workspaces. When the student shares learning preferences (e.g. language, depth), target exams, recurring mistakes, or key concepts mastered, call 'retain' with scope='global' or 'project' to store them. Call 'recall' or 'reflect' to retrieve prior knowledge, past context, or tailored study preferences.`;
+        `\n4. Native Sidepanel Browser ('browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_key', 'browser_scroll', 'browser_screenshot', 'browser_console', 'browser_evaluate', 'browser_tabs', 'browser_request_help'): When the student asks to open a webpage in the browser, browse Wikipedia/arXiv/docs together, or interact with a live web app/simulation in the right sidepanel, invoke 'browser_navigate' followed by 'browser_snapshot' to inspect the ARIA tree.` +
+        `\n5. Long-Term Memory ('retain', 'recall', 'reflect'): You have persistent durable memory across chat sessions and learning workspaces. When the student shares learning preferences, target exams, recurring mistakes, or key concepts mastered, call 'retain'. Call 'recall' or 'reflect' to retrieve prior knowledge.` +
+        `\n6. Speech & Image Tool Calls ('generate_speech', 'generate_image'): You have dedicated native tool calls to synthesize spoken narration and create images directly into workspace files. When producing Video Summaries, HyperFrames compositions, or slides with spoken narration, call 'generate_speech' for each scene audio file (e.g. 'audio/scene_1.mp3') and 'generate_image' for visual assets. NEVER write custom Python scripts or try to import 'inworld_tts' or external TTS modules!`;
 
       const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
@@ -1713,6 +1726,8 @@ app.on("second-instance", (_event, commandLine) => {
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         browserHandler: (toolName, args) => browserController.executeTool(toolName, args),
+        voiceConfig: payload.voiceConfig,
+        imageConfig: payload.imageConfig,
         onAskQuestion: (toolCallId, questionData) => {
           return new Promise((resolve) => {
             pendingQuestions.set(toolCallId, resolve);

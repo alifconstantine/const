@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld("electron", {
       systemPrompt?: string;
       temperature?: number;
       mcpServers?: any;
+      voiceConfig?: any;
+      imageConfig?: any;
+      sourcesMarkdown?: string;
     }) => ipcRenderer.invoke("agent:send-message", payload),
     abort: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
     answerQuestion: (toolCallId: string, answer: any) =>
