@@ -1057,7 +1057,7 @@ export function ChatCard({
       {/* Unified Card */}
       <div
         className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
-          compact ? "bg-[#ffffff] dark:bg-[#2b2b2b] focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555]" : "bg-[#ffffff] dark:bg-[#222222]"
+          compact ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
         }`}
       >
         {/* Top Header Strip: Choose Project (Only visible in landing view) */}
@@ -1175,7 +1175,7 @@ export function ChatCard({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 relative",
+            "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors min-w-0 relative",
             compact
               ? "max-w-full rounded-2xl"
               : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
