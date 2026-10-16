@@ -11,6 +11,7 @@ interface MarkdownContentProps {
   className?: string;
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  variant?: "default" | "user";
 }
 
 export function MarkdownContent({
@@ -18,6 +19,7 @@ export function MarkdownContent({
   className = "",
   onOpenFilePreview,
   onOpenTrajectory,
+  variant = "default",
 }: MarkdownContentProps) {
   if (!content) return null;
 
@@ -163,18 +165,28 @@ export function MarkdownContent({
     <div
       onClick={handleClick}
       className={cn(
-        "space-y-3 text-[14px] leading-[1.68] text-[#262626] dark:text-[#d4d4d4] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_b]:text-[#161616] dark:[&_b]:text-[#ececec]",
+        variant === "user"
+          ? "space-y-1.5 text-[13.5px] leading-relaxed text-[#262626] dark:text-[#ececec] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-white [&_b]:text-[#161616] dark:[&_b]:text-white"
+          : "space-y-3 text-[14px] leading-[1.68] text-[#262626] dark:text-[#d4d4d4] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_b]:text-[#161616] dark:[&_b]:text-[#ececec]",
         className
       )}
     >
       {tokens.map((token, index) => (
-        <TokenRenderer key={index} token={token} />
+        <TokenRenderer key={index} token={token} variant={variant} />
       ))}
     </div>
   );
 }
 
-function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }) {
+function TokenRenderer({
+  token,
+  isNested,
+  variant = "default",
+}: {
+  token: Token;
+  isNested?: boolean;
+  variant?: "default" | "user";
+}) {
   switch (token.type) {
     case "heading": {
       const heading = token as Tokens.Heading;
@@ -197,7 +209,13 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     case "paragraph": {
       const paragraph = token as Tokens.Paragraph;
       return (
-        <p className="leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-2 font-sans">
+        <p
+          className={cn(
+            variant === "user"
+              ? "leading-relaxed text-[#262626] dark:text-[#ececec] m-0 font-sans"
+              : "leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-2 font-sans"
+          )}
+        >
           <InlineRenderer text={paragraph.text} />
         </p>
       );

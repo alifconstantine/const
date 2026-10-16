@@ -60,49 +60,6 @@ export function getMentionIconMarkup({
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
   }
 
-  const lower = title.toLowerCase();
-  const ext = lower.includes(".") ? lower.split(".").pop() || "" : "";
-
-  // 1. Markdown (*.md, *.mdx) -> Iconify / VS Code Markdown M↓ icon
-  if (ext === "md" || ext === "markdown" || ext === "mdx") {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14" fill="currentColor" class="text-[#519aba] shrink-0 inline-block"><path fill-rule="evenodd" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15V4.15C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.5 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>`;
-  }
-
-  // 2. React TSX/JSX -> Cyan Atom
-  if (ext === "tsx" || ext === "jsx") {
-    return `<svg viewBox="-11.5 -10.23174 23 20.46348" width="14" height="14" class="text-[#00d8ff] shrink-0 inline-block" fill="currentColor"><circle cx="0" cy="0" r="2.05" fill="#00d8ff"/><g stroke="#00d8ff" stroke-width="1.2" fill="none"><ellipse rx="11" ry="4.2"/><ellipse rx="11" ry="4.2" transform="rotate(60)"/><ellipse rx="11" ry="4.2" transform="rotate(120)"/></g></svg>`;
-  }
-
-  // 3. TypeScript (*.ts) -> TS blue
-  if (ext === "ts" || ext === "mts" || ext === "cts") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[9.5px] tracking-tighter leading-none select-none text-[#519aba] shrink-0">TS</span>`;
-  }
-
-  // 4. JavaScript (*.js) -> JS yellow
-  if (ext === "js" || ext === "mjs" || ext === "cjs") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[9.5px] tracking-tighter leading-none select-none text-[#cbcb41] shrink-0">JS</span>`;
-  }
-
-  // 5. JSON (*.json) -> {} yellow
-  if (ext === "json") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[10.5px] leading-none select-none text-[#cbcb41] shrink-0">{}</span>`;
-  }
-
-  // 6. CSS / SCSS -> #
-  if (ext === "css" || ext === "scss" || ext === "sass" || ext === "less") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[11px] leading-none select-none text-[#519aba] shrink-0">#</span>`;
-  }
-
-  // 7. HTML -> </>
-  if (ext === "html" || ext === "htm") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[10px] leading-none select-none text-[#e34c26] shrink-0">&lt;/&gt;</span>`;
-  }
-
-  // 8. YAML -> !
-  if (ext === "yaml" || ext === "yml") {
-    return `<span class="w-3.5 h-3.5 inline-flex items-center justify-center font-mono font-bold text-[11px] leading-none select-none text-[#c678dd] shrink-0">!</span>`;
-  }
-
   // Generic File
   return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
 }

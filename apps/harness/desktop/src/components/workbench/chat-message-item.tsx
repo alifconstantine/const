@@ -134,7 +134,7 @@ export function ChatMessageItem({
             }
           }}
           className={cn(
-            "w-fit rounded-3xl rounded-tr-md bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-2.5 text-[13.5px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
+            "w-fit rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-2 text-[13.5px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
             userBubbleWidthClass,
             !isReadOnly && isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#b0b0b0] dark:hover:border-[#484848]"
           )}
@@ -152,19 +152,17 @@ export function ChatMessageItem({
                   content={message.content}
                   onOpenFilePreview={onOpenFilePreview}
                   onOpenTrajectory={onOpenTrajectory}
-                  className="space-y-1.5 text-[13.5px] [&_p]:my-0 [&_p]:leading-relaxed"
+                  variant="user"
                 />
               </div>
             </ScrollArea>
           ) : (
-            <div>
-              <MarkdownContent
-                content={message.content}
-                onOpenFilePreview={onOpenFilePreview}
-                onOpenTrajectory={onOpenTrajectory}
-                className="space-y-1.5 text-[13.5px] [&_p]:my-0 [&_p]:leading-relaxed"
-              />
-            </div>
+            <MarkdownContent
+              content={message.content}
+              onOpenFilePreview={onOpenFilePreview}
+              onOpenTrajectory={onOpenTrajectory}
+              variant="user"
+            />
           )}
         </div>
 

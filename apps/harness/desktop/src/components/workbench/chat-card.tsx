@@ -19,7 +19,6 @@ import {
   SquarePen,
   Globe,
   Play,
-  FileText,
   X,
   Brain,
   Gauge,
@@ -1266,7 +1265,7 @@ export function ChatCard({
                                   <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
                                     {ext}
                                   </span>
-                                  <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                                  <FileIcon filename={file.name} className="w-3.5 h-3.5 shrink-0" />
                                 </div>
                                 <div className="w-full min-w-0">
                                   <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block" title={file.name}>

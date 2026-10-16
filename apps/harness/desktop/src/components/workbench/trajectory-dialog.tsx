@@ -4,13 +4,13 @@ import {
   Copy,
   Check,
   Terminal,
-  FileCode,
   Brain,
   MessageSquare,
   Sparkles,
   ExternalLink,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
+import { FileIcon } from "./file-icon";
 import { useTranslation } from "../../lib/i18n";
 
 interface TrajectoryDialogProps {
@@ -308,15 +308,18 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
                 Files Modified ({message.mutations.length})
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {message.mutations.map((m: any, mIdx: number) => (
-                  <div
-                    key={mIdx}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#f0f0f3] dark:bg-[#202022] border border-[#e2e2e4] dark:border-[#2e2e30] font-mono text-[11px] text-[#262626] dark:text-[#d0d0d0]"
-                  >
-                    <FileCode className="w-3 h-3 text-[#ff7a00]" />
-                    <span>{m.targetFile?.split(/[\/\\]/).pop()}</span>
-                  </div>
-                ))}
+                {message.mutations.map((m: any, mIdx: number) => {
+                  const fileName = m.targetFile?.split(/[\/\\]/).pop() || m.targetFile || "file";
+                  return (
+                    <div
+                      key={mIdx}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#f0f0f3] dark:bg-[#202022] border border-[#e2e2e4] dark:border-[#2e2e30] font-mono text-[11px] text-[#262626] dark:text-[#d0d0d0]"
+                    >
+                      <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fileName}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, X, ArrowUp, FileText, Image as ImageIcon, Video, Code, FileCode } from "lucide-react";
+import { Plus, X, ArrowUp, Image as ImageIcon, Video } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { parseUploadedFiles, type AttachedFile } from "./chat-card";
+import { FileIcon } from "./file-icon";
 import { useTranslation } from "../../lib/i18n";
 
 export interface InlineMessageEditorProps {
@@ -92,7 +93,7 @@ export function InlineMessageEditor({
   return (
     <div
       className={cn(
-        "w-full rounded-3xl rounded-tr-md bg-[#f0f0f0] dark:bg-[#1f1f1f] border border-[#d5d5d9] dark:border-[#383838] p-3 text-[13.5px] shadow-sm flex flex-col gap-2.5 transition-all duration-150 animate-in fade-in zoom-in-[0.99]",
+        "w-full rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#1f1f1f] border border-[#d5d5d9] dark:border-[#383838] p-3 text-[13.5px] shadow-sm flex flex-col gap-2.5 transition-all duration-150 animate-in fade-in zoom-in-[0.99]",
         userBubbleWidthClass
       )}
     >
@@ -114,10 +115,8 @@ export function InlineMessageEditor({
                   />
                 ) : att.type === "video" ? (
                   <Video className="w-3.5 h-3.5 text-blue-500" />
-                ) : att.type === "code" ? (
-                  <Code className="w-3.5 h-3.5 text-emerald-500" />
                 ) : (
-                  <FileText className="w-3.5 h-3.5 text-neutral-400" />
+                  <FileIcon filename={att.name} className="w-3.5 h-3.5 shrink-0" />
                 )}
                 <span className="max-w-[120px] truncate">{att.name}</span>
                 <button
