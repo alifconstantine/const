@@ -275,7 +275,6 @@ export function ChatCard({
   const [prompt, setPrompt] = useState("");
   const editorRef = useRef<RichMentionEditorRef>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Attachments & Plus Menu State
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -906,9 +905,6 @@ export function ChatCard({
       }
       if (thinkingMenuRef.current && !thinkingMenuRef.current.contains(target)) {
         setIsThinkingOpen(false);
-      }
-      if (contextMenuRef.current && !contextMenuRef.current.contains(target)) {
-        setIsContextOpen(false);
       }
       if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
         setIsPlusOpen(false);
@@ -1622,170 +1618,9 @@ export function ChatCard({
               </div>
             </div>
 
-            {/* Right Actions: Context Window, Model Selector, Send Button */}
+            {/* Right Actions: Model Selector, Send Button */}
             <div className="flex items-center gap-1 sm:gap-2 shrink min-w-0 ml-auto">
-              {/* 1. Context Windows Indicator & Detailed Popover */}
-              {shouldShowContextUsage && (
-                <div className="relative" ref={contextMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !isContextOpen;
-                      closeAllMenus();
-                      setIsContextOpen(next);
-                    }}
-                    className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
-                      rawPercentUsed >= 90
-                        ? "text-red-500 hover:text-red-400"
-                        : rawPercentUsed >= 75
-                        ? "text-[#e79737] hover:text-[#ff9838]"
-                        : "text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                    }`}
-                    title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
-                    aria-label="Context window usage"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5 transform -rotate-90"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="9"
-                        fill="none"
-                        stroke="currentColor"
-                        className="text-[#e2e2e4] dark:text-[#383838]"
-                        strokeWidth="2.5"
-                      />
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="9"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeDasharray={56.55}
-                        strokeDashoffset={
-                          56.55 - (56.55 * safePercent) / 100
-                        }
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Context Window Popover */}
-                  {isContextOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-[60] flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      {/* Header: % of context used and tokens */}
-                      <div className="flex items-center justify-between text-[13px]">
-                        <span className="text-[#161616] dark:text-white font-medium">
-                          {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
-                        </span>
-                        <span className="font-sans tabular-nums text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
-                          ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
-                        </span>
-                      </div>
-
-                      {/* Multi-segment Horizontal Progress Bar */}
-                      <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
-                        {systemPromptTokens > 0 && (
-                          <div
-                            className="bg-[#71717a] h-full transition-all"
-                            style={{
-                              width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
-                            }}
-                            title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
-                          />
-                        )}
-                        {toolsTokens > 0 && (
-                          <div
-                            className="bg-[#a855f7] h-full transition-all"
-                            style={{
-                              width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
-                            }}
-                            title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
-                          />
-                        )}
-                        {effectiveMessagesTokens > 0 && (
-                          <div
-                            className="bg-[#3b82f6] h-full transition-all"
-                            style={{
-                              width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
-                            }}
-                            title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
-                          />
-                        )}
-                        {draftInputTokens > 0 && (
-                          <div
-                            className="bg-[#10b981] h-full transition-all"
-                            style={{
-                              width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
-                            }}
-                            title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
-                          />
-                        )}
-                      </div>
-
-                      {/* Legend / Breakdown List */}
-                      <div className="flex flex-col gap-2 pt-1">
-                        <div className="flex items-center justify-between text-[12px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
-                          </div>
-                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(systemPromptTokens)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[12px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
-                          </div>
-                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(toolsTokens)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[12px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
-                          </div>
-                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(effectiveMessagesTokens)}
-                          </span>
-                        </div>
-
-                        {draftInputTokens > 0 && (
-                          <div className="flex items-center justify-between text-[12px]">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
-                              <span className="text-[#10b981] font-medium">Current input</span>
-                            </div>
-                            <span className="font-sans tabular-nums text-[#10b981]">
-                              ~{formatTokenDisplay(draftInputTokens)}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#e2e2e4] dark:border-[#383838]/60">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#e2e2e4] dark:bg-[#383838] shrink-0" />
-                            <span className="text-[#777777] dark:text-[#888888]">Available context</span>
-                          </div>
-                          <span className="font-sans tabular-nums text-[#777777] dark:text-[#888888]">
-                            ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 2. Model Selector Dropdown (Const ∨) */}
+              {/* Model Selector Dropdown (Const ∨) */}
               <div className="relative min-w-0 shrink" ref={modelMenuRef}>
                 <button
                   type="button"
@@ -2051,107 +1886,285 @@ export function ChatCard({
       </div>
 
       {/* Active Conversation Footer Telemetry Bar */}
-      {compact && metrics && (() => {
-        const totalTokens = metrics.totalTokens ?? (metrics.inputTokens + metrics.outputTokens);
-        const cachedInputTokens = metrics.cachedInputTokens ?? Math.round(metrics.inputTokens * (metrics.cacheHitRate / 100));
-        const uncachedInputTokens = metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens);
+      {compact && (metrics || shouldShowContextUsage) && (() => {
+        const convTokens = metrics ? (metrics.totalTokens ?? (metrics.inputTokens + metrics.outputTokens)) : 0;
+        const cachedInputTokens = metrics ? (metrics.cachedInputTokens ?? Math.round(metrics.inputTokens * (metrics.cacheHitRate / 100))) : 0;
+        const uncachedInputTokens = metrics ? (metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens)) : 0;
 
         return (
-          <div className="w-full flex items-center justify-center gap-2 pt-2 pb-0.5 select-none flex-wrap">
-            {/* Pill 1: Session statistics (Gauge) */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                  title="Session statistics"
-                >
-                  <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                  <span>
-                    {metrics.turns} {metrics.turns === 1 ? "turn" : "turns"} · {metrics.steps} steps · {metrics.tokPerSec} tok/s
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="center"
-                sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="font-medium text-[13px] text-foreground">Session statistics</span>
-                </div>
-                <div className="space-y-2 text-[12.5px] font-sans">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">LLM time</span>
-                    <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.llmDurationMs)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Tool time</span>
-                    <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.toolDurationMs)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
-                    <span className="tabular-nums text-foreground">{metrics.ttftSeconds.toFixed(1)}s</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Tokens per second (TPS)</span>
-                    <span className="tabular-nums text-foreground">{metrics.tokPerSec} tok/s</span>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+          <div className="w-full flex items-center justify-between gap-2 sm:gap-4 pt-2 pb-0.5 px-1 select-none flex-wrap">
+            {/* Left: Session statistics & Context Windows */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+              {metrics && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+                      title="Session statistics"
+                    >
+                      <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <span>
+                        {metrics.turns} {metrics.turns === 1 ? "turn" : "turns"} · {metrics.steps} steps · {metrics.tokPerSec} tok/s
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="start"
+                    sideOffset={8}
+                    className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-[13px] text-foreground">Session statistics</span>
+                    </div>
+                    <div className="space-y-2 text-[12.5px] font-sans">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">LLM time</span>
+                        <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.llmDurationMs)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tool time</span>
+                        <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.toolDurationMs)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
+                        <span className="tabular-nums text-foreground">{metrics.ttftSeconds.toFixed(1)}s</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tokens per second (TPS)</span>
+                        <span className="tabular-nums text-foreground">{metrics.tokPerSec} tok/s</span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
 
-            {/* Pill 2: Token usage (Database) */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                  title="Token usage"
-                >
-                  <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                  <span>
-                    {formatTokenDisplay(totalTokens)} tok · Cache hit {metrics.cacheHitRate}%
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="center"
-                sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium text-[13px] text-foreground">Token usage</span>
-                  </div>
-                  <span className="tabular-nums font-medium text-foreground text-[13px]">
-                    {totalTokens.toLocaleString()} tok
-                  </span>
-                </div>
-                <div className="space-y-2 text-[12.5px] font-sans">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Cache hit</span>
-                    <span className="tabular-nums text-foreground">{metrics.cacheHitRate}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Uncached input</span>
-                    <span className="tabular-nums text-foreground">{uncachedInputTokens.toLocaleString()} tok</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Cached input</span>
-                    <span className="tabular-nums text-foreground">{cachedInputTokens.toLocaleString()} tok</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Output</span>
-                    <span className="tabular-nums text-foreground">{metrics.outputTokens.toLocaleString()} tok</span>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+              {/* Context Window usage (Circle progress + percentage) */}
+              {shouldShowContextUsage && (
+                <Popover open={isContextOpen} onOpenChange={setIsContextOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 group",
+                        rawPercentUsed >= 90
+                          ? "text-red-500 hover:text-red-400 hover:bg-red-500/10 data-[state=open]:bg-red-500/15"
+                          : rawPercentUsed >= 75
+                          ? "text-[#e79737] hover:text-[#ff9838] hover:bg-[#e79737]/10 data-[state=open]:bg-[#e79737]/15"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground"
+                      )}
+                      title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
+                      aria-label="Context window usage"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5 shrink-0 transform -rotate-90"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          fill="none"
+                          stroke="currentColor"
+                          className="text-muted-foreground/30 dark:text-muted-foreground/20"
+                          strokeWidth="2.5"
+                        />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeDasharray={56.55}
+                          strokeDashoffset={
+                            56.55 - (56.55 * (rawPercentUsed > 0 ? Math.max(1, safePercent) : 0)) / 100
+                          }
+                          strokeLinecap="round"
+                          className={cn(
+                            rawPercentUsed >= 90
+                              ? "text-red-500"
+                              : rawPercentUsed >= 75
+                              ? "text-[#e79737]"
+                              : "text-muted-foreground group-hover:text-foreground"
+                          )}
+                        />
+                      </svg>
+                      <span className="tabular-nums font-medium">
+                        {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="start"
+                    sideOffset={8}
+                    className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans select-none flex flex-col gap-3"
+                  >
+                    {/* Header: % of context used and tokens */}
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-foreground font-medium">
+                        {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
+                      </span>
+                      <span className="font-sans tabular-nums text-[12px] text-muted-foreground">
+                        ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
+                      </span>
+                    </div>
+
+                    {/* Multi-segment Horizontal Progress Bar */}
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex gap-0.5">
+                      {systemPromptTokens > 0 && (
+                        <div
+                          className="bg-[#71717a] h-full transition-all"
+                          style={{
+                            width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
+                        />
+                      )}
+                      {toolsTokens > 0 && (
+                        <div
+                          className="bg-[#a855f7] h-full transition-all"
+                          style={{
+                            width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
+                        />
+                      )}
+                      {effectiveMessagesTokens > 0 && (
+                        <div
+                          className="bg-[#3b82f6] h-full transition-all"
+                          style={{
+                            width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
+                        />
+                      )}
+                      {draftInputTokens > 0 && (
+                        <div
+                          className="bg-[#10b981] h-full transition-all"
+                          style={{
+                            width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
+                        />
+                      )}
+                    </div>
+
+                    {/* Legend / Breakdown List */}
+                    <div className="flex flex-col gap-2 pt-1 text-[12px]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
+                          <span className="text-foreground">System prompt</span>
+                        </div>
+                        <span className="font-sans tabular-nums text-foreground">
+                          ~{formatTokenDisplay(systemPromptTokens)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
+                          <span className="text-foreground">Tools</span>
+                        </div>
+                        <span className="font-sans tabular-nums text-foreground">
+                          ~{formatTokenDisplay(toolsTokens)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
+                          <span className="text-foreground">Messages</span>
+                        </div>
+                        <span className="font-sans tabular-nums text-foreground">
+                          ~{formatTokenDisplay(effectiveMessagesTokens)}
+                        </span>
+                      </div>
+
+                      {draftInputTokens > 0 && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
+                            <span className="text-[#10b981] font-medium">Current input</span>
+                          </div>
+                          <span className="font-sans tabular-nums text-[#10b981]">
+                            ~{formatTokenDisplay(draftInputTokens)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-border/80">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/30 shrink-0" />
+                          <span className="text-muted-foreground">Available context</span>
+                        </div>
+                        <span className="font-sans tabular-nums text-muted-foreground">
+                          ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
+                        </span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            {/* Right: Token usage (Database) */}
+            {metrics && (
+              <div className="flex items-center ml-auto shrink-0">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+                      title="Token usage"
+                    >
+                      <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <span>
+                        {formatTokenDisplay(convTokens)} tok · Cache hit {metrics.cacheHitRate}%
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="end"
+                    sideOffset={8}
+                    className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-[13px] text-foreground">Token usage</span>
+                      </div>
+                      <span className="tabular-nums font-medium text-foreground text-[13px]">
+                        {convTokens.toLocaleString()} tok
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-[12.5px] font-sans">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Cache hit</span>
+                        <span className="tabular-nums text-foreground">{metrics.cacheHitRate}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Uncached input</span>
+                        <span className="tabular-nums text-foreground">{uncachedInputTokens.toLocaleString()} tok</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Cached input</span>
+                        <span className="tabular-nums text-foreground">{cachedInputTokens.toLocaleString()} tok</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Output</span>
+                        <span className="tabular-nums text-foreground">{metrics.outputTokens.toLocaleString()} tok</span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         );
       })()}
