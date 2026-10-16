@@ -10,6 +10,11 @@ import {
   globalTaskManager,
   globalSubAgentManager,
   registerGlobalBrowserToolHandler,
+  listMemoryFiles,
+  readMemoryFile,
+  saveMemoryFile,
+  deleteMemoryFile,
+  type MemoryFileInfo,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
@@ -70,11 +75,13 @@ export interface UserConfig {
     supportsThinking?: boolean;
     supportsTools?: boolean;
   }>;
+  workspaceMemoryEnabled?: boolean;
 }
 
 const defaultUserConfig: UserConfig = {
   activeModel: "gemini-3.8-flash",
   activeProvider: "const",
+  workspaceMemoryEnabled: true,
   providers: {
     const: {
       name: "Const",
@@ -541,6 +548,65 @@ app.whenReady().then(() => {
   ipcMain.handle("config:save", async (_event, newConfig: Partial<UserConfig>) => {
     return saveUserConfig(newConfig);
   });
+
+  // ---------------------------------------------------------------------------
+  // Memory Management IPC Handlers
+  // ---------------------------------------------------------------------------
+  ipcMain.handle(
+    "memory:list",
+    async (
+      _event,
+      options?: { scope?: "project" | "global" | "all"; workspacePath?: string }
+    ) => {
+      const scope = options?.scope || "all";
+      return await listMemoryFiles(options?.workspacePath, scope);
+    }
+  );
+
+  ipcMain.handle("memory:read", async (_event, filePath: string) => {
+    return await readMemoryFile(filePath);
+  });
+
+  ipcMain.handle("memory:save", async (_event, filePath: string, content: string) => {
+    await saveMemoryFile(filePath, content);
+    return true;
+  });
+
+  ipcMain.handle("memory:delete", async (_event, filePath: string) => {
+    return await deleteMemoryFile(filePath);
+  });
+
+  ipcMain.handle("memory:open-in-folder", async (_event, filePath: string) => {
+    if (fs.existsSync(filePath)) {
+      shell.showItemInFolder(filePath);
+      return true;
+    }
+    return false;
+  });
+
+  ipcMain.handle("memory:get-config", async () => {
+    const config = loadUserConfig();
+    return {
+      workspaceMemoryEnabled: config.workspaceMemoryEnabled ?? true,
+    };
+  });
+
+  ipcMain.handle(
+    "memory:save-config",
+    async (_event, memoryConfig: { workspaceMemoryEnabled?: boolean }) => {
+      const current = loadUserConfig();
+      const updated = saveUserConfig({
+        ...current,
+        workspaceMemoryEnabled:
+          memoryConfig.workspaceMemoryEnabled !== undefined
+            ? memoryConfig.workspaceMemoryEnabled
+            : current.workspaceMemoryEnabled ?? true,
+      });
+      return {
+        workspaceMemoryEnabled: updated.workspaceMemoryEnabled ?? true,
+      };
+    }
+  );
 
   ipcMain.handle("agent:get-models", async () => {
     const config = loadUserConfig();

@@ -386,6 +386,20 @@ export function buildConstSystemPrompt(workspacePath: string, customPrompt?: str
     }
   }
 
+  // Check for workspace memory (MEMORY.md)
+  let workspaceMemory = "";
+  try {
+    const memoryFile = path.join(workspacePath, ".const", "memory", "MEMORY.md");
+    if (fs.existsSync(memoryFile)) {
+      const memRaw = fs.readFileSync(memoryFile, "utf-8").trim();
+      if (memRaw) {
+        workspaceMemory = `\n<workspace_memory path=".const/memory/MEMORY.md">\n${memRaw.slice(0, 3000)}\n</workspace_memory>\n`;
+      }
+    }
+  } catch {
+    // ignore memory read error
+  }
+
   return `You are Const Agent, an expert autonomous coding and software engineering assistant operating inside Const Harness. You help users by reading files, executing commands, editing code, creating folders, and developing complete software applications.
 
 Current working directory: ${normalizedCwd}
@@ -400,6 +414,9 @@ Available tools:
 - find: Search for files and directories matching a glob pattern or filename (e.g. '*.ts', '**/*.json', 'src/**/*.tsx').
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
+- retain: Store important architectural facts, project conventions, coding patterns, user preferences, or durable decisions into long-term memory across sessions (.const/memory/MEMORY.md or <topic>.md).
+- recall: Search long-term memory for previously retained architectural decisions, coding patterns, project context, or user preferences across workspace and global scopes.
+- reflect: Synthesize an overview or answer architectural and coding questions using relevant entries stored in long-term memory.
 - manage_task: Inspect status, view real-time logs, list, or terminate running background processes and services started by the agent.
 - wait: Event-driven wait for background subagents or background shell tasks to complete, produce output, or become ready. NEVER execute terminal 'sleep' commands to wait for tasks.
 - task: Delegate work to one or more isolated subagents. Supports single-task mode ('{ agent, name, description, assignment }') or parallel batch mode ('{ agent, context, tasks: [{ id, description, assignment }, ...] }'). Specialist roles: 'scout' (strictly read-only codebase reconnaissance), 'reviewer' (read-only code quality & logic audit), 'security-reviewer' (read-only vulnerability audit), 'task' (focused implementation worker with full write/edit/terminal tools), or 'sonic' (ultra-fast worker for rapid mechanical changes). Also loads custom '.const/agents/*.md' and '.omp/agents/*.md' personas.
@@ -463,7 +480,7 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
   2. If 'edit' fails because 'old_content' was not found, call 'read' immediately to inspect the latest file content and exact lines before attempting another edit.
   3. If 'bash' fails with exit code != 0, examine stderr/stdout carefully to understand why it failed before trying an alternative fix.
   4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.
-  5. NEVER execute terminal 'sleep' commands (e.g. 'sleep 5', 'sleep 10') in bash or powershell to wait or poll for background tasks or subagents. Subagents run in the foreground by default and return their complete findings directly.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
+  5. NEVER execute terminal 'sleep' commands (e.g. 'sleep 5', 'sleep 10') in bash or powershell to wait or poll for background tasks or subagents. Subagents run in the foreground by default and return their complete findings directly.${workspaceMemory ? `\n\n${workspaceMemory}` : ""}${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
 }
 
 export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {

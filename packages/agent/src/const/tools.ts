@@ -710,7 +710,7 @@ export const RETAIN_TOOL: NativeToolDefinition = {
   function: {
     name: "retain",
     description:
-      "Store important facts, learner conventions, study preferences, milestones, or decisions into durable long-term memory across chat sessions.",
+      "Store important architectural facts, project conventions, coding patterns, user preferences, or durable decisions into long-term memory across sessions. Stored as markdown files in .const/memory/ (MEMORY.md or <topic>.md).",
     parameters: {
       type: "object",
       properties: {
@@ -722,11 +722,15 @@ export const RETAIN_TOOL: NativeToolDefinition = {
             properties: {
               content: {
                 type: "string",
-                description: "Information or fact to remember.",
+                description: "Information, rule, or architectural fact to remember.",
+              },
+              title: {
+                type: "string",
+                description: "Optional topic or title for this memory (e.g. 'coding-conventions', 'learning-goals'). Creates a dedicated <topic>.md file when provided.",
               },
               context: {
                 type: "string",
-                description: "Optional background or source context.",
+                description: "Optional background context, rationale, or source of this decision.",
               },
               scope: {
                 type: "string",
@@ -748,7 +752,7 @@ export const RECALL_TOOL: NativeToolDefinition = {
   function: {
     name: "recall",
     description:
-      "Search long-term memory for previously retained facts, study topics, misconceptions, or user preferences.",
+      "Search long-term memory for previously retained architectural decisions, coding patterns, project context, or user preferences. Searches markdown files in .const/memory/ across workspace and global scopes.",
     parameters: {
       type: "object",
       properties: {
@@ -759,7 +763,7 @@ export const RECALL_TOOL: NativeToolDefinition = {
         scope: {
           type: "string",
           enum: ["project", "global", "all"],
-          description: "Scope filter (default: 'all').",
+          description: "Scope filter: 'project' (workspace memory only), 'global' (cross-project memory only), or 'all' (default).",
         },
         limit: {
           type: "number",
@@ -776,7 +780,7 @@ export const REFLECT_TOOL: NativeToolDefinition = {
   function: {
     name: "reflect",
     description:
-      "Synthesize an overview or answer a question using relevant entries stored in long-term memory.",
+      "Synthesize an overview or answer architectural and coding questions using relevant entries stored in long-term memory.",
     parameters: {
       type: "object",
       properties: {
@@ -6585,7 +6589,16 @@ export async function executeNativeTool(
       const items = Array.isArray(args.items)
         ? args.items
         : args.content
-        ? [{ content: args.content, context: args.context, scope: args.scope }]
+        ? [
+            {
+              content: args.content,
+              context: args.context,
+              scope: args.scope,
+              title: args.title || args.topic,
+              topic: args.topic,
+              filename: args.filename,
+            },
+          ]
         : [];
       const retainRes = await executeRetain(items, workspacePath);
       return {

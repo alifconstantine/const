@@ -3370,6 +3370,7 @@ function AuthenticatedContent({
         onClose={() => setIsSettingsOpen(false)}
         onBackToWorkspace={() => setIsSettingsOpen(false)}
         initialTab={settingsTab}
+        currentProject={currentProject}
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}

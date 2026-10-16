@@ -113,6 +113,42 @@ describe("Cognitive Memory Engine", () => {
     const reflectRes = await executeReflect("Design tokens", tmpDir);
     expect(reflectRes.memoriesCount).toBe(1);
   });
+
+  it("creates topic markdown files, lists memory files, and deletes files", async () => {
+    const { listMemoryFiles, readMemoryFile, deleteMemoryFile } = await import("./memory.js");
+
+    // Retain a topic-specific memory (e.g. user-java-learning-goal.md)
+    const topicRetain = await executeRetain(
+      [
+        {
+          content: "Master Java 21, virtual threads, and Spring Boot 3 microservice patterns.",
+          title: "User Java Learning Goal",
+          context: "Spring Boot roadmap",
+          scope: "project",
+        },
+      ],
+      tmpDir
+    );
+    expect(topicRetain.success).toBe(true);
+    expect(topicRetain.files[0]).toContain("user-java-learning-goal.md");
+
+    // List memory files
+    const files = await listMemoryFiles(tmpDir, "project");
+    expect(files.length).toBeGreaterThanOrEqual(1);
+    const javaDoc = files.find((f) => f.name === "user-java-learning-goal.md");
+    expect(javaDoc).toBeDefined();
+
+    // Read file
+    const content = await readMemoryFile(javaDoc!.path);
+    expect(content).toContain("virtual threads");
+
+    // Delete file
+    const deleted = await deleteMemoryFile(javaDoc!.path);
+    expect(deleted).toBe(true);
+
+    const filesAfter = await listMemoryFiles(tmpDir, "project");
+    expect(filesAfter.find((f) => f.name === "user-java-learning-goal.md")).toBeUndefined();
+  });
 });
 
 describe("In-Memory Eval REPL", () => {

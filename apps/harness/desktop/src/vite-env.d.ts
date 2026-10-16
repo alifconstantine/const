@@ -217,6 +217,17 @@ export interface UserConfig {
     supportsThinking?: boolean;
     supportsTools?: boolean;
   }>;
+  workspaceMemoryEnabled?: boolean;
+}
+
+export interface MemoryFileInfo {
+  name: string;
+  path: string;
+  scope: "project" | "global";
+  updatedAt: number;
+  formattedDate: string;
+  size: number;
+  preview: string;
 }
 
 declare global {
@@ -340,6 +351,15 @@ declare global {
         history: (taskId?: string) => Promise<ScheduledTaskRunHistory[]>;
         deleteRun: (id: string) => Promise<boolean>;
         onChanged: (callback: () => void) => () => void;
+      };
+      memory?: {
+        list: (options?: { scope?: "project" | "global" | "all"; workspacePath?: string }) => Promise<MemoryFileInfo[]>;
+        read: (filePath: string) => Promise<string>;
+        save: (filePath: string, content: string) => Promise<boolean>;
+        delete: (filePath: string) => Promise<boolean>;
+        openInFolder: (filePath: string) => Promise<boolean>;
+        getConfig: () => Promise<{ workspaceMemoryEnabled: boolean }>;
+        saveConfig: (config: { workspaceMemoryEnabled?: boolean }) => Promise<{ workspaceMemoryEnabled: boolean }>;
       };
       terminal?: {
         create: (options: {

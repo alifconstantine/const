@@ -60,6 +60,7 @@ import {
   ZOOM_STEP,
 } from "../lib/theme";
 import { ModelSettings } from "./settings/model-settings";
+import { MemorySettings } from "./settings/memory-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { Volume2, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 
@@ -71,6 +72,7 @@ export interface SettingsViewProps {
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
   initialTab?: string;
+  currentProject?: string;
 }
 
 export const CONST_ROUTER_DEFAULT_URL = "https://router.const.web.id/v1";
@@ -176,6 +178,7 @@ export function SettingsView({
   onSignOut,
   onSwitchAccount,
   initialTab = "general",
+  currentProject,
 }: SettingsViewProps) {
   // Normalize legacy tab names
   const normalizedInitialTab = useMemo(() => {
@@ -484,6 +487,8 @@ export function SettingsView({
                   ? "Configure multi-modal AI models for LLM reasoning, speech synthesis, image generation, and cinematic video."
                   : activeTab === "usage-stats"
                   ? "Monitor your weekly token consumption and account usage limits."
+                  : activeTab === "memory"
+                  ? "Save and reuse long-term context across your workspaces and global sessions."
                   : "This section is currently being configured and will be available in an upcoming update."}
               </p>
             </div>
@@ -1086,6 +1091,11 @@ export function SettingsView({
                 quota={quota}
                 onActiveModelChanged={(modelId) => handleSelectActiveModel(modelId)}
               />
+            ) : activeTab === "memory" ? (
+              /* --------------------------------------------------------- */
+              /* Memory Settings View (Image 1 style)                      */
+              /* --------------------------------------------------------- */
+              <MemorySettings currentProject={currentProject} />
             ) : (
               /* --------------------------------------------------------- */
               /* Generic Placeholder for other original tabs               */

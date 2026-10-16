@@ -128,6 +128,17 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("scheduled-tasks:changed", handler);
     },
   },
+  memory: {
+    list: (options?: { scope?: "project" | "global" | "all"; workspacePath?: string }) =>
+      ipcRenderer.invoke("memory:list", options),
+    read: (filePath: string) => ipcRenderer.invoke("memory:read", filePath),
+    save: (filePath: string, content: string) => ipcRenderer.invoke("memory:save", filePath, content),
+    delete: (filePath: string) => ipcRenderer.invoke("memory:delete", filePath),
+    openInFolder: (filePath: string) => ipcRenderer.invoke("memory:open-in-folder", filePath),
+    getConfig: () => ipcRenderer.invoke("memory:get-config"),
+    saveConfig: (config: { workspaceMemoryEnabled?: boolean }) =>
+      ipcRenderer.invoke("memory:save-config", config),
+  },
   terminal: {
     create: (options: {
       id: string;
