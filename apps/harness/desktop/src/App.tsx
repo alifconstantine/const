@@ -799,23 +799,44 @@ function AuthenticatedContent({
 
   const handleOpenFilePreview = (filePath: string, content?: string) => {
     setIsRightSidebarOpen(true);
+    let cleanPath = filePath;
+    let targetLine: number | undefined;
+
+    if (cleanPath.includes("#L")) {
+      const parts = cleanPath.split("#L");
+      cleanPath = parts[0] || "";
+      const l = parts[1] || "";
+      const parsed = parseInt(l, 10);
+      if (!isNaN(parsed)) targetLine = parsed;
+    } else if (cleanPath.includes("#")) {
+      cleanPath = cleanPath.split("#")[0] || "";
+    }
+
     const fileName =
-      filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
-      filePath ||
+      cleanPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
+      cleanPath ||
       "Preview";
 
+    const currentWp = currentProject === "Outside Project" ? undefined : currentProject;
+
     const existing = rightPaneTabs.find(
-      (t) => t.type === "file_preview" && (t.filePath === filePath || t.title === fileName)
+      (t) => t.type === "file_preview" && (t.filePath === cleanPath || t.title === fileName)
     );
 
     if (existing) {
-      if (content !== undefined) {
-        setRightPaneTabs((prev) =>
-          prev.map((t) =>
-            t.id === existing.id ? { ...t, filePath, newContent: content } : t
-          )
-        );
-      }
+      setRightPaneTabs((prev) =>
+        prev.map((t) =>
+          t.id === existing.id
+            ? {
+                ...t,
+                filePath: cleanPath,
+                workspacePath: currentWp,
+                targetLine: targetLine || t.targetLine,
+                ...(content !== undefined ? { newContent: content } : {}),
+              }
+            : t
+        )
+      );
       setActiveRightPaneTabId(existing.id);
       setIsOpeningNewTab(false);
       return;
@@ -825,7 +846,9 @@ function AuthenticatedContent({
       id: `preview_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: "file_preview",
       title: fileName,
-      filePath,
+      filePath: cleanPath,
+      workspacePath: currentWp,
+      targetLine,
       newContent: content,
     };
     setRightPaneTabs((prev) => [...prev, newTab]);

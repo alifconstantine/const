@@ -6,6 +6,8 @@ import React, {
   useState,
 } from "react";
 import { cn } from "@const/ui";
+import { renderToStaticMarkup } from "react-dom/server";
+import { FileIcon } from "./file-icon";
 import { useI18n } from "../../lib/i18n";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
 
@@ -38,6 +40,7 @@ export interface RichMentionEditorProps {
 
 /**
  * Returns crisp SVG or HTML for file icons matching VS Code / Antigravity aesthetics.
+ * Uses official brand icons from @thesvg/react via FileIcon.
  */
 export function getMentionIconMarkup({
   title,
@@ -48,20 +51,26 @@ export function getMentionIconMarkup({
   kind?: string;
   fileType?: string;
 }): string {
-  if (kind === "directory") {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
+  if (kind === "directory" || title.endsWith("/") || title.endsWith("\\")) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500 fill-amber-500/20 shrink-0 inline-block"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
   }
 
   if (kind === "session") {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`;
   }
 
   if (kind === "media" || fileType === "image") {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500 shrink-0 inline-block"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`;
   }
 
-  // Generic File
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
+  // Official programming language & brand icons via @thesvg/react
+  try {
+    return renderToStaticMarkup(
+      <FileIcon filename={title} className="w-3.5 h-3.5 shrink-0 inline-flex items-center justify-center" />
+    );
+  } catch {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`;
+  }
 }
 
 /**
@@ -72,11 +81,13 @@ export function renderMentionBadgeHtml({
   title,
   kind,
   fileType,
+  status,
 }: {
   href: string;
   title: string;
   kind?: string;
   fileType?: string;
+  status?: string;
 }): string {
   const isSession =
     kind === "session" ||
@@ -87,10 +98,37 @@ export function renderMentionBadgeHtml({
 
   const isDirectory =
     !isSession &&
-    (kind === "directory" || href.startsWith("folder://") || title.endsWith("/") || href.endsWith("/"));
+    (kind === "directory" ||
+      href.startsWith("folder://") ||
+      title.endsWith("/") ||
+      href.endsWith("/") ||
+      title.endsWith("\\") ||
+      href.endsWith("\\"));
 
   const resolvedKind = isSession ? "session" : isDirectory ? "directory" : (kind || "file");
-  const cleanTitle = title.replace(/^[\s💬📁📄]+/, "").replace(/\/$/, "");
+
+  let cleanTitle = title.replace(/^[\s💬📁📄]+/, "");
+  if (cleanTitle.endsWith("/") || cleanTitle.endsWith("\\")) {
+    cleanTitle = cleanTitle.slice(0, -1);
+  }
+
+  // Detect status prefix e.g. "M+ AGENTS.md", "A+ file.ts", "TS src/types.ts"
+  const statusMatch = cleanTitle.match(/^(M\+|A\+|D\-|\bTS\b|\bJS\b|\bPY\b|\bMD\b)\s+(.+)$/);
+  const activeStatus = status || (statusMatch && statusMatch[1] ? statusMatch[1] : undefined);
+  if (statusMatch && statusMatch[2]) {
+    cleanTitle = statusMatch[2].trim();
+  }
+
+  let statusBadgeHtml = "";
+  if (activeStatus === "M+") {
+    statusBadgeHtml = `<span class="px-1 py-0.5 rounded text-[9px] font-bold font-mono tracking-tight text-amber-600 bg-amber-500/15 dark:text-amber-400 dark:bg-amber-400/20 shrink-0 leading-none mr-0.5">M+</span>`;
+  } else if (activeStatus === "A+") {
+    statusBadgeHtml = `<span class="px-1 py-0.5 rounded text-[9px] font-bold font-mono tracking-tight text-emerald-600 bg-emerald-500/15 dark:text-emerald-400 dark:bg-emerald-400/20 shrink-0 leading-none mr-0.5">A+</span>`;
+  } else if (activeStatus === "D-") {
+    statusBadgeHtml = `<span class="px-1 py-0.5 rounded text-[9px] font-bold font-mono tracking-tight text-rose-600 bg-rose-500/15 dark:text-rose-400 dark:bg-rose-400/20 shrink-0 leading-none mr-0.5">D-</span>`;
+  } else if (activeStatus === "TS") {
+    statusBadgeHtml = `<span class="px-1 py-0.5 rounded text-[9px] font-bold font-mono tracking-tight text-blue-600 bg-blue-500/15 dark:text-blue-400 dark:bg-blue-400/20 shrink-0 leading-none mr-0.5">TS</span>`;
+  }
 
   const iconHtml = getMentionIconMarkup({
     title: cleanTitle,
@@ -98,13 +136,15 @@ export function renderMentionBadgeHtml({
     fileType,
   });
 
-  const tooltip = isSession
-    ? `Trajectory: ${cleanTitle} • Click to view`
-    : isDirectory
-    ? `Directory: ${cleanTitle} • Click to open`
-    : `File: ${cleanTitle} • Click to preview`;
+  const displayTitle = isDirectory ? `${cleanTitle}/` : cleanTitle;
 
-  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" title="${tooltip}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${cleanTitle}</span></a>`;
+  const tooltip = isSession
+    ? `Trajectory: ${displayTitle} • Click to view`
+    : isDirectory
+    ? `Directory: ${displayTitle} • Click to open`
+    : `File: ${displayTitle} • Click to preview in sidebar`;
+
+  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.14] border border-black/[0.08] dark:border-white/[0.08] hover:border-black/20 dark:hover:border-white/20 align-baseline font-sans text-[12.5px] mx-0.5 my-0.5 transition-all no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline shadow-xs group/badge" data-mention-token="true" data-mention-path="${cleanTitle}" data-mention-kind="${resolvedKind}" title="${tooltip}">${statusBadgeHtml}${iconHtml}<span class="leading-tight text-[12px] font-mono font-medium text-[#262626] dark:text-[#ececec] group-hover/badge:underline decoration-[#888888]/40 underline-offset-2">${displayTitle}</span></a>`;
 }
 
 /**

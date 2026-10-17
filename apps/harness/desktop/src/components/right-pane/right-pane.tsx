@@ -138,7 +138,7 @@ export function RightPane({
       case "file_diff":
         return <FileDiffTab tab={tab} onRollbackFile={onRollbackFile} />;
       case "file_preview":
-        return <FilePreviewTab tab={tab} />;
+        return <FilePreviewTab tab={tab} workspacePath={workspacePath} />;
       case "subagent":
         return (
           <SubagentTab

@@ -8,14 +8,16 @@ import { useTranslation } from "../../lib/i18n";
 
 interface FilePreviewTabProps {
   tab: RightPaneTab;
+  workspacePath?: string;
 }
 
-export function FilePreviewTab({ tab }: FilePreviewTabProps) {
+export function FilePreviewTab({ tab, workspacePath }: FilePreviewTabProps) {
   const { t } = useTranslation();
   const [content, setContent] = useState<string>(tab.newContent || tab.previousContent || "");
   const [isLoading, setIsLoading] = useState<boolean>(!content && Boolean(tab.filePath));
   const [copied, setCopied] = useState(false);
 
+  const effectiveWorkspacePath = tab.workspacePath || workspacePath;
   const rawPath = tab.filePath || tab.title || "";
   const normalizedPath = rawPath.replace(/\\/g, "/");
   const allParts = normalizedPath.split("/").filter(Boolean);
@@ -31,7 +33,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
   useEffect(() => {
     if (!content && tab.filePath && window.electron?.readFile) {
       setIsLoading(true);
-      window.electron.readFile(tab.filePath).then((res) => {
+      window.electron.readFile(tab.filePath, effectiveWorkspacePath).then((res) => {
         if (res && res.content !== undefined) {
           setContent(res.content);
         } else if (res?.error) {
@@ -40,7 +42,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
         setIsLoading(false);
       });
     }
-  }, [tab.filePath, content]);
+  }, [tab.filePath, content, effectiveWorkspacePath]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -50,7 +52,11 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
 
   const handleOpenExternal = () => {
     if (tab.filePath && window.electron?.openPath) {
-      window.electron.openPath(tab.filePath);
+      const isAbsolute = /^[a-zA-Z]:[\\/]/.test(tab.filePath) || tab.filePath.startsWith("/");
+      const target = !isAbsolute && effectiveWorkspacePath
+        ? `${effectiveWorkspacePath.replace(/[\\/]$/, "")}/${tab.filePath.replace(/^[\\/]/, "")}`
+        : tab.filePath;
+      window.electron.openPath(target);
     }
   };
 

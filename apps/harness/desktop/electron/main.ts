@@ -893,9 +893,11 @@ app.whenReady().then(() => {
       ) {
         // Run natively inside selected project directory
         targetWorkspace = path.resolve(payload.workspacePath);
+        lastActiveWorkspacePath = targetWorkspace;
       } else {
         // Outside Project: run inside dedicated session directory under ~/.const/brain/<convoId>
         targetWorkspace = path.join(constBrainDir, convoId);
+        lastActiveWorkspacePath = targetWorkspace;
         if (!fs.existsSync(targetWorkspace)) {
           fs.mkdirSync(targetWorkspace, { recursive: true });
         }
@@ -1293,8 +1295,12 @@ app.whenReady().then(() => {
 
   // Workspace files scanning and shell open-path handlers for Mentions & Palette
   const workspaceFilesCache = new Map<string, { timestamp: number; data: any[] }>();
+  let lastActiveWorkspacePath: string | undefined;
 
   ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
+    if (workspacePath && fs.existsSync(workspacePath)) {
+      lastActiveWorkspacePath = workspacePath;
+    }
     if (!workspacePath || !fs.existsSync(workspacePath)) return [];
     
     // Check 15-second cache
@@ -1424,10 +1430,15 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
+  ipcMain.handle("shell:open-path", async (_event, targetPath: string, workspacePath?: string) => {
     if (!targetPath) return false;
     try {
-      const res = await shell.openPath(targetPath);
+      let resolved = targetPath;
+      const wp = workspacePath || lastActiveWorkspacePath;
+      if (!path.isAbsolute(resolved) && wp && fs.existsSync(wp)) {
+        resolved = path.resolve(wp, resolved);
+      }
+      const res = await shell.openPath(resolved);
       return res === "";
     } catch (err) {
       console.error("Failed to open path:", err);
@@ -1439,12 +1450,35 @@ app.whenReady().then(() => {
     if (!filePath) return { error: "Path is required" };
     try {
       let resolvedPath = filePath;
+      // Strip line anchor if present (e.g. #L10-L20)
+      if (resolvedPath.includes("#")) {
+        resolvedPath = resolvedPath.split("#")[0] || resolvedPath;
+      }
+
+      const activeWp = (workspacePath && workspacePath !== "Outside Project" && fs.existsSync(workspacePath))
+        ? workspacePath
+        : lastActiveWorkspacePath;
+
       if (resolvedPath.startsWith("~/") || resolvedPath.startsWith("~\\")) {
         resolvedPath = path.join(os.homedir(), resolvedPath.slice(2));
       } else if (resolvedPath.startsWith("brain/") || resolvedPath.startsWith("brain\\")) {
         resolvedPath = path.join(harnessHomeDir, resolvedPath);
-      } else if (!path.isAbsolute(resolvedPath) && workspacePath && fs.existsSync(workspacePath)) {
-        resolvedPath = path.resolve(workspacePath, resolvedPath);
+      } else if (!path.isAbsolute(resolvedPath) && activeWp) {
+        resolvedPath = path.resolve(activeWp, resolvedPath);
+      }
+
+      // If file does not exist directly, attempt search within workspace cache
+      if (!fs.existsSync(resolvedPath) && activeWp && fs.existsSync(activeWp)) {
+        const cached = workspaceFilesCache.get(activeWp);
+        if (cached && Array.isArray(cached.data)) {
+          const targetBase = (path.basename(filePath).split("#")[0] || "").toLowerCase();
+          const match = cached.data.find(
+            (f: any) => !f.isDirectory && f.name?.toLowerCase() === targetBase
+          );
+          if (match && typeof match.path === "string" && fs.existsSync(match.path)) {
+            resolvedPath = match.path;
+          }
+        }
       }
 
       if (!fs.existsSync(resolvedPath)) {

@@ -19,6 +19,8 @@ export interface RightPaneTab {
   newContent?: string | null;
   mutation?: FileMutationRecord;
   previewMode?: "formatted" | "raw";
+  workspacePath?: string;
+  targetLine?: number;
   cwd?: string;
   project?: string;
   conversationId?: string;
