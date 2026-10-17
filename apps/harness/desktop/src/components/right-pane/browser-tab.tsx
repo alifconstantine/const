@@ -743,7 +743,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               }
             }}
             placeholder={t("rightPane.browserSearchPlaceholder")}
-            className="w-full h-7 px-3 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#202020] border border-[#333333] focus:border-[#4f4f4f] rounded-lg text-xs text-[#e0e0e0] placeholder-[#666666] outline-none transition-all font-sans"
+            className="w-full h-7 px-3 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#202020] border border-[#333333] rounded-lg text-xs text-[#e0e0e0] placeholder-[#666666] outline-none transition-all font-sans"
           />
         </div>
 

@@ -1595,7 +1595,7 @@ export function Sidebar({
                     value={archiveSearchQuery}
                     onChange={(e) => setArchiveSearchQuery(e.target.value)}
                     placeholder={t("sidebar.searchArchived")}
-                    className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#f4f4f6] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] rounded-lg text-[#262626] dark:text-[#d4d4d4] placeholder-[#a9a9a9] dark:placeholder-[#777777] focus:outline-none focus:border-[#a9a9a9] dark:focus:border-[#555555]"
+                    className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#f4f4f6] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] rounded-lg text-[#262626] dark:text-[#d4d4d4] placeholder-[#a9a9a9] dark:placeholder-[#777777] focus:outline-none transition-colors"
                   />
                   {archiveSearchQuery && (
                     <button
@@ -1733,7 +1733,7 @@ export function Sidebar({
               }}
               autoFocus
               placeholder={t("sidebar.renameConvo")}
-              className="bg-[#f4f4f6] dark:bg-[#282828] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-white text-xs focus-visible:ring-1 focus-visible:ring-[#888888]"
+              className="bg-[#f4f4f6] dark:bg-[#282828] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-white text-xs focus-visible:ring-0 focus:outline-none transition-colors"
             />
           </div>
 

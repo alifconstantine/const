@@ -72,7 +72,7 @@ export function RenameTaskDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("workbench.renameTaskPlaceholder")}
-              className="w-full px-3.5 py-2 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] text-[14px] text-[#161616] dark:text-[#d4d4d4] placeholder-[#888888] dark:placeholder-[#5d5d5d] focus:outline-none focus:border-[#555555] transition-colors"
+              className="w-full px-3.5 py-2 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] text-[14px] text-[#161616] dark:text-[#d4d4d4] placeholder-[#888888] dark:placeholder-[#5d5d5d] focus:outline-none transition-colors"
             />
           </div>
 

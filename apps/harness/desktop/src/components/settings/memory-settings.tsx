@@ -425,7 +425,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search memory files..."
-              className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] text-[#262626] dark:text-white placeholder:text-[#888888] dark:placeholder:text-[#737373] focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all"
+              className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] text-[#262626] dark:text-white placeholder:text-[#888888] dark:placeholder:text-[#737373] focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button
@@ -825,7 +825,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   value={newFileName}
                   onChange={(e) => setNewFileName(e.target.value)}
                   placeholder="e.g. user-coding-preferences.md"
-                  className="w-full h-8 px-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white font-mono"
+                  className="w-full h-8 px-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] focus:outline-none font-mono transition-colors"
                   autoFocus
                 />
               </div>
@@ -838,7 +838,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   value={newFileContent}
                   onChange={(e) => setNewFileContent(e.target.value)}
                   placeholder="# Title&#10;&#10;Add initial memory notes, rules, or conventions..."
-                  className="w-full h-32 p-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] font-mono resize-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                  className="w-full h-32 p-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] font-mono resize-none focus:outline-none transition-colors"
                 />
               </div>
             </div>

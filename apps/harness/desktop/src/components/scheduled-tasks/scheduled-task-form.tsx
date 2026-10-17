@@ -538,7 +538,7 @@ export function ScheduledTaskForm({
               <label className="text-xs font-medium text-[#969696]">{t("scheduledTasks.taskName")}</label>
               <input
                 type="text"
-                className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-3 py-2 text-[13px] text-white outline-none focus:border-[#5d5d5d] placeholder:text-[#5d5d5d] transition-colors"
+                className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-3 py-2 text-[13px] text-white outline-none placeholder:text-[#5d5d5d] transition-colors"
                 placeholder={t("scheduledTasks.taskNamePlaceholder")}
                 value={name}
                 onChange={(e) => {
@@ -658,7 +658,7 @@ export function ScheduledTaskForm({
             {/* Field: Instructions with Bottom Toolbar (Workspace, Permission, Model - exactly matching ChatCard) */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-[#969696]">{t("workbench.editPrompt")}</label>
-              <div className="bg-[#2b2b2b] border border-[#383838] rounded-xl focus-within:border-[#5d5d5d] transition-colors flex flex-col">
+              <div className="bg-[#2b2b2b] border border-[#383838] rounded-xl transition-colors flex flex-col">
                 <textarea
                   className="w-full min-h-[140px] bg-transparent text-[13px] text-white placeholder:text-[#5d5d5d] p-3 outline-none resize-y font-sans leading-relaxed rounded-t-xl"
                   placeholder={t("scheduledTasks.promptPlaceholder")}

@@ -3706,7 +3706,7 @@ export default function App() {
                             value={manualToken}
                             onChange={(e) => setManualToken(e.target.value)}
                             placeholder="eyJhbGciOi..."
-                            className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none focus:border-[#5d5d5d]"
+                            className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none transition-colors"
                           />
                           <Button
                             type="submit"

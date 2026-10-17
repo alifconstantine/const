@@ -75,7 +75,7 @@ export function CustomRepeatModal({
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                className="w-20 bg-[#2b2b2b] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#5d5d5d]"
+                className="w-20 bg-[#2b2b2b] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                 min={1}
                 max={365}
                 value={frequency}
@@ -120,7 +120,7 @@ export function CustomRepeatModal({
                 <div className="mt-1">
                   <input
                     type="date"
-                    className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#5d5d5d]"
+                    className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
