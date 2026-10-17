@@ -25,6 +25,7 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  cn,
 } from "@const/ui";
 import {
   PanelLeft,
@@ -187,9 +188,6 @@ export function Sidebar({
   const [activeTab, setActiveTab] = useState<"project" | "recent" | "outside">("project");
   const [hoveredConvoId, setHoveredConvoId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
-  const [isProjectsSectionCollapsed, setIsProjectsSectionCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem("const_harness_projects_section_collapsed") === "true";
-  });
   const [isConversationsCollapsed, setIsConversationsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("const_harness_conversations_collapsed") === "true";
   });
@@ -348,14 +346,6 @@ export function Sidebar({
     }));
   };
 
-  const toggleProjectsSection = () => {
-    setIsProjectsSectionCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("const_harness_projects_section_collapsed", String(next));
-      return next;
-    });
-  };
-
   const toggleConversationsCollapsed = () => {
     setIsConversationsCollapsed((prev) => {
       const next = !prev;
@@ -451,20 +441,19 @@ export function Sidebar({
     }
   }, [activeConversationId, projectMap, outsideConversations, recentConversations]);
 
+  // Check if all project folders are currently collapsed
+  const areAllFoldersCollapsed = useMemo(() => {
+    if (sortedProjectKeys.length === 0) return false;
+    return sortedProjectKeys.every((k) => Boolean(collapsedFolders[k]));
+  }, [sortedProjectKeys, collapsedFolders]);
+
   const toggleCollapseAllProjects = () => {
-    setIsProjectsSectionCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("const_harness_projects_section_collapsed", String(next));
-      if (!next) {
-        // When opening projects section, also ensure inner project folders are open
-        const nextFolders: Record<string, boolean> = {};
-        for (const k of sortedProjectKeys) {
-          nextFolders[k] = false;
-        }
-        setCollapsedFolders(nextFolders);
-      }
-      return next;
-    });
+    const shouldCollapse = !areAllFoldersCollapsed;
+    const nextFolders: Record<string, boolean> = {};
+    for (const k of sortedProjectKeys) {
+      nextFolders[k] = shouldCollapse;
+    }
+    setCollapsedFolders(nextFolders);
   };
 
   // Drag and drop handlers for projects
@@ -509,9 +498,187 @@ export function Sidebar({
     setDragOverProjectIndex(null);
   };
 
+  const renderConversationItem = (
+    convo: ConversationItem,
+    options?: { showProjectTooltip?: boolean }
+  ) => {
+    const isActive = convo.id === activeConversationId;
+    const isMenuOpen = openMenuConvoId === convo.id;
+    const isHovered = hoveredConvoId === convo.id;
+    const projectName =
+      convo.project && convo.project !== "Outside Project"
+        ? convo.project
+        : t("sidebar.outsideProject");
+
+    const content = (
+      <div
+        key={convo.id}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("[data-no-select]")) return;
+          onSelectConversation?.(convo.id);
+        }}
+        onMouseEnter={() => setHoveredConvoId(convo.id)}
+        onMouseLeave={() => setHoveredConvoId(null)}
+        className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+          isActive
+            ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
+            : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
+        }`}
+      >
+        <AutoScrollTitle
+          text={getCleanConversationTitle(convo.title)}
+          className="flex-1 mr-2"
+          textClassName={
+            isActive
+              ? "font-medium text-[#262626] dark:text-white"
+              : "font-normal text-[#666666] dark:text-[#999999] group-hover/chat:text-black dark:group-hover/chat:text-white transition-colors"
+          }
+          isParentHovered={isHovered}
+        />
+
+        <div
+          data-no-select="true"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
+        >
+          {/* Relative time or Loading Spinner or Approval Waiting */}
+          {pendingApprovals?.has(convo.id) ? (
+            <div
+              title="Needs permission / Waiting for approval"
+              className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
+            >
+              <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
+            </div>
+          ) : runningConvoIds?.has(convo.id) ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
+          ) : (
+            <div
+              className={`items-center gap-1 ${
+                isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
+              }`}
+            >
+              {isScheduledTaskConversation(convo) && (
+                <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
+              )}
+              <span
+                className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
+                  isActive
+                    ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
+                    : "text-[#888888] dark:text-[#777777]"
+                }`}
+              >
+                {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+              </span>
+            </div>
+          )}
+
+          {/* Actions on hover or when dropdown menu is open */}
+          <div
+            className={`items-center gap-0.5 ${
+              isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchiveConversation?.(convo.id);
+              }}
+              className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+              title={t("sidebar.archiveConvo")}
+              aria-label={t("sidebar.archiveConvo")}
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </button>
+
+            <DropdownMenu
+              open={isMenuOpen}
+              onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+            >
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                    isMenuOpen
+                      ? "bg-[#dedee2] dark:bg-[#484848] text-[#262626] dark:text-white"
+                      : "hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
+                  }`}
+                  title={t("common.actions")}
+                  aria-label={t("common.actions")}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="bottom"
+                align="end"
+                sideOffset={4}
+                className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+              >
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuConvoId(null);
+                    handleOpenRename(convo);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
+                  <span>{t("sidebar.renameConvo")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuConvoId(null);
+                    onArchiveConversation?.(convo.id);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                >
+                  <Archive className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
+                  <span>{t("sidebar.archived")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-[#dedee2] dark:bg-[#383838] my-1" />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuConvoId(null);
+                    handleOpenDelete(convo);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t("common.delete")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (options?.showProjectTooltip) {
+      return (
+        <Tooltip key={convo.id} open={isMenuOpen ? false : undefined}>
+          <TooltipTrigger asChild>{content}</TooltipTrigger>
+          <TooltipContent
+            side="right"
+            sideOffset={8}
+            className="bg-[#222222] border border-[#383838] text-[#d4d4d4] rounded-xl px-2.5 py-1 text-xs font-medium flex items-center gap-1.5 shadow-xl select-none pointer-events-none"
+          >
+            <Folder className="w-3.5 h-3.5 text-[#969696]" />
+            <span>{projectName}</span>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return content;
+  };
+
   const isMac =
     typeof window !== "undefined" &&
-    /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 
   return (
     <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#666666] dark:text-[#999999] p-3">
@@ -613,92 +780,107 @@ export function Sidebar({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent hover:bg-[#dedee2] dark:hover:bg-[#383838] data-[state=open]:bg-[#dedee2] dark:data-[state=open]:bg-[#383838] text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white dark:data-[state=open]:text-white rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none group"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 bg-transparent hover:bg-[#dedee2] dark:hover:bg-[#383838] data-[state=open]:bg-[#dedee2] dark:data-[state=open]:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white dark:data-[state=open]:text-white rounded-lg text-[13px] font-medium transition-colors cursor-pointer outline-none select-none group"
                 >
-                  {activeTab === "recent" && (
-                    <>
-                      <Clock className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-                      <span>{t("sidebar.recent")}</span>
-                    </>
-                  )}
                   {activeTab === "project" && (
                     <>
-                      <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
+                      <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
                       <span>{t("sidebar.projects")}</span>
                     </>
                   )}
                   {activeTab === "outside" && (
                     <>
-                      <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
+                      <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
                       <span>{t("sidebar.outsideProject")}</span>
                     </>
                   )}
-                  <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white ml-0.5 transition-colors" />
+                  {activeTab === "recent" && (
+                    <>
+                      <Clock className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
+                      <span>{t("sidebar.recent")}</span>
+                    </>
+                  )}
+                  <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white ml-0.5 transition-colors shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-40 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50"
+                sideOffset={4}
+                className="w-44 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 font-sans text-xs"
               >
                 <DropdownMenuItem
-                  onClick={() => setActiveTab("recent")}
-                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
-                    activeTab === "recent"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
-                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>{t("sidebar.recent")}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
                   onClick={() => setActiveTab("project")}
-                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
+                  className={cn(
+                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
                     activeTab === "project"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
                       : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  }`}
+                  )}
                 >
-                  <Folder className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>{t("sidebar.projects")}</span>
+                  <div className="flex items-center gap-2">
+                    <Folder className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("sidebar.projects")}</span>
+                  </div>
+                  {activeTab === "project" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setActiveTab("outside")}
-                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
+                  className={cn(
+                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
                     activeTab === "outside"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
                       : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  }`}
+                  )}
                 >
-                  <MessageSquare className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>{t("sidebar.outsideProject")}</span>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("sidebar.outsideProject")}</span>
+                  </div>
+                  {activeTab === "outside" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("recent")}
+                  className={cn(
+                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
+                    activeTab === "recent"
+                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("sidebar.recent")}</span>
+                  </div>
+                  {activeTab === "recent" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Right: Collapse all, Filter/Sort, Archive */}
-            <div className="flex items-center gap-1 text-[#777777] dark:text-[#888888]">
-              <button
-                type="button"
-                onClick={toggleCollapseAllProjects}
-                className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
-                title={isProjectsSectionCollapsed ? "Expand all projects" : "Collapse all projects"}
-                aria-label={isProjectsSectionCollapsed ? "Expand all projects" : "Collapse all projects"}
-              >
-                <div className="transition-transform duration-200 flex items-center justify-center">
-                  {isProjectsSectionCollapsed ? (
-                    <ChevronsUpDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200 scale-105" />
-                  ) : (
-                    <ChevronsDownUp className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
-                  )}
-                </div>
-              </button>
+            {/* Right: Collapse all (ONLY when in Projects view) & Archive */}
+            <div className="flex items-center gap-0.5 text-[#777777] dark:text-[#888888]">
+              {activeTab === "project" && sortedProjectKeys.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleCollapseAllProjects}
+                  className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+                  title={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
+                  aria-label={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
+                >
+                  <div className="transition-transform duration-200 flex items-center justify-center">
+                    {areAllFoldersCollapsed ? (
+                      <ChevronsUpDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
+                    ) : (
+                      <ChevronsDownUp className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
+                    )}
+                  </div>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleOpenArchiveModal}
                 className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                title="Archived sessions"
-                aria-label="Archived sessions"
+                title={t("sidebar.archivedSessions")}
+                aria-label={t("sidebar.archivedSessions")}
               >
                 <Archive className="w-3.5 h-3.5" />
               </button>
@@ -723,154 +905,7 @@ export function Sidebar({
                       {(isRecentExpanded
                         ? recentConversations
                         : recentConversations.slice(0, VISIBLE_CHATS_LIMIT)
-                      ).map((convo) => {
-                        const isActive = convo.id === activeConversationId;
-                        const isMenuOpen = openMenuConvoId === convo.id;
-                        const isHovered = hoveredConvoId === convo.id;
-                        const projectName =
-                          convo.project && convo.project !== "Outside Project"
-                            ? convo.project
-                            : "Outside Project";
-
-                        return (
-                          <Tooltip key={convo.id} open={isMenuOpen ? false : undefined}>
-                            <TooltipTrigger asChild>
-                              <div
-                                onClick={(e) => {
-                                  if ((e.target as HTMLElement).closest("[data-no-select]")) return;
-                                  onSelectConversation?.(convo.id);
-                                }}
-                                onMouseEnter={() => setHoveredConvoId(convo.id)}
-                                onMouseLeave={() => setHoveredConvoId(null)}
-                                className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
-                                  isActive
-                                    ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
-                                    : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/[0.08]"
-                                }`}
-                              >
-                                {/* Left: Auto-scrolling title */}
-                                <AutoScrollTitle
-                                  text={getCleanConversationTitle(convo.title)}
-                                  className="flex-1 mr-2"
-                                  textClassName={
-                                    isActive
-                                      ? "font-medium text-[#262626] dark:text-white"
-                                      : "font-normal text-[#666666] dark:text-[#999999] group-hover/chat:text-black dark:group-hover/chat:text-white transition-colors"
-                                  }
-                                  isParentHovered={isHovered}
-                                />
-
-                                {/* Right: Timestamp or Loading Spinner + Action Menu */}
-                                <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
-                                  {pendingApprovals?.has(convo.id) ? (
-                                    <div
-                                      title="Needs permission / Waiting for approval"
-                                      className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
-                                    >
-                                      <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
-                                    </div>
-                                  ) : runningConvoIds?.has(convo.id) ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
-                                  ) : (
-                                    <div
-                                      className={`items-center gap-1 ${
-                                        isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
-                                      }`}
-                                    >
-                                      {isScheduledTaskConversation(convo) && (
-                                        <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
-                                      )}
-                                      <span
-                                        className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
-                                          isActive
-                                            ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
-                                            : "text-[#888888] dark:text-[#777777]"
-                                        }`}
-                                      >
-                                        {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  <div
-                                    data-no-select="true"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className={`items-center gap-0.5 ${
-                                      isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
-                                    }`}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onArchiveConversation?.(convo.id);
-                                      }}
-                                      className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                                      title="Archive task"
-                                      aria-label="Archive task"
-                                    >
-                                      <Archive className="w-3.5 h-3.5" />
-                                    </button>
-
-                                    <DropdownMenu
-                                      open={isMenuOpen}
-                                      onOpenChange={(open) =>
-                                        setOpenMenuConvoId(open ? convo.id : null)
-                                      }
-                                    >
-                                      <DropdownMenuTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#a9a9a9] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                                          title="More options"
-                                          aria-label="More options"
-                                        >
-                                          <MoreHorizontal className="w-3.5 h-3.5" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent
-                                        align="end"
-                                        className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
-                                      >
-                                        <DropdownMenuItem
-                                          onClick={() => handleOpenRename(convo)}
-                                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#dedee2]/60 dark:hover:bg-[#303030]"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
-                                          <span>Rename</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          onClick={() => onArchiveConversation?.(convo.id)}
-                                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#dedee2]/60 dark:hover:bg-[#303030]"
-                                        >
-                                          <Archive className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
-                                          <span>Archive</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator className="bg-[#dedee2] dark:bg-[#383838] my-1" />
-                                        <DropdownMenuItem
-                                          onClick={() => handleOpenDelete(convo)}
-                                          className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-red-600 dark:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/20"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                          <span>Delete</span>
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </div>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="right"
-                              sideOffset={8}
-                              className="bg-[#222222] border border-[#383838] text-[#d4d4d4] rounded-xl px-2.5 py-1 text-xs font-medium flex items-center gap-1.5 shadow-xl select-none pointer-events-none"
-                            >
-                              <Folder className="w-3.5 h-3.5 text-[#969696]" />
-                              <span>{projectName}</span>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })}
+                      ).map((convo) => renderConversationItem(convo, { showProjectTooltip: true }))}
 
                       {recentConversations.length > VISIBLE_CHATS_LIMIT && (
                         <button
@@ -885,46 +920,44 @@ export function Sidebar({
                   )}
                 </div>
               </TooltipProvider>
+            ) : activeTab === "outside" ? (
+              <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+                {outsideConversations.length === 0 ? (
+                  <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
+                    No conversations outside project
+                  </div>
+                ) : (
+                  <>
+                    {(isOutsideExpanded
+                      ? outsideConversations
+                      : outsideConversations.slice(0, VISIBLE_CHATS_LIMIT)
+                    ).map((convo) => renderConversationItem(convo))}
+
+                    {outsideConversations.length > VISIBLE_CHATS_LIMIT && (
+                      <button
+                        type="button"
+                        onClick={() => setIsOutsideExpanded((prev) => !prev)}
+                        className="w-full h-8 flex items-center px-2 rounded-lg text-xs font-normal text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5 transition-colors cursor-pointer text-left select-none"
+                      >
+                        <span>{isOutsideExpanded ? "Show less" : `See all (${outsideConversations.length})`}</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             ) : sortedProjectKeys.length === 0 && outsideConversations.length === 0 ? (
-              <div className="px-2.5 py-4 text-xs text-[#777777] italic text-center">
+              <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
                 No tasks yet
               </div>
             ) : (
-              <>
-                {/* 1. Projects Section (Visible in Project view) */}
-                {activeTab === "project" && (
-                  <div className="flex flex-col gap-1">
-                    {/* Header: Projects with Chevron and Action Icons (Image 1, 2, 3) */}
-                    <div className="w-full flex items-center justify-between px-2.5 py-1 text-[13px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors select-none group">
-                      <button
-                        type="button"
-                        onClick={toggleProjectsSection}
-                        className="flex items-center gap-1.5 font-medium cursor-pointer text-left text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors"
-                      >
-                        <span>Projects</span>
-                        {isProjectsSectionCollapsed ? (
-                          <ChevronRight className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-transform" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-transform" />
-                        )}
-                      </button>
-
-                      <div className="flex items-center gap-1 text-[#777777] dark:text-[#888888]">
-                        <button
-                          type="button"
-                          onClick={() => onNewChat?.()}
-                          className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                          title="New task in project"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Project Folders List (when Projects section is not collapsed) */}
-                    {!isProjectsSectionCollapsed && (
-                      <div className="flex flex-col gap-1">
-                        {sortedProjectKeys.map((projectName, index) => {
+              <div className="flex flex-col gap-1">
+                {/* Project Folders List */}
+                {sortedProjectKeys.length === 0 ? (
+                  <div className="px-2.5 py-2 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
+                    No project folders
+                  </div>
+                ) : (
+                  sortedProjectKeys.map((projectName, index) => {
                           const items = projectMap[projectName] || [];
                           const isCollapsed = Boolean(collapsedFolders[projectName]);
                           const isDragging = draggedProjectIndex === index;
@@ -1017,146 +1050,7 @@ export function Sidebar({
 
                                     return (
                                       <>
-                                        {displayItems.map((convo) => {
-                                          const isActive = convo.id === activeConversationId;
-                                          const isMenuOpen = openMenuConvoId === convo.id;
-                                          return (
-                                            <div
-                                              key={convo.id}
-                                              onClick={(e) => {
-                                                if ((e.target as HTMLElement).closest("[data-no-select]")) return;
-                                                onSelectConversation?.(convo.id);
-                                              }}
-                                              onMouseEnter={() => setHoveredConvoId(convo.id)}
-                                              onMouseLeave={() => setHoveredConvoId(null)}
-                                              className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
-                                                isActive
-                                                  ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
-                                                  : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
-                                              }`}
-                                            >
-                                              <AutoScrollTitle
-                                                text={getCleanConversationTitle(convo.title)}
-                                                className="flex-1 mr-2"
-                                                textClassName={
-                                                  isActive
-                                                    ? "font-medium text-[#262626] dark:text-white"
-                                                    : "font-normal text-[#666666] dark:text-[#999999] group-hover/chat:text-black dark:group-hover/chat:text-white transition-colors"
-                                                }
-                                                isParentHovered={hoveredConvoId === convo.id}
-                                              />
-
-                                              <div
-                                                data-no-select="true"
-                                                onPointerDown={(e) => e.stopPropagation()}
-                                                className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
-                                              >
-                                                {/* Relative time or Loading Spinner */}
-                                                {pendingApprovals?.has(convo.id) ? (
-                                                  <div
-                                                    title="Needs permission / Waiting for approval"
-                                                    className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
-                                                  >
-                                                    <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
-                                                  </div>
-                                                ) : runningConvoIds?.has(convo.id) ? (
-                                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
-                                                ) : (
-                                                  <div
-                                                    className={`items-center gap-1 ${
-                                                      isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
-                                                    }`}
-                                                  >
-                                                    {isScheduledTaskConversation(convo) && (
-                                                      <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
-                                                    )}
-                                                    <span
-                                                      className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
-                                                        isActive
-                                                          ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
-                                                          : "text-[#888888] dark:text-[#777777]"
-                                                      }`}
-                                                    >
-                                                      {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                                    </span>
-                                                  </div>
-                                                )}
-
-                                                {/* Actions on hover or when dropdown menu is open */}
-                                                <div
-                                                  className={`items-center gap-0.5 ${
-                                                    isMenuOpen
-                                                      ? "flex"
-                                                      : "hidden group-hover/chat:flex"
-                                                  }`}
-                                                >
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      onArchiveConversation?.(convo.id);
-                                                    }}
-                                                    className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
-                                                    title="Archive task"
-                                                    aria-label="Archive task"
-                                                  >
-                                                    <Archive className="w-3.5 h-3.5" />
-                                                  </button>
-
-                                                  <DropdownMenu
-                                                    open={isMenuOpen}
-                                                    onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
-                                                  >
-                                                    <DropdownMenuTrigger asChild>
-                                                      <button
-                                                        type="button"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className={`p-1 rounded transition-colors cursor-pointer outline-none ${
-                                                          isMenuOpen
-                                                            ? "bg-[#484848] text-white"
-                                                            : "hover:bg-[#484848] text-[#969696] hover:text-white"
-                                                        }`}
-                                                        title="More actions"
-                                                        aria-label="More actions"
-                                                      >
-                                                        <MoreHorizontal className="w-3.5 h-3.5" />
-                                                      </button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent
-                                                      side="bottom"
-                                                      align="end"
-                                                      sideOffset={4}
-                                                      className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
-                                                    >
-                                                      <DropdownMenuItem
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          setOpenMenuConvoId(null);
-                                                          handleOpenRename(convo);
-                                                        }}
-                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
-                                                      >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                        <span>Rename</span>
-                                                      </DropdownMenuItem>
-                                                      <DropdownMenuItem
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          setOpenMenuConvoId(null);
-                                                          handleOpenDelete(convo);
-                                                        }}
-                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
-                                                      >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                        <span>Delete</span>
-                                                      </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                  </DropdownMenu>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
+                                        {displayItems.map((convo) => renderConversationItem(convo))}
 
                                         {hasMore && (
                                           <button
@@ -1174,31 +1068,30 @@ export function Sidebar({
                               )}
                             </div>
                           );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                        })
                 )}
 
-                {/* 2. Conversation Section (Fixed at bottom, Image 1, 2, 3) */}
-                {(activeTab === "project" || activeTab === "outside") && (
-                  <div className="flex flex-col gap-1 mt-1">
-                    {/* Header: Conversation with Chevron, Grip, and Plus */}
-                    <div className="w-full flex items-center justify-between px-2.5 py-1 text-[13px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors select-none group">
+                {/* Collapsible Outside Project group when inside Project View */}
+                {outsideConversations.length > 0 && (
+                  <div className="flex flex-col gap-1 mt-1 pt-1">
+                    <div className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-md text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5">
                       <button
                         type="button"
                         onClick={toggleConversationsCollapsed}
-                        className="flex items-center gap-1.5 font-medium cursor-pointer text-left text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors"
+                        className="w-full flex items-center gap-2 min-w-0 pr-8 cursor-pointer text-left"
                       >
-                        <span>Conversation</span>
+                        <MessageSquare className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover/folder:text-black dark:group-hover/folder:text-white transition-colors shrink-0" />
+                        <span className="truncate group-hover/folder:text-black dark:group-hover/folder:text-white transition-colors">
+                          {t("sidebar.outsideProject")}
+                        </span>
                         {isConversationsCollapsed ? (
-                          <ChevronRight className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-transform" />
+                          <ChevronRight className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-transform" />
+                          <ChevronDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0" />
                         )}
                       </button>
 
-                      <div className="flex items-center gap-1 text-[#777777] dark:text-[#888888]">
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1209,184 +1102,36 @@ export function Sidebar({
                               onNewChat?.();
                             }
                           }}
-                          className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                          title="New conversation"
-                          aria-label="New conversation"
+                          className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer opacity-0 group-hover/folder:opacity-100"
+                          title="New conversation outside project"
+                          aria-label="New conversation outside project"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    {/* Conversations List: NO folder icons, comfortable sizing */}
                     {!isConversationsCollapsed && (
                       <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
-                        {outsideConversations.length === 0 ? (
-                          <div className="px-2.5 py-2 text-xs text-[#a9a9a9] dark:text-[#777777] italic">
-                            No conversations
-                          </div>
-                        ) : (
-                          <>
-                            {(isOutsideExpanded
-                              ? outsideConversations
-                              : outsideConversations.slice(0, VISIBLE_CHATS_LIMIT)
-                            ).map((convo) => {
-                              const isActive = convo.id === activeConversationId;
-                              const isMenuOpen = openMenuConvoId === convo.id;
-                              return (
-                                <div
-                                  key={convo.id}
-                                  onClick={(e) => {
-                                    if ((e.target as HTMLElement).closest("[data-no-select]")) return;
-                                    onSelectConversation?.(convo.id);
-                                  }}
-                                  onMouseEnter={() => setHoveredConvoId(convo.id)}
-                                  onMouseLeave={() => setHoveredConvoId(null)}
-                                  className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
-                                    isActive
-                                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
-                                      : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
-                                  }`}
-                                >
-                                  <AutoScrollTitle
-                                    text={getCleanConversationTitle(convo.title)}
-                                    className="flex-1 mr-2"
-                                    textClassName={
-                                      isActive
-                                        ? "font-medium text-[#262626] dark:text-white"
-                                        : "font-normal text-[#666666] dark:text-[#999999] group-hover/chat:text-black dark:group-hover/chat:text-white transition-colors"
-                                    }
-                                    isParentHovered={hoveredConvoId === convo.id}
-                                  />
+                        {(isOutsideExpanded
+                          ? outsideConversations
+                          : outsideConversations.slice(0, VISIBLE_CHATS_LIMIT)
+                        ).map((convo) => renderConversationItem(convo))}
 
-                                  <div
-                                    data-no-select="true"
-                                    onPointerDown={(e) => e.stopPropagation()}
-                                    className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
-                                  >
-                                    {/* Relative time or Loading Spinner */}
-                                    {pendingApprovals?.has(convo.id) ? (
-                                      <div
-                                        title="Needs permission / Waiting for approval"
-                                        className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
-                                      >
-                                        <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
-                                      </div>
-                                    ) : runningConvoIds?.has(convo.id) ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
-                                    ) : (
-                                      <div
-                                        className={`items-center gap-1 ${
-                                          isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
-                                        }`}
-                                      >
-                                        {isScheduledTaskConversation(convo) && (
-                                          <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
-                                        )}
-                                        <span
-                                          className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
-                                            isActive
-                                              ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
-                                              : "text-[#888888] dark:text-[#777777]"
-                                          }`}
-                                        >
-                                          {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                        </span>
-                                      </div>
-                                    )}
-
-                                    {/* Actions on hover or when dropdown menu is open */}
-                                    <div
-                                      className={`items-center gap-0.5 ${
-                                        isMenuOpen
-                                          ? "flex"
-                                          : "hidden group-hover/chat:flex"
-                                      }`}
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          onArchiveConversation?.(convo.id);
-                                        }}
-                                        className="p-1 rounded hover:bg-[#d5d5d9] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                                        title="Archive task"
-                                        aria-label="Archive task"
-                                      >
-                                        <Archive className="w-3.5 h-3.5" />
-                                      </button>
-
-                                      <DropdownMenu
-                                        open={isMenuOpen}
-                                        onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
-                                      >
-                                        <DropdownMenuTrigger asChild>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className={`p-1 rounded transition-colors cursor-pointer outline-none ${
-                                              isMenuOpen
-                                                ? "bg-[#d5d5d9] dark:bg-[#484848] text-[#262626] dark:text-white"
-                                                : "hover:bg-[#d5d5d9] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
-                                            }`}
-                                            title="More actions"
-                                            aria-label="More actions"
-                                          >
-                                            <MoreHorizontal className="w-3.5 h-3.5" />
-                                          </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                          side="bottom"
-                                          align="end"
-                                          sideOffset={4}
-                                          className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
-                                        >
-                                          <DropdownMenuItem
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setOpenMenuConvoId(null);
-                                              handleOpenRename(convo);
-                                            }}
-                                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
-                                          >
-                                            <Pencil className="w-3.5 h-3.5" />
-                                            <span>Rename</span>
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setOpenMenuConvoId(null);
-                                              handleOpenDelete(convo);
-                                            }}
-                                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            <span>Delete</span>
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                            {outsideConversations.length > VISIBLE_CHATS_LIMIT && (
-                              <button
-                                type="button"
-                                onClick={() => setIsOutsideExpanded((prev) => !prev)}
-                                className="w-full h-8 flex items-center px-2 rounded-lg text-xs font-normal text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5 transition-colors cursor-pointer text-left select-none"
-                              >
-                                <span>{isOutsideExpanded ? "Show less" : `See all (${outsideConversations.length})`}</span>
-                              </button>
-                            )}
-                          </>
+                        {outsideConversations.length > VISIBLE_CHATS_LIMIT && (
+                          <button
+                            type="button"
+                            onClick={() => setIsOutsideExpanded((prev) => !prev)}
+                            className="w-full h-8 flex items-center px-2 rounded-lg text-xs font-normal text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5 transition-colors cursor-pointer text-left select-none"
+                          >
+                            <span>{isOutsideExpanded ? "Show less" : `See all (${outsideConversations.length})`}</span>
+                          </button>
                         )}
                       </div>
                     )}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </ScrollArea>
