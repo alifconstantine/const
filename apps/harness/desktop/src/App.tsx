@@ -2369,10 +2369,13 @@ function AuthenticatedContent({
       setConversationTitle(titleToUse);
 
       // Asynchronously request AI to generate an ultra-clean title
+      const modelForTitle = model || activeModelItem?.id || activeModelItem?.name || undefined;
       generateAiTitle(
         prompt || (attachments && attachments[0]?.name) || "New task",
         (aiTitle) => {
-          setConversationTitle(aiTitle);
+          if (conversationIdRef.current === conversationId) {
+            setConversationTitle(aiTitle);
+          }
           const stored = loadConversations();
           const target = stored.find((c) => c.id === conversationId);
           if (target) {
@@ -2382,7 +2385,8 @@ function AuthenticatedContent({
             setConversations(loadConversations());
           }
         },
-        token || undefined
+        token || undefined,
+        modelForTitle
       );
     }
 

@@ -741,49 +741,112 @@ app.whenReady().then(() => {
   });
 
   // Dedicated lightweight title generation that never conflicts with activeAgent
-  ipcMain.handle("agent:generate-title", async (_event, prompt: string, authToken?: string) => {
-    try {
-      const config = loadUserConfig();
-      const activeProv = config.activeProvider || "const";
-      const provCfg = config.providers[activeProv] || config.providers["const"];
-      const baseUrl = provCfg?.baseUrl || "https://router.const.web.id/v1";
-      let apiKey = provCfg?.apiKey || "";
-      if (!apiKey && (activeProv === "const" || activeProv === "const-engine")) {
-        apiKey = authToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "";
-      }
-      const endpoint = baseUrl.endsWith("/chat/completions")
-        ? baseUrl
-        : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  ipcMain.handle(
+    "agent:generate-title",
+    async (_event, prompt: string, authToken?: string, model?: string) => {
+      try {
+        const config = loadUserConfig();
+        const targetModel = model || config.activeModel || "gemini-3.8-flash";
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-        },
-        body: JSON.stringify({
-          model: config.activeModel || "gemini-3.8-flash",
-          messages: [
-            {
-              role: "user",
-              content: `Summarize this user request into a concise 3 to 5 word title. Return ONLY the title text with no punctuation, no quotes, no extra words:\n\n${prompt.slice(0, 300)}`,
-            },
-          ],
-          stream: false,
-        }),
-      });
+        // Match model to provider (matching agent:send-message architecture)
+        const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
+        const modelDef = allModels.find((m) => m.id === targetModel || m.displayName === targetModel);
+        const providerKey = modelDef?.provider || config.activeProvider || "const";
+        const providerCfg =
+          config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
 
-      if (!res.ok) return null;
-      const json: any = await res.json();
-      const rawTitle = json.choices?.[0]?.message?.content;
-      if (rawTitle) {
-        return rawTitle.replace(/^["']|["']$/g, "").replace(/[.\n]/g, "").trim();
+        const baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1";
+        let apiKey = providerCfg?.apiKey || "";
+
+        if (authToken && isValidAuthToken(authToken)) {
+          lastAuthToken = authToken;
+        }
+        if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
+          apiKey =
+            authToken ||
+            lastAuthToken ||
+            process.env.CONST_ROUTER_API_KEY ||
+            process.env.CONST_ENGINE_API_KEY ||
+            "const-local-dev-key";
+        }
+
+        const endpoint = baseUrl.endsWith("/chat/completions")
+          ? baseUrl
+          : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+          body: JSON.stringify({
+            model: targetModel,
+            messages: [
+              {
+                role: "user",
+                content: `Summarize this user request into a concise 3 to 5 word title. Return ONLY the title text with no punctuation, no quotes, no extra words:\n\n${prompt.slice(0, 300)}`,
+              },
+            ],
+            stream: false,
+          }),
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          console.warn(`[Electron Main] Title generation HTTP error ${res.status}:`, errText);
+          return null;
+        }
+
+        const responseText = await res.text();
+        let rawTitle = "";
+
+        if (responseText.includes("data:") || responseText.includes(": keep-alive")) {
+          // Handle SSE streams (e.g. combo models like combo/coding)
+          const lines = responseText.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed.choices?.[0]?.delta?.content || "";
+              if (delta) rawTitle += delta;
+            } catch {}
+          }
+        } else {
+          try {
+            const json = JSON.parse(responseText);
+            rawTitle = json.choices?.[0]?.message?.content || "";
+          } catch (parseErr) {
+            console.warn("[Electron Main] Failed to parse title JSON:", parseErr);
+          }
+        }
+
+        if (rawTitle) {
+          const cleaned = rawTitle
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
+            .replace(/^["'`]|["'`]$/g, "")
+            .replace(/[.\n\r]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (cleaned.length > 0) {
+            return cleaned;
+          }
+        }
+        return null;
+      } catch (err: any) {
+        console.warn("[Electron Main] Title generation error:", err?.message || err);
+        return null;
       }
-      return null;
-    } catch {
-      return null;
     }
-  });
+  );
 
   // ---------------------------------------------------------------------------
   // Agent & Execution IPC Handlers (Multi-Session Concurrent Architecture)

@@ -301,7 +301,7 @@ declare global {
       getModels: () => Promise<ModelOption[]>;
       getConfig: () => Promise<UserConfig>;
       saveConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;
-      generateTitle: (prompt: string, authToken?: string) => Promise<string | null>;
+      generateTitle: (prompt: string, authToken?: string, model?: string) => Promise<string | null>;
       onAgentEvent: (callback: (event: AgentStreamEvent) => void) => () => void;
       listConversations?: (includeArchived?: boolean) => Promise<any[]>;
       listArchivedConversations?: () => Promise<any[]>;

@@ -479,28 +479,36 @@ export function generateFallbackTitle(prompt: string): string {
 
 /**
  * Generates a concise 3-5 word AI title with fallback.
+ * Returns fallback immediately for instant UI responsiveness,
+ * and asynchronously calls onGenerated when AI generates the title.
  */
 export async function generateAiTitle(
   prompt: string,
   onGenerated?: (title: string) => void,
-  authToken?: string
+  authToken?: string,
+  model?: string
 ): Promise<string> {
   const fallback = generateFallbackTitle(prompt);
 
   if (typeof window !== "undefined" && window.electron?.generateTitle) {
-    try {
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
-      const requestPromise = window.electron.generateTitle(prompt, authToken);
-
-      const title = await Promise.race([requestPromise, timeoutPromise]);
-      if (title && typeof title === "string" && title.length > 0 && title.length <= 48) {
-        onGenerated?.(title);
-        return title;
-      }
-    } catch {}
+    // Non-blocking asynchronous AI refinement
+    window.electron
+      .generateTitle(prompt, authToken, model)
+      .then((aiTitle) => {
+        if (
+          aiTitle &&
+          typeof aiTitle === "string" &&
+          aiTitle.trim().length > 0 &&
+          aiTitle.trim().length <= 100
+        ) {
+          onGenerated?.(aiTitle.trim());
+        }
+      })
+      .catch((err) => {
+        console.warn("[ConversationStore] Background AI title generation error:", err);
+      });
   }
 
-  onGenerated?.(fallback);
   return fallback;
 }
 
