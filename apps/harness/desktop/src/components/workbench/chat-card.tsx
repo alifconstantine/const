@@ -1124,6 +1124,15 @@ export function ChatCard({
     const finalPrompt = augmentedPrompt;
 
     if (isExecuting) {
+      const savedQueueMode = localStorage.getItem("const_harness_queue_mode") || "queue";
+      if (savedQueueMode === "steer" && onSteerDraft) {
+        onSteerDraft({
+          prompt: finalPrompt,
+          attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+        });
+        toast.info("Steering active agent directly with message");
+        return;
+      }
       if (onQueueMessage) {
         onQueueMessage({
           prompt: finalPrompt,

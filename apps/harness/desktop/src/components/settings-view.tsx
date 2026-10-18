@@ -4,6 +4,7 @@ import {
   AvatarImage,
   AvatarFallback,
   ScrollArea,
+  Switch,
   toast,
   cn,
 } from "@const/ui";
@@ -38,6 +39,15 @@ import {
   Volume2,
   Image as ImageIcon,
   Video as VideoIcon,
+  FolderOpen,
+  Globe,
+  ShieldCheck,
+  Bell,
+  RefreshCw,
+  Play,
+  ExternalLink,
+  Laptop,
+  Layers,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -57,7 +67,8 @@ import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { SkillsSettings } from "./settings/skills-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
-import { useTranslation } from "../lib/i18n";
+import { useTranslation, type SupportedLanguage } from "../lib/i18n";
+import { playTaskCompletionSound } from "../lib/sound";
 
 export interface SettingsViewProps {
   open?: boolean;
@@ -189,7 +200,7 @@ export function SettingsView({
   }, [open]);
 
   // Appearance & Theme settings
-  const { t } = useTranslation();
+  const { t, language, setLanguage } = useTranslation();
   const [theme, setTheme] = useTheme();
   const [conversationWidth, setConversationWidth] = useConversationWidth();
   const [zoom, setZoom] = useInterfaceZoom();
@@ -207,39 +218,191 @@ export function SettingsView({
 
   const multiModalConfig = useMemo(() => loadMultiModalConfig(), [activeTab]);
 
+  // General Settings State
+  const [defaultProjectLocation, setDefaultProjectLocation] = useState<string>(() => {
+    return localStorage.getItem("const_harness_default_project_location") || "";
+  });
+
   const [defaultConfirmationMode, setDefaultConfirmationMode] = useState<
-    "ask_before_changes" | "full_access"
+    "ask_before_changes" | "full_access" | "request_review"
   >(() => {
     return (
       (localStorage.getItem("const_harness_default_mode") as
         | "ask_before_changes"
-        | "full_access") || "ask_before_changes"
+        | "full_access"
+        | "request_review") || "ask_before_changes"
     );
   });
 
+  const [queueMode, setQueueMode] = useState<"queue" | "steer">(() => {
+    return (localStorage.getItem("const_harness_queue_mode") as "queue" | "steer") || "queue";
+  });
+
+  const [taskNotifications, setTaskNotifications] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_task_notifications") !== "false";
+  });
+
+  const [soundAlerts, setSoundAlerts] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_sound_alerts") !== "false";
+  });
+
+  const [autoUpdates, setAutoUpdates] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_auto_updates") !== "false";
+  });
+
+  const [launchOnStartup, setLaunchOnStartup] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_launch_on_startup") === "true";
+  });
+
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
   const presetDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (!isPresetDropdownOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target as Node)) {
         setIsPresetDropdownOpen(false);
+      }
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(e.target as Node)) {
+        setIsLanguageDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isPresetDropdownOpen]);
+  }, []);
 
-  const handleSetDefaultMode = (mode: "ask_before_changes" | "full_access") => {
+  const handleBrowseDefaultLocation = async () => {
+    if (window.electron?.openDirectoryDialog) {
+      const selected = await window.electron.openDirectoryDialog();
+      if (selected) {
+        setDefaultProjectLocation(selected);
+        localStorage.setItem("const_harness_default_project_location", selected);
+        if (window.electron?.saveConfig) {
+          window.electron.saveConfig({ defaultProjectLocation: selected }).catch(() => {});
+        }
+        toast.success("Default project location updated");
+      }
+    }
+  };
+
+  const handleResetDefaultLocation = () => {
+    setDefaultProjectLocation("");
+    localStorage.removeItem("const_harness_default_project_location");
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ defaultProjectLocation: "" }).catch(() => {});
+    }
+    toast.success("Reset to default project location");
+  };
+
+  const LANGUAGE_OPTIONS: { id: SupportedLanguage; label: string; native: string }[] = [
+    { id: "en", label: "English", native: "English (US)" },
+    { id: "id", label: "Indonesian", native: "Bahasa Indonesia" },
+    { id: "ja", label: "Japanese", native: "日本語" },
+    { id: "zh", label: "Chinese", native: "中文 (简体)" },
+    { id: "es", label: "Spanish", native: "Español" },
+  ];
+
+  const handleSetLanguage = (lang: SupportedLanguage) => {
+    setLanguage(lang);
+    localStorage.setItem("const_app_language", lang);
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ language: lang }).catch(() => {});
+    }
+    setIsLanguageDropdownOpen(false);
+    toast.success(`Language set to ${LANGUAGE_OPTIONS.find((l) => l.id === lang)?.native || lang}`);
+  };
+
+  const handleSetDefaultMode = (mode: "ask_before_changes" | "full_access" | "request_review") => {
     setDefaultConfirmationMode(mode);
     localStorage.setItem("const_harness_default_mode", mode);
     window.dispatchEvent(new CustomEvent("const:default-mode-changed", { detail: mode }));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ defaultPermission: mode }).catch(() => {});
+    }
+    setIsPresetDropdownOpen(false);
+    const modeLabel =
+      mode === "full_access"
+        ? "Full Machine"
+        : mode === "request_review"
+        ? "Request Review"
+        : "Ask Before Changes";
+    toast.success(`Default permission set to ${modeLabel}`);
+  };
+
+  const handleSetQueueMode = (mode: "queue" | "steer") => {
+    setQueueMode(mode);
+    localStorage.setItem("const_harness_queue_mode", mode);
+    window.dispatchEvent(new CustomEvent("const:queue-mode-changed", { detail: mode }));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ queueMode: mode }).catch(() => {});
+    }
     toast.success(
-      `Security preset set to ${mode === "full_access" ? "Full Machine" : "Ask Before Changes"}`
+      mode === "queue"
+        ? "Messages will be queued while agent is executing"
+        : "Messages will steer the active agent immediately"
     );
+  };
+
+  const handleToggleTaskNotifications = (enabled: boolean) => {
+    setTaskNotifications(enabled);
+    localStorage.setItem("const_harness_task_notifications", String(enabled));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ taskNotifications: enabled }).catch(() => {});
+    }
+    if (enabled && typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    toast.success(enabled ? "Task notifications enabled" : "Task notifications disabled");
+  };
+
+  const handleToggleSoundAlerts = (enabled: boolean) => {
+    setSoundAlerts(enabled);
+    localStorage.setItem("const_harness_sound_alerts", String(enabled));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ soundAlerts: enabled }).catch(() => {});
+    }
+    if (enabled) {
+      playTaskCompletionSound();
+    }
+    toast.success(enabled ? "Sound alerts enabled" : "Sound alerts disabled");
+  };
+
+  const handleToggleAutoUpdates = (enabled: boolean) => {
+    setAutoUpdates(enabled);
+    localStorage.setItem("const_harness_auto_updates", String(enabled));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ autoCheckUpdates: enabled }).catch(() => {});
+    }
+    toast.success(enabled ? "Automatic updates enabled" : "Automatic updates disabled");
+  };
+
+  const handleToggleLaunchOnStartup = (enabled: boolean) => {
+    setLaunchOnStartup(enabled);
+    localStorage.setItem("const_harness_launch_on_startup", String(enabled));
+    if (window.electron?.saveConfig) {
+      window.electron.saveConfig({ launchOnStartup: enabled }).catch(() => {});
+    }
+    toast.success(enabled ? "Launch on startup enabled" : "Launch on startup disabled");
+  };
+
+  const handleCheckUpdates = () => {
+    setIsCheckingUpdate(true);
+    setTimeout(() => {
+      setIsCheckingUpdate(false);
+      toast.success("Const Harness v0.1.0-alpha is up to date");
+    }, 700);
+  };
+
+  const handleOpenDataFolder = () => {
+    if (window.electron?.openConstFolder) {
+      window.electron.openConstFolder();
+      toast.success("Opening local .const data directory");
+    }
   };
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -261,6 +424,27 @@ export function SettingsView({
         setConfig(cfg);
         if (cfg?.activeModel) {
           setActiveModel(cfg.activeModel);
+        }
+        if (cfg?.defaultProjectLocation !== undefined) {
+          setDefaultProjectLocation(cfg.defaultProjectLocation);
+        }
+        if (cfg?.defaultPermission) {
+          setDefaultConfirmationMode(cfg.defaultPermission);
+        }
+        if (cfg?.queueMode) {
+          setQueueMode(cfg.queueMode);
+        }
+        if (cfg?.taskNotifications !== undefined) {
+          setTaskNotifications(cfg.taskNotifications);
+        }
+        if (cfg?.autoCheckUpdates !== undefined) {
+          setAutoUpdates(cfg.autoCheckUpdates);
+        }
+        if (cfg?.launchOnStartup !== undefined) {
+          setLaunchOnStartup(cfg.launchOnStartup);
+        }
+        if (cfg?.soundAlerts !== undefined) {
+          setSoundAlerts(cfg.soundAlerts);
         }
       });
     }
@@ -656,40 +840,134 @@ export function SettingsView({
               /* General Settings Tab                                      */
               /* --------------------------------------------------------- */
               <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* Agent Settings Card */}
+                {/* 1. Workspace & Default Project Location */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-[14px] font-semibold text-[#262626] dark:text-white">
-                    Agent Settings
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Workspace & Location
+                  </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Default Project Location
+                      </span>
+                      <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                        Fallback directory used for outside workspace sessions and new scratch tasks.
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 rounded-lg bg-[#ffffff] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#333333]">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 px-1">
+                        <FolderOpen className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
+                        <span className="font-mono text-xs text-[#262626] dark:text-[#d4d4d4] truncate">
+                          {defaultProjectLocation || "Default (~/.const/harness/brain)"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 justify-end">
+                        <button
+                          type="button"
+                          onClick={handleBrowseDefaultLocation}
+                          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          <span>Browse...</span>
+                        </button>
+                        {defaultProjectLocation && (
+                          <button
+                            type="button"
+                            onClick={handleResetDefaultLocation}
+                            className="px-2 py-1 text-[11px] font-medium rounded-md border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838] hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
+                            title="Reset to default session location"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Language & Localization */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Language & Region
+                  </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Interface Language
+                      </span>
+                      <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                        Select the display language for the application interface and controls.
+                      </span>
+                    </div>
+
+                    <div className="relative" ref={languageDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setIsLanguageDropdownOpen((prev) => !prev)}
+                        className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] border border-[#dedee2] dark:border-[#383838] text-[12px] font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
+                      >
+                        <Globe className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span>
+                          {LANGUAGE_OPTIONS.find((l) => l.id === language)?.native || "English (US)"}
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                      </button>
+
+                      {isLanguageDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
+                          {LANGUAGE_OPTIONS.map((opt) => {
+                            const isSelected = language === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => handleSetLanguage(opt.id)}
+                                className={cn(
+                                  "w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none text-xs",
+                                  isSelected
+                                    ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
+                                    : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
+                                )}
+                              >
+                                <div className="flex flex-col">
+                                  <span>{opt.native}</span>
+                                  <span className="text-[10px] text-[#737373] dark:text-[#969696]">
+                                    {opt.label}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-3.5 h-3.5 shrink-0 text-[#262626] dark:text-white" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Default Permission (Security Preset) */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Agent Permissions
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex items-center justify-between gap-4">
                     <div className="flex flex-col gap-1">
-                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        Security Preset
-                      </span>
-                      <span className="text-[12px] text-[#737373] dark:text-[#969696]">
-                        Controls the actions the agent can take.
-                      </span>
-                      <div className="flex items-center gap-1 mt-0.5 text-[11px] text-[#737373] dark:text-[#969696]">
-                        <span>
-                          Learn more about{" "}
-                          <strong className="font-medium text-[#262626] dark:text-white">
-                            {defaultConfirmationMode === "full_access" ? "Full machine" : "Ask before changes"}
-                          </strong>
-                        </span>
-                        <span
-                          className="inline-flex items-center cursor-help"
-                          title={
-                            defaultConfirmationMode === "full_access"
-                              ? "Full machine: The agent executes actions and file edits without asking for manual confirmation each time."
-                              : "Ask before changes: The agent will require manual confirmation before running terminal commands or modifying files."
-                          }
-                        >
-                          <Info className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Default Permission
                         </span>
                       </div>
+                      <span className="text-[11px] text-[#737373] dark:text-[#969696]">
+                        Controls default tool execution, terminal commands, and file mutation approvals.
+                      </span>
                     </div>
 
-                    {/* Dropdown Selector */}
                     <div className="relative" ref={presetDropdownRef}>
                       <button
                         type="button"
@@ -697,7 +975,11 @@ export function SettingsView({
                         className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] border border-[#dedee2] dark:border-[#383838] text-[12px] font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
                       >
                         <span>
-                          {defaultConfirmationMode === "full_access" ? "Full Machine" : "Ask Before Changes"}
+                          {defaultConfirmationMode === "full_access"
+                            ? "Full Machine"
+                            : defaultConfirmationMode === "request_review"
+                            ? "Request Review"
+                            : "Ask Before Changes"}
                         </span>
                         <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                       </button>
@@ -706,10 +988,7 @@ export function SettingsView({
                         <div className="absolute right-0 top-full mt-1.5 w-64 bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
                           <button
                             type="button"
-                            onClick={() => {
-                              handleSetDefaultMode("ask_before_changes");
-                              setIsPresetDropdownOpen(false);
-                            }}
+                            onClick={() => handleSetDefaultMode("ask_before_changes")}
                             className={cn(
                               "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
                               defaultConfirmationMode === "ask_before_changes"
@@ -718,9 +997,9 @@ export function SettingsView({
                             )}
                           >
                             <div className="flex flex-col">
-                              <span className="text-[12px]">Ask Before Changes</span>
+                              <span className="text-[12px]">Ask Before Changes (Default)</span>
                               <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                Ask before file changes & command execution.
+                                Prompts for confirmation before command execution or file modifications.
                               </span>
                             </div>
                             {defaultConfirmationMode === "ask_before_changes" && (
@@ -730,10 +1009,7 @@ export function SettingsView({
 
                           <button
                             type="button"
-                            onClick={() => {
-                              handleSetDefaultMode("full_access");
-                              setIsPresetDropdownOpen(false);
-                            }}
+                            onClick={() => handleSetDefaultMode("full_access")}
                             className={cn(
                               "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
                               defaultConfirmationMode === "full_access"
@@ -744,10 +1020,31 @@ export function SettingsView({
                             <div className="flex flex-col">
                               <span className="text-[12px]">Full Machine</span>
                               <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                Run with full terminal & editing permissions.
+                                Autonomous agent execution without prompt interruptions.
                               </span>
                             </div>
                             {defaultConfirmationMode === "full_access" && (
+                              <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSetDefaultMode("request_review")}
+                            className={cn(
+                              "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
+                              defaultConfirmationMode === "request_review"
+                                ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
+                                : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
+                            )}
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-[12px]">Request Review</span>
+                              <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
+                                Always stages changes for side-by-side visual diff inspection.
+                              </span>
+                            </div>
+                            {defaultConfirmationMode === "request_review" && (
                               <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
                             )}
                           </button>
@@ -757,129 +1054,213 @@ export function SettingsView({
                   </div>
                 </div>
 
-                {/* Workbench Preferences Card */}
+                {/* 4. Message Queuing Behavior */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Workbench Preferences
+                    Message Execution Behavior
                   </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3.5">
-                    {/* Default LLM */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Default LLM Model
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Active model selected for new tasks and workbench chat.
+                          Queue Message
                         </span>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("model-settings")}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage models in Models"
-                      >
-                        <Bot className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>{activeModel}</span>
-                      </button>
+                      <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                        Behavior when sending a message while the agent is actively executing a task.
+                      </span>
                     </div>
 
-                    {/* Default Speech */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Default Voice AI
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Synthesizes audio responses and voice dialogues.
-                        </span>
-                      </div>
-
+                    <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
                       <button
                         type="button"
-                        onClick={() => setActiveTab("model-settings")}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage speech in Models"
+                        onClick={() => handleSetQueueMode("queue")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
+                          queueMode === "queue"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
+                            : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                        title="Queue messages to run sequentially after current task"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="text-[#737373] dark:text-[#969696]">
-                          {multiModalConfig.speech.activeModelId || "Not configured"}
-                        </span>
+                        <span>Queue Message</span>
                       </button>
-                    </div>
-
-                    {/* Default Image */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Default Image AI
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Generates visual assets and UI mockups.
-                        </span>
-                      </div>
-
                       <button
                         type="button"
-                        onClick={() => setActiveTab("model-settings")}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage images in Models"
+                        onClick={() => handleSetQueueMode("steer")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
+                          queueMode === "steer"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
+                            : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                        title="Send message immediately to steer the running agent"
                       >
-                        <ImageIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="text-[#737373] dark:text-[#969696]">
-                          {multiModalConfig.image.activeModelId || "Not configured"}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Default Video */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Default Video AI
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Generates cinematic video clips and motion sequences.
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("model-settings")}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage videos in Models"
-                      >
-                        <VideoIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="text-[#737373] dark:text-[#969696]">
-                          {multiModalConfig.video.activeModelId || "Not configured"}
-                        </span>
+                        <span>Send Directly</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* About & System Card */}
+                {/* 5. Notifications & Sound Alerts */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    About
+                    Notifications & Audio
                   </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-2.5">
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
+                    {/* Task Notification Row */}
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <Bell className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
+                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                            Task Notifications
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Display desktop notifications when an agent finishes a task or requires confirmation.
+                        </span>
+                      </div>
+
+                      <Switch
+                        checked={taskNotifications}
+                        onCheckedChange={handleToggleTaskNotifications}
+                      />
+                    </div>
+
+                    {/* Sound Alerts Row */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <Volume2 className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
+                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                            Completion Sound Effects
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Play a subtle audio chime when agent execution completes.
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => playTaskCompletionSound()}
+                          className="px-2 py-1 text-[11px] rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#d4d4d4] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
+                          title="Preview completion chime"
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Test</span>
+                        </button>
+                        <Switch
+                          checked={soundAlerts}
+                          onCheckedChange={handleToggleSoundAlerts}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 6. Updates & Startup Preferences */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Updates & Startup
+                  </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
+                    {/* Automatic Updates Row */}
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <RefreshCw className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
+                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                            Automatically Download and Install Updates
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Keep Const Harness updated with the latest agent capabilities and improvements.
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isCheckingUpdate}
+                          onClick={handleCheckUpdates}
+                          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none disabled:opacity-50"
+                        >
+                          <RefreshCw className={cn("w-3 h-3", isCheckingUpdate && "animate-spin")} />
+                          <span>Check for Updates</span>
+                        </button>
+                        <Switch
+                          checked={autoUpdates}
+                          onCheckedChange={handleToggleAutoUpdates}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Launch on Startup Row */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5">
+                          <Laptop className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
+                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                            Launch on System Startup
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Automatically start Const Harness in background when logging in to your system.
+                        </span>
+                      </div>
+
+                      <Switch
+                        checked={launchOnStartup}
+                        onCheckedChange={handleToggleLaunchOnStartup}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 7. About & System Storage */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Application Info & Storage
+                  </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#737373] dark:text-[#969696]">Version</span>
-                      <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">v0.1.0-alpha</span>
+                      <span className="text-[#737373] dark:text-[#969696]">App Version</span>
+                      <span className="font-mono text-[#262626] dark:text-[#d4d4d4] font-medium">
+                        v0.1.0-alpha
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#737373] dark:text-[#969696]">Platform</span>
+                      <span className="text-[#737373] dark:text-[#969696]">Operating System</span>
                       <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
                         {window.electron?.platform || "desktop"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#737373] dark:text-[#969696]">Runtime</span>
+                      <span className="text-[#737373] dark:text-[#969696]">Runtime Environment</span>
                       <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
                         Electron {window.electron?.versions?.electron || "34"} • Node {window.electron?.versions?.node || "20"}
                       </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-[#dedee2] dark:border-[#383838] text-xs">
+                      <div className="flex flex-col">
+                        <span className="text-[#262626] dark:text-white font-medium">Local App Storage</span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
+                          Config files, agent logs, and outside brain session storage (~/.const).
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenDataFolder}
+                        className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span>Open Folder</span>
+                      </button>
                     </div>
                   </div>
                 </div>

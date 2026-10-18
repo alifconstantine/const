@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -78,12 +78,28 @@ export interface UserConfig {
     supportsTools?: boolean;
   }>;
   workspaceMemoryEnabled?: boolean;
+  defaultProjectLocation?: string;
+  language?: string;
+  defaultPermission?: "ask_before_changes" | "full_access" | "request_review";
+  queueMode?: "queue" | "steer";
+  taskNotifications?: boolean;
+  autoCheckUpdates?: boolean;
+  launchOnStartup?: boolean;
+  soundAlerts?: boolean;
 }
 
 const defaultUserConfig: UserConfig = {
   activeModel: "gemini-3.8-flash",
   activeProvider: "const",
   workspaceMemoryEnabled: true,
+  defaultProjectLocation: "",
+  language: "en",
+  defaultPermission: "ask_before_changes",
+  queueMode: "queue",
+  taskNotifications: true,
+  autoCheckUpdates: true,
+  launchOnStartup: false,
+  soundAlerts: true,
   providers: {
     const: {
       name: "Const",
@@ -179,6 +195,15 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
       ...(config.providers || {}),
     },
   };
+  if (config.launchOnStartup !== undefined) {
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: Boolean(config.launchOnStartup),
+      });
+    } catch (err) {
+      console.warn("[Electron Main] Could not set login item settings:", err);
+    }
+  }
   try {
     fs.writeFileSync(constConfigFile, JSON.stringify(merged, null, 2), "utf-8");
   } catch (err) {
@@ -959,8 +984,13 @@ app.whenReady().then(() => {
         // Run natively inside selected project directory
         targetWorkspace = path.resolve(payload.workspacePath);
       } else {
-        // Outside Project: run inside dedicated session directory under ~/.const/brain/<convoId>
-        targetWorkspace = path.join(constBrainDir, convoId);
+        // Outside Project: run inside dedicated session directory under defaultProjectLocation or ~/.const/brain/<convoId>
+        const defaultLoc = config.defaultProjectLocation;
+        if (defaultLoc && fs.existsSync(defaultLoc)) {
+          targetWorkspace = path.join(defaultLoc, convoId);
+        } else {
+          targetWorkspace = path.join(constBrainDir, convoId);
+        }
         if (!fs.existsSync(targetWorkspace)) {
           fs.mkdirSync(targetWorkspace, { recursive: true });
         }
@@ -1459,7 +1489,11 @@ app.whenReady().then(() => {
       if (project && project !== "Outside Project" && fs.existsSync(project)) {
         return path.resolve(project);
       }
-      const outsideDir = path.join(constBrainDir, convoId);
+      const config = loadUserConfig();
+      const defaultLoc = config.defaultProjectLocation;
+      const outsideDir = defaultLoc && fs.existsSync(defaultLoc)
+        ? path.join(defaultLoc, convoId)
+        : path.join(constBrainDir, convoId);
       if (!fs.existsSync(outsideDir)) {
         try {
           fs.mkdirSync(outsideDir, { recursive: true });
@@ -1611,6 +1645,39 @@ app.whenReady().then(() => {
       return res === "";
     } catch (err) {
       console.error("Failed to open path:", err);
+      return false;
+    }
+  });
+
+  ipcMain.handle(
+    "system:show-notification",
+    async (_event, payload: { title: string; body: string; silent?: boolean }) => {
+      try {
+        if (Notification.isSupported()) {
+          const notif = new Notification({
+            title: payload.title || "Const Harness",
+            body: payload.body || "",
+            silent: payload.silent ?? false,
+          });
+          notif.show();
+          return true;
+        }
+      } catch (err) {
+        console.warn("[Electron Main] Could not show desktop notification:", err);
+      }
+      return false;
+    }
+  );
+
+  ipcMain.handle("system:open-const-folder", async () => {
+    try {
+      if (!fs.existsSync(constHomeDir)) {
+        fs.mkdirSync(constHomeDir, { recursive: true });
+      }
+      await shell.openPath(constHomeDir);
+      return true;
+    } catch (err) {
+      console.warn("[Electron Main] Could not open const folder:", err);
       return false;
     }
   });

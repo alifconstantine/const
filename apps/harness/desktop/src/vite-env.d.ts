@@ -218,6 +218,14 @@ export interface UserConfig {
     supportsTools?: boolean;
   }>;
   workspaceMemoryEnabled?: boolean;
+  defaultProjectLocation?: string;
+  language?: string;
+  defaultPermission?: "ask_before_changes" | "full_access" | "request_review";
+  queueMode?: "queue" | "steer";
+  taskNotifications?: boolean;
+  autoCheckUpdates?: boolean;
+  launchOnStartup?: boolean;
+  soundAlerts?: boolean;
 }
 
 export interface MemoryFileInfo {
@@ -245,6 +253,8 @@ declare global {
       onSystemThemeChange?: (callback: (mode: "dark" | "light") => void) => () => void;
       openExternal: (url: string) => Promise<boolean>;
       openDirectoryDialog: () => Promise<string | null>;
+      showNotification?: (payload: { title: string; body: string; silent?: boolean }) => Promise<boolean>;
+      openConstFolder?: () => Promise<boolean>;
       minimize?: () => void;
       maximize?: () => void;
       close?: () => void;

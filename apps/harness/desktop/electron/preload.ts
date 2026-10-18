@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld("electron", {
   },
   openExternal: (url: string) => ipcRenderer.invoke("auth:open-external", url),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
+  showNotification: (payload: { title: string; body: string; silent?: boolean }) =>
+    ipcRenderer.invoke("system:show-notification", payload),
+  openConstFolder: () => ipcRenderer.invoke("system:open-const-folder"),
   setThemeMode: (mode: "system" | "light" | "dark") =>
     ipcRenderer.invoke("window:set-theme-mode", mode),
   onSystemThemeChange: (callback: (mode: "dark" | "light") => void) => {

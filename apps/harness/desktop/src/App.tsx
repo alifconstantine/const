@@ -51,6 +51,7 @@ import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import { useTranslation } from "./lib/i18n";
+import { playTaskCompletionSound } from "./lib/sound";
 import {
   loadConversations,
   saveConversation,
@@ -1882,6 +1883,31 @@ function AuthenticatedContent({
           next.delete(data.conversationId);
           return next;
         });
+
+        // Trigger desktop completion notification if enabled
+        try {
+          const taskNotifsEnabled = localStorage.getItem("const_harness_task_notifications") !== "false";
+          if (taskNotifsEnabled) {
+            if (window.electron?.showNotification) {
+              window.electron.showNotification({
+                title: "Task Completed",
+                body: "Agent has finished executing the task.",
+              }).catch(() => {});
+            } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+              new Notification("Task Completed", {
+                body: "Agent has finished executing the task.",
+              });
+            }
+          }
+        } catch {}
+
+        // Play completion audio chime if enabled
+        try {
+          const soundEnabled = localStorage.getItem("const_harness_sound_alerts") !== "false";
+          if (soundEnabled) {
+            playTaskCompletionSound();
+          }
+        } catch {}
 
         const queued = queuedMessagesByConvoRef.current[data.conversationId];
         if (queued && queued.length > 0) {
