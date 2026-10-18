@@ -614,7 +614,14 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("memory:save", async (_event, filePath: string, content: string) => {
-    await saveMemoryFile(filePath, content);
+    let target = filePath;
+    if (filePath.startsWith(".const") || !path.isAbsolute(filePath)) {
+      target = path.join(os.homedir(), filePath);
+    } else if (filePath.startsWith("C:\\Users\\.const") || filePath.startsWith("/home/.const")) {
+      const parts = filePath.split(".const");
+      target = path.join(os.homedir(), ".const", parts[1] || "");
+    }
+    await saveMemoryFile(target, content);
     return true;
   });
 

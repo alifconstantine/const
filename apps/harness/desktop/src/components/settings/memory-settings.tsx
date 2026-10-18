@@ -37,16 +37,51 @@ interface ProjectOption {
   isGlobal: boolean;
 }
 
+function resolveActiveWorkspace(project?: string): string | null {
+  const p =
+    project ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("const_harness_current_project")
+      : null);
+  if (!p || p === "Outside Project" || p === "[object Object]" || p.trim() === "") {
+    return null;
+  }
+  return p;
+}
+
+function formatProjectName(projPath: string): string {
+  return (
+    projPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || projPath
+  );
+}
+
+function getInitialProjectOptions(activeWorkspace: string | null): ProjectOption[] {
+  const list: ProjectOption[] = [
+    { id: "global", name: "Global / Default", isGlobal: true },
+  ];
+  if (activeWorkspace) {
+    list.push({
+      id: activeWorkspace,
+      name: formatProjectName(activeWorkspace),
+      path: activeWorkspace,
+      isGlobal: false,
+    });
+  }
+  return list;
+}
+
 export function MemorySettings({ currentProject }: MemorySettingsProps) {
   // 1. Workspace Memory master toggle
   const [memoryEnabled, setMemoryEnabled] = useState<boolean>(true);
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
 
-  // 2. Scope & Project Selector state
-  const [selectedScopeId, setSelectedScopeId] = useState<string>("global");
-  const [projectsList, setProjectsList] = useState<ProjectOption[]>([
-    { id: "global", name: "Global / Default", isGlobal: true },
-  ]);
+  // 2. Scope & Project Selector state - initialize directly based on current workspace
+  const [selectedScopeId, setSelectedScopeId] = useState<string>(() => {
+    return resolveActiveWorkspace(currentProject) || "global";
+  });
+  const [projectsList, setProjectsList] = useState<ProjectOption[]>(() => {
+    return getInitialProjectOptions(resolveActiveWorkspace(currentProject));
+  });
   const [isScopeDropdownOpen, setIsScopeDropdownOpen] = useState(false);
   const scopeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -104,68 +139,67 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
     }
   }, []);
 
+  // Keep selected scope in sync if currentProject changes while mounted
+  const prevProjectRef = useRef<string | undefined>(currentProject);
+  useEffect(() => {
+    if (prevProjectRef.current !== currentProject) {
+      prevProjectRef.current = currentProject;
+      const ws = resolveActiveWorkspace(currentProject);
+      setSelectedScopeId(ws || "global");
+    }
+  }, [currentProject]);
+
   // Discover all unique projects from conversations database
   useEffect(() => {
+    const ws = resolveActiveWorkspace(currentProject);
+    const seenProjects = new Set<string>();
+
     const list: ProjectOption[] = [
       { id: "global", name: "Global / Default", isGlobal: true },
     ];
 
+    if (ws) {
+      seenProjects.add(ws);
+      list.push({
+        id: ws,
+        name: formatProjectName(ws),
+        path: ws,
+        isGlobal: false,
+      });
+    }
+
     if (window.electron?.listConversations) {
       window.electron.listConversations().then((convos) => {
-        const seenProjects = new Set<string>();
-
-        // Prioritize currentProject if open
-        if (currentProject && currentProject !== "Outside Project") {
-          const baseName = currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
-          seenProjects.add(currentProject);
-          list.push({
-            id: currentProject,
-            name: baseName,
-            path: currentProject,
-            isGlobal: false,
-          });
-        }
-
-        // Add other unique projects from history
         for (const c of convos) {
-          if (c.project && c.project !== "Outside Project" && !seenProjects.has(c.project)) {
+          if (
+            c.project &&
+            c.project !== "Outside Project" &&
+            c.project !== "[object Object]" &&
+            c.project.trim() !== "" &&
+            !seenProjects.has(c.project)
+          ) {
             seenProjects.add(c.project);
-            const baseName = c.project.replace(/\\/g, "/").split("/").filter(Boolean).pop() || c.project;
             list.push({
               id: c.project,
-              name: baseName,
+              name: formatProjectName(c.project),
               path: c.project,
               isGlobal: false,
             });
           }
         }
-
         setProjectsList(list);
-
-        // Default selection to current project if available, otherwise global
-        if (currentProject && currentProject !== "Outside Project") {
-          setSelectedScopeId(currentProject);
-        }
       }).catch(() => {});
-    } else if (currentProject && currentProject !== "Outside Project") {
-      const baseName = currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
-      setProjectsList([
-        { id: "global", name: "Global / Default", isGlobal: true },
-        { id: currentProject, name: baseName, path: currentProject, isGlobal: false },
-      ]);
-      setSelectedScopeId(currentProject);
     }
   }, [currentProject]);
 
   // Load memory files whenever selectedScopeId changes
-  const fetchMemoryFiles = async () => {
+  const fetchMemoryFiles = async (targetScope: string = selectedScopeId) => {
     if (!window.electron?.memory?.list) return;
 
     setIsLoadingFiles(true);
     try {
-      const currentScope = projectsList.find((p) => p.id === selectedScopeId);
-      const isGlobal = currentScope?.isGlobal ?? (selectedScopeId === "global");
-      const workspacePath = isGlobal ? undefined : currentScope?.path || selectedScopeId;
+      const isGlobal = targetScope === "global";
+      const workspacePath = isGlobal ? undefined : targetScope;
 
       const res = await window.electron.memory.list({
         scope: isGlobal ? "global" : "project",
@@ -181,8 +215,8 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   };
 
   useEffect(() => {
-    fetchMemoryFiles();
-  }, [selectedScopeId, projectsList]);
+    fetchMemoryFiles(selectedScopeId);
+  }, [selectedScopeId]);
 
   // Handle Toggle Workspace Memory
   const handleToggleMemory = async (checked: boolean) => {
@@ -209,10 +243,18 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   }, [files, searchQuery]);
 
   const selectedProjectObj = useMemo(() => {
-    return projectsList.find((p) => p.id === selectedScopeId) || projectsList[0] || {
-      id: "global",
-      name: "Global / Default",
-      isGlobal: true,
+    const found = projectsList.find((p) => p.id === selectedScopeId);
+    if (found) return found;
+
+    if (selectedScopeId === "global") {
+      return { id: "global", name: "Global / Default", isGlobal: true };
+    }
+
+    return {
+      id: selectedScopeId,
+      name: formatProjectName(selectedScopeId),
+      path: selectedScopeId,
+      isGlobal: false,
     };
   }, [projectsList, selectedScopeId]);
 
@@ -242,7 +284,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       await window.electron.memory.save(editingFile.file.path, editingFile.content);
       toast.success(`Saved ${editingFile.file.name}`);
       setEditingFile(null);
-      fetchMemoryFiles();
+      fetchMemoryFiles(selectedScopeId);
     } catch {
       toast.error(`Failed to save ${editingFile.file.name}`);
     } finally {
@@ -268,7 +310,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       if (ok) {
         toast.success(`Deleted ${deletingFile.name}`);
         setDeletingFile(null);
-        fetchMemoryFiles();
+        fetchMemoryFiles(selectedScopeId);
       } else {
         toast.error(`Could not delete ${deletingFile.name}`);
       }
@@ -289,14 +331,15 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
     let finalName = newFileName.trim();
     if (!finalName.endsWith(".md")) finalName += ".md";
 
-    const targetProject = projectsList.find((p) => p.id === selectedScopeId);
-    const isGlobal = targetProject?.isGlobal ?? (selectedScopeId === "global");
+    const isGlobal = selectedScopeId === "global";
 
     let targetPath = "";
     if (isGlobal) {
-      targetPath = `${window.electron?.platform === "win32" ? "C:\\Users\\" : "/home/"}.const/memory/${finalName}`;
-    } else if (targetProject?.path) {
-      targetPath = `${targetProject.path}/.const/memory/${finalName}`;
+      targetPath = `.const/memory/${finalName}`;
+    } else {
+      const targetProject = projectsList.find((p) => p.id === selectedScopeId);
+      const wsPath = targetProject?.path || selectedScopeId;
+      targetPath = `${wsPath}/.const/memory/${finalName}`;
     }
 
     if (!targetPath || !window.electron?.memory?.save) return;
@@ -310,7 +353,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       setIsCreatingNew(false);
       setNewFileName("");
       setNewFileContent("");
-      fetchMemoryFiles();
+      fetchMemoryFiles(selectedScopeId);
     } catch {
       toast.error("Failed to create memory file");
     } finally {
@@ -441,7 +484,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
           {/* Refresh Button */}
           <button
             type="button"
-            onClick={fetchMemoryFiles}
+            onClick={() => fetchMemoryFiles(selectedScopeId)}
             className="p-2 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
             title="Refresh memory files"
           >
@@ -498,7 +541,11 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 type="button"
                 onClick={() => {
                   setNewFileName("MEMORY.md");
-                  setNewFileContent("# Workspace Memory\n\nCore conventions and architectural decisions.\n");
+                  setNewFileContent(
+                    selectedProjectObj.isGlobal
+                      ? "# Global Memory\n\nGlobal preferences, conventions, and instructions across all workspaces.\n"
+                      : "# Workspace Memory\n\nCore conventions and architectural decisions.\n"
+                  );
                   setIsCreatingNew(true);
                 }}
                 className="mt-1 px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-xs font-medium text-[#262626] dark:text-white transition-colors cursor-pointer"
