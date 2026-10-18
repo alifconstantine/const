@@ -117,6 +117,15 @@ importers:
       convex:
         specifier: ^1.45.0
         version: 1.45.0(react@19.2.8)
+      dexie:
+        specifier: ^4.4.5
+        version: 4.4.5
+      dexie-react-hooks:
+        specifier: ^4.4.0
+        version: 4.4.0(dexie@4.4.5)(react@19.2.8)
+      jszip:
+        specifier: ^3.10.2
+        version: 3.10.2
       lucide-react:
         specifier: ^1.16.0
         version: 1.38.0(react@19.2.8)
@@ -136,6 +145,9 @@ importers:
       '@iconify-json/vscode-icons':
         specifier: ^1.2.76
         version: 1.2.76
+      '@types/jszip':
+        specifier: ^3.4.1
+        version: 3.4.1
       '@types/node':
         specifier: ^22.13.9
         version: 22.20.1

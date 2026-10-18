@@ -1,0 +1,66 @@
+# tradingview-reader
+
+Read-only TradingView desktop reader for market data via [opencli](https://github.com/jackwener/opencli) + the [`tradingview`](../../../../opencli-plugins/tradingview/) opencli plugin shipped alongside this skill.
+
+## What it does
+
+Reads TradingView's macOS desktop app for market data via Chrome DevTools Protocol — no API keys, no cookie extraction, no scraping. Capabilities include:
+
+- **Quote** — spot quote for any symbol (close, change, currency)
+- **Options chain** — full chain or filtered by expiry / type / ATM band, with full greeks (delta, gamma, theta, vega, rho), IV, bid/ask IVs, and theoretical price
+- **Options expiries** — list available expirations with DTE and contracts count
+- **Screener and search** — stocks, crypto, forex, futures, bonds, and symbol lookup
+- **News** — TradingView news feed and full story lookup
+- **Watchlists and alerts** — read the signed-in account's existing lists and alert states
+- **Chart state** — current symbol, interval, and layout of an active chart tab
+- **Screenshot** — PNG capture of a chart tab
+- **Status / launch** — CDP connection diagnostics and one-shot relaunch helper
+
+**This skill is read-only.** It does NOT place trades, modify watchlists, post ideas, or change chart layouts.
+
+## Authentication
+
+No API key, no token. The adapter attaches to the user's already-logged-in TradingView desktop app over CDP. Just have `TradingView.app` installed and logged in.
+
+## How it works
+
+Data commands harvest session cookies via CDP `Storage.getCookies`, then fire HTTP requests from Node directly. Page-context fetch is blocked by browser CORS preflight even from TradingView's own pages — the desktop app uses Electron's main process (Node network stack) to bypass this, and the adapter replicates that path. No Browser Bridge extension or `apps.yaml` registration is required.
+
+## Triggers
+
+- "options chain for X", "what's the IV on Y", "show me SNDK puts"
+- "what's the bid/ask on AAPL options", "TradingView IV skew"
+- "what symbol is on my TradingView chart", "screenshot my NVDA chart"
+- "read my TradingView watchlist", "show active TV alerts", "TradingView news for NVDA"
+- "screen US stocks on TradingView", "find the TradingView symbol for gold futures"
+- "TradingView quote for", "TV options for", "what expiries does X have"
+- Any mention of TradingView in context of reading market data, options data, or charts
+
+## Platform
+
+Works on **Claude Code** and other CLI-based agents on macOS. Does **not** work on Claude.ai — the sandbox restricts network access and binaries required by opencli + CDP.
+
+The plugin is currently macOS-only (relies on `open -a TradingView --args`).
+
+## Setup
+
+```bash
+# Choose finance-data-providers when prompted.
+npx plugins add himself65/finance-skills
+
+# Or install just this skill
+npx skills add himself65/finance-skills --skill tradingview-reader
+```
+
+See the [main README](../../../../README.md) for more installation options.
+
+## Prerequisites
+
+- Node.js >= 24 — for `npm install -g @jackwener/opencli`
+- `TradingView.app` installed on macOS, logged in
+- The `tradingview` opencli plugin: `opencli plugin install github:himself65/finance-skills/tradingview` (installs from this repo's monorepo subpath)
+- Relaunch with CDP enabled: `opencli tradingview launch` (one-time per session — warn the user to save chart layouts first)
+
+## Reference files
+
+- `references/commands.md` — Complete read command reference with all flags, output schemas, and analyst workflows

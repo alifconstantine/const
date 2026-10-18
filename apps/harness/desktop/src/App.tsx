@@ -10,6 +10,10 @@ import {
   ThumbsDown,
   Play,
   ChevronDown,
+  ArrowLeft,
+  Minus,
+  Square,
+  X,
 } from "lucide-react";
 import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -39,6 +43,7 @@ import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
+import { SkillsSettings } from "./components/settings/skills-settings";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
@@ -276,6 +281,7 @@ function AuthenticatedContent({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
+  const [isSkillsOpen, setIsSkillsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
@@ -2988,6 +2994,7 @@ function AuthenticatedContent({
     saveCurrentConversationRightPaneState();
 
     setIsScheduledTasksOpen(false);
+    setIsSkillsOpen(false);
     setIsSettingsOpen(false);
     setIsRenameDialogOpen(false);
     setIsTrajectoryOpen(false);
@@ -3033,6 +3040,7 @@ function AuthenticatedContent({
   const handleSelectConversation = async (id: string) => {
     if (id === conversationIdRef.current) return;
     setIsScheduledTasksOpen(false);
+    setIsSkillsOpen(false);
     setEditingMessageId(null);
 
     // Save outgoing conversation right pane state
@@ -3246,8 +3254,16 @@ function AuthenticatedContent({
             onArchiveConversation={handleArchiveConversation}
             onUnarchiveConversation={handleUnarchiveConversation}
             onOpenSettings={(tab) => handleOpenSettings(tab || "general")}
-            onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
+            onOpenScheduledTasks={() => {
+              setIsScheduledTasksOpen(true);
+              setIsSkillsOpen(false);
+            }}
             isScheduledTasksActive={isScheduledTasksOpen}
+            onOpenSkills={() => {
+              setIsSkillsOpen(true);
+              setIsScheduledTasksOpen(false);
+            }}
+            isSkillsActive={isSkillsOpen}
             onOpenSearch={() => setIsSearchOpen(true)}
           />
         </div>
@@ -3255,7 +3271,74 @@ function AuthenticatedContent({
 
       {/* 2. Main Content Area (Floating card with rounded corners on all sides: top, right, bottom, left) */}
       <main className="flex-1 min-w-0 bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative rounded-2xl sm:rounded-3xl border border-[#dedee2] dark:border-[#333333]/60 shadow-sm m-2 sm:m-2.5">
-        {isScheduledTasksOpen ? (
+        {isSkillsOpen ? (
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-background text-foreground">
+            {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
+            <div
+              className="h-10 px-4 flex items-center justify-between shrink-0 select-none border-b border-[#dedee2] dark:border-[#2b2b2e]"
+              style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+            >
+              <div
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+                className="flex items-center gap-1.5 text-[13px]"
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsSkillsOpen(false)}
+                  className="flex items-center gap-1.5 text-xs text-[#969696] hover:text-foreground hover:bg-[#dedee2]/60 dark:hover:bg-[#222222] px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{t("common.back")}</span>
+                </button>
+              </div>
+
+              {/* Window Controls */}
+              <div
+                className="flex items-center gap-0.5 text-[#969696] shrink-0 ml-auto"
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              >
+                <button
+                  type="button"
+                  onClick={() => window.electron?.minimize?.()}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  title="Minimize"
+                  aria-label="Minimize"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.electron?.maximize?.()}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  title="Maximize"
+                  aria-label="Maximize"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.electron?.close?.()}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scroll Area with SkillsSettings (exact 1:1 match with learn-home.tsx) */}
+            <ScrollArea className="flex-1 w-full h-full min-h-0">
+              <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
+                <SkillsSettings
+                  isSidebarOpen={isSidebarOpen}
+                  onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                  onClose={() => setIsSkillsOpen(false)}
+                />
+              </div>
+            </ScrollArea>
+          </div>
+        ) : isScheduledTasksOpen ? (
           <ScheduledTasksView
             onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
             onOpenSession={(sessionId) => {
@@ -3636,7 +3719,14 @@ function AuthenticatedContent({
         onSelectConversation={handleSelectConversation}
         onNewChat={() => handleNewChat()}
         onOpenWorkspace={handleOpenWorkspaceFromPalette}
-        onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
+        onOpenScheduledTasks={() => {
+          setIsScheduledTasksOpen(true);
+          setIsSkillsOpen(false);
+        }}
+        onOpenSkills={() => {
+          setIsSkillsOpen(true);
+          setIsScheduledTasksOpen(false);
+        }}
         onOpenArchive={() => {
           window.dispatchEvent(new CustomEvent("const:open-archive-modal"));
         }}

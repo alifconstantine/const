@@ -9,12 +9,31 @@ import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
 
+export interface ActiveSlashToken {
+  range: [number, number];
+  query: string;
+}
+
+export function activeSlashToken(text: string, cursorOffset: number): ActiveSlashToken | null {
+  const textBefore = text.slice(0, cursorOffset);
+  const match = /(?:^|\s)\/([a-zA-Z0-9_-]*)$/.exec(textBefore);
+  if (!match) return null;
+  const query = match[1] ?? "";
+  const slashIndex = textBefore.length - query.length - 1;
+  return {
+    range: [slashIndex, cursorOffset],
+    query,
+  };
+}
+
 export interface RichMentionEditorRef {
   focus: () => void;
   insertMention: (candidate: MentionCandidate) => void;
+  insertSkillMention: (skill: { id: string; name: string; slug: string; category?: string }) => void;
   drillDirectory: (candidate: MentionCandidate) => void;
   insertText: (text: string) => void;
   insertAt: () => void;
+  insertSlash: () => void;
   insertCommand: (cmd: string) => void;
   clear: () => void;
   getText: () => string;
@@ -29,6 +48,7 @@ export interface RichMentionEditorProps {
   className?: string;
   onSerializedChange?: (value: string) => void;
   onMentionTokenChange?: (token: ActiveAtToken | null) => void;
+  onSlashTokenChange?: (token: ActiveSlashToken | null) => void;
   onOpenFilePreview?: (path: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
   onSend?: () => void;
@@ -48,6 +68,10 @@ export function getMentionIconMarkup({
   kind?: string;
   fileType?: string;
 }): string {
+  if (kind === "skill") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><path d="m18 2 4 4-10 10H8v-4L18 2Z"/><path d="m14 6 4 4"/><path d="M4 12v8a2 2 0 0 0 2 2h8"/><path d="m21.5 13-1.5-1.5-1.5 1.5 1.5 1.5Z"/><path d="m3 3 1.5 1.5L3 6l-1.5-1.5Z"/></svg>`;
+  }
+
   if (kind === "directory") {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-[#888888] dark:text-[#a0a0a0] shrink-0 inline-block"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
   }
@@ -78,19 +102,22 @@ export function renderMentionBadgeHtml({
   kind?: string;
   fileType?: string;
 }): string {
+  const isSkill = kind === "skill" || href.startsWith("skill://");
   const isSession =
-    kind === "session" ||
-    href.startsWith("trajectory://") ||
-    href.startsWith("conversation://") ||
-    href.includes("transcript.jsonl") ||
-    href.includes("brain/");
+    !isSkill &&
+    (kind === "session" ||
+      href.startsWith("trajectory://") ||
+      href.startsWith("conversation://") ||
+      href.includes("transcript.jsonl") ||
+      href.includes("brain/"));
 
   const isDirectory =
+    !isSkill &&
     !isSession &&
     (kind === "directory" || href.startsWith("folder://") || title.endsWith("/") || href.endsWith("/"));
 
-  const resolvedKind = isSession ? "session" : isDirectory ? "directory" : (kind || "file");
-  const cleanTitle = title.replace(/^[\s💬📁📄]+/, "").replace(/\/$/, "");
+  const resolvedKind = isSkill ? "skill" : isSession ? "session" : isDirectory ? "directory" : (kind || "file");
+  const cleanTitle = title.replace(/^[\s💬📁📄✨]+/, "").replace(/\/$/, "");
 
   const iconHtml = getMentionIconMarkup({
     title: cleanTitle,
@@ -98,13 +125,15 @@ export function renderMentionBadgeHtml({
     fileType,
   });
 
-  const tooltip = isSession
+  const tooltip = isSkill
+    ? `Skill: ${cleanTitle}`
+    : isSession
     ? `Trajectory: ${cleanTitle} • Click to view`
     : isDirectory
     ? `Directory: ${cleanTitle} • Click to open`
     : `File: ${cleanTitle} • Click to preview`;
 
-  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" title="${tooltip}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${cleanTitle}</span></a>`;
+  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" data-mention-kind="${resolvedKind}" title="${tooltip}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${cleanTitle}</span></a>`;
 }
 
 /**
@@ -126,14 +155,17 @@ function createMentionBadgeElement(
   badge.contentEditable = "false";
   badge.setAttribute("data-mention-token", "true");
 
-  const isSession =
-    candidate.kind === "session" ||
-    Boolean(candidate.conversationId) ||
-    (candidate.path && candidate.path.includes("transcript.jsonl"));
-
   const targetPath = candidate.fullPath || candidate.path || candidate.title;
+  const isSkill = candidate.kind === "skill" || targetPath.startsWith("skill://");
+  const isSession =
+    !isSkill &&
+    (candidate.kind === "session" ||
+      Boolean(candidate.conversationId) ||
+      (candidate.path && candidate.path.includes("transcript.jsonl")));
+
+  const resolvedKind = isSkill ? "skill" : isSession ? "session" : (candidate.kind || "file");
   badge.setAttribute("data-mention-path", targetPath);
-  badge.setAttribute("data-mention-kind", isSession ? "session" : (candidate.kind || "file"));
+  badge.setAttribute("data-mention-kind", resolvedKind);
   badge.setAttribute("data-mention-title", candidate.title);
   if (candidate.conversationId) {
     badge.setAttribute("data-mention-id", candidate.conversationId);
@@ -141,14 +173,16 @@ function createMentionBadgeElement(
 
   badge.className =
     "inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors group";
-  badge.title = isSession
+  badge.title = isSkill
+    ? `Skill: ${candidate.title}`
+    : isSession
     ? `Trajectory: ${candidate.title} • Click to view`
     : `Click to preview ${candidate.title}`;
 
-  const cleanName = candidate.title.replace(/\/$/, "");
+  const cleanName = candidate.title.replace(/^[\s💬📁📄✨]+/, "").replace(/\/$/, "");
   const iconHtml = getMentionIconMarkup({
     title: cleanName,
-    kind: isSession ? "session" : (candidate.kind || "file"),
+    kind: resolvedKind,
     fileType: candidate.fileType,
   });
 
@@ -205,7 +239,10 @@ function serializeContainer(container: Node, forActiveToken = false): string {
           const kind = el.getAttribute("data-mention-kind") || "file";
           const title = el.getAttribute("data-mention-title") || "";
           const path = el.getAttribute("data-mention-path") || title;
-          if (kind === "session") {
+          if (kind === "skill") {
+            const cleanPath = path.startsWith("skill://") ? path : `skill://${path}`;
+            result += `/[${title}](${cleanPath})`;
+          } else if (kind === "session") {
             const cleanTitle = title || path.split("/").filter(Boolean).pop() || "Chat";
             result += `@[${cleanTitle}](${path})`;
           } else {
@@ -244,6 +281,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       className,
       onSerializedChange,
       onMentionTokenChange,
+      onSlashTokenChange,
       onOpenFilePreview,
       onOpenTrajectory,
       onSend,
@@ -283,7 +321,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       lastEmittedValueRef.current = serialized;
       onSerializedChange?.(serialized);
 
-      // Check activeAtToken based on cursor position
+      // Check activeAtToken and activeSlashToken based on cursor position
       try {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
@@ -300,16 +338,26 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
             const token = activeAtToken(textBeforeCaret, textBeforeCaret.length);
             onMentionTokenChange?.(token);
+
+            if (!token) {
+              const slashToken = activeSlashToken(textBeforeCaret, textBeforeCaret.length);
+              onSlashTokenChange?.(slashToken);
+            } else {
+              onSlashTokenChange?.(null);
+            }
           } else {
             onMentionTokenChange?.(null);
+            onSlashTokenChange?.(null);
           }
         } else {
           onMentionTokenChange?.(null);
+          onSlashTokenChange?.(null);
         }
       } catch {
         onMentionTokenChange?.(null);
+        onSlashTokenChange?.(null);
       }
-    }, [onSerializedChange, onMentionTokenChange]);
+    }, [onSerializedChange, onMentionTokenChange, onSlashTokenChange]);
 
     const setEditorFromSerializedText = useCallback(
       (text: string) => {
@@ -324,8 +372,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           return;
         }
 
-        // Match @[Title](path) or @[path]
-        const mentionRegex = /@\[([^\]]+)\](?:\(([^)]+)\))?/g;
+        // Match @[Title](path) or /[Title](path) or @[path] or /[path]
+        const mentionRegex = /(?:@|\/)\[([^\]]+)\](?:\(([^)]+)\))?/g;
         let lastIndex = 0;
         let match: RegExpExecArray | null;
 
@@ -335,16 +383,21 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             editor.appendChild(document.createTextNode(before));
           }
 
+          const isSlashBadge = match[0].startsWith("/[");
           const rawTitle = match[1];
           const rawLink = match[2];
           if (!rawTitle) continue;
 
-          let kind: "file" | "directory" | "session" = "file";
+          let kind: "file" | "directory" | "session" | "skill" = isSlashBadge ? "skill" : "file";
           let targetPath = rawLink || rawTitle;
           let displayTitle = rawTitle;
           let convoId: string | undefined = undefined;
 
-          if (rawLink && (rawLink.includes("transcript.jsonl") || rawLink.startsWith("brain/"))) {
+          if (isSlashBadge || (rawLink && rawLink.startsWith("skill://")) || rawTitle.startsWith("skill:")) {
+            kind = "skill";
+            displayTitle = rawTitle.replace(/^skill:/, "");
+            targetPath = rawLink || `skill://${displayTitle}`;
+          } else if (rawLink && (rawLink.includes("transcript.jsonl") || rawLink.startsWith("brain/"))) {
             kind = "session";
             convoId = rawLink.match(/brain\/([^\/\\]+)/)?.[1];
           } else if (rawTitle.startsWith("chat:") || rawTitle.startsWith("session:")) {
@@ -605,6 +658,102 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           saveSelection();
           syncContent();
           onMentionTokenChange?.(null);
+        },
+        insertSlash: () => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+
+          const sel = window.getSelection();
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
+
+          const preRange = document.createRange();
+          preRange.selectNodeContents(editor);
+          preRange.setEnd(range.startContainer, range.startOffset);
+          const temp = document.createElement("div");
+          temp.appendChild(preRange.cloneContents());
+          const textBefore = serializeContainer(temp);
+
+          const needsSpace = textBefore.length > 0 && !/\s$/.test(textBefore);
+          const insertStr = needsSpace ? " /" : "/";
+          const textNode = document.createTextNode(insertStr);
+          range.insertNode(textNode);
+
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+          saveSelection();
+          syncContent();
+        },
+        insertSkillMention: (skill: { id: string; name: string; slug: string; category?: string }) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+
+          const sel = window.getSelection();
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
+
+          // Find and replace active /slash token in text node
+          if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            const node = range.startContainer;
+            const fullText = node.nodeValue || "";
+            const offset = range.startOffset;
+
+            const beforeText = fullText.slice(0, offset);
+            const tokenMatch = /(?:^|\s)\/([a-zA-Z0-9_-]*)$/.exec(beforeText);
+
+            if (tokenMatch) {
+              const matchLen = tokenMatch[1] ? tokenMatch[1].length + 1 : 1;
+              const tokenStart = offset - matchLen;
+              range.setStart(node, tokenStart);
+              range.setEnd(node, offset);
+              range.deleteContents();
+            }
+          }
+
+          // Create badge element with kind="skill" and pencil-sparkles icon
+          const badge = createMentionBadgeElement(
+            {
+              title: skill.name,
+              fullPath: `skill://${skill.slug}`,
+              path: `skill://${skill.slug}`,
+              kind: "skill",
+            },
+            onOpenFilePreview,
+            onOpenTrajectory
+          );
+          range.insertNode(badge);
+
+          const spaceNode = document.createTextNode(" ");
+          badge.after(spaceNode);
+
+          range.setStartAfter(spaceNode);
+          range.setEndAfter(spaceNode);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+
+          saveSelection();
+          syncContent();
+          onSlashTokenChange?.(null);
         },
         drillDirectory: (candidate: MentionCandidate) => {
           const editor = editorRef.current;

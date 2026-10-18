@@ -13,6 +13,7 @@ import {
   Rocket,
   Search,
   Settings,
+  PencilSparkles,
   X,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
@@ -38,6 +39,7 @@ export interface CommandPaletteModalProps {
   onNewChat?: () => void;
   onOpenWorkspace?: () => void;
   onOpenScheduledTasks?: () => void;
+  onOpenSkills?: () => void;
   onOpenArchive?: () => void;
   onOpenSettings?: (tab?: string) => void;
   onToggleSidebar?: () => void;
@@ -143,6 +145,7 @@ export function CommandPaletteModal({
   onNewChat,
   onOpenWorkspace,
   onOpenScheduledTasks,
+  onOpenSkills,
   onOpenArchive,
   onOpenSettings,
   onToggleSidebar,
@@ -303,6 +306,16 @@ export function CommandPaletteModal({
         run: () => {
           onClose();
           onOpenScheduledTasks?.();
+        },
+      },
+      {
+        id: "act-skills",
+        title: t("skillsTitle") || "Agent Skills",
+        icon: <PencilSparkles size={16} />,
+        category: "tools",
+        run: () => {
+          onClose();
+          onOpenSkills?.();
         },
       },
       {

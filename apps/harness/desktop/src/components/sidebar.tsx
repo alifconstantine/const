@@ -61,6 +61,7 @@ import {
   ZoomIn,
   BarChart2,
   Check,
+  PencilSparkles,
 } from "lucide-react";
 import { AutoScrollTitle } from "./auto-scroll-title";
 import {
@@ -104,6 +105,8 @@ interface SidebarProps {
   onOpenSettings?: (tab?: string) => void;
   onOpenScheduledTasks?: () => void;
   isScheduledTasksActive?: boolean;
+  onOpenSkills?: () => void;
+  isSkillsActive?: boolean;
   onOpenSearch?: () => void;
 }
 
@@ -177,6 +180,8 @@ export function Sidebar({
   onOpenSettings,
   onOpenScheduledTasks,
   isScheduledTasksActive,
+  onOpenSkills,
+  isSkillsActive,
   onOpenSearch,
 }: SidebarProps) {
   const [theme, setTheme] = useTheme();
@@ -774,6 +779,24 @@ export function Sidebar({
                 : "text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white"
             }`} />
             <span>{t("sidebar.scheduledTasks")}</span>
+          </button>
+
+          {/* Agent Skills (matching learn home sidebar) */}
+          <button
+            type="button"
+            onClick={onOpenSkills}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
+              isSkillsActive
+                ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                : "text-[#666666] dark:text-[#999999]"
+            }`}
+          >
+            <PencilSparkles className={`w-4 h-4 transition-colors ${
+              isSkillsActive
+                ? "text-primary"
+                : "text-[#777777] dark:text-[#888888] group-hover:text-primary"
+            }`} />
+            <span>{t("settings.skills") || "Agent Skills"}</span>
           </button>
         </div>
 

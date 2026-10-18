@@ -25,6 +25,7 @@ import {
   Database,
   Box,
   Eye,
+  PencilSparkles,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -54,8 +55,12 @@ import {
 } from "../../lib/mention-search";
 import { MentionPopover } from "./mention-popover";
 import { FileIcon } from "./file-icon";
-import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
+import { RichMentionEditor, type RichMentionEditorRef, type ActiveSlashToken } from "./rich-mention-editor";
 import { QueueDock, type QueuedMessageItem } from "./queue-dock";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, type LocalSkill } from "../../lib/db";
+import { SkillSlashPopover, orderSkillsBySections } from "./skill-slash-popover";
+import { extractSkillsAndAugmentPrompt } from "../../lib/skills/skills-service";
 
 
 function formatTokenDisplay(tokens: number): string {
@@ -619,6 +624,38 @@ export function ChatCard({
     setMentionToken(null);
     setMentionIndex(0);
   };
+
+  // Skills from Dexie Database
+  const rawSkills = useLiveQuery(() => db.skills.toArray(), []);
+  const availableSkills: LocalSkill[] = useMemo(() => {
+    return (rawSkills || []).filter((s) => s.isEnabled);
+  }, [rawSkills]);
+
+  // Slash token state for SkillSlashPopover
+  const [slashToken, setSlashToken] = useState<ActiveSlashToken | null>(null);
+  const [slashSkillIndex, setSlashSkillIndex] = useState(0);
+
+  const filteredSkills = useMemo(() => {
+    if (!slashToken) return [];
+    const q = slashToken.query.toLowerCase().trim();
+    const matches = availableSkills.filter((s) => {
+      if (!q) return true;
+      return (
+        s.slug.toLowerCase().includes(q) ||
+        s.name.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        (s.category && s.category.toLowerCase().includes(q))
+      );
+    });
+    return matches;
+  }, [slashToken, availableSkills]);
+
+  const handleSelectSkill = (skill: LocalSkill) => {
+    if (!skill) return;
+    editorRef.current?.insertSkillMention(skill);
+    setSlashToken(null);
+    setSlashSkillIndex(0);
+  };
   const [isProjectOpen, setIsProjectOpen] = useState(false);
   const [searchWorkspace, setSearchWorkspace] = useState("");
   const [workspaces, setWorkspaces] = useState<string[]>(() => {
@@ -1082,10 +1119,14 @@ export function ChatCard({
     editorRef.current?.clear();
     setAttachments([]);
 
+    // Augment prompt if skills are referenced (/slug or inline mention badges)
+    const { augmentedPrompt } = extractSkillsAndAugmentPrompt(text, availableSkills);
+    const finalPrompt = augmentedPrompt;
+
     if (isExecuting) {
       if (onQueueMessage) {
         onQueueMessage({
-          prompt: text,
+          prompt: finalPrompt,
           attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
         });
       }
@@ -1094,7 +1135,7 @@ export function ChatCard({
 
     const matchedModel = models.find((m) => m.name === selectedModel || m.id === selectedModel);
     onSendMessage?.({
-      prompt: text,
+      prompt: finalPrompt,
       project: currentProject,
       mode,
       model: matchedModel?.id || currentModelItem?.id || "gemini-3.8-flash",
@@ -1117,9 +1158,11 @@ export function ChatCard({
     editorRef.current?.clear();
     setAttachments([]);
 
+    const { augmentedPrompt } = extractSkillsAndAugmentPrompt(text, availableSkills);
+
     if (onSteerDraft) {
       onSteerDraft({
-        prompt: text,
+        prompt: augmentedPrompt,
         attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
       });
     }
@@ -1192,10 +1235,17 @@ export function ChatCard({
     setIsContextOpen(false);
     setIsPlusOpen(false);
     setMentionToken(null);
+    setSlashToken(null);
   };
 
   const isAnyBottomMenuOpen =
-    isPlusOpen || isModeOpen || isContextOpen || isModelOpen || isThinkingOpen || Boolean(mentionToken);
+    isPlusOpen ||
+    isModeOpen ||
+    isContextOpen ||
+    isModelOpen ||
+    isThinkingOpen ||
+    Boolean(mentionToken) ||
+    Boolean(slashToken);
 
   return (
     <div
@@ -1368,6 +1418,18 @@ export function ChatCard({
               />
             )}
 
+            {/* Skill Slash Popover (/) */}
+            {slashToken && (
+              <SkillSlashPopover
+                skills={filteredSkills}
+                selectedIndex={slashSkillIndex}
+                query={slashToken.query}
+                onSelect={handleSelectSkill}
+                onHover={(idx) => setSlashSkillIndex(idx)}
+                onOpenSettings={() => onOpenSettings?.("skills")}
+              />
+            )}
+
             {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
             {attachments.length > 0 && (
               <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
@@ -1487,6 +1549,10 @@ export function ChatCard({
               initialValue={initialPrompt || ""}
               onSerializedChange={handleSerializedChange}
               onMentionTokenChange={handleMentionTokenChange}
+              onSlashTokenChange={(tok) => {
+                setSlashToken(tok);
+                setSlashSkillIndex(0);
+              }}
               onOpenFilePreview={onOpenFilePreview}
               onOpenTrajectory={onOpenTrajectory}
               onSend={handleSend}
@@ -1498,6 +1564,33 @@ export function ChatCard({
               }
               disabled={false}
               onKeyDown={(e) => {
+                // Skills Slash Popover Keyboard Navigation
+                if (slashToken && filteredSkills.length > 0) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSlashSkillIndex((prev) => (prev + 1) % filteredSkills.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSlashSkillIndex((prev) => (prev - 1 + filteredSkills.length) % filteredSkills.length);
+                    return;
+                  }
+                  if (e.key === "Tab" || e.key === "Enter") {
+                    e.preventDefault();
+                    const skill = filteredSkills[slashSkillIndex];
+                    if (skill) {
+                      handleSelectSkill(skill);
+                    }
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setSlashToken(null);
+                    return;
+                  }
+                }
+
                 if (mentionToken && mentionCandidates.length > 0) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
@@ -1652,6 +1745,19 @@ export function ChatCard({
                     >
                       <AtSign className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
                       <span className="text-[13px]">{t("workbench.mentions")}</span>
+                    </button>
+
+                    {/* 2.5 Skills (/) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusOpen(false);
+                        editorRef.current?.insertSlash();
+                      }}
+                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
+                    >
+                      <PencilSparkles className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-[13px]">Skills (/)</span>
                     </button>
 
                     {/* 3. Actions */}

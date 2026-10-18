@@ -490,6 +490,7 @@ export interface TranslationDictionary {
     verify: string;
     allRightsReserved: string;
   };
+  [key: string]: any;
 }
 
 export type SupportedLanguage = "en" | "id" | "ja" | "zh" | "es";

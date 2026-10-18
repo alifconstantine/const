@@ -55,6 +55,7 @@ import {
 } from "../lib/theme";
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
+import { SkillsSettings } from "./settings/skills-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation } from "../lib/i18n";
 
@@ -1226,6 +1227,11 @@ export function SettingsView({
               /* Memory Settings View                                      */
               /* --------------------------------------------------------- */
               <MemorySettings currentProject={currentProject} />
+            ) : activeTab === "skills" ? (
+              /* --------------------------------------------------------- */
+              /* Agent Skills Settings View                                */
+              /* --------------------------------------------------------- */
+              <SkillsSettings />
             ) : (
               /* --------------------------------------------------------- */
               /* Generic Placeholder for other capabilities                */
