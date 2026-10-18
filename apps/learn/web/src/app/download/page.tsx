@@ -9,14 +9,6 @@ import Footer from '../../components/Footer';
 import CustomCursor from '../../components/CustomCursor';
 
 type PlatformCategory = 'desktop' | 'mobile';
-type LinuxPkg = 'pacman' | 'aur' | 'apt' | 'dnf';
-
-const linuxCommands: Record<LinuxPkg, string> = {
-  pacman: 'sudo pacman -S constlearn',
-  aur: 'yay -S const-learn-bin',
-  apt: 'sudo apt install ./const-learn.deb',
-  dnf: 'sudo dnf install ./const-learn.rpm',
-};
 
 interface DownloadTarget {
   id: string;
@@ -31,14 +23,13 @@ export default function DownloadPage() {
   const { t } = useI18n();
   const [category, setCategory] = useState<PlatformCategory>('desktop');
   const [downloadToast, setDownloadToast] = useState<string | null>(null);
-  const [linuxPkg, setLinuxPkg] = useState<LinuxPkg>('pacman');
-  const [copiedCmd, setCopiedCmd] = useState(false);
 
   const targets: Record<string, DownloadTarget> = {
     'mac-arm64': { id: 'mac-arm64', filename: 'Const-Learn-0.0.1-arm64.dmg', url: `${RELEASES_BASE_URL}/Const-Learn-0.0.1-arm64.dmg` },
     'mac-intel': { id: 'mac-intel', filename: 'Const-Learn-0.0.1-x64.dmg', url: `${RELEASES_BASE_URL}/Const-Learn-0.0.1-x64.dmg` },
-    'win-x64': { id: 'win-x64', filename: 'Const-Learn-Setup-0.0.1-x64.exe', url: `${RELEASES_BASE_URL}/Const-Learn-Setup-0.0.1-x64.exe` },
-    'win-arm64': { id: 'win-arm64', filename: 'Const-Learn-Setup-0.0.1-arm64.exe', url: `${RELEASES_BASE_URL}/Const-Learn-Setup-0.0.1-arm64.exe` },
+    'win-x64': { id: 'win-x64', filename: 'Const.Learn.Setup.0.0.1-x64.exe', url: `${RELEASES_BASE_URL}/Const.Learn.Setup.0.0.1-x64.exe` },
+    'win-arm64': { id: 'win-arm64', filename: 'Const.Learn.Setup.0.0.1-arm64.exe', url: `${RELEASES_BASE_URL}/Const.Learn.Setup.0.0.1-arm64.exe` },
+    'win-universal': { id: 'win-universal', filename: 'Const.Learn.Setup.0.0.1.exe', url: `${RELEASES_BASE_URL}/Const.Learn.Setup.0.0.1.exe` },
     'linux-deb': { id: 'linux-deb', filename: 'const-learn_0.0.1_amd64.deb', url: `${RELEASES_BASE_URL}/const-learn_0.0.1_amd64.deb` },
     'linux-rpm': { id: 'linux-rpm', filename: 'const-learn-0.0.1.x86_64.rpm', url: `${RELEASES_BASE_URL}/const-learn-0.0.1.x86_64.rpm` },
     'linux-appimage': { id: 'linux-appimage', filename: 'Const-Learn-0.0.1-x86_64.AppImage', url: `${RELEASES_BASE_URL}/Const-Learn-0.0.1-x86_64.AppImage` },
@@ -73,15 +64,6 @@ export default function DownloadPage() {
     document.body.removeChild(a);
   };
 
-  const handleCopyCommand = (cmd: string) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(cmd);
-      setCopiedCmd(true);
-      setTimeout(() => {
-        setCopiedCmd(false);
-      }, 2000);
-    }
-  };
 
   return (
     <div
@@ -238,66 +220,43 @@ export default function DownloadPage() {
               </div>
 
               {/* Column 3: Linux */}
-              <div className="flex flex-col gap-3 font-sans">
+              <div className="flex flex-col gap-3 font-sans opacity-85">
                 <div className="flex items-center gap-2 px-1 mb-1">
                   <BrandLogo id="linux" size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent" />
                   <h2 className="text-lg font-semibold text-zinc-900 dark:text-white tracking-tight font-sans">Linux</h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold uppercase tracking-wider bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                    Beta
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Soon
                   </span>
                 </div>
 
-                {/* Linux Terminal Package Manager Card */}
-                <div className="w-full flex flex-col justify-between p-4 rounded-2xl border border-zinc-200 dark:border-[#262626] bg-white dark:bg-[#18181b] shadow-xs font-sans min-h-[124px]">
-                  {/* Top bar: package manager pills & copy button */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-[#27272a] border border-zinc-200/80 dark:border-white/5">
-                      {(['pacman', 'aur', 'apt', 'dnf'] as const).map((pkg) => (
-                        <button
-                          key={pkg}
-                          type="button"
-                          onClick={() => setLinuxPkg(pkg)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
-                            linuxPkg === pkg
-                              ? 'bg-white dark:bg-[#1e1e22] text-zinc-900 dark:text-white font-semibold shadow-xs'
-                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                          }`}
-                        >
-                          {pkg}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCopyCommand(linuxCommands[linuxPkg])}
-                      className="inline-flex items-center gap-1.5 text-xs font-sans font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-[#27272a] hover:bg-zinc-200 dark:hover:bg-[#323238] border border-zinc-200/80 dark:border-white/5 transition-all cursor-pointer select-none"
-                      title="Copy install command"
-                    >
-                      {copiedCmd ? (
-                        <>
-                          <svg className="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
+                {/* Linux (x86_64) */}
+                <div className="w-full flex items-center justify-between p-4 rounded-2xl border border-zinc-200/70 dark:border-[#262626]/70 bg-zinc-50/60 dark:bg-[#151517] text-left cursor-not-allowed font-sans select-none shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-medium text-sm text-zinc-500 dark:text-zinc-400 font-sans">
+                      Linux (x86_64)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[11px] font-sans font-medium bg-zinc-100 dark:bg-[#27272a] text-zinc-400 dark:text-zinc-500 border border-zinc-200/50 dark:border-white/5">
+                      .AppImage / pacman
+                    </span>
                   </div>
+                  <span className="text-[11px] font-sans font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    Soon
+                  </span>
+                </div>
 
-                  {/* Command code block styled adaptively */}
-                  <div className="flex items-center gap-2 font-mono text-xs text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-[#121214] px-3.5 py-2.5 rounded-xl border border-zinc-200/70 dark:border-white/5 overflow-x-auto select-all">
-                    <span className="text-zinc-400 dark:text-zinc-500 select-none font-semibold">$</span>
-                    <span className="font-medium tracking-tight whitespace-nowrap">{linuxCommands[linuxPkg]}</span>
+                {/* Linux (ARM64) */}
+                <div className="w-full flex items-center justify-between p-4 rounded-2xl border border-zinc-200/70 dark:border-[#262626]/70 bg-zinc-50/60 dark:bg-[#151517] text-left cursor-not-allowed font-sans select-none shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-medium text-sm text-zinc-500 dark:text-zinc-400 font-sans">
+                      Linux (ARM64)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[11px] font-sans font-medium bg-zinc-100 dark:bg-[#27272a] text-zinc-400 dark:text-zinc-500 border border-zinc-200/50 dark:border-white/5">
+                      .AppImage
+                    </span>
                   </div>
+                  <span className="text-[11px] font-sans font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    Soon
+                  </span>
                 </div>
               </div>
             </motion.div>

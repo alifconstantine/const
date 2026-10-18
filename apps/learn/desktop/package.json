@@ -30,7 +30,7 @@
     ],
     "win": {
       "icon": "build/icon.ico",
-      "artifactName": "${productName} Setup ${version}-${arch}.${ext}",
+      "artifactName": "Const.Learn.Setup.${version}-${arch}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -51,7 +51,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "${productName} Setup ${version}-${arch}.${ext}",
+      "artifactName": "Const.Learn.Setup.${version}-${arch}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
