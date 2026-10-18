@@ -70,21 +70,6 @@ export function FileIcon({
   const ext = basename.includes(".") ? basename.split(".").pop() || "" : basename;
 
   const renderIcon = () => {
-    // 0. Folder / Directory Check
-    if (
-      filename.endsWith("/") ||
-      filename.endsWith("\\") ||
-      ext === "directory" ||
-      ext === "folder" ||
-      (!basename.includes(".") && ["app", "components", "public", "src", "assets", "lib", "locales", "dist", "build", "node_modules", "electron", "pages", "styles", "routes"].includes(basename))
-    ) {
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 fill-amber-500/20 w-full h-full shrink-0 inline-block">
-          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
-        </svg>
-      );
-    }
-
     // 1. Vite Config -> Official Vite logo
     if (basename.startsWith("vite.config") || ext === "vite") {
       return <Vite className="w-full h-full shrink-0" />;

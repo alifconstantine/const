@@ -799,44 +799,23 @@ function AuthenticatedContent({
 
   const handleOpenFilePreview = (filePath: string, content?: string) => {
     setIsRightSidebarOpen(true);
-    let cleanPath = filePath;
-    let targetLine: number | undefined;
-
-    if (cleanPath.includes("#L")) {
-      const parts = cleanPath.split("#L");
-      cleanPath = parts[0] || "";
-      const l = parts[1] || "";
-      const parsed = parseInt(l, 10);
-      if (!isNaN(parsed)) targetLine = parsed;
-    } else if (cleanPath.includes("#")) {
-      cleanPath = cleanPath.split("#")[0] || "";
-    }
-
     const fileName =
-      cleanPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
-      cleanPath ||
+      filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
+      filePath ||
       "Preview";
 
-    const currentWp = currentProject === "Outside Project" ? undefined : currentProject;
-
     const existing = rightPaneTabs.find(
-      (t) => t.type === "file_preview" && (t.filePath === cleanPath || t.title === fileName)
+      (t) => t.type === "file_preview" && (t.filePath === filePath || t.title === fileName)
     );
 
     if (existing) {
-      setRightPaneTabs((prev) =>
-        prev.map((t) =>
-          t.id === existing.id
-            ? {
-                ...t,
-                filePath: cleanPath,
-                workspacePath: currentWp,
-                targetLine: targetLine || t.targetLine,
-                ...(content !== undefined ? { newContent: content } : {}),
-              }
-            : t
-        )
-      );
+      if (content !== undefined) {
+        setRightPaneTabs((prev) =>
+          prev.map((t) =>
+            t.id === existing.id ? { ...t, filePath, newContent: content } : t
+          )
+        );
+      }
       setActiveRightPaneTabId(existing.id);
       setIsOpeningNewTab(false);
       return;
@@ -846,9 +825,7 @@ function AuthenticatedContent({
       id: `preview_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: "file_preview",
       title: fileName,
-      filePath: cleanPath,
-      workspacePath: currentWp,
-      targetLine,
+      filePath,
       newContent: content,
     };
     setRightPaneTabs((prev) => [...prev, newTab]);
@@ -3733,7 +3710,7 @@ export default function App() {
                             value={manualToken}
                             onChange={(e) => setManualToken(e.target.value)}
                             placeholder="eyJhbGciOi..."
-                            className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none transition-colors"
+                            className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none focus:border-[#5d5d5d]"
                           />
                           <Button
                             type="submit"

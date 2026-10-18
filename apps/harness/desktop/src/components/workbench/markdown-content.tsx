@@ -14,53 +14,6 @@ interface MarkdownContentProps {
   variant?: "default" | "user";
 }
 
-const KNOWN_FILE_EXTENSIONS = new Set([
-  "js", "jsx", "mjs", "cjs",
-  "ts", "tsx", "mts", "cts",
-  "css", "scss", "sass", "less",
-  "html", "htm",
-  "json", "jsonc", "json5",
-  "yaml", "yml", "toml", "xml",
-  "md", "markdown", "mdx", "txt", "pdf",
-  "py", "pyw", "go", "rs", "java", "c", "cpp", "cxx", "cc", "h", "hpp", "cs",
-  "php", "rb", "kt", "kts", "swift", "dart", "vue", "svelte", "astro",
-  "sql", "sqlite", "sh", "bash", "zsh", "ps1", "bat", "cmd",
-  "sol", "lua", "zig", "r",
-  "png", "jpg", "jpeg", "gif", "svg", "webp", "ico",
-  "zip", "tar", "gz",
-  "lock", "env"
-]);
-
-function isFileCandidate(str: string): boolean {
-  const trimmed = str.trim().replace(/^`+|`+$/g, "");
-  if (!trimmed || trimmed.includes(" ") || trimmed.includes("\n") || trimmed.includes(";") || trimmed.includes("<") || trimmed.includes(">") || trimmed.includes("=") || trimmed.includes("(")) {
-    return false;
-  }
-  const normalized = trimmed.replace(/\\/g, "/");
-  const clean = normalized.split("#")[0] || "";
-  const base = clean.split("/").filter(Boolean).pop() || "";
-  if (!base) return false;
-
-  const lower = base.toLowerCase();
-  if (lower === "dockerfile" || lower === "package.json" || lower.startsWith(".env") || lower === "agents.md") {
-    return true;
-  }
-
-  const parts = base.split(".");
-  if (parts.length < 2) return false;
-  const ext = parts.pop()?.toLowerCase() || "";
-  return KNOWN_FILE_EXTENSIONS.has(ext);
-}
-
-function isDirCandidate(str: string): boolean {
-  const trimmed = str.trim().replace(/^`+|`+$/g, "");
-  if (!trimmed || trimmed.includes(" ") || trimmed.includes("\n") || trimmed.includes(";") || trimmed.includes("<") || trimmed.includes(">") || trimmed.includes("=") || trimmed.includes("(")) {
-    return false;
-  }
-  const normalized = trimmed.replace(/\\/g, "/");
-  return (normalized.endsWith("/") || normalized.endsWith("\\")) && normalized.length > 1;
-}
-
 export function MarkdownContent({
   content,
   className = "",
@@ -76,15 +29,8 @@ export function MarkdownContent({
     breaks: true,
   });
 
-  // 0. Mask fenced code blocks so we never touch sample code blocks inside markdown
-  const codeBlocks: string[] = [];
-  let processed = content.replace(/```[\s\S]*?```/g, (match) => {
-    codeBlocks.push(match);
-    return `__FENCED_CODE_BLOCK_${codeBlocks.length - 1}__`;
-  });
-
   // 1. Normalize @[Title](path) mentions into native badge pills matching AI input
-  processed = processed.replace(/@\[([^\]]+)\](?:\(([^)]+)\))/g, (_, label, path) => {
+  let processed = content.replace(/@\[([^\]]+)\](?:\(([^)]+)\))/g, (_, label, path) => {
     const trimmedLabel = label.trim();
     const trimmedPath = path.trim().replace(/\\/g, "/");
     let kind = "file";
@@ -129,73 +75,19 @@ export function MarkdownContent({
     return renderMentionBadgeHtml({ href, title, kind });
   });
 
-  // 3. Normalize status-prefixed file mentions (e.g. [M+ AGENTS.md], (M+ apps/.../AGENTS.md), [TS src/.../types.ts])
-  processed = processed.replace(
-    /(?:\[|\()?(M\+|A\+|D\-|\bTS\b|\bJS\b|\bPY\b|\bMD\b)\s+([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)(?:\]|\))?/g,
-    (_, status, filePath) => {
-      const norm = filePath.replace(/\\/g, "/");
-      return renderMentionBadgeHtml({
-        href: `file:///${norm}`,
-        title: norm,
-        status,
-        kind: "file",
-      });
+  // 3. Normalize any previously formatted links: [💬 Title](trajectory://...), [📁 Title](folder://...), [Title](file://...)
+  processed = processed.replace(/\[(?:💬|📁|📄)?\s*([^\]]+)\]\((trajectory:\/\/[^)]+|folder:\/\/\/[^)]+|file:\/\/\/[^)]+)\)/g, (_, label, href) => {
+    const cleanLabel = label.trim().replace(/^[\s💬📁📄]+/, "");
+    let kind = "file";
+    if (href.startsWith("trajectory://")) {
+      kind = "session";
+    } else if (href.startsWith("folder://") || cleanLabel.endsWith("/")) {
+      kind = "directory";
     }
-  );
-
-  // 4. Normalize markdown links to files or folders: [label](href)
-  processed = processed.replace(
-    /\[(?:💬|📁|📄)?\s*([^\]]+)\]\(([^)]+)\)/g,
-    (original, rawLabel, rawHref) => {
-      const cleanLabel = rawLabel.trim().replace(/^[`\s💬📁📄]+/, "").replace(/[`\s]+$/, "");
-      const cleanHref = rawHref.trim().replace(/^[`\s]+/, "").replace(/[`\s]+$/, "").replace(/\\/g, "/");
-
-      if (cleanHref.startsWith("trajectory://") || cleanHref.startsWith("conversation://")) {
-        return renderMentionBadgeHtml({ href: cleanHref, title: cleanLabel, kind: "session" });
-      }
-
-      if (cleanHref.startsWith("folder://") || isDirCandidate(cleanHref) || isDirCandidate(cleanLabel)) {
-        const path = cleanHref.replace(/^folder:\/\/\/?/i, "");
-        return renderMentionBadgeHtml({ href: `folder:///${path}`, title: cleanLabel, kind: "directory" });
-      }
-
-      if (
-        cleanHref.startsWith("file://") ||
-        cleanHref.startsWith("file;") ||
-        isFileCandidate(cleanHref) ||
-        isFileCandidate(cleanLabel)
-      ) {
-        let normHref = cleanHref.replace(/^file;file:\/\/\/?/i, "").replace(/^file:\/\/\/?/i, "").replace(/^file;/i, "");
-        return renderMentionBadgeHtml({ href: `file:///${normHref}`, title: cleanLabel, kind: "file" });
-      }
-
-      return original;
-    }
-  );
-
-  // 5. Normalize inline code with file or folder paths (e.g. `layout.jsx`, `globals.css`, `app/`, `download/page.jsx`)
-  processed = processed.replace(/`([^`\r\n]+)`/g, (original, code) => {
-    const trimmed = code.trim();
-    if (isDirCandidate(trimmed)) {
-      const norm = trimmed.replace(/\\/g, "/");
-      return renderMentionBadgeHtml({
-        href: `folder:///${norm}`,
-        title: norm,
-        kind: "directory",
-      });
-    }
-    if (isFileCandidate(trimmed)) {
-      const norm = trimmed.replace(/\\/g, "/");
-      return renderMentionBadgeHtml({
-        href: `file:///${norm}`,
-        title: norm,
-        kind: "file",
-      });
-    }
-    return original;
+    return renderMentionBadgeHtml({ href, title: cleanLabel, kind });
   });
 
-  // 6. Normalize standalone file/folder mentions like @"path/to/dir/" or @src/index.ts
+  // 4. Normalize standalone file/folder mentions like @"path/to/dir/" or @src/index.ts
   processed = processed.replace(/(^|[\s(])@(?:"([^"]+)"|([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-./\\]+\/))(?=$|[\s),.?!])/g, (match, prefix, quotedPath, unquotedPath) => {
     const raw = quotedPath || unquotedPath;
     if (!raw) return match;
@@ -210,14 +102,9 @@ export function MarkdownContent({
     return `${prefix}${renderMentionBadgeHtml({ href, title, kind })}`;
   });
 
-  // 7. Normalize file;file:/// or file; links into valid file:/// links for marked
+  // Normalize file;file:/// or file; links into valid file:/// links for marked
   processed = processed.replace(/\]\(file;file:\/\/\/?/gi, "](file:///");
   processed = processed.replace(/\]\(file;/gi, "](file:///");
-
-  // 8. Restore masked fenced code blocks
-  processed = processed.replace(/__FENCED_CODE_BLOCK_(\d+)__/g, (_, idx) => {
-    return codeBlocks[Number(idx)] || "";
-  });
 
   // Normalize single-space indented list items so they parse cleanly into nested lists
   const normalizedContent = processed.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
@@ -231,21 +118,19 @@ export function MarkdownContent({
     if (!target) return;
 
     const href = target.getAttribute("href") || "";
-    const mentionPath = target.getAttribute("data-mention-path");
-    const mentionKind = target.getAttribute("data-mention-kind");
 
     // Trajectory / Conversation links
-    if (href.startsWith("trajectory://") || href.startsWith("conversation://") || mentionKind === "session") {
+    if (href.startsWith("trajectory://") || href.startsWith("conversation://")) {
       e.preventDefault();
-      const targetIdOrPath = (mentionPath || href).replace(/^(?:trajectory|conversation):\/\/\/?/i, "");
+      const targetIdOrPath = href.replace(/^(?:trajectory|conversation):\/\/\/?/i, "");
       onOpenTrajectory?.(targetIdOrPath);
       return;
     }
 
     // Folder links
-    if (href.startsWith("folder://") || href.endsWith("/") || mentionKind === "directory") {
+    if (href.startsWith("folder://") || href.endsWith("/")) {
       e.preventDefault();
-      let cleanDir = (mentionPath || href).replace(/^folder:\/\/\/?/i, "").replace(/^file:\/\/\/?/i, "");
+      let cleanDir = href.replace(/^folder:\/\/\/?/i, "").replace(/^file:\/\/\/?/i, "");
       if (/^\/[a-zA-Z]:/i.test(cleanDir)) {
         cleanDir = cleanDir.slice(1);
       }
@@ -262,19 +147,17 @@ export function MarkdownContent({
       href.startsWith("file://") ||
       href.startsWith("file;file://") ||
       href.startsWith("file;") ||
-      /^[a-zA-Z]:[\\/]/.test(href) ||
-      target.hasAttribute("data-mention-token")
+      /^[a-zA-Z]:[\\/]/.test(href)
     ) {
       e.preventDefault();
-      let cleaned = (mentionPath || href)
+      let cleaned = href
         .replace(/^file;file:\/\/\/?/i, "")
         .replace(/^file:\/\/\/?/i, "")
         .replace(/^file;/i, "");
       if (/^\/[a-zA-Z]:/i.test(cleaned)) {
         cleaned = cleaned.slice(1);
       }
-      const [filePathWithoutAnchor] = cleaned.split("#");
-      onOpenFilePreview?.(filePathWithoutAnchor || cleaned);
+      onOpenFilePreview?.(cleaned);
     }
   };
 
