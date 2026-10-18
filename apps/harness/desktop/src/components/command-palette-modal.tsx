@@ -454,7 +454,7 @@ export function CommandPaletteModal({
       >
         {/* Rounded Pill Search Input Box */}
         <div className="flex-none px-4 pt-3.5 pb-2 flex items-center box-border">
-          <div className="flex-1 flex items-center gap-2.5 h-10 px-3.5 rounded-full bg-white/[0.06] border border-white/10 transition-colors duration-150 focus-within:border-blue-500 focus-within:bg-white/[0.08] box-border">
+          <div className="flex-1 flex items-center gap-2.5 h-10 px-3.5 rounded-full bg-white/[0.06] border border-white/10 box-border">
             <Search size={16} className="text-white/45 shrink-0" />
             <input
               ref={inputRef}
