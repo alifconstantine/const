@@ -71,6 +71,7 @@ import {
   setProjectPinned,
   getPinnedProjects,
   isScheduledTaskConversation,
+  isSideChatConversation,
   getCleanConversationTitle,
 } from "../lib/conversation-store";
 import { useTheme, type Theme, useInterfaceZoom } from "../lib/theme";
@@ -360,6 +361,7 @@ export function Sidebar({
     const outside: ConversationItem[] = [];
 
     for (const c of conversations) {
+      if (isSideChatConversation(c)) continue;
       if (!c.project || c.project === "Outside Project") {
         outside.push(c);
       } else {
@@ -412,11 +414,13 @@ export function Sidebar({
 
   // Flat chronologically sorted conversations for Recent view
   const recentConversations = useMemo(() => {
-    return [...conversations].sort((a, b) => {
-      const timeA = a.updatedAt || a.createdAt || 0;
-      const timeB = b.updatedAt || b.createdAt || 0;
-      return timeB - timeA;
-    });
+    return conversations
+      .filter((c) => !isSideChatConversation(c))
+      .sort((a, b) => {
+        const timeA = a.updatedAt || a.createdAt || 0;
+        const timeB = b.updatedAt || b.createdAt || 0;
+        return timeB - timeA;
+      });
   }, [conversations]);
 
   // Auto-expand project or section if the active conversation is beyond VISIBLE_CHATS_LIMIT

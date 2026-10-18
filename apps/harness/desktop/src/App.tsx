@@ -3119,11 +3119,11 @@ function AuthenticatedContent({
             <ScrollArea
               ref={chatScrollRef}
               data-chat-viewport="true"
-              className="flex-1 w-full h-full min-w-0 [&>div>div[style]]:!block"
+              className="flex-1 w-full h-full min-w-0 select-text [&>div>div[style]]:!block"
             >
-              <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6", streamWidthClass)}>
+              <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6 select-text", streamWidthClass)}>
                 {messages.map((msg, idx) => (
-                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col">
+                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col select-text cursor-text">
                     <ChatMessageItem
                       message={msg}
                       idx={idx}
@@ -3152,7 +3152,7 @@ function AuthenticatedContent({
 
                     {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
                     {!isExecuting && msg.role === "assistant" && msg.content && (
-                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
+                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none pointer-events-none group-hover:pointer-events-auto">
                             <button
                               type="button"
                               onClick={() => handleCopyMessage(msg.id, msg.content)}

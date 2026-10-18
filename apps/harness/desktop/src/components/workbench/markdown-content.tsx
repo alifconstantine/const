@@ -165,9 +165,10 @@ export function MarkdownContent({
     <div
       onClick={handleClick}
       className={cn(
+        "cursor-text select-text",
         variant === "user"
-          ? "space-y-1.5 text-[13.5px] leading-relaxed text-[#262626] dark:text-[#ececec] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-white [&_b]:text-[#161616] dark:[&_b]:text-white"
-          : "space-y-3 text-[14px] leading-[1.68] text-[#262626] dark:text-[#d4d4d4] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_b]:text-[#161616] dark:[&_b]:text-[#ececec]",
+          ? "space-y-1.5 text-[13.5px] leading-relaxed text-[#262626] dark:text-[#ececec] font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-white [&_b]:text-[#161616] dark:[&_b]:text-white"
+          : "space-y-3 text-[14px] leading-[1.68] text-[#262626] dark:text-[#d4d4d4] font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_b]:text-[#161616] dark:[&_b]:text-[#ececec]",
         className
       )}
     >
@@ -200,7 +201,7 @@ function TokenRenderer({
           ? "text-[14.5px] font-medium text-[#161616] dark:text-[#e4e4e4] mt-3.5 mb-1 tracking-tight"
           : "text-[13.5px] font-medium text-[#262626] dark:text-[#d4d4d4] mt-3 mb-1";
       return (
-        <Tag className={`${sizeClasses} font-sans`}>
+        <Tag className={`${sizeClasses} font-sans cursor-text select-text`}>
           <InlineRenderer text={heading.text} />
         </Tag>
       );
@@ -213,7 +214,8 @@ function TokenRenderer({
           className={cn(
             variant === "user"
               ? "leading-relaxed text-[#262626] dark:text-[#ececec] m-0 font-sans"
-              : "leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-2 font-sans"
+              : "leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-1.5 last:mb-0 font-sans",
+            "cursor-text select-text"
           )}
         >
           <InlineRenderer text={paragraph.text} />
@@ -242,13 +244,13 @@ function TokenRenderer({
       if (list.ordered) {
         const start = list.start || 1;
         return (
-          <ol className={cn("space-y-2 my-2.5 pl-0.5 text-[#262626] dark:text-[#cfcfcf]", isNested && "my-1.5 pl-2 space-y-1.5")}>
+          <ol className={cn("space-y-2 my-2.5 last:mb-0 pl-0.5 text-[#262626] dark:text-[#cfcfcf] cursor-text select-text", isNested && "my-1.5 pl-2 space-y-1.5")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
-              <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
+              <li key={idx} className="flex items-start gap-2.5 leading-[1.65] cursor-text select-text">
                 <span className="select-none font-sans tabular-nums text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 cursor-text select-text">
                   <ListItemContent item={item} />
                 </div>
               </li>
@@ -257,9 +259,9 @@ function TokenRenderer({
         );
       }
       return (
-        <ul className={cn("space-y-2 my-2.5 pl-0.5 text-[#262626] dark:text-[#cfcfcf]", isNested && "my-1.5 pl-3 space-y-1.5")}>
+        <ul className={cn("space-y-2 my-2.5 last:mb-0 pl-0.5 text-[#262626] dark:text-[#cfcfcf] cursor-text select-text", isNested && "my-1.5 pl-3 space-y-1.5")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
-            <li key={idx} className="flex items-start gap-2 leading-[1.65]">
+            <li key={idx} className="flex items-start gap-2 leading-[1.65] cursor-text select-text">
               {item.task ? (
                 <input
                   type="checkbox"
@@ -275,7 +277,7 @@ function TokenRenderer({
                   {isNested ? "-" : "•"}
                 </span>
               )}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 cursor-text select-text">
                 <ListItemContent item={item} />
               </div>
             </li>
@@ -287,7 +289,7 @@ function TokenRenderer({
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-[#e79737] dark:border-[#ff7a00]/80 pl-3.5 py-1.5 my-3 text-[#262626] dark:text-[#a8a8a8] bg-black/[0.03] dark:bg-white/[0.02] rounded-r-lg italic">
+        <blockquote className="border-l-2 border-[#e79737] dark:border-[#ff7a00]/80 pl-3.5 py-1.5 my-2.5 last:mb-0 text-[#262626] dark:text-[#a8a8a8] bg-black/[0.03] dark:bg-white/[0.02] rounded-r-lg italic cursor-text select-text">
           <InlineRenderer text={bq.text} />
         </blockquote>
       );
@@ -302,7 +304,7 @@ function TokenRenderer({
     default: {
       if ("text" in token && typeof (token as any).text === "string") {
         return (
-          <p className="leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-1.5 font-sans">
+          <p className="leading-[1.68] text-[#262626] dark:text-[#cfcfcf] my-1.5 last:mb-0 font-sans cursor-text select-text">
             <InlineRenderer text={(token as any).text} />
           </p>
         );
@@ -323,25 +325,25 @@ function ListItemContent({ item }: { item: Tokens.ListItem }) {
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 cursor-text select-text">
       {item.tokens.map((childToken, cIdx) => {
         if (childToken.type === "text") {
           return (
-            <div key={cIdx} className="leading-[1.65]">
+            <div key={cIdx} className="leading-[1.65] cursor-text select-text">
               <InlineRenderer text={childToken.text} />
             </div>
           );
         }
         if (childToken.type === "paragraph") {
           return (
-            <div key={cIdx} className="leading-[1.65] my-0.5">
+            <div key={cIdx} className="leading-[1.65] my-0.5 cursor-text select-text">
               <InlineRenderer text={(childToken as Tokens.Paragraph).text} />
             </div>
           );
         }
         if (childToken.type === "list") {
           return (
-            <div key={cIdx} className="mt-1">
+            <div key={cIdx} className="mt-1 cursor-text select-text">
               <TokenRenderer token={childToken} isNested />
             </div>
           );
@@ -655,9 +657,9 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium cursor-pointer"
+        className="cursor-text select-text [&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:cursor-pointer [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium"
       />
     );
   }
-  return <span>{text}</span>;
+  return <span className="cursor-text select-text">{text}</span>;
 }

@@ -50,6 +50,13 @@ export function isScheduledTaskConversation(convo?: {
   return false;
 }
 
+export function isSideChatConversation(convo?: { id?: string } | string | null): boolean {
+  if (!convo) return false;
+  const id = typeof convo === "string" ? convo : convo.id;
+  if (!id) return false;
+  return id.startsWith("side_conversation_") || id.startsWith("side_chat_");
+}
+
 export function normalizeUiMessages(rawMessages: any[]): any[] {
   if (!Array.isArray(rawMessages) || rawMessages.length === 0) return [];
 
@@ -191,13 +198,19 @@ export function loadConversations(): ConversationItem[] {
   };
 
   if (cachedConversations) {
-    return cachedConversations.filter((c) => !c.isArchived).map(normalize).sort(sortFn);
+    return cachedConversations
+      .filter((c) => !c.isArchived && !isSideChatConversation(c.id))
+      .map(normalize)
+      .sort(sortFn);
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: ConversationItem[] = JSON.parse(raw);
-    cachedConversations = parsed.map(normalize).sort(sortFn);
+    cachedConversations = parsed
+      .filter((c) => !isSideChatConversation(c.id))
+      .map(normalize)
+      .sort(sortFn);
     return cachedConversations.filter((c) => !c.isArchived);
   } catch {
     return [];
@@ -218,7 +231,10 @@ export async function initConversationStore(): Promise<ConversationItem[]> {
         try {
           const localList: ConversationItem[] = JSON.parse(raw);
           if (Array.isArray(localList) && localList.length > 0) {
-            await window.electron.importLegacyConversations(localList);
+            const cleanList = localList.filter((c) => !isSideChatConversation(c.id));
+            if (cleanList.length > 0) {
+              await window.electron.importLegacyConversations(cleanList);
+            }
           }
         } catch (e) {
           console.warn("[ConversationStore] Legacy migration error:", e);
@@ -228,12 +244,14 @@ export async function initConversationStore(): Promise<ConversationItem[]> {
       // Load fresh list from SQLite disk database
       const diskList = await window.electron.listConversations(false);
       if (Array.isArray(diskList)) {
-        const normalized = diskList.map((c) => ({
-          ...c,
-          title: getCleanConversationTitle(c.title),
-          isScheduled: isScheduledTaskConversation(c),
-          messages: normalizeUiMessages(c.messages || []),
-        }));
+        const normalized = diskList
+          .filter((c) => !isSideChatConversation(c.id))
+          .map((c) => ({
+            ...c,
+            title: getCleanConversationTitle(c.title),
+            isScheduled: isScheduledTaskConversation(c),
+            messages: normalizeUiMessages(c.messages || []),
+          }));
         cachedConversations = normalized;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
@@ -253,12 +271,14 @@ export async function refreshConversationsFromDisk(): Promise<ConversationItem[]
     try {
       const diskList = await window.electron.listConversations(false);
       if (Array.isArray(diskList)) {
-        const normalized = diskList.map((c) => ({
-          ...c,
-          title: getCleanConversationTitle(c.title),
-          isScheduled: isScheduledTaskConversation(c),
-          messages: normalizeUiMessages(c.messages || []),
-        }));
+        const normalized = diskList
+          .filter((c) => !isSideChatConversation(c.id))
+          .map((c) => ({
+            ...c,
+            title: getCleanConversationTitle(c.title),
+            isScheduled: isScheduledTaskConversation(c),
+            messages: normalizeUiMessages(c.messages || []),
+          }));
         cachedConversations = normalized;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
@@ -297,6 +317,9 @@ export async function loadArchivedConversations(): Promise<ConversationItem[]> {
  * Save or update a conversation.
  */
 export function saveConversation(conversation: ConversationItem): void {
+  if (!conversation?.id || isSideChatConversation(conversation.id)) {
+    return;
+  }
   try {
     const list = loadConversations();
     const index = list.findIndex((c) => c.id === conversation.id);

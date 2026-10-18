@@ -212,7 +212,7 @@ export function ChatMessageItem({
 
   // Assistant message
   return (
-    <div className="w-full flex flex-col gap-2.5 group">
+    <div className="w-full flex flex-col gap-2.5 group select-text cursor-text">
       <ExecutionTrace
         thinking={message.thinking}
         toolCalls={message.toolCalls}
@@ -232,7 +232,7 @@ export function ChatMessageItem({
 
       {/* Formatted Markdown Content */}
       {message.content ? (
-        <div className="px-0.5">
+        <div className="px-0.5 select-text cursor-text">
           <MarkdownContent
             content={message.content}
             onOpenFilePreview={onOpenFilePreview}

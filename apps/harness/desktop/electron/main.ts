@@ -1025,28 +1025,31 @@ app.whenReady().then(() => {
           };
         }
 
-        // Auto-save to SQLite conversation database ONLY IF not cancelled
-        try {
-          const existingConvo = conversationDb.getConversation(convoId);
-          // Preserve rich UI messages with traceSteps/durationMs if already present
-          const hasRichMessages = existingConvo?.messages && existingConvo.messages.length > 0;
-          conversationDb.saveConversation({
-            id: convoId,
-            title: existingConvo?.title || "New Task",
-            project: payload.workspacePath || "Outside Project",
-            model,
-            mode: payload.mode || (activeSessions.get(convoId) as any)?.mode || existingConvo?.mode || "ask_before_changes",
-            updatedAt: Date.now(),
-            createdAt: existingConvo?.createdAt || Date.now(),
-            messages: hasRichMessages ? existingConvo.messages : updatedMessages,
-          });
+        // Auto-save to SQLite conversation database ONLY IF not cancelled and not a Side Chat
+        const isSideChat = convoId.startsWith("side_conversation_") || convoId.startsWith("side_chat_");
+        if (!isSideChat) {
+          try {
+            const existingConvo = conversationDb.getConversation(convoId);
+            // Preserve rich UI messages with traceSteps/durationMs if already present
+            const hasRichMessages = existingConvo?.messages && existingConvo.messages.length > 0;
+            conversationDb.saveConversation({
+              id: convoId,
+              title: existingConvo?.title || "New Task",
+              project: payload.workspacePath || "Outside Project",
+              model,
+              mode: payload.mode || (activeSessions.get(convoId) as any)?.mode || existingConvo?.mode || "ask_before_changes",
+              updatedAt: Date.now(),
+              createdAt: existingConvo?.createdAt || Date.now(),
+              messages: hasRichMessages ? existingConvo.messages : updatedMessages,
+            });
 
-          // Notify renderer that conversations have changed
-          if (win && !win.isDestroyed()) {
-            win.webContents.send("conversations:changed", { conversationId: convoId });
+            // Notify renderer that conversations have changed
+            if (win && !win.isDestroyed()) {
+              win.webContents.send("conversations:changed", { conversationId: convoId });
+            }
+          } catch (dbErr) {
+            console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
           }
-        } catch (dbErr) {
-          console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
         }
 
         return {

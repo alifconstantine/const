@@ -130,6 +130,66 @@ export function SideChatTab({
     const unsubscribe = window.electron.onAgentEvent((event: any) => {
       if (event.conversationId !== sideChatId) return;
 
+      // 1. Completion / Done events from Const Agent & Electron
+      if (
+        event.type === "done" ||
+        event.type === "session_completed" ||
+        event.type === "completed" ||
+        (event.type === "status" && event.status === "done")
+      ) {
+        setIsExecuting(false);
+        const current = [...messagesRef.current];
+        if (current.length > 0) {
+          const lastIdx = current.length - 1;
+          const last = current[lastIdx];
+          if (last && last.role === "assistant") {
+            const steps = (last.traceSteps || []).map((st) => {
+              if (st.type === "thought" && st.startTime && !st.durationMs) {
+                return {
+                  ...st,
+                  durationMs: Math.max(1000, Date.now() - st.startTime),
+                };
+              }
+              return st;
+            });
+            current[lastIdx] = {
+              ...last,
+              content: event.fullContent || last.content || "",
+              traceSteps: steps,
+              durationMs: last.durationMs || (last.timestamp ? Date.now() - last.timestamp : undefined),
+            };
+            setMessages(current);
+          }
+        }
+        // Persist final conversation state
+        saveSideConversation({
+          id: sideChatId,
+          parentConversationId: effectiveParentId,
+          title: tab.title || "Side chat",
+          project: tab.project || "Outside Project",
+          model: activeModel,
+          mode: activeMode,
+          createdAt: tab.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          messages: current.length > 0 ? current : messagesRef.current,
+        });
+        return;
+      }
+
+      // 2. Error events
+      if (event.type === "error" || (event.type === "status" && event.status === "error")) {
+        setIsExecuting(false);
+        const errStr = event.error || event.message || "";
+        if (
+          errStr &&
+          !errStr.toLowerCase().includes("cancelled") &&
+          !errStr.toLowerCase().includes("abort")
+        ) {
+          toast.error(errStr);
+        }
+        return;
+      }
+
       const current = [...messagesRef.current];
       if (current.length === 0) return;
 
@@ -192,6 +252,15 @@ export function SideChatTab({
 
         const callId = event.toolCallId || `tc_${Date.now()}`;
         const steps = [...(last.traceSteps || [])];
+        if (steps.length > 0) {
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+            steps[steps.length - 1] = {
+              ...lastStep,
+              durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+            };
+          }
+        }
         steps.push({
           id: callId,
           type: "tool",
@@ -237,28 +306,38 @@ export function SideChatTab({
           mutations,
         };
         setMessages(current);
-      } else if (event.type === "session_completed" || event.type === "completed") {
-        setIsExecuting(false);
-        // Persist final conversation state
-        saveSideConversation({
-          id: sideChatId,
-          parentConversationId: effectiveParentId,
-          title: tab.title || "Side chat",
-          project: tab.project || "Outside Project",
-          model: activeModel,
-          mode: activeMode,
-          createdAt: tab.createdAt || Date.now(),
-          updatedAt: Date.now(),
-          messages: current,
+      } else if (event.type === "file_mutation") {
+        const mutations = [...(last.mutations || [])];
+        if (event.record) {
+          mutations.push(event.record);
+        }
+        const steps = (last.traceSteps || []).map((st) => {
+          if (st.type === "tool" && event.record && !st.mutation) {
+            const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
+            if (norm.includes("write") || norm.includes("edit") || norm.includes("replace")) {
+              return { ...st, mutation: event.record };
+            }
+          }
+          return st;
         });
-      } else if (event.type === "error") {
+        current[lastIdx] = {
+          ...last,
+          mutations,
+          traceSteps: steps,
+        };
+        setMessages(current);
+      }
+    });
+
+    const unsubEnded = window.electron?.onSessionEnded?.((data) => {
+      if (data?.conversationId === sideChatId) {
         setIsExecuting(false);
-        toast.error(event.error || "Error in side agent execution");
       }
     });
 
     return () => {
       unsubscribe();
+      unsubEnded?.();
     };
   }, [sideChatId, effectiveParentId, tab.title, tab.project, tab.createdAt, activeModel, activeMode]);
 
@@ -363,6 +442,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
 
     if (window.electron?.sendMessage) {
       try {
+        const authToken = localStorage.getItem("const_harness_auth_token") || undefined;
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
           model: modelToUse,
@@ -370,17 +450,41 @@ Answer the user's query directly. Only modify workspace files or run commands if
           workspacePath: tab.project,
           mode: modeToUse,
           conversationId: sideChatId,
+          authToken,
         });
 
         if (!res.success && res.error) {
-          if (!res.aborted) {
+          if (
+            !res.aborted &&
+            !res.error.toLowerCase().includes("cancelled") &&
+            !res.error.toLowerCase().includes("abort")
+          ) {
             toast.error(res.error);
           }
-          setIsExecuting(false);
         }
       } catch (err: any) {
-        toast.error(err.message || "Failed to communicate with side agent");
+        if (
+          !err.message?.toLowerCase().includes("cancelled") &&
+          !err.message?.toLowerCase().includes("abort")
+        ) {
+          toast.error(err.message || "Failed to communicate with side agent");
+        }
+      } finally {
         setIsExecuting(false);
+        const finalMsgs = messagesRef.current;
+        if (finalMsgs.length > 0) {
+          saveSideConversation({
+            id: sideChatId,
+            parentConversationId: effectiveParentId,
+            title: tab.title || "Side chat",
+            project: tab.project || "Outside Project",
+            model: modelToUse,
+            mode: modeToUse,
+            createdAt: tab.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            messages: finalMsgs,
+          });
+        }
       }
     } else {
       // Mock fallback if electron not available
@@ -438,15 +542,15 @@ Answer the user's query directly. Only modify workspace files or run commands if
       {/* 2. Scrollable Messages Feed */}
       <ScrollArea
         ref={scrollRef}
-        className="flex-1 w-full h-full min-w-0 [&>div>div[style]]:!block"
+        className="flex-1 w-full h-full min-w-0 select-text [&>div>div[style]]:!block"
       >
-        <div className="w-full max-w-full px-3.5 py-4 flex flex-col gap-4">
+        <div className="w-full max-w-full px-3.5 py-4 flex flex-col gap-4 select-text">
           {messages.map((msg) => (
-            <div key={msg.id} className="w-full flex flex-col select-text">
+            <div key={msg.id} className="w-full flex flex-col select-text cursor-text">
               {msg.role === "user" ? (
                 /* User Bubble */
-                <div className="w-full flex flex-col items-end group">
-                  <div className="w-fit max-w-[85%] rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#242424] border border-[#e2e2e4] dark:border-[#363636] px-3.5 py-2 text-xs text-[#262626] dark:text-[#ececec] leading-relaxed break-words">
+                <div className="w-full flex flex-col items-end group select-text cursor-text">
+                  <div className="w-fit max-w-[85%] rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#242424] border border-[#e2e2e4] dark:border-[#363636] px-3.5 py-2 text-xs text-[#262626] dark:text-[#ececec] leading-relaxed break-words select-text cursor-text">
                     <MarkdownContent
                       content={msg.content}
                       onOpenFilePreview={onOpenFilePreview}
@@ -455,7 +559,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                     />
                   </div>
                   {/* Hover actions */}
-                  <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[#a9a9a9] dark:text-[#777777]">
+                  <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[#a9a9a9] dark:text-[#777777] select-none pointer-events-none group-hover:pointer-events-auto">
                     <span>{formatMessageTimestamp(msg.timestamp)}</span>
                     <button
                       type="button"
@@ -473,7 +577,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                 </div>
               ) : (
                 /* Assistant Bubble */
-                <div className="w-full flex flex-col gap-2 group">
+                <div className="w-full flex flex-col gap-2 group select-text cursor-text">
                   <ExecutionTrace
                     thinking={msg.thinking}
                     toolCalls={msg.toolCalls}
@@ -487,7 +591,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                   />
 
                   {msg.content && (
-                    <div className="text-xs text-[#262626] dark:text-[#d4d4d4] leading-relaxed break-words">
+                    <div className="text-xs text-[#262626] dark:text-[#d4d4d4] leading-relaxed break-words select-text cursor-text">
                       <MarkdownContent
                         content={msg.content}
                         onOpenFilePreview={onOpenFilePreview}
@@ -497,7 +601,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                   )}
 
                   {/* Assistant Action Bar: Copy & Bridge to Main */}
-                  <div className="flex items-center gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#a9a9a9] dark:text-[#777777]">
+                  <div className="flex items-center gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#a9a9a9] dark:text-[#777777] select-none pointer-events-none group-hover:pointer-events-auto">
                     <button
                       type="button"
                       onClick={() => handleCopy(msg.id, msg.content)}

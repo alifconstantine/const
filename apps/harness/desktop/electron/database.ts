@@ -124,19 +124,27 @@ export class ConversationDatabase {
         WHERE id LIKE 'scheduled_%';
       `);
     } catch {}
+
+    // Clean up any leaked side conversations in existing database
+    try {
+      this.db.exec(`
+        DELETE FROM messages WHERE conversation_id LIKE 'side_conversation_%' OR conversation_id LIKE 'side_chat_%';
+        DELETE FROM conversations WHERE id LIKE 'side_conversation_%' OR id LIKE 'side_chat_%';
+      `);
+    } catch {}
   }
 
   public listConversations(includeArchived = false): ConversationRecord[] {
     const query = includeArchived
-      ? "SELECT * FROM conversations ORDER BY is_pinned DESC, updated_at DESC"
-      : "SELECT * FROM conversations WHERE is_archived = 0 ORDER BY is_pinned DESC, updated_at DESC";
+      ? "SELECT * FROM conversations WHERE id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY is_pinned DESC, updated_at DESC"
+      : "SELECT * FROM conversations WHERE is_archived = 0 AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY is_pinned DESC, updated_at DESC";
 
     const rows = this.db.prepare(query).all() as any[];
     return rows.map((row) => this.hydrateConversation(row));
   }
 
   public listArchivedConversations(): ConversationRecord[] {
-    const query = "SELECT * FROM conversations WHERE is_archived = 1 ORDER BY updated_at DESC";
+    const query = "SELECT * FROM conversations WHERE is_archived = 1 AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY updated_at DESC";
     const rows = this.db.prepare(query).all() as any[];
     return rows.map((row) => this.hydrateConversation(row));
   }
@@ -150,6 +158,9 @@ export class ConversationDatabase {
   }
 
   public saveConversation(convo: ConversationRecord): void {
+    if (!convo?.id || convo.id.startsWith("side_conversation_") || convo.id.startsWith("side_chat_")) {
+      return;
+    }
     const now = Date.now();
     const updatedAt = convo.updatedAt || now;
     const createdAt = convo.createdAt || now;
