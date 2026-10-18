@@ -415,9 +415,21 @@ Answer the user's query directly. Only modify workspace files or run commands if
     if (parentMessages && parentMessages.length > 0) {
       for (const m of parentMessages) {
         if (m.role === "user" || m.role === "assistant") {
+          let textContent = "";
+          const contentVal = (m as any).content;
+          if (typeof contentVal === "string") {
+            textContent = contentVal;
+          } else if (Array.isArray(contentVal)) {
+            textContent = contentVal
+              .filter((p: any) => p?.type === "text" && typeof p?.text === "string")
+              .map((p: any) => p.text)
+              .join("\n");
+          } else {
+            textContent = String(contentVal || "");
+          }
           payloadMessages.push({
             role: m.role,
-            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+            content: textContent,
           });
         }
       }

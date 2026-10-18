@@ -211,5 +211,7 @@ export {
 	type ServiceReady,
 	type ActiveBackgroundTask,
 	type BackgroundTaskItem,
+	extractPdfText,
+	extractDocumentText,
 } from "./const/index.ts";
 

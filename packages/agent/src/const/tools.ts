@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import net from "node:net";
+import zlib from "node:zlib";
 import type { FileMutationRecord } from "./mutation-ledger.js";
 import type {
   TodoItem,
@@ -3921,46 +3922,314 @@ export function extractCommandArg(args: Record<string, any>): string {
 // PDF Text Extraction Helper (Instant pdftotext with safe fallback)
 // ---------------------------------------------------------------------------
 
-async function extractPdfText(
-  filePath: string,
+export async function extractPdfText(
+  filePathOrBuffer: string | Buffer,
   signal?: AbortSignal
 ): Promise<{ text: string; pages: number }> {
-  const shellCfg = getShellConfig();
+  let buffer: Buffer;
+  let filename = "document.pdf";
+  try {
+    if (typeof filePathOrBuffer === "string") {
+      filename = path.basename(filePathOrBuffer);
+      buffer = await fs.readFile(filePathOrBuffer);
+    } else {
+      buffer = filePathOrBuffer;
+    }
+  } catch (err: any) {
+    throw new Error(`Failed to read PDF file: ${err.message}`);
+  }
 
-  // Fast path: If shell is Git Bash, use native pdftotext
-  if (shellCfg.type === "bash") {
-    try {
-      const posixPath = filePath.replace(/\\/g, "/");
-      const cmd = `pdftotext "${posixPath}" -`;
+  // 1. Primary Extractor: pdf-parse (pure JavaScript, works universally across all platforms)
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    const parsed = await parser.getText();
+    await parser.destroy().catch(() => {});
+    if (parsed && typeof parsed.text === "string" && parsed.text.trim().length > 0) {
+      return {
+        text: parsed.text.trim(),
+        pages: parsed.total || parsed.pages?.length || 1,
+      };
+    }
+  } catch {
+    // Fall back to CLI if pdf-parse encounters unusual stream encoding
+  }
 
-      const result = await runProcess(shellCfg.shell, [...shellCfg.args, cmd], {
-        cwd: path.dirname(filePath),
-        signal,
-        timeoutMs: 15000,
-      });
+  // 2. Secondary Extractor: pdftotext CLI (Git Bash / Linux / macOS)
+  if (typeof filePathOrBuffer === "string") {
+    const shellCfg = getShellConfig();
+    if (shellCfg.type === "bash") {
+      try {
+        const posixPath = filePathOrBuffer.replace(/\\/g, "/");
+        const cmd = `pdftotext "${posixPath}" -`;
 
-      if (result.stdout && result.stdout.trim().length > 0) {
-        const text = result.stdout.trim();
-        const pages = text.split("\f").filter(Boolean).length || 1;
-        return { text, pages };
-      }
-    } catch {
-      // Fallback below
+        const result = await runProcess(shellCfg.shell, [...shellCfg.args, cmd], {
+          cwd: path.dirname(filePathOrBuffer),
+          signal,
+          timeoutMs: 15000,
+        });
+
+        if (result.stdout && result.stdout.trim().length > 0) {
+          const text = result.stdout.trim();
+          const pages = text.split("\f").filter(Boolean).length || 1;
+          return { text, pages };
+        }
+      } catch {}
     }
   }
 
-  // Safe Fallback: Streamlined text extraction
+  // 3. Graceful Fallback: Extract basic metadata for scanned or image-only PDFs
   try {
-    const buffer = await fs.readFile(filePath);
     const content = buffer.toString("latin1");
     const matches = content.match(/\/Title\s*\(([^)]+)\)|\/Author\s*\(([^)]+)\)/g) || [];
     const info = matches.map((m) => m.replace(/[\/\(\)]/g, "")).join(" | ");
     return {
-      text: `[PDF Document: ${path.basename(filePath)}]\n${info ? `Metadata: ${info}\n` : ""}(PDF file is valid on disk. Note: install Git for Windows to enable native high-speed pdftotext extraction).`,
+      text: `[PDF Document: ${filename}]\n${info ? `Metadata: ${info}\n` : ""}(Note: This PDF does not contain an embedded text layer; it may be an image scan).`,
       pages: 1,
     };
   } catch (err: any) {
     throw new Error(`Failed to extract text from PDF: ${err.message}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Office & Universal Document Extraction Helper (.docx, .pptx, .xlsx, .odt, .ods, .odp)
+// ---------------------------------------------------------------------------
+
+function decodeXmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function readZipEntries(buffer: Buffer): Map<string, Buffer> {
+  const entries = new Map<string, Buffer>();
+  if (buffer.length < 22) return entries;
+
+  // Find End of Central Directory Record (EOCD): signature 0x06054b50 (PK\x05\x06)
+  let eocdOffset = -1;
+  const maxSearch = Math.min(buffer.length, 65557);
+  for (let i = buffer.length - 22; i >= buffer.length - maxSearch; i--) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset === -1) return entries;
+
+  const cdEntriesCount = buffer.readUInt16LE(eocdOffset + 10);
+  const cdOffset = buffer.readUInt32LE(eocdOffset + 16);
+
+  let cur = cdOffset;
+  for (let i = 0; i < cdEntriesCount; i++) {
+    if (cur + 46 > buffer.length || buffer.readUInt32LE(cur) !== 0x02014b50) break;
+    const method = buffer.readUInt16LE(cur + 10);
+    const compSize = buffer.readUInt32LE(cur + 20);
+    const nameLen = buffer.readUInt16LE(cur + 28);
+    const extraLen = buffer.readUInt16LE(cur + 30);
+    const commentLen = buffer.readUInt16LE(cur + 32);
+    const localHeaderOffset = buffer.readUInt32LE(cur + 42);
+
+    const name = buffer.toString("utf-8", cur + 46, cur + 46 + nameLen);
+    cur += 46 + nameLen + extraLen + commentLen;
+
+    if (localHeaderOffset + 30 <= buffer.length) {
+      const localNameLen = buffer.readUInt16LE(localHeaderOffset + 26);
+      const localExtraLen = buffer.readUInt16LE(localHeaderOffset + 28);
+      const dataOffset = localHeaderOffset + 30 + localNameLen + localExtraLen;
+      const compData = buffer.subarray(dataOffset, dataOffset + compSize);
+
+      let uncompData: Buffer | undefined;
+      if (method === 0) {
+        uncompData = compData;
+      } else if (method === 8) {
+        try {
+          uncompData = zlib.inflateRawSync(compData);
+        } catch {}
+      }
+      if (uncompData) {
+        entries.set(name, uncompData);
+      }
+    }
+  }
+  return entries;
+}
+
+function extractDocxText(entries: Map<string, Buffer>): string {
+  const docBuf = entries.get("word/document.xml");
+  if (!docBuf) return "";
+  const xml = docBuf.toString("utf-8");
+  const text = xml
+    .replace(/<w:p[^>]*>/gi, "")
+    .replace(/<\/w:p>/gi, "\n")
+    .replace(/<w:br[^>]*\/>/gi, "\n")
+    .replace(/<w:tab[^>]*\/>/gi, "\t")
+    .replace(/<\/w:tr>/gi, "\n")
+    .replace(/<\/w:tc>/gi, "\t")
+    .replace(/<[^>]+>/g, "");
+  return decodeXmlEntities(text).replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function extractPptxText(entries: Map<string, Buffer>): { text: string; pages: number } {
+  const slideKeys: { key: string; num: number }[] = [];
+  for (const key of entries.keys()) {
+    const match = key.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+    if (match) {
+      slideKeys.push({ key, num: parseInt(match[1]!, 10) });
+    }
+  }
+  slideKeys.sort((a, b) => a.num - b.num);
+
+  const slideTexts: string[] = [];
+  for (const { key, num } of slideKeys) {
+    const buf = entries.get(key);
+    if (!buf) continue;
+    const xml = buf.toString("utf-8");
+    const raw = xml
+      .replace(/<a:p[^>]*>/gi, "")
+      .replace(/<\/a:p>/gi, "\n")
+      .replace(/<a:br[^>]*\/>/gi, "\n")
+      .replace(/<[^>]+>/g, "");
+    const clean = decodeXmlEntities(raw).replace(/\n{3,}/g, "\n\n").trim();
+    if (clean) {
+      slideTexts.push(`--- Slide ${num} ---\n${clean}`);
+    }
+  }
+  return {
+    text: slideTexts.join("\n\n"),
+    pages: Math.max(1, slideKeys.length),
+  };
+}
+
+function extractXlsxText(entries: Map<string, Buffer>): string {
+  const sharedStrings: string[] = [];
+  const sstBuf = entries.get("xl/sharedStrings.xml");
+  if (sstBuf) {
+    const xml = sstBuf.toString("utf-8");
+    const matches = xml.matchAll(/<t[^>]*>(.*?)<\/t>/gs);
+    for (const m of matches) {
+      sharedStrings.push(decodeXmlEntities(m[1] || ""));
+    }
+  }
+
+  const sheetKeys = Array.from(entries.keys())
+    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(k))
+    .sort();
+
+  const lines: string[] = [];
+  for (const key of sheetKeys.slice(0, 5)) {
+    const buf = entries.get(key);
+    if (!buf) continue;
+    const xml = buf.toString("utf-8");
+    const rowMatches = xml.matchAll(/<row[^>]*>(.*?)<\/row>/gs);
+    const sheetRows: string[] = [];
+    for (const r of rowMatches) {
+      const rowContent = r[1] || "";
+      const cellMatches = rowContent.matchAll(/<c[^>]*?(?:\st="([a-z]+)")?[^>]*>(?:<v>(.*?)<\/v>)?<\/c>/gs);
+      const cells: string[] = [];
+      for (const c of cellMatches) {
+        const type = c[1];
+        const val = c[2] || "";
+        if (type === "s" && sharedStrings.length > 0) {
+          const idx = parseInt(val, 10);
+          cells.push(sharedStrings[idx] || val);
+        } else {
+          cells.push(val);
+        }
+      }
+      if (cells.some((v) => v.trim().length > 0)) {
+        sheetRows.push(cells.join("\t"));
+      }
+    }
+    if (sheetRows.length > 0) {
+      const sheetName = key.replace(/.*\/([^/]+)\.xml/, "$1");
+      lines.push(`--- Sheet: ${sheetName} ---\n` + sheetRows.slice(0, 300).join("\n"));
+    }
+  }
+
+  if (lines.length > 0) {
+    return lines.join("\n\n").trim();
+  }
+
+  if (sharedStrings.length > 0) {
+    return sharedStrings.slice(0, 500).join("\n");
+  }
+  return "";
+}
+
+function extractOdfText(entries: Map<string, Buffer>): string {
+  const contentBuf = entries.get("content.xml");
+  if (!contentBuf) return "";
+  const xml = contentBuf.toString("utf-8");
+  const raw = xml
+    .replace(/<text:p[^>]*>/gi, "")
+    .replace(/<\/text:p>/gi, "\n")
+    .replace(/<text:line-break\/>/gi, "\n")
+    .replace(/<[^>]+>/g, "");
+  return decodeXmlEntities(raw).replace(/\n{3,}/g, "\n\n").trim();
+}
+
+export async function extractDocumentText(
+  filePathOrBuffer: string | Buffer,
+  filenameOverride?: string,
+  signal?: AbortSignal
+): Promise<{ text: string; pages?: number; type: string }> {
+  let buffer: Buffer;
+  let filename = filenameOverride || "document";
+
+  if (typeof filePathOrBuffer === "string") {
+    filename = filenameOverride || path.basename(filePathOrBuffer);
+    buffer = await fs.readFile(filePathOrBuffer);
+  } else {
+    buffer = filePathOrBuffer;
+  }
+
+  const ext = (filename.split(".").pop() || "").toLowerCase();
+
+  // 1. PDF
+  if (ext === "pdf" || (!ext && buffer.slice(0, 4).toString() === "%PDF")) {
+    const res = await extractPdfText(buffer, signal);
+    return { text: res.text, pages: res.pages, type: "PDF Document" };
+  }
+
+  // 2. OpenXML & ODF Formats (PKZIP archives)
+  if (["docx", "pptx", "xlsx", "odt", "ods", "odp"].includes(ext) || buffer.slice(0, 2).toString() === "PK") {
+    const entries = readZipEntries(buffer);
+    if (entries.size > 0) {
+      if (ext === "docx" || entries.has("word/document.xml")) {
+        const text = extractDocxText(entries);
+        return { text: text || `[Word Document: ${filename} (empty or no text layer)]`, type: "Word Document" };
+      }
+      if (ext === "pptx" || entries.has("ppt/presentation.xml")) {
+        const res = extractPptxText(entries);
+        return {
+          text: res.text || `[PowerPoint Presentation: ${filename} (empty or no text layer)]`,
+          pages: res.pages,
+          type: "PowerPoint Presentation",
+        };
+      }
+      if (ext === "xlsx" || entries.has("xl/workbook.xml")) {
+        const text = extractXlsxText(entries);
+        return { text: text || `[Excel Spreadsheet: ${filename} (empty or no text layer)]`, type: "Excel Spreadsheet" };
+      }
+      if (["odt", "ods", "odp"].includes(ext) || entries.has("content.xml")) {
+        const text = extractOdfText(entries);
+        return { text: text || `[OpenDocument: ${filename}]`, type: "OpenDocument" };
+      }
+    }
+  }
+
+  // 3. Plain Text, Markdown, CSV, JSON, Code files
+  try {
+    const text = buffer.toString("utf-8");
+    return { text, type: "Text Document" };
+  } catch (err: any) {
+    throw new Error(`Failed to extract text from ${filename}: ${err.message}`);
   }
 }
 
@@ -4836,6 +5105,31 @@ export async function executeNativeTool(
           } catch (pdfErr: any) {
             return {
               result: `Failed to extract PDF text (${path.basename(filePath)}): ${pdfErr.message}`,
+              isError: true,
+            };
+          }
+        }
+
+        // 1b. Office Document Extraction (.docx, .pptx, .xlsx, .odt, .ods, .odp)
+        const officeExtensions = [".docx", ".pptx", ".xlsx", ".odt", ".ods", ".odp"];
+        if (officeExtensions.includes(ext)) {
+          try {
+            const { text, pages, type } = await extractDocumentText(filePath, undefined, signal);
+            const previewLimit = 40000;
+            const preview =
+              text.length > previewLimit
+                ? text.slice(0, previewLimit) +
+                  `\n\n[... Document truncated at ${previewLimit} characters (Total: ${text.length} chars) ...]`
+                : text;
+
+            const pageInfo = pages ? ` | ${pages} ${ext === ".pptx" ? "Slides" : "Pages"}` : "";
+            return {
+              result: `[${type}: ${path.basename(filePath)}${pageInfo} | ${(stat.size / 1024).toFixed(1)} KB]\n\n${preview}`,
+              isError: false,
+            };
+          } catch (docErr: any) {
+            return {
+              result: `Failed to extract document text (${path.basename(filePath)}): ${docErr.message}`,
               isError: true,
             };
           }

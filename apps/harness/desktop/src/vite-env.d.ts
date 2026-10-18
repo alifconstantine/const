@@ -279,6 +279,26 @@ declare global {
         isOutsideProject?: boolean;
         error?: string;
       }>;
+      getPathForFile?: (file: File) => string;
+      extractPdfText?: (payload: { filePath?: string; bufferBase64?: string }) => Promise<{
+        success: boolean;
+        text?: string;
+        pages?: number;
+        error?: string;
+      }>;
+      extractDocumentText?: (payload: { filePath?: string; bufferBase64?: string; filename?: string }) => Promise<{
+        success: boolean;
+        text?: string;
+        pages?: number;
+        type?: string;
+        error?: string;
+      }>;
+      saveAttachment?: (payload: {
+        conversationId?: string;
+        name: string;
+        base64?: string;
+        sourcePath?: string;
+      }) => Promise<{ success: boolean; path?: string; error?: string }>;
       steerAgent?: (payload: {
         conversationId: string;
         prompt: string;

@@ -114,6 +114,115 @@ interface ChatMessage {
   attachments?: AttachedFile[];
 }
 
+function formatChatMessageForLlm(
+  m: ChatMessage,
+  allConvos: ConversationItem[]
+): { role: string; content: string | any[] } {
+  if (m.role !== "user") {
+    return {
+      role: m.role,
+      content: m.content,
+    };
+  }
+
+  // Resolve @-mentioned sessions in user prompt
+  let textContent = resolveMentionedSessionsInPrompt(m.content || "", allConvos);
+
+  if (!m.attachments || m.attachments.length === 0) {
+    return {
+      role: "user",
+      content: textContent,
+    };
+  }
+
+  const hasExistingAttachmentSection = textContent.includes("[Attached media / Lampiran media:");
+  const attLines = m.attachments.map((att: any) => {
+    const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+    const pageInfo = att.pages ? (att.type === "presentation" ? ` [${att.pages} slides]` : ` [${att.pages} pages]`) : "";
+    return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pageInfo}${pathInfo}`;
+  });
+
+  let fullText = textContent;
+  if (!hasExistingAttachmentSection) {
+    const baseText = fullText.trim() ? fullText : "Please analyze the attached file(s).";
+    fullText = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+  }
+
+  // Append media notices for video, audio, or binary attachments so AI knows disk location & tools
+  const mediaNotices: string[] = [];
+  for (const att of m.attachments) {
+    if (!att.textContent) {
+      if (att.type === "video") {
+        mediaNotices.push(
+          `[VIDEO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Video file is stored on disk at the indicated path. You may use workspace tools (such as ffmpeg, ffprobe, python) to inspect or process it if needed.]`
+        );
+      } else if (att.type === "audio") {
+        mediaNotices.push(
+          `[AUDIO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Audio file is stored on disk at the indicated path. You may use workspace tools to inspect or transcribe it if needed.]`
+        );
+      } else if (att.type === "other") {
+        mediaNotices.push(
+          `[FILE ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Binary file is stored on disk at the indicated path.]`
+        );
+      }
+    }
+  }
+
+  if (mediaNotices.length > 0) {
+    fullText = `${fullText}\n\n${mediaNotices.join("\n")}`;
+  }
+
+  // Append extracted document/PDF text blocks if available and not already embedded
+  const docTextBlocks: string[] = [];
+  for (const att of m.attachments) {
+    if (att.textContent && att.textContent.trim()) {
+      const headerTag = `--- DOCUMENT ATTACHMENT: "${att.name}"`;
+      if (!fullText.includes(headerTag)) {
+        const meta = [
+          att.pages ? (att.type === "presentation" ? `${att.pages} slides` : `${att.pages} pages`) : null,
+          att.path ? `Path: ${att.path}` : null,
+        ].filter(Boolean).join(", ");
+        const metaStr = meta ? ` (${meta})` : "";
+        docTextBlocks.push(
+          `--- DOCUMENT ATTACHMENT: "${att.name}"${metaStr} ---\n${att.textContent.trim()}\n--- END ATTACHMENT: "${att.name}" ---`
+        );
+      }
+    }
+  }
+
+  if (docTextBlocks.length > 0) {
+    fullText = `${fullText}\n\n${docTextBlocks.join("\n\n")}`;
+  }
+
+  // Collect multimodal image parts (base64 data URLs)
+  const imageParts: Array<{ type: "image_url"; image_url: { url: string } }> = [];
+  for (const att of m.attachments) {
+    if (att.type === "image" && att.base64) {
+      imageParts.push({
+        type: "image_url",
+        image_url: {
+          url: att.base64,
+        },
+      });
+    }
+  }
+
+  if (imageParts.length > 0) {
+    return {
+      role: "user",
+      content: [
+        { type: "text", text: fullText },
+        ...imageParts,
+      ],
+    };
+  }
+
+  return {
+    role: "user",
+    content: fullText,
+  };
+}
+
 interface ConversationRightPaneState {
   isOpen: boolean;
   tabs: RightPaneTab[];
@@ -1392,24 +1501,8 @@ function AuthenticatedContent({
     // 4. Dispatch re-run request to AI agent with clean context
     if (window.electron?.sendMessage) {
       try {
-        const payloadMessages = newStreamMessages.map((m) => {
-          let content = m.content;
-          if (m.role === "user" && m.attachments && m.attachments.length > 0) {
-            const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
-            if (!hasExistingAttachmentSection) {
-              const attLines = m.attachments.map((att: any) => {
-                const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
-                return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
-              });
-              const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
-              content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
-            }
-          }
-          return {
-            role: m.role,
-            content,
-          };
-        });
+        const allConvos = conversations.length > 0 ? conversations : loadConversations();
+        const payloadMessages = newStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
@@ -2554,29 +2647,8 @@ function AuthenticatedContent({
 
     if (window.electron?.sendMessage) {
       try {
-        const payloadMessages = currentStreamMessages.map((m) => {
-          let content = m.content;
-          if (m.role === "user") {
-            const allConvos = conversations.length > 0 ? conversations : loadConversations();
-            content = resolveMentionedSessionsInPrompt(content, allConvos);
-
-            if (m.attachments && m.attachments.length > 0) {
-              const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
-              if (!hasExistingAttachmentSection) {
-                const attLines = m.attachments.map((att) => {
-                  const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
-                  return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
-                });
-                const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
-                content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
-              }
-            }
-          }
-          return {
-            role: m.role,
-            content,
-          };
-        });
+        const allConvos = conversations.length > 0 ? conversations : loadConversations();
+        const payloadMessages = currentStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,

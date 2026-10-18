@@ -17,6 +17,8 @@ import {
   type MemoryFileInfo,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
+  extractPdfText,
+  extractDocumentText,
 } from "@const/agent";
 import { ConversationDatabase, type ConversationRecord } from "./database";
 import {
@@ -1101,6 +1103,89 @@ app.whenReady().then(() => {
       }
 
       return { success: false, notRunning: true };
+    }
+  );
+
+  ipcMain.handle(
+    "file:extract-pdf-text",
+    async (
+      _event,
+      payload: { filePath?: string; bufferBase64?: string }
+    ) => {
+      try {
+        let input: string | Buffer;
+        if (payload.filePath && fs.existsSync(payload.filePath)) {
+          input = payload.filePath;
+        } else if (payload.bufferBase64) {
+          const cleanBase64 = payload.bufferBase64.replace(/^data:[^;]+;base64,/, "");
+          input = Buffer.from(cleanBase64, "base64");
+        } else {
+          return { success: false, error: "No file path or buffer provided" };
+        }
+        const res = await extractPdfText(input);
+        return { success: true, text: res.text, pages: res.pages };
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to extract PDF text" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "file:extract-document-text",
+    async (
+      _event,
+      payload: { filePath?: string; bufferBase64?: string; filename?: string }
+    ) => {
+      try {
+        let input: string | Buffer;
+        if (payload.filePath && fs.existsSync(payload.filePath)) {
+          input = payload.filePath;
+        } else if (payload.bufferBase64) {
+          const cleanBase64 = payload.bufferBase64.replace(/^data:[^;]+;base64,/, "");
+          input = Buffer.from(cleanBase64, "base64");
+        } else {
+          return { success: false, error: "No file path or buffer provided" };
+        }
+        const res = await extractDocumentText(input, payload.filename);
+        return { success: true, text: res.text, pages: res.pages, type: res.type };
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to extract document text" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "file:save-attachment",
+    async (
+      _event,
+      payload: {
+        conversationId?: string;
+        name: string;
+        base64?: string;
+        sourcePath?: string;
+      }
+    ) => {
+      try {
+        const convoId = payload.conversationId || "shared_uploads";
+        const uploadDir = path.join(constBrainDir, convoId, "uploads");
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const safeName = path.basename(payload.name).replace(/[^a-zA-Z0-9._-]/g, "_");
+        const targetPath = path.join(uploadDir, safeName);
+
+        if (payload.sourcePath && fs.existsSync(payload.sourcePath)) {
+          fs.copyFileSync(payload.sourcePath, targetPath);
+          return { success: true, path: targetPath };
+        } else if (payload.base64) {
+          const cleanBase64 = payload.base64.replace(/^data:[^;]+;base64,/, "");
+          fs.writeFileSync(targetPath, Buffer.from(cleanBase64, "base64"));
+          return { success: true, path: targetPath };
+        }
+        return { success: false, error: "No source path or base64 provided" };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
     }
   );
 

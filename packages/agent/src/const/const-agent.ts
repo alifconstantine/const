@@ -306,14 +306,21 @@ export function compactHistoryForContext(
     // 1. Compact older USER messages (e.g. from previous completed tasks in the same session)
     if (
       compacted.role === "user" &&
-      index !== latestUserIndex &&
-      typeof compacted.content === "string" &&
-      compacted.content.length > 800
+      index !== latestUserIndex
     ) {
-      const originalLen = compacted.content.length;
-      const head = compacted.content.slice(0, 300);
-      const tail = compacted.content.slice(-150);
-      compacted.content = `${head}\n\n... [Prior task instructions: ${originalLen} characters compacted for context optimization] ...\n\n${tail}`;
+      if (typeof compacted.content === "string" && compacted.content.length > 800) {
+        const originalLen = compacted.content.length;
+        const head = compacted.content.slice(0, 300);
+        const tail = compacted.content.slice(-150);
+        compacted.content = `${head}\n\n... [Prior task instructions: ${originalLen} characters compacted for context optimization] ...\n\n${tail}`;
+      } else if (Array.isArray(compacted.content)) {
+        compacted.content = compacted.content.map((part) => {
+          if (part.type === "image_url" && typeof part.image_url?.url === "string" && part.image_url.url.startsWith("data:")) {
+            return { type: "text", text: "[Attached image from earlier turn]" };
+          }
+          return part;
+        });
+      }
     }
 
     // 2. Compact older tool result messages with large text outputs (> 800 chars)
@@ -801,18 +808,49 @@ export class ConstAgent {
         if (this.steeringQueue.length > 0) {
           while (this.steeringQueue.length > 0) {
             const steer = this.steeringQueue.shift()!;
-            let steerContent = steer.content;
+            let steerContent = steer.content || "";
+            const imageParts: any[] = [];
+            const docSections: string[] = [];
+
             if (steer.attachments && steer.attachments.length > 0) {
               const attLines = steer.attachments.map((att: any) => {
                 const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
                 const sizeStr = att.size ? ` (${Math.round(att.size / 1024)} KB)` : "";
-                return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pathInfo}`;
+                const pagesInfo = att.pages ? ` [${att.pages} Pages]` : "";
+                return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pagesInfo}${pathInfo}`;
               });
-              steerContent = `${steerContent}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+              const baseText = steerContent.trim() ? steerContent : "Please analyze the attached media/file(s).";
+              steerContent = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+
+              for (const att of steer.attachments) {
+                if (att.textContent && att.textContent.trim().length > 0) {
+                  docSections.push(
+                    `--- DOCUMENT ATTACHMENT: "${att.name}" (${(att.type || "file").toUpperCase()}) ---\n${att.textContent}\n--- END ATTACHMENT ---`
+                  );
+                }
+                if (att.type === "image" && (att.base64 || att.url)) {
+                  const imgUrl = att.base64 || att.url;
+                  if (imgUrl && (imgUrl.startsWith("data:") || imgUrl.startsWith("http"))) {
+                    imageParts.push({
+                      type: "image_url",
+                      image_url: { url: imgUrl },
+                    });
+                  }
+                }
+              }
             }
+
+            if (docSections.length > 0) {
+              steerContent += `\n\n${docSections.join("\n\n")}`;
+            }
+
+            const steerMsgContent = imageParts.length > 0
+              ? [{ type: "text", text: steerContent }, ...imageParts]
+              : steerContent;
+
             const steerMsg: AgentMessage = {
               role: "user",
-              content: steerContent,
+              content: steerMsgContent,
               timestamp: steer.timestamp,
             };
             conversationHistory.push(steerMsg);
@@ -1363,18 +1401,49 @@ export class ConstAgent {
           if (this.steeringQueue.length > 0) {
             while (this.steeringQueue.length > 0) {
               const steer = this.steeringQueue.shift()!;
-              let steerContent = steer.content;
+              let steerContent = steer.content || "";
+              const imageParts: any[] = [];
+              const docSections: string[] = [];
+
               if (steer.attachments && steer.attachments.length > 0) {
                 const attLines = steer.attachments.map((att: any) => {
                   const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
                   const sizeStr = att.size ? ` (${Math.round(att.size / 1024)} KB)` : "";
-                  return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pathInfo}`;
+                  const pagesInfo = att.pages ? ` [${att.pages} Pages]` : "";
+                  return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pagesInfo}${pathInfo}`;
                 });
-                steerContent = `${steerContent}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+                const baseText = steerContent.trim() ? steerContent : "Please analyze the attached media/file(s).";
+                steerContent = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+
+                for (const att of steer.attachments) {
+                  if (att.textContent && att.textContent.trim().length > 0) {
+                    docSections.push(
+                      `--- DOCUMENT ATTACHMENT: "${att.name}" (${(att.type || "file").toUpperCase()}) ---\n${att.textContent}\n--- END ATTACHMENT ---`
+                    );
+                  }
+                  if (att.type === "image" && (att.base64 || att.url)) {
+                    const imgUrl = att.base64 || att.url;
+                    if (imgUrl && (imgUrl.startsWith("data:") || imgUrl.startsWith("http"))) {
+                      imageParts.push({
+                        type: "image_url",
+                        image_url: { url: imgUrl },
+                      });
+                    }
+                  }
+                }
               }
+
+              if (docSections.length > 0) {
+                steerContent += `\n\n${docSections.join("\n\n")}`;
+              }
+
+              const steerMsgContent = imageParts.length > 0
+                ? [{ type: "text", text: steerContent }, ...imageParts]
+                : steerContent;
+
               const steerMsg: AgentMessage = {
                 role: "user",
-                content: steerContent,
+                content: steerMsgContent,
                 timestamp: steer.timestamp,
               };
               conversationHistory.push(steerMsg);

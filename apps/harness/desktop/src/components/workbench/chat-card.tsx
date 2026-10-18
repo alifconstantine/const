@@ -91,11 +91,13 @@ export interface AttachedFile {
   id: string;
   name: string;
   size: number;
-  type: "image" | "video" | "pdf" | "markdown" | "code" | "document" | "other";
+  type: "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "document" | "presentation" | "spreadsheet" | "other";
   url?: string;
   base64?: string;
   path?: string;
   imageIndex?: number;
+  textContent?: string;
+  pages?: number;
 }
 
 export const readBase64 = (file: File): Promise<string> =>
@@ -118,28 +120,126 @@ export async function parseUploadedFiles(files: FileList | File[]): Promise<Atta
 
     if (
       fileType.startsWith("image/") ||
-      ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"].includes(ext)
+      ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"].includes(ext)
     ) {
       type = "image";
     } else if (
       fileType.startsWith("video/") ||
-      ["mp4", "webm", "mov", "mkv"].includes(ext)
+      ["mp4", "webm", "mov", "mkv", "avi"].includes(ext)
     ) {
       type = "video";
+    } else if (
+      fileType.startsWith("audio/") ||
+      ["mp3", "wav", "ogg", "m4a", "aac", "flac"].includes(ext)
+    ) {
+      type = "audio";
     } else if (fileType === "application/pdf" || ext === "pdf") {
       type = "pdf";
+    } else if (["pptx", "ppt", "odp"].includes(ext)) {
+      type = "presentation";
+    } else if (["xlsx", "xls", "ods"].includes(ext)) {
+      type = "spreadsheet";
     } else if (["md", "markdown"].includes(ext)) {
       type = "markdown";
     } else if (
-      ["ts", "tsx", "js", "jsx", "json", "py", "rs", "go", "cpp", "c", "h", "css", "html", "sh", "sql"].includes(ext)
+      [
+        "ts", "tsx", "js", "jsx", "json", "py", "rs", "go", "cpp", "c", "h", "hpp", "cs",
+        "css", "html", "sh", "bash", "zsh", "sql", "yaml", "yml", "xml", "toml", "env", "ini"
+      ].includes(ext)
     ) {
       type = "code";
-    } else if (["txt", "doc", "docx", "xls", "xlsx", "csv", "rtf"].includes(ext)) {
+    } else if (["txt", "doc", "docx", "csv", "tsv", "rtf", "log", "odt"].includes(ext)) {
       type = "document";
     }
 
-    const url = type === "image" || type === "video" ? URL.createObjectURL(file) : undefined;
-    const base64 = type === "image" ? await readBase64(file) : undefined;
+    const filePath =
+      window.electron && typeof window.electron.getPathForFile === "function"
+        ? window.electron.getPathForFile(file)
+        : (file as any).path || "";
+
+    const isMedia = type === "image" || type === "video" || type === "audio";
+    const url = isMedia ? URL.createObjectURL(file) : undefined;
+    const base64 = (type === "image" || type === "pdf" || file.size < 8 * 1024 * 1024)
+      ? await readBase64(file)
+      : undefined;
+
+    let textContent: string | undefined;
+    let pages: number | undefined;
+
+    // 1. Text/Code/Markdown/CSV direct extraction
+    const isPlainText =
+      ["markdown", "code"].includes(type) ||
+      (["document"].includes(type) && !["docx", "doc", "rtf", "odt"].includes(ext));
+
+    if (isPlainText && file.size < 5 * 1024 * 1024) {
+      try {
+        textContent = await file.text();
+        if (textContent.length > 80_000) {
+          textContent = textContent.slice(0, 80_000) + "\n... [Content truncated at 80,000 characters]";
+        }
+      } catch {}
+    }
+
+    // 2. Office Document Extraction (.docx, .pptx, .xlsx, .odt, .ods, .odp)
+    const isOfficeDoc = ["docx", "pptx", "xlsx", "odt", "ods", "odp"].includes(ext);
+    if (isOfficeDoc && window.electron?.extractDocumentText) {
+      try {
+        const res = await window.electron.extractDocumentText({
+          filePath: filePath || undefined,
+          bufferBase64: !filePath ? base64 : undefined,
+          filename: file.name,
+        });
+        if (res.success && res.text) {
+          textContent = res.text;
+          pages = res.pages;
+        }
+      } catch {}
+    }
+
+    // 3. PDF Text Extraction
+    if (type === "pdf") {
+      try {
+        if (window.electron?.extractDocumentText) {
+          const res = await window.electron.extractDocumentText({
+            filePath: filePath || undefined,
+            bufferBase64: !filePath ? base64 : undefined,
+            filename: file.name,
+          });
+          if (res.success && res.text) {
+            textContent = res.text;
+            pages = res.pages;
+          }
+        } else if (window.electron?.extractPdfText) {
+          if (filePath) {
+            const res = await window.electron.extractPdfText({ filePath });
+            if (res.success && res.text) {
+              textContent = res.text;
+              pages = res.pages;
+            }
+          } else if (base64) {
+            const res = await window.electron.extractPdfText({ bufferBase64: base64 });
+            if (res.success && res.text) {
+              textContent = res.text;
+              pages = res.pages;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    let finalPath = filePath;
+    // 4. If file has no disk path, persist to session uploads directory via electron
+    if (!finalPath && window.electron?.saveAttachment && (base64 || textContent)) {
+      try {
+        const saved = await window.electron.saveAttachment({
+          name: file.name,
+          base64: base64 || (textContent ? btoa(unescape(encodeURIComponent(textContent))) : undefined),
+        });
+        if (saved.success && saved.path) {
+          finalPath = saved.path;
+        }
+      } catch {}
+    }
 
     result.push({
       id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
@@ -148,7 +248,9 @@ export async function parseUploadedFiles(files: FileList | File[]): Promise<Atta
       type,
       url: url || base64,
       base64,
-      path: (file as any).path,
+      path: finalPath,
+      textContent,
+      pages,
     });
   }
 

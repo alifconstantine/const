@@ -1,7 +1,24 @@
-import { contextBridge, ipcRenderer, webFrame } from "electron";
+import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 
 // Bridge Electron APIs to the Renderer window
 contextBridge.exposeInMainWorld("electron", {
+  getPathForFile: (file: File) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return (file as any).path || "";
+    }
+  },
+  extractPdfText: (payload: { filePath?: string; bufferBase64?: string }) =>
+    ipcRenderer.invoke("file:extract-pdf-text", payload),
+  extractDocumentText: (payload: { filePath?: string; bufferBase64?: string; filename?: string }) =>
+    ipcRenderer.invoke("file:extract-document-text", payload),
+  saveAttachment: (payload: {
+    conversationId?: string;
+    name: string;
+    base64?: string;
+    sourcePath?: string;
+  }) => ipcRenderer.invoke("file:save-attachment", payload),
   platform: process.platform,
   versions: {
     node: process.versions.node,

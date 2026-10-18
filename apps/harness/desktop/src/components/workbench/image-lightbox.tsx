@@ -6,7 +6,7 @@ import { useTranslation } from "../../lib/i18n";
 export interface ImageLightboxProps {
   src: string;
   alt: string;
-  type?: "image" | "video" | "pdf" | "markdown" | "code" | "document" | "other";
+  type?: "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "document" | "presentation" | "spreadsheet" | "other";
   fileSize?: number;
   onClose: () => void;
 }
@@ -22,6 +22,7 @@ export function ImageLightbox({
 
   const isVideo = type === "video";
   const isImage = type === "image";
+  const isAudio = type === "audio";
 
   useEffect(() => {
     closeBtnRef.current?.focus();
@@ -76,6 +77,16 @@ export function ImageLightbox({
               playsInline
               className="max-w-[85vw] max-h-[85vh] object-contain rounded-2xl"
             />
+          </div>
+        ) : isAudio ? (
+          <div className="bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-4 min-w-[320px]">
+            <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center text-[#ff7a00]">
+              <FileText className="w-6 h-6" />
+            </div>
+            <span className="text-sm font-medium text-white truncate max-w-[280px]" title={alt}>
+              {alt}
+            </span>
+            <audio src={src} controls className="w-full mt-2" />
           </div>
         ) : (
           <div className="bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3">
