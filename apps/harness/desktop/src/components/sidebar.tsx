@@ -78,6 +78,7 @@ import { useTheme, type Theme, useInterfaceZoom } from "../lib/theme";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
 
 export interface UserProfile {
+  id?: string | null;
   name?: string | null;
   email?: string | null;
   image?: string | null;

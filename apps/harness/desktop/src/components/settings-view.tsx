@@ -1,49 +1,43 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  ConstLogoIcon,
   Avatar,
   AvatarImage,
   AvatarFallback,
-  Button,
-  Input,
-  Label,
   ScrollArea,
   toast,
   cn,
 } from "@const/ui";
 import {
-  SlidersHorizontal,
+  Settings2,
+  Cable,
+  PencilSparkles,
+  UserRound,
+  UserRoundPen,
+  Keyboard,
   Palette,
   Box,
-  Globe,
-  Monitor,
   Brain,
   Bot,
   Puzzle,
-  Server,
-  Sparkles,
-  Terminal,
-  Anchor,
-  Database,
   BarChart3,
-  Rocket,
   Settings,
-  RotateCw,
   Plus,
   Minus,
   RotateCcw,
-  Trash2,
-  Eye,
-  EyeOff,
   Check,
   Info,
-  ShieldCheck,
   X,
   Sun,
   Moon,
   LogOut,
   ArrowLeftRight,
   ChevronDown,
+  Search,
+  Copy,
+  Monitor,
+  Volume2,
+  Image as ImageIcon,
+  Video as VideoIcon,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -63,7 +57,6 @@ import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation } from "../lib/i18n";
-import { Volume2, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 
 export interface SettingsViewProps {
   open?: boolean;
@@ -150,27 +143,6 @@ function formatTokenDisplay(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
-function generateAsciiBar(
-  percentRemaining: number,
-  totalLength = 24
-): { bar: string; colorClass: string } {
-  const clamped = Math.max(0, Math.min(100, percentRemaining));
-  let filled = Math.round((clamped / 100) * totalLength);
-  if (clamped > 0 && filled === 0) filled = 1;
-  if (clamped < 100 && filled === totalLength) filled = totalLength - 1;
-  const unfilled = Math.max(0, totalLength - filled);
-  const bar = `${"█".repeat(filled)}${"░".repeat(unfilled)}`;
-
-  let colorClass = "text-[#262626] dark:text-[#d4d4d4]";
-  if (clamped <= 10) {
-    colorClass = "text-rose-600 dark:text-rose-500";
-  } else if (clamped <= 30) {
-    colorClass = "text-amber-600 dark:text-amber-400";
-  }
-
-  return { bar, colorClass };
-}
-
 export function SettingsView({
   open = true,
   onClose,
@@ -181,9 +153,12 @@ export function SettingsView({
   initialTab = "general",
   currentProject,
 }: SettingsViewProps) {
-  // Normalize legacy tab names
+  // Normalize legacy and alias tab names
   const normalizedInitialTab = useMemo(() => {
     if (initialTab === "model" || initialTab === "models") return "model-settings";
+    if (initialTab === "shortcuts") return "keyboard-shortcuts";
+    if (initialTab === "user" || initialTab === "account") return "profile";
+    if (initialTab === "data-and-stats" || initialTab === "usage") return "usage-stats";
     return initialTab || "general";
   }, [initialTab]);
 
@@ -278,10 +253,6 @@ export function SettingsView({
     return Math.max(0, Math.min(100, (quota.remainingTokens / limit) * 100));
   }, [quota]);
 
-  const { bar: asciiBar, colorClass: barColorClass } = useMemo(() => {
-    return generateAsciiBar(percentRemaining, 24);
-  }, [percentRemaining]);
-
   // Load config on mount or refresh
   useEffect(() => {
     if (window.electron?.getConfig) {
@@ -294,11 +265,6 @@ export function SettingsView({
     }
   }, [refreshKey]);
 
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
-    toast.success(t("toast.settingsRefreshed"));
-  };
-
   const handleSelectActiveModel = (modelId: string) => {
     setActiveModel(modelId);
     const found = BUILTIN_CONST_MODELS.find((m) => m.id === modelId);
@@ -310,16 +276,74 @@ export function SettingsView({
     toast.success(t("toast.activeModelSet", { model: displayName }));
   };
 
-  // Original Const Harness Nav Categories
+  // Keyboard Shortcuts state & definitions
+  const [shortcutsSearch, setShortcutsSearch] = useState<string>("");
+
+  const isMac = useMemo(() => {
+    return typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+  }, []);
+
+  const KEYBOARD_SHORTCUTS = useMemo(
+    () => [
+      {
+        category: "General & Navigation",
+        items: [
+          { label: "Open Command Palette", keys: [isMac ? "⌘" : "Ctrl", "K"] },
+          { label: "Open Settings", keys: [isMac ? "⌘" : "Ctrl", ","] },
+          { label: "Toggle Left Sidebar", keys: [isMac ? "⌘" : "Ctrl", "B"] },
+          { label: "Quick Switch Workspace", keys: [isMac ? "⌘" : "Ctrl", "O"] },
+          { label: "Close Modal or Dismiss", keys: ["Esc"] },
+        ],
+      },
+      {
+        category: "Workbench & Prompts",
+        items: [
+          { label: "Send Message", keys: ["Enter"] },
+          { label: "Insert New Line", keys: ["Shift", "Enter"] },
+          { label: "Stop Agent Execution", keys: ["Esc"] },
+          { label: "Attach Media & Files", keys: [isMac ? "⌘" : "Ctrl", "U"] },
+          { label: "Mention Context or Files", keys: ["@"] },
+          { label: "Slash Command Palette", keys: ["/"] },
+        ],
+      },
+      {
+        category: "Workspace & Panes",
+        items: [
+          { label: "Toggle Right Pane", keys: [isMac ? "⌘" : "Ctrl", "."] },
+          { label: "Clear Terminal Logs", keys: [isMac ? "⌘" : "Ctrl", "L"] },
+          { label: "Zoom In Interface", keys: [isMac ? "⌘" : "Ctrl", "+"] },
+          { label: "Zoom Out Interface", keys: [isMac ? "⌘" : "Ctrl", "-"] },
+          { label: "Reset Interface Zoom", keys: [isMac ? "⌘" : "Ctrl", "0"] },
+        ],
+      },
+    ],
+    [isMac]
+  );
+
+  const filteredShortcuts = useMemo(() => {
+    if (!shortcutsSearch.trim()) return KEYBOARD_SHORTCUTS;
+    const q = shortcutsSearch.toLowerCase();
+    return KEYBOARD_SHORTCUTS.map((cat) => ({
+      ...cat,
+      items: cat.items.filter(
+        (item) =>
+          item.label.toLowerCase().includes(q) ||
+          item.keys.some((k) => k.toLowerCase().includes(q))
+      ),
+    })).filter((cat) => cat.items.length > 0);
+  }, [KEYBOARD_SHORTCUTS, shortcutsSearch]);
+
+  // Const Harness Nav Categories
   const navCategories = [
     {
-      label: t("settings.basics"),
+      label: t("settings.personal"),
       items: [
-        { id: "general", label: t("settings.general"), icon: SlidersHorizontal },
+        { id: "general", label: t("settings.general"), icon: Settings2 },
+        { id: "profile", label: t("settings.profile"), icon: UserRound },
         { id: "appearance", label: t("settings.appearance"), icon: Palette },
-        { id: "model-settings", label: t("settings.modelSettings"), icon: Box },
-        { id: "browser-use", label: t("settings.browserUse"), icon: Globe },
-        { id: "computer-use", label: t("settings.computerUse"), icon: Monitor },
+        { id: "model-settings", label: t("settings.models"), icon: Box },
+        { id: "personalization", label: t("settings.personalization"), icon: UserRoundPen },
+        { id: "keyboard-shortcuts", label: t("settings.keyboardShortcuts"), icon: Keyboard },
       ],
     },
     {
@@ -328,22 +352,89 @@ export function SettingsView({
         { id: "memory", label: t("settings.memory"), icon: Brain },
         { id: "subagents", label: t("settings.subagents"), icon: Bot },
         { id: "plugins", label: t("settings.plugins"), icon: Puzzle },
-        { id: "mcp-servers", label: t("settings.mcpServers"), icon: Server },
-        { id: "skills", label: t("settings.skills"), icon: Sparkles },
-        { id: "commands", label: t("settings.commands"), icon: Terminal },
-        { id: "hooks", label: t("settings.hooks"), icon: Anchor },
+        { id: "mcp-servers", label: t("settings.mcpServers"), icon: Cable },
+        { id: "skills", label: t("settings.skills"), icon: PencilSparkles },
       ],
     },
     {
-      label: t("settings.dataAndStats"),
+      label: t("settings.usageStatistic"),
       items: [
-        { id: "indexing", label: t("settings.indexing"), icon: Database },
         { id: "usage-stats", label: t("settings.usageStats"), icon: BarChart3 },
       ],
     },
   ];
 
   const initials = getUserInitials(user?.name, user?.email);
+
+  const tabHeader = useMemo(() => {
+    switch (activeTab) {
+      case "general":
+        return {
+          title: t("settings.general"),
+          desc: "Manage default workbench preferences, agent execution modes, and system environment.",
+        };
+      case "profile":
+        return {
+          title: t("settings.profile"),
+          desc: "Manage your personal account profile, authentication, and token quota.",
+        };
+      case "appearance":
+        return {
+          title: t("settings.appearance"),
+          desc: "Configure theme mode and conversation workbench layout.",
+        };
+      case "model-settings":
+        return {
+          title: t("settings.models"),
+          desc: "Configure multi-modal AI models for LLM reasoning, speech synthesis, image generation, and cinematic video.",
+        };
+      case "personalization":
+        return {
+          title: t("settings.personalization"),
+          desc: "This capability is currently being configured and will be available in an upcoming update.",
+        };
+      case "keyboard-shortcuts":
+        return {
+          title: t("settings.keyboardShortcuts"),
+          desc: "Keyboard shortcuts and hotkeys for fast navigation across the workbench.",
+        };
+      case "usage-stats":
+        return {
+          title: t("settings.usageStatistic"),
+          desc: "Monitor your weekly token consumption and account usage limits.",
+        };
+      case "memory":
+        return {
+          title: t("settings.memory"),
+          desc: "Save and reuse long-term context across your workspaces and global sessions.",
+        };
+      case "mcp-servers":
+        return {
+          title: t("settings.mcpServers"),
+          desc: "Manage Model Context Protocol servers and tool integrations.",
+        };
+      case "skills":
+        return {
+          title: t("settings.skills"),
+          desc: "Manage agent skills, workflow procedures, and custom tool suites.",
+        };
+      case "subagents":
+        return {
+          title: t("settings.subagents"),
+          desc: "Configure autonomous subagent swarms and delegation capabilities.",
+        };
+      case "plugins":
+        return {
+          title: t("settings.plugins"),
+          desc: "Extend desktop functionality with community and local plugins.",
+        };
+      default:
+        return {
+          title: activeTab.replace(/-/g, " "),
+          desc: "This capability is currently being configured and will be available in an upcoming update.",
+        };
+    }
+  }, [activeTab, t]);
 
   if (!open) return null;
 
@@ -361,13 +452,14 @@ export function SettingsView({
         tabIndex={-1}
       >
         {/* ----------------------------------------------------------- */}
-        {/* Left Sidebar inside Modal (Original Const Harness Menus)    */}
+        {/* Left Sidebar inside Modal                                   */}
         {/* ----------------------------------------------------------- */}
-        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col justify-between shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
-          {/* Top Branding Strip */}
-          <div className="flex items-center gap-2 px-2.5 py-1.5 shrink-0 mb-1">
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
-            <span className="text-xs font-semibold text-[#262626] dark:text-white tracking-tight">{t("settings.title")}</span>
+        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
+          {/* Top Heading */}
+          <div className="px-2.5 pt-2 pb-2 shrink-0 mb-1">
+            <h2 className="text-base font-semibold text-[#171717] dark:text-white tracking-tight">
+              {t("settings.title")}
+            </h2>
           </div>
 
           {/* Navigation Categories using Radix ScrollArea */}
@@ -397,7 +489,9 @@ export function SettingsView({
                           <Icon
                             className={cn(
                               "w-4 h-4 shrink-0",
-                              isActive ? "text-[#262626] dark:text-white" : "text-[#737373] dark:text-[#969696]"
+                              isActive
+                                ? "text-[#262626] dark:text-white"
+                                : "text-[#737373] dark:text-[#969696]"
                             )}
                           />
                           <span className="truncate">{item.label}</span>
@@ -409,89 +503,20 @@ export function SettingsView({
               ))}
             </div>
           </ScrollArea>
-
-          {/* Bottom Section: Onboard & User Profile (Zero divider lines) */}
-          <div className="flex flex-col gap-1.5 pt-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab("onboard")}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer text-left outline-none focus:outline-none",
-                activeTab === "onboard"
-                  ? "bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white"
-                  : "text-[#555555] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b]"
-              )}
-            >
-              <Rocket
-                className={cn(
-                  "w-4 h-4 shrink-0",
-                  activeTab === "onboard" ? "text-[#262626] dark:text-white" : "text-[#737373] dark:text-[#969696]"
-                )}
-              />
-              <span>{t("settings.onboard")}</span>
-            </button>
-
-            {/* User Profile Bar */}
-            <div className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] transition-colors mt-0.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Avatar className="h-7 w-7 rounded-full bg-[#e2e2e5] dark:bg-[#383838] border border-[#dedee2] dark:border-[#383838] shrink-0">
-                  {user?.image ? (
-                    <AvatarImage
-                      src={user.image}
-                      alt={user?.name || "User"}
-                      className="object-cover"
-                    />
-                  ) : (
-                    <AvatarFallback className="text-[11px] font-semibold text-[#262626] dark:text-white bg-[#e2e2e5] dark:bg-[#383838]">
-                      {initials}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-[#262626] dark:text-white truncate">
-                    {user?.name || "Const User"}
-                  </p>
-                  <p className="text-[10px] text-[#737373] dark:text-[#969696] truncate">
-                    {user?.email || "Workspace"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("general")}
-                className="p-1 rounded-md text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none"
-                title="Account Settings"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
         </aside>
 
         {/* ----------------------------------------------------------- */}
-        {/* Right Main Content Area (Antigravity pop-up header & X)     */}
+        {/* Right Main Content Area                                     */}
         {/* ----------------------------------------------------------- */}
         <main className="flex-1 h-full flex flex-col min-w-0 bg-[#ffffff] dark:bg-[#161616] overflow-hidden">
-          {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' (zero divider lines) */}
+          {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' */}
           <div className="flex-none px-6 sm:px-8 pt-5 pb-2 flex items-start justify-between gap-4 select-none">
             <div>
               <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white capitalize">
-                {activeTab === "model-settings"
-                  ? "Model settings"
-                  : activeTab.replace(/-/g, " ")}
+                {tabHeader.title}
               </h1>
               <p className="mt-1 text-xs text-[#737373] dark:text-[#969696]">
-                {activeTab === "general"
-                  ? "Manage profile details, default workbench preferences, and system environment."
-                  : activeTab === "appearance"
-                  ? "Configure theme mode and conversation workbench layout."
-                  : activeTab === "model-settings"
-                  ? "Configure multi-modal AI models for LLM reasoning, speech synthesis, image generation, and cinematic video."
-                  : activeTab === "usage-stats"
-                  ? "Monitor your weekly token consumption and account usage limits."
-                  : activeTab === "memory"
-                  ? "Save and reuse long-term context across your workspaces and global sessions."
-                  : "This section is currently being configured and will be available in an upcoming update."}
+                {tabHeader.desc}
               </p>
             </div>
 
@@ -508,20 +533,20 @@ export function SettingsView({
 
           {/* Dynamic Section Content wrapped in Radix ScrollArea */}
           <ScrollArea className="flex-1 min-h-0 w-full px-6 sm:px-8 py-3">
-            {activeTab === "general" ? (
+            {activeTab === "profile" ? (
               /* --------------------------------------------------------- */
-              /* General Settings Tab                                      */
+              /* Profile Tab                                               */
               /* --------------------------------------------------------- */
               <div className="flex flex-col gap-5 max-w-2xl pb-6">
                 {/* Account Profile Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Account
+                    User Profile
                   </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Avatar className="h-10 w-10 rounded-full bg-[#eaeaea] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] shrink-0">
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <Avatar className="h-12 w-12 rounded-full bg-[#eaeaea] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] shrink-0">
                           {user?.image ? (
                             <AvatarImage
                               src={user.image}
@@ -529,13 +554,13 @@ export function SettingsView({
                               className="object-cover"
                             />
                           ) : (
-                            <AvatarFallback className="text-xs font-semibold text-[#262626] dark:text-white bg-[#e2e2e5] dark:bg-[#383838]">
+                            <AvatarFallback className="text-sm font-semibold text-[#262626] dark:text-white bg-[#e2e2e5] dark:bg-[#383838]">
                               {initials}
                             </AvatarFallback>
                           )}
                         </Avatar>
                         <div className="min-w-0 flex flex-col">
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white truncate">
+                          <span className="text-sm font-medium text-[#262626] dark:text-white truncate">
                             {user?.name || "Const User"}
                           </span>
                           <span className="text-xs text-[#737373] dark:text-[#969696] truncate">
@@ -545,36 +570,39 @@ export function SettingsView({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-[#ebebed] dark:bg-[#1b1b1b] text-[#555555] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838]">
+                        <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#ebebed] dark:bg-[#1b1b1b] text-[#555555] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838]">
                           Local Studio
                         </span>
                       </div>
                     </div>
 
-                    {quota && (
-                      <div className="flex flex-col gap-1.5 pt-1">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#737373] dark:text-[#969696]">Weekly Token Quota</span>
-                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
-                            {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#22c55e] transition-all rounded-full"
-                            style={{ width: `${Math.max(2, percentRemaining)}%` }}
-                          />
-                        </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#dedee2] dark:border-[#383838] text-xs">
+                      <div className="flex flex-col">
+                        <span className="text-[#737373] dark:text-[#969696]">Account Identifier</span>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4] mt-0.5">
+                          {user?.id || "local-user-session"}
+                        </span>
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(user?.id || user?.email || "local-user-session");
+                          toast.success("Account ID copied to clipboard");
+                        }}
+                        className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span>Copy ID</span>
+                      </button>
+                    </div>
 
                     {(onSwitchAccount || onSignOut) && (
-                      <div className="flex items-center justify-end gap-2 pt-1">
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#dedee2] dark:border-[#383838]">
                         {onSwitchAccount && (
                           <button
                             type="button"
                             onClick={onSwitchAccount}
-                            className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <ArrowLeftRight className="w-3.5 h-3.5" />
                             <span>Switch account</span>
@@ -584,7 +612,7 @@ export function SettingsView({
                           <button
                             type="button"
                             onClick={onSignOut}
-                            className="px-2.5 py-1 text-xs rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <LogOut className="w-3.5 h-3.5" />
                             <span>Sign out</span>
@@ -595,6 +623,38 @@ export function SettingsView({
                   </div>
                 </div>
 
+                {/* Token Quota Card */}
+                {quota && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                      Token Allocation
+                    </span>
+                    <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-[#262626] dark:text-white">Weekly Quota</span>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)} tokens
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#22c55e] transition-all rounded-full"
+                          style={{ width: `${Math.max(2, percentRemaining)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-[#737373] dark:text-[#969696]">
+                        <span>{percentRemaining.toFixed(1)}% remaining</span>
+                        <span>Resets in {quota.resetsInText || "7 days"}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : activeTab === "general" ? (
+              /* --------------------------------------------------------- */
+              /* General Settings Tab                                      */
+              /* --------------------------------------------------------- */
+              <div className="flex flex-col gap-5 max-w-2xl pb-6">
                 {/* Agent Settings Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[14px] font-semibold text-[#262626] dark:text-white">
@@ -717,7 +777,7 @@ export function SettingsView({
                         type="button"
                         onClick={() => setActiveTab("model-settings")}
                         className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage models in Model settings"
+                        title="Manage models in Models"
                       >
                         <Bot className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                         <span>{activeModel}</span>
@@ -739,7 +799,7 @@ export function SettingsView({
                         type="button"
                         onClick={() => setActiveTab("model-settings")}
                         className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage speech in Model settings"
+                        title="Manage speech in Models"
                       >
                         <Volume2 className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                         <span className="text-[#737373] dark:text-[#969696]">
@@ -763,7 +823,7 @@ export function SettingsView({
                         type="button"
                         onClick={() => setActiveTab("model-settings")}
                         className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage images in Model settings"
+                        title="Manage images in Models"
                       >
                         <ImageIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                         <span className="text-[#737373] dark:text-[#969696]">
@@ -787,7 +847,7 @@ export function SettingsView({
                         type="button"
                         onClick={() => setActiveTab("model-settings")}
                         className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                        title="Manage videos in Model settings"
+                        title="Manage videos in Models"
                       >
                         <VideoIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                         <span className="text-[#737373] dark:text-[#969696]">
@@ -822,6 +882,74 @@ export function SettingsView({
                     </div>
                   </div>
                 </div>
+              </div>
+            ) : activeTab === "keyboard-shortcuts" ? (
+              /* --------------------------------------------------------- */
+              /* Keyboard Shortcuts Tab                                    */
+              /* --------------------------------------------------------- */
+              <div className="flex flex-col gap-4 max-w-2xl pb-6">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#969696]" />
+                  <input
+                    type="text"
+                    value={shortcutsSearch}
+                    onChange={(e) => setShortcutsSearch(e.target.value)}
+                    placeholder="Search shortcuts..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] text-[#262626] dark:text-white placeholder-[#888888] dark:placeholder-[#666666] outline-none focus:border-[#737373] dark:focus:border-[#969696] transition-colors"
+                  />
+                  {shortcutsSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setShortcutsSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Shortcuts List */}
+                {filteredShortcuts.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    {filteredShortcuts.map((cat) => (
+                      <div key={cat.category} className="flex flex-col gap-2">
+                        <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                          {cat.category}
+                        </span>
+                        <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] divide-y divide-[#dedee2] dark:divide-[#383838] overflow-hidden">
+                          {cat.items.map((item) => (
+                            <div
+                              key={item.label}
+                              className="px-4 py-2.5 flex items-center justify-between gap-4 text-xs hover:bg-black/2 dark:hover:bg-white/2 transition-colors"
+                            >
+                              <span className="text-[#262626] dark:text-[#d4d4d4] font-medium">
+                                {item.label}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {item.keys.map((k, idx) => (
+                                  <kbd
+                                    key={idx}
+                                    className="px-2 py-0.5 text-[11px] font-mono font-medium rounded-md bg-[#ffffff] dark:bg-[#2c2c2c] border border-[#dedee2] dark:border-[#404040] text-[#262626] dark:text-white shadow-2xs"
+                                  >
+                                    {k}
+                                  </kbd>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 flex flex-col items-center justify-center text-center">
+                    <Keyboard className="w-8 h-8 text-[#a3a3a3] dark:text-[#555555] mb-2" />
+                    <p className="text-xs text-[#737373] dark:text-[#969696]">
+                      No shortcuts matching "{shortcutsSearch}"
+                    </p>
+                  </div>
+                )}
               </div>
             ) : activeTab === "appearance" ? (
               /* --------------------------------------------------------- */
@@ -1080,7 +1208,7 @@ export function SettingsView({
                   <div className="flex flex-col gap-1 leading-relaxed">
                     <span className="font-medium text-[#262626] dark:text-[#d4d4d4]">Router Native Gateway</span>
                     <span>
-                      Your weekly quota of 7,000,000 tokens covers all queries routed through the Const native router. Custom external providers configured in Model Settings use your own API keys directly.
+                      Your weekly quota of 7,000,000 tokens covers all queries routed through the Const native router. Custom external providers configured in Models use your own API keys directly.
                     </span>
                   </div>
                 </div>
@@ -1095,23 +1223,18 @@ export function SettingsView({
               />
             ) : activeTab === "memory" ? (
               /* --------------------------------------------------------- */
-              /* Memory Settings View (Image 1 style)                      */
+              /* Memory Settings View                                      */
               /* --------------------------------------------------------- */
               <MemorySettings currentProject={currentProject} />
             ) : (
               /* --------------------------------------------------------- */
-              /* Generic Placeholder for other original tabs               */
-              /* (browser-use, computer-use, memory, subagents, plugins,   */
-              /* mcp-servers, skills, commands, hooks, indexing, onboard)  */
+              /* Generic Placeholder for other capabilities                */
+              /* (subagents, plugins, mcp-servers, skills)                 */
               /* --------------------------------------------------------- */
               (() => {
-                const currentItem =
-                  navCategories
-                    .flatMap((c) => c.items)
-                    .find((i) => i.id === activeTab) ||
-                  (activeTab === "onboard"
-                    ? { id: "onboard", label: "Onboard", icon: Rocket }
-                    : null);
+                const currentItem = navCategories
+                  .flatMap((c) => c.items)
+                  .find((i) => i.id === activeTab);
                 const Icon = currentItem?.icon || Settings;
                 return (
                   <div className="flex flex-col gap-3 pt-6 max-w-2xl pb-6">

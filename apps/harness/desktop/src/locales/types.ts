@@ -310,6 +310,12 @@ export interface TranslationDictionary {
   settings: {
     title: string;
     basics: string;
+    personal: string;
+    profile: string;
+    models: string;
+    personalization: string;
+    keyboardShortcuts: string;
+    usageStatistic: string;
     agentCapabilities: string;
     dataAndStats: string;
     general: string;
