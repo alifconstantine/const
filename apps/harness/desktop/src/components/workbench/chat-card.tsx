@@ -55,6 +55,7 @@ import {
 import { MentionPopover } from "./mention-popover";
 import { FileIcon } from "./file-icon";
 import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
+import { QueueDock, type QueuedMessageItem } from "./queue-dock";
 
 
 function formatTokenDisplay(tokens: number): string {
@@ -221,6 +222,13 @@ interface ChatCardProps {
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
   forceIconOnly?: boolean;
+  queuedMessages?: QueuedMessageItem[];
+  onQueueMessage?: (payload: { prompt: string; attachments?: AttachedFile[] }) => void;
+  onRemoveQueuedMessage?: (id: string) => void;
+  onEditQueuedMessage?: (id: string, newText: string) => void;
+  onSteerMessage?: (item: QueuedMessageItem) => void;
+  onSteerAllQueuedMessages?: () => void;
+  onSteerDraft?: (payload: { prompt: string; attachments?: AttachedFile[] }) => void;
 }
 
 export interface MentionedItem {
@@ -256,6 +264,13 @@ export function ChatCard({
   onOpenFilePreview,
   onOpenTrajectory,
   forceIconOnly = false,
+  queuedMessages,
+  onQueueMessage,
+  onRemoveQueuedMessage,
+  onEditQueuedMessage,
+  onSteerMessage,
+  onSteerAllQueuedMessages,
+  onSteerDraft,
 }: ChatCardProps) {
   const { t } = useTranslation();
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -954,7 +969,7 @@ export function ChatCard({
 
   const handleSend = () => {
     let text = (editorRef.current?.getText() || prompt).trim();
-    if ((!text && attachments.length === 0) || isExecuting) return;
+    if (!text && attachments.length === 0) return;
 
     if (!text && attachments.length > 0) {
       text = "Please analyze the attached media/file(s).";
@@ -964,6 +979,17 @@ export function ChatCard({
     setPrompt("");
     editorRef.current?.clear();
     setAttachments([]);
+
+    if (isExecuting) {
+      if (onQueueMessage) {
+        onQueueMessage({
+          prompt: text,
+          attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+        });
+      }
+      return;
+    }
+
     const matchedModel = models.find((m) => m.name === selectedModel || m.id === selectedModel);
     onSendMessage?.({
       prompt: text,
@@ -974,6 +1000,27 @@ export function ChatCard({
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
       maxOutputTokens: matchedModel?.maxOutputTokens || currentModelItem?.maxOutputTokens,
     });
+  };
+
+  const handleSteerCurrentDraft = () => {
+    let text = (editorRef.current?.getText() || prompt).trim();
+    if (!text && attachments.length === 0) return;
+
+    if (!text && attachments.length > 0) {
+      text = "Please analyze the attached media/file(s).";
+    }
+
+    const currentAttachments = [...attachments];
+    setPrompt("");
+    editorRef.current?.clear();
+    setAttachments([]);
+
+    if (onSteerDraft) {
+      onSteerDraft({
+        prompt: text,
+        attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+      });
+    }
   };
 
   const displayProjectName =
@@ -1168,6 +1215,17 @@ export function ChatCard({
           </div>
         )}
 
+        {/* Queued Messages Dock attached directly above AI input card, matching Screenshot */}
+        {isExecuting && queuedMessages && queuedMessages.length > 0 && (
+          <QueueDock
+            items={queuedMessages}
+            onSteerItem={onSteerMessage || (() => {})}
+            onRemoveItem={onRemoveQueuedMessage || (() => {})}
+            onEditItem={onEditQueuedMessage}
+            className={compact ? "max-w-full rounded-t-2xl" : "rounded-t-2xl -mx-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]"}
+          />
+        )}
+
         {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
         <div
           onDragOver={handleDragOver}
@@ -1176,8 +1234,12 @@ export function ChatCard({
           className={cn(
             "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors min-w-0 relative",
             compact
-              ? "max-w-full rounded-2xl"
-              : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
+              ? isExecuting && queuedMessages && queuedMessages.length > 0
+                ? "max-w-full rounded-b-2xl rounded-t-none border-t border-[#e2e2e4] dark:border-[#383838]"
+                : "max-w-full rounded-2xl"
+              : isExecuting && queuedMessages && queuedMessages.length > 0
+                ? "rounded-b-2xl rounded-t-none border border-[#e2e2e4] dark:border-[#383838] border-t-0 -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]"
+                : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
             isDraggingOver && "ring-2 ring-primary/60 border-primary dark:border-primary/80 bg-primary/5",
             isAnyBottomMenuOpen ? "z-30" : "z-10"
           )}
@@ -1327,8 +1389,12 @@ export function ChatCard({
               onOpenTrajectory={onOpenTrajectory}
               onSend={handleSend}
               onPasteFiles={handlePasteFiles}
-              placeholder={t("workbench.askPlaceholder")}
-              disabled={isExecuting}
+              placeholder={
+                isExecuting && queuedMessages && queuedMessages.length > 0 && !prompt.trim()
+                  ? t("workbench.steerQueuePlaceholder")
+                  : t("workbench.askPlaceholder")
+              }
+              disabled={false}
               onKeyDown={(e) => {
                 if (mentionToken && mentionCandidates.length > 0) {
                   if (e.key === "ArrowDown") {
@@ -1364,6 +1430,35 @@ export function ChatCard({
                   if (e.key === "Escape") {
                     e.preventDefault();
                     setMentionToken(null);
+                    return;
+                  }
+                }
+
+                // Keyboard Steering: Cmd/Ctrl + Enter
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  const text = (editorRef.current?.getText() || prompt).trim();
+                  if (!text && (!attachments || attachments.length === 0)) {
+                    // Empty draft: Steer all queued messages into active turn!
+                    if (isExecuting && queuedMessages && queuedMessages.length > 0) {
+                      e.preventDefault();
+                      onSteerAllQueuedMessages?.();
+                      return;
+                    }
+                  } else {
+                    // Draft has content: Steer this draft directly into active turn!
+                    if (isExecuting) {
+                      e.preventDefault();
+                      handleSteerCurrentDraft();
+                      return;
+                    }
+                  }
+                }
+
+                // Plain Enter while AI is generating: Queue message into QueueDock!
+                if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                  if (isExecuting) {
+                    e.preventDefault();
+                    handleSend();
                     return;
                   }
                 }
@@ -1850,19 +1945,35 @@ export function ChatCard({
 
               {/* 3. Send or Stop Generation Button */}
               {isExecuting ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onAbort?.();
-                  }}
-                  className="w-7 h-7 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#383838] dark:hover:bg-[#454545] text-[#e79737] dark:text-[#ff7a00] flex items-center justify-center cursor-pointer select-none transition-colors shrink-0"
-                  title={t("workbench.stopExecution")}
-                  aria-label={t("workbench.stopExecution")}
-                >
-                  <Square className="w-3 h-3 fill-current" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Stop Generation Button (Circular Blue Button matching Screenshot) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onAbort?.();
+                    }}
+                    className="w-7 h-7 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center cursor-pointer select-none transition-all shrink-0 shadow-sm active:scale-95"
+                    title={t("workbench.stopExecution")}
+                    aria-label={t("workbench.stopExecution")}
+                  >
+                    <Square className="w-2.5 h-2.5 fill-current" />
+                  </button>
+
+                  {/* Send/Queue Button when user has typed text or attached files during execution */}
+                  {(prompt.trim() || attachments.length > 0) && (
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
+                      title={t("workbench.steerMessage")}
+                      aria-label={t("workbench.steerMessage")}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   type="button"

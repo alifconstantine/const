@@ -172,6 +172,7 @@ export interface AgentEventMap {
   subagent_killed: { agentId: string; agent?: SubAgentItem };
   source_created: { source: any };
   artifact_created: { artifact: any };
+  steer_message: { conversationId?: string; message: AgentMessage };
 }
 
 export type AgentEvent = {

@@ -114,6 +114,11 @@ export const ja: TranslationDictionary = {
   },
   workbench: {
     askPlaceholder: "Constに質問、@でファイル・フォルダー・ウェブを参照...",
+    steerQueuePlaceholder: "Cmd/Ctrl+Enter でキュー内の全メッセージをステア送信",
+    steerMessage: "実行中のターンに割り込み送信",
+    removeQueuedMessage: "キューから削除",
+    editQueuedMessage: "メッセージを編集",
+    queueCount: "{n} 件のキュー中メッセージ",
     modeAskBeforeChanges: "変更前に確認",
     modeFullAccess: "全アクセス許可",
     modeAskDesc: "ファイル変更やコマンド実行の前に確認を求めます",

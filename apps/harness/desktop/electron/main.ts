@@ -1075,6 +1075,35 @@ app.whenReady().then(() => {
     }
   );
 
+  ipcMain.handle(
+    "agent:steer",
+    async (
+      _event,
+      payload: {
+        conversationId?: string;
+        prompt: string;
+        attachments?: any[];
+      }
+    ) => {
+      const safeConvoId =
+        typeof payload.conversationId === "string" && payload.conversationId.trim().length > 0
+          ? payload.conversationId.trim()
+          : undefined;
+
+      let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
+      if (!targetSession && activeSessions.size === 1) {
+        targetSession = activeSessions.values().next().value;
+      }
+
+      if (targetSession) {
+        const steered = targetSession.agent.steer(payload.prompt, payload.attachments);
+        return { success: steered };
+      }
+
+      return { success: false, notRunning: true };
+    }
+  );
+
   ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
     for (const [tcId, resolver] of pendingQuestions.entries()) {
       pendingQuestions.delete(tcId);

@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld("electron", {
     authToken?: string;
     maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
+  steerAgent: (payload: { conversationId: string; prompt: string; attachments?: any[] }) =>
+    ipcRenderer.invoke("agent:steer", payload),
   abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
   updateMode: (payload: { mode: "request_review" | "ask_before_changes" | "full_access"; conversationId?: string }) =>
     ipcRenderer.invoke("agent:update-mode", payload),

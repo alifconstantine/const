@@ -114,6 +114,11 @@ export const zh: TranslationDictionary = {
   },
   workbench: {
     askPlaceholder: "向 Const 提问，输入 @ 引用文件、文件夹或网页...",
+    steerQueuePlaceholder: "Cmd/Ctrl+Enter 插话发送全部排队消息",
+    steerMessage: "插话发送",
+    removeQueuedMessage: "从队列中移除",
+    editQueuedMessage: "编辑消息",
+    queueCount: "{n} 条排队消息",
     modeAskBeforeChanges: "更改前询问",
     modeFullAccess: "完全访问",
     modeAskDesc: "在修改文件或执行命令前需要确认",

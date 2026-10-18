@@ -40,6 +40,7 @@ import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { CommandPaletteModal } from "./components/command-palette-modal";
+import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
@@ -866,9 +867,116 @@ function AuthenticatedContent({
     runningConvoIdsRef.current = runningConvoIds;
   }, [runningConvoIds]);
   const isExecuting = runningConvoIds.has(conversationId);
+  const [queuedMessagesByConvo, setQueuedMessagesByConvo] = useState<Record<string, QueuedMessageItem[]>>({});
+  const queuedMessagesByConvoRef = React.useRef(queuedMessagesByConvo);
+  useEffect(() => {
+    queuedMessagesByConvoRef.current = queuedMessagesByConvo;
+  }, [queuedMessagesByConvo]);
+  const currentQueuedMessages = queuedMessagesByConvo[conversationId] || [];
+
+  const handleSendMessageRef = React.useRef<(args: any) => void>(() => {});
+  const currentProjectRef = React.useRef(currentProject);
+  useEffect(() => {
+    currentProjectRef.current = currentProject;
+  }, [currentProject]);
+  const currentModeRef = React.useRef(currentMode);
+  useEffect(() => {
+    currentModeRef.current = currentMode;
+  }, [currentMode]);
+
   const activeSessionMessagesRef = React.useRef<Map<string, ChatMessage[]>>(new Map());
   const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+
+  const handleQueueMessage = useCallback((payload: { prompt: string; attachments?: AttachedFile[] }) => {
+    const newItem: QueuedMessageItem = {
+      id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      conversationId,
+      prompt: payload.prompt,
+      attachments: payload.attachments,
+      timestamp: Date.now(),
+    };
+    setQueuedMessagesByConvo((prev) => ({
+      ...prev,
+      [conversationId]: [...(prev[conversationId] || []), newItem],
+    }));
+  }, [conversationId]);
+
+  const handleRemoveQueuedMessage = useCallback((id: string) => {
+    setQueuedMessagesByConvo((prev) => ({
+      ...prev,
+      [conversationId]: (prev[conversationId] || []).filter((item) => item.id !== id),
+    }));
+  }, [conversationId]);
+
+  const handleEditQueuedMessage = useCallback((id: string, newText: string) => {
+    setQueuedMessagesByConvo((prev) => ({
+      ...prev,
+      [conversationId]: (prev[conversationId] || []).map((item) =>
+        item.id === id ? { ...item, prompt: newText } : item
+      ),
+    }));
+  }, [conversationId]);
+
+  const handleSteerMessage = useCallback((item: QueuedMessageItem) => {
+    handleRemoveQueuedMessage(item.id);
+
+    if (window.electron?.steerAgent) {
+      window.electron
+        .steerAgent({
+          conversationId: item.conversationId,
+          prompt: item.prompt,
+          attachments: item.attachments,
+        })
+        .then((res) => {
+          if (!res?.success && res?.notRunning) {
+            handleSendMessageRef.current?.({
+              prompt: item.prompt,
+              project: currentProjectRef.current || "Outside Project",
+              mode: currentModeRef.current,
+              attachments: item.attachments,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [handleRemoveQueuedMessage]);
+
+  const handleSteerAllQueuedMessages = useCallback(() => {
+    const items = queuedMessagesByConvoRef.current[conversationId] || [];
+    if (items.length === 0) return;
+
+    setQueuedMessagesByConvo((prev) => ({
+      ...prev,
+      [conversationId]: [],
+    }));
+
+    for (const item of items) {
+      handleSteerMessage(item);
+    }
+  }, [conversationId, handleSteerMessage]);
+
+  const handleSteerDraft = useCallback((payload: { prompt: string; attachments?: AttachedFile[] }) => {
+    if (window.electron?.steerAgent) {
+      window.electron
+        .steerAgent({
+          conversationId,
+          prompt: payload.prompt,
+          attachments: payload.attachments,
+        })
+        .then((res) => {
+          if (!res?.success && res?.notRunning) {
+            handleSendMessageRef.current?.({
+              prompt: payload.prompt,
+              project: currentProjectRef.current || "Outside Project",
+              mode: currentModeRef.current,
+              attachments: payload.attachments,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [conversationId]);
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, ApprovalRequestData>>(new Map());
   const [isRespondingApproval, setIsRespondingApproval] = useState<boolean>(false);
   const activeApproval = pendingApprovals.get(conversationId);
@@ -1675,6 +1783,25 @@ function AuthenticatedContent({
           next.delete(data.conversationId);
           return next;
         });
+
+        const queued = queuedMessagesByConvoRef.current[data.conversationId];
+        if (queued && queued.length > 0) {
+          const [nextItem, ...remaining] = queued;
+          if (nextItem) {
+            setQueuedMessagesByConvo((prev) => ({
+              ...prev,
+              [data.conversationId]: remaining,
+            }));
+            setTimeout(() => {
+              handleSendMessageRef.current?.({
+                prompt: nextItem.prompt,
+                project: currentProjectRef.current || "Outside Project",
+                mode: currentModeRef.current,
+                attachments: nextItem.attachments,
+              });
+            }, 150);
+          }
+        }
       }
     });
 
@@ -2094,12 +2221,56 @@ function AuthenticatedContent({
             return next;
           });
         }
+      } else if (event.type === "steer_message") {
+        if (event.message) {
+          const steerMsg: ChatMessage = {
+            id: `msg_${Date.now()}_steer`,
+            role: "user",
+            content: event.message.content || "",
+            timestamp: event.message.timestamp || Date.now(),
+            attachments: event.message.attachments,
+          };
+          const nextAssistantPlaceholder: ChatMessage = {
+            id: `msg_${Date.now()}_assistant`,
+            role: "assistant",
+            content: "",
+            thinking: "",
+            traceSteps: [],
+            toolCalls: [],
+            mutations: [],
+            timestamp: Date.now(),
+          };
+          targetMsgs = [...targetMsgs, steerMsg, nextAssistantPlaceholder];
+          activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+          if (targetConvoId === conversationIdRef.current) {
+            setMessages(targetMsgs);
+          }
+        }
       } else if (event.type === "done") {
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
           next.delete(targetConvoId);
           return next;
         });
+
+        const queued = queuedMessagesByConvoRef.current[targetConvoId];
+        if (queued && queued.length > 0) {
+          const [nextItem, ...remaining] = queued;
+          if (nextItem) {
+            setQueuedMessagesByConvo((prev) => ({
+              ...prev,
+              [targetConvoId]: remaining,
+            }));
+            setTimeout(() => {
+              handleSendMessageRef.current?.({
+                prompt: nextItem.prompt,
+                project: currentProjectRef.current || "Outside Project",
+                mode: currentModeRef.current,
+                attachments: nextItem.attachments,
+              });
+            }, 150);
+          }
+        }
 
         setPendingApprovals((prev) => {
           if (!prev.has(targetConvoId)) return prev;
@@ -2464,6 +2635,7 @@ function AuthenticatedContent({
       }, 600);
     }
   };
+  handleSendMessageRef.current = handleSendMessage;
 
   const handleRollback = async (record: FileMutationRecord) => {
     if (!window.electron?.rollbackFile) {
@@ -3088,6 +3260,13 @@ function AuthenticatedContent({
                   sessionMedia={sessionMediaAttachments}
                   onOpenFilePreview={handleOpenFilePreview}
                   onOpenTrajectory={handleOpenTrajectory}
+                  queuedMessages={currentQueuedMessages}
+                  onQueueMessage={handleQueueMessage}
+                  onRemoveQueuedMessage={handleRemoveQueuedMessage}
+                  onEditQueuedMessage={handleEditQueuedMessage}
+                  onSteerMessage={handleSteerMessage}
+                  onSteerAllQueuedMessages={handleSteerAllQueuedMessages}
+                  onSteerDraft={handleSteerDraft}
                 />
               </div>
             </div>
@@ -3276,6 +3455,13 @@ function AuthenticatedContent({
                       sessionMedia={sessionMediaAttachments}
                       onOpenFilePreview={handleOpenFilePreview}
                       onOpenTrajectory={handleOpenTrajectory}
+                      queuedMessages={currentQueuedMessages}
+                      onQueueMessage={handleQueueMessage}
+                      onRemoveQueuedMessage={handleRemoveQueuedMessage}
+                      onEditQueuedMessage={handleEditQueuedMessage}
+                      onSteerMessage={handleSteerMessage}
+                      onSteerAllQueuedMessages={handleSteerAllQueuedMessages}
+                      onSteerDraft={handleSteerDraft}
                     />
                   )}
                 </SmoothCardMorph>

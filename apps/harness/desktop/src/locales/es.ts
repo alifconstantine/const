@@ -114,6 +114,11 @@ export const es: TranslationDictionary = {
   },
   workbench: {
     askPlaceholder: "Pregunta a Const lo que sea, escribe @ para mencionar archivos o web...",
+    steerQueuePlaceholder: "Cmd/Ctrl+Enter para enviar todos los mensajes en cola",
+    steerMessage: "Enviar al turno activo",
+    removeQueuedMessage: "Eliminar de la cola",
+    editQueuedMessage: "Editar mensaje",
+    queueCount: "{n} mensajes en cola",
     modeAskBeforeChanges: "Preguntar antes de editar",
     modeFullAccess: "Acceso total",
     modeAskDesc: "Solicita confirmación antes de modificar archivos o ejecutar comandos",

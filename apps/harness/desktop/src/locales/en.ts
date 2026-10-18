@@ -114,6 +114,11 @@ export const en: TranslationDictionary = {
   },
   workbench: {
     askPlaceholder: "Ask Const anything, type @ to mention files, folders, or web...",
+    steerQueuePlaceholder: "Cmd/Ctrl+Enter steers all queued messages",
+    steerMessage: "Steer into active turn",
+    removeQueuedMessage: "Remove from queue",
+    editQueuedMessage: "Edit message",
+    queueCount: "{n} queued messages",
     modeAskBeforeChanges: "Ask before edits",
     modeFullAccess: "Full access",
     modeAskDesc: "Requests confirmation before modifying files or running commands",

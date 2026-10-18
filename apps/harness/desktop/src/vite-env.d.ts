@@ -279,6 +279,11 @@ declare global {
         isOutsideProject?: boolean;
         error?: string;
       }>;
+      steerAgent?: (payload: {
+        conversationId: string;
+        prompt: string;
+        attachments?: any[];
+      }) => Promise<{ success: boolean; notRunning?: boolean }>;
       abortAgent: (conversationId?: string) => Promise<boolean>;
       updateMode?: (payload: {
         mode: "request_review" | "ask_before_changes" | "full_access";

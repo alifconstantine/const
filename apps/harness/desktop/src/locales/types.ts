@@ -112,6 +112,11 @@ export interface TranslationDictionary {
   };
   workbench: {
     askPlaceholder: string;
+    steerQueuePlaceholder: string;
+    steerMessage: string;
+    removeQueuedMessage: string;
+    editQueuedMessage: string;
+    queueCount: string;
     modeAskBeforeChanges: string;
     modeFullAccess: string;
     modeAskDesc: string;

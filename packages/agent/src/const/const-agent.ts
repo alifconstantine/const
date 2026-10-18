@@ -724,6 +724,18 @@ export class ConstAgent {
     return this.config.maxTurns || 200;
   }
 
+  private steeringQueue: Array<{ content: string; attachments?: any[]; timestamp: number }> = [];
+
+  public steer(content: string, attachments?: any[]): boolean {
+    if (!this.isRunning || this._isCancelled) return false;
+    this.steeringQueue.push({
+      content,
+      attachments,
+      timestamp: Date.now(),
+    });
+    return true;
+  }
+
   public abort(): void {
     this._isCancelled = true;
     if (this.abortController) {
@@ -784,6 +796,34 @@ export class ConstAgent {
           throw new Error("User cancelled agent execution.");
         }
         currentTurn++;
+
+        // Drain any pending steering messages into conversationHistory before next LLM turn
+        if (this.steeringQueue.length > 0) {
+          while (this.steeringQueue.length > 0) {
+            const steer = this.steeringQueue.shift()!;
+            let steerContent = steer.content;
+            if (steer.attachments && steer.attachments.length > 0) {
+              const attLines = steer.attachments.map((att: any) => {
+                const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+                const sizeStr = att.size ? ` (${Math.round(att.size / 1024)} KB)` : "";
+                return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pathInfo}`;
+              });
+              steerContent = `${steerContent}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+            }
+            const steerMsg: AgentMessage = {
+              role: "user",
+              content: steerContent,
+              timestamp: steer.timestamp,
+            };
+            conversationHistory.push(steerMsg);
+            onEvent({
+              type: "steer_message",
+              conversationId: this.config.conversationId,
+              message: steerMsg,
+            });
+          }
+        }
+
         onEvent({ type: "status", status: "thinking" });
 
         const activeTools =
@@ -1319,6 +1359,34 @@ export class ConstAgent {
           };
           conversationHistory.push(assistantMsg);
 
+          // Check if any steer messages arrived during generation
+          if (this.steeringQueue.length > 0) {
+            while (this.steeringQueue.length > 0) {
+              const steer = this.steeringQueue.shift()!;
+              let steerContent = steer.content;
+              if (steer.attachments && steer.attachments.length > 0) {
+                const attLines = steer.attachments.map((att: any) => {
+                  const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+                  const sizeStr = att.size ? ` (${Math.round(att.size / 1024)} KB)` : "";
+                  return `- ${(att.type || "file").toUpperCase()}: "${att.name}"${sizeStr}${pathInfo}`;
+                });
+                steerContent = `${steerContent}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+              }
+              const steerMsg: AgentMessage = {
+                role: "user",
+                content: steerContent,
+                timestamp: steer.timestamp,
+              };
+              conversationHistory.push(steerMsg);
+              onEvent({
+                type: "steer_message",
+                conversationId: this.config.conversationId,
+                message: steerMsg,
+              });
+            }
+            continue;
+          }
+
           onEvent({
             type: "done",
             fullContent: turnContent,
@@ -1355,6 +1423,7 @@ export class ConstAgent {
           toolName: string;
         }> = [];
 
+        let tcIdx = 0;
         for (const tc of toolCalls) {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
@@ -1797,6 +1866,30 @@ export class ConstAgent {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
           }
+
+          // If user steered with a new message while this tool was running:
+          // Safely stop remaining scheduled tool calls in this turn so the agent can pivot immediately
+          if (this.steeringQueue.length > 0 && tcIdx < toolCalls.length - 1) {
+            for (const skippedTc of toolCalls.slice(tcIdx + 1)) {
+              const skipMsg = "[Tool execution stopped: User steered with a new instruction.]";
+              onEvent({
+                type: "tool_result",
+                toolCallId: skippedTc.id,
+                toolName: skippedTc.function.name,
+                result: skipMsg,
+                isError: false,
+              });
+              conversationHistory.push({
+                role: "tool",
+                tool_call_id: skippedTc.id,
+                name: skippedTc.function.name,
+                content: skipMsg,
+                timestamp: Date.now(),
+              });
+            }
+            break;
+          }
+          tcIdx++;
         }
 
         // If multiple subagents were spawned in parallel, wait for all of them to complete
@@ -1916,6 +2009,7 @@ export class ConstAgent {
       this.isRunning = false;
       this.abortController = null;
       this.pendingApprovals.clear();
+      this.steeringQueue = [];
     }
   }
 }

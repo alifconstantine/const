@@ -114,6 +114,11 @@ export const id: TranslationDictionary = {
   },
   workbench: {
     askPlaceholder: "Tanyakan apa saja ke Const, ketik @ untuk menyebut berkas, folder, atau web...",
+    steerQueuePlaceholder: "Cmd/Ctrl+Enter untuk mengarahkan (steer) semua pesan antrean",
+    steerMessage: "Arahkan (steer) ke giliran aktif",
+    removeQueuedMessage: "Hapus dari antrean",
+    editQueuedMessage: "Edit pesan",
+    queueCount: "{n} pesan dalam antrean",
     modeAskBeforeChanges: "Tanya sebelum ubah",
     modeFullAccess: "Akses penuh",
     modeAskDesc: "Meminta konfirmasi sebelum memodifikasi berkas atau menjalankan perintah",
