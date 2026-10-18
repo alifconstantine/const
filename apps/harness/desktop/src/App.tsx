@@ -277,6 +277,42 @@ function AuthenticatedContent({
   onSwitchAccount: () => void;
 }) {
   const user = useQuery(api.auth.queries.currentUser, {});
+  const [localProfile, setLocalProfile] = useState<{ name?: string; image?: string }>(() => {
+    try {
+      const saved = localStorage.getItem("const_custom_user_profile");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleProfileUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ name?: string; image?: string }>;
+      if (customEvent.detail) {
+        setLocalProfile(customEvent.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem("const_custom_user_profile");
+          setLocalProfile(saved ? JSON.parse(saved) : {});
+        } catch {
+          setLocalProfile({});
+        }
+      }
+    };
+    window.addEventListener("const:user-profile-updated", handleProfileUpdate);
+    return () => window.removeEventListener("const:user-profile-updated", handleProfileUpdate);
+  }, []);
+
+  const effectiveUser = useMemo(() => {
+    if (!user && !localProfile.name && !localProfile.image) return user;
+    return {
+      ...(user || { id: "local-user-session", email: "Local Workspace" }),
+      name: localProfile.name !== undefined ? localProfile.name : user?.name,
+      image: localProfile.image !== undefined ? localProfile.image : user?.image,
+    };
+  }, [user, localProfile]);
+
   const { token } = useAppAuth();
   const { t } = useTranslation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -3264,7 +3300,7 @@ function AuthenticatedContent({
       >
         <div className="w-64 h-full">
           <Sidebar
-            user={user}
+            user={effectiveUser}
             onSignOut={onSignOut}
             onSwitchAccount={onSwitchAccount}
             onCollapse={() => setIsSidebarOpen(false)}
@@ -3800,7 +3836,7 @@ function AuthenticatedContent({
         onBackToWorkspace={() => setIsSettingsOpen(false)}
         initialTab={settingsTab}
         currentProject={currentProject}
-        user={user}
+        user={effectiveUser}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
       />

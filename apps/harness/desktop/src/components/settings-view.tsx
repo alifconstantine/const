@@ -48,8 +48,14 @@ import {
   ExternalLink,
   Laptop,
   Layers,
+  Camera,
+  Pencil,
+  Sparkles,
+  Trash2,
+  Upload,
+  Mail,
 } from "lucide-react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import type { UserProfile } from "./sidebar";
 import { getUserInitials } from "./sidebar";
@@ -146,6 +152,39 @@ export const BUILTIN_CONST_MODELS = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     desc: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
+  },
+];
+
+export const AVATAR_PRESETS = [
+  {
+    id: "cosmic",
+    name: "Cosmic Indigo",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%236366f1"/><stop offset="100%" stop-color="%23a855f7"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g1)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
+  },
+  {
+    id: "emerald",
+    name: "Emerald Spark",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23059669"/><stop offset="100%" stop-color="%2310b981"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g2)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
+  },
+  {
+    id: "solar",
+    name: "Solar Sunset",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23f97316"/><stop offset="100%" stop-color="%23ec4899"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g3)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
+  },
+  {
+    id: "cyber",
+    name: "Neon Cyber",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2306b6d4"/><stop offset="100%" stop-color="%233b82f6"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g4)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
+  },
+  {
+    id: "amber",
+    name: "Mystic Pulse",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23d97706"/><stop offset="100%" stop-color="%23ef4444"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g5)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
+  },
+  {
+    id: "obsidian",
+    name: "Obsidian Core",
+    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231e293b"/><stop offset="100%" stop-color="%230f172a"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g6)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
   },
 ];
 
@@ -402,6 +441,104 @@ export function SettingsView({
     if (window.electron?.openConstFolder) {
       window.electron.openConstFolder();
       toast.success("Opening local .const data directory");
+    }
+  };
+
+  // Profile settings state & mutations
+  const updateProfileMutation = useMutation(api.users.updateProfile);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState<string>(user?.name || "Const User");
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isEditingUsername && user?.name) {
+      setUsernameDraft(user.name);
+    }
+  }, [user?.name, isEditingUsername]);
+
+  const handleSaveUsername = async () => {
+    const trimmed = usernameDraft.trim();
+    if (!trimmed) {
+      toast.error("Username cannot be empty");
+      return;
+    }
+    try {
+      const existingRaw = localStorage.getItem("const_custom_user_profile");
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      const updated = { ...existing, name: trimmed };
+      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
+
+      try {
+        await updateProfileMutation({ name: trimmed });
+      } catch {
+        // Silently fallback if offline/unauthenticated
+      }
+
+      setIsEditingUsername(false);
+      toast.success("Username updated successfully");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update username");
+    }
+  };
+
+  const handleSelectAvatarPreset = async (avatarUrl: string) => {
+    try {
+      const existingRaw = localStorage.getItem("const_custom_user_profile");
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      const updated = { ...existing, image: avatarUrl };
+      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
+
+      try {
+        await updateProfileMutation({ image: avatarUrl });
+      } catch {
+        // Fallback if offline/unauthenticated
+      }
+
+      setIsAvatarPickerOpen(false);
+      toast.success("Avatar updated");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update avatar");
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image file size must be less than 2MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      await handleSelectAvatarPreset(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      const existingRaw = localStorage.getItem("const_custom_user_profile");
+      const existing = existingRaw ? JSON.parse(existingRaw) : {};
+      const updated = { ...existing, image: "" };
+      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
+
+      try {
+        await updateProfileMutation({ image: "" });
+      } catch {
+        // Fallback
+      }
+
+      setIsAvatarPickerOpen(false);
+      toast.success("Avatar removed (initials restored)");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to remove avatar");
     }
   };
 
@@ -726,45 +863,224 @@ export function SettingsView({
                 {/* Account Profile Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    User Profile
+                    User Profile & Identity
                   </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <Avatar className="h-12 w-12 rounded-full bg-[#eaeaea] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] shrink-0">
-                          {user?.image ? (
-                            <AvatarImage
-                              src={user.image}
-                              alt={user?.name || "User"}
-                              className="object-cover"
-                            />
-                          ) : (
-                            <AvatarFallback className="text-sm font-semibold text-[#262626] dark:text-white bg-[#e2e2e5] dark:bg-[#383838]">
-                              {initials}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-5">
+                    {/* Avatar & Username Header Section */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 min-w-0">
+                        {/* Avatar with Hover Camera Button */}
+                        <div className="relative group shrink-0">
+                          <Avatar className="h-16 w-16 rounded-full bg-[#eaeaea] dark:bg-[#2b2b2b] border-2 border-[#dedee2] dark:border-[#383838] shadow-sm overflow-hidden">
+                            {user?.image ? (
+                              <AvatarImage
+                                src={user.image}
+                                alt={user?.name || "User"}
+                                className="object-cover w-full h-full"
+                              />
+                            ) : (
+                              <AvatarFallback className="text-base font-bold text-[#262626] dark:text-white bg-gradient-to-br from-[#e2e2e5] to-[#c7c7cb] dark:from-[#383838] dark:to-[#222222]">
+                                {initials}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <button
+                            type="button"
+                            onClick={() => setIsAvatarPickerOpen((v) => !v)}
+                            className="absolute inset-0 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[1px]"
+                            title="Change avatar"
+                          >
+                            <Camera className="w-5 h-5" />
+                            <span className="text-[9px] font-medium mt-0.5">Edit</span>
+                          </button>
+                        </div>
+
+                        {/* Username & Status badge */}
                         <div className="min-w-0 flex flex-col">
-                          <span className="text-sm font-medium text-[#262626] dark:text-white truncate">
-                            {user?.name || "Const User"}
-                          </span>
-                          <span className="text-xs text-[#737373] dark:text-[#969696] truncate">
-                            {user?.email || "Local Workspace"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {isEditingUsername ? (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={usernameDraft}
+                                  onChange={(e) => setUsernameDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveUsername();
+                                    if (e.key === "Escape") {
+                                      setUsernameDraft(user?.name || "Const User");
+                                      setIsEditingUsername(false);
+                                    }
+                                  }}
+                                  autoFocus
+                                  placeholder="Enter your username"
+                                  className="px-2.5 py-1 text-sm font-semibold rounded-lg border border-primary/50 bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white focus:outline-none focus:ring-1 focus:ring-primary w-44 sm:w-56"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleSaveUsername}
+                                  className="p-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
+                                  title="Save username"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUsernameDraft(user?.name || "Const User");
+                                    setIsEditingUsername(false);
+                                  }}
+                                  className="p-1 rounded-md bg-[#eaeaea] dark:bg-[#333333] text-[#737373] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#444444] transition-colors cursor-pointer"
+                                  title="Cancel"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group/name">
+                                <span className="text-base font-semibold text-[#262626] dark:text-white truncate">
+                                  {user?.name || "Const User"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUsernameDraft(user?.name || "Const User");
+                                    setIsEditingUsername(true);
+                                  }}
+                                  className="opacity-60 hover:opacity-100 p-1 rounded-md hover:bg-[#eaeaea] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer"
+                                  title="Edit username"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-[#737373] dark:text-[#969696] truncate">
+                              {user?.email || "Local Workspace"}
+                            </span>
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              Active
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-[#ebebed] dark:bg-[#1b1b1b] text-[#555555] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838]">
-                          Local Studio
-                        </span>
+                      {/* Change Avatar Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsAvatarPickerOpen((v) => !v)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span>Change Avatar</span>
+                      </button>
+                    </div>
+
+                    {/* Avatar Picker Drawer / Popover if Open */}
+                    {isAvatarPickerOpen && (
+                      <div className="p-4 rounded-xl border border-primary/20 bg-[#ffffff] dark:bg-[#1a1a1a] flex flex-col gap-3.5 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-[#262626] dark:text-white flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-primary" />
+                            Choose an Avatar or Upload
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsAvatarPickerOpen(false)}
+                            className="p-1 rounded text-[#737373] hover:text-black dark:text-[#969696] dark:hover:text-white cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Preset Gradients */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                            Avatar Presets
+                          </span>
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            {AVATAR_PRESETS.map((preset) => (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => handleSelectAvatarPreset(preset.svg)}
+                                className="group/preset relative flex flex-col items-center gap-1 p-2 rounded-lg border border-[#dedee2] dark:border-[#333333] hover:border-primary/60 bg-[#f9f9fb] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2a2a2a] transition-all cursor-pointer"
+                              >
+                                <img
+                                  src={preset.svg}
+                                  alt={preset.name}
+                                  className="w-10 h-10 rounded-full border border-black/10 dark:border-white/10 group-hover/preset:scale-105 transition-transform"
+                                />
+                                <span className="text-[10px] text-[#737373] dark:text-[#969696] truncate max-w-full text-center">
+                                  {preset.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action Row: Upload file + Remove */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#dedee2] dark:border-[#333333]">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            className="hidden"
+                            onChange={handleFileUpload}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-primary" />
+                            <span>Upload Custom Image</span>
+                          </button>
+
+                          {user?.image && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              className="px-2.5 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove Avatar</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Email Address & Verification */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 rounded-lg bg-[#ffffff] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#333333]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Mail className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] text-[#737373] dark:text-[#969696]">Email Address</span>
+                          <span className="text-xs font-medium text-[#262626] dark:text-white truncate">
+                            {user?.email || "No email linked (Local Workspace)"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        {user?.email ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <ShieldCheck className="w-3 h-3" />
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#eaeaea] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696]">
+                            Offline Mode
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[#dedee2] dark:border-[#383838] text-xs">
+                    {/* Account Identifier */}
+                    <div className="flex items-center justify-between pt-1 border-t border-[#dedee2] dark:border-[#383838] text-xs">
                       <div className="flex flex-col">
                         <span className="text-[#737373] dark:text-[#969696]">Account Identifier</span>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4] mt-0.5">
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4] mt-0.5 text-[11px]">
                           {user?.id || "local-user-session"}
                         </span>
                       </div>
@@ -781,8 +1097,9 @@ export function SettingsView({
                       </button>
                     </div>
 
+                    {/* Switch Account and Sign Out */}
                     {(onSwitchAccount || onSignOut) && (
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                         {onSwitchAccount && (
                           <button
                             type="button"
@@ -790,7 +1107,7 @@ export function SettingsView({
                             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <ArrowLeftRight className="w-3.5 h-3.5" />
-                            <span>Switch account</span>
+                            <span>Switch Account</span>
                           </button>
                         )}
                         {onSignOut && (
@@ -800,7 +1117,7 @@ export function SettingsView({
                             className="px-3 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <LogOut className="w-3.5 h-3.5" />
-                            <span>Sign out</span>
+                            <span>Sign Out</span>
                           </button>
                         )}
                       </div>
