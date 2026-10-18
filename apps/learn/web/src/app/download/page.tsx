@@ -36,7 +36,7 @@ export default function DownloadPage() {
     'linux-arm-deb': { id: 'linux-arm-deb', filename: 'const-learn_0.0.1_arm64.deb', url: `${RELEASES_BASE_URL}/const-learn_0.0.1_arm64.deb` },
     'linux-arm-rpm': { id: 'linux-arm-rpm', filename: 'const-learn-0.0.1.aarch64.rpm', url: `${RELEASES_BASE_URL}/const-learn-0.0.1.aarch64.rpm` },
     'linux-arm-appimage': { id: 'linux-arm-appimage', filename: 'Const-Learn-0.0.1-arm64.AppImage', url: `${RELEASES_BASE_URL}/Const-Learn-0.0.1-arm64.AppImage` },
-    'android-apk': { id: 'android-apk', filename: 'Const-Learn-0.0.1.apk', url: `${RELEASES_BASE_URL}/Const-Learn-0.0.1.apk` },
+    'android-apk': { id: 'android-apk', filename: 'Const.Learn.Setup.0.0.1.apk', url: `${RELEASES_BASE_URL}/Const.Learn.Setup.0.0.1.apk` },
     'android-play': { id: 'android-play', filename: 'Google Play Store', url: 'https://play.google.com/store/apps', isExternal: true },
     'ios-testflight': { id: 'ios-testflight', filename: 'Apple TestFlight', url: 'https://testflight.apple.com', isExternal: true },
   };
@@ -210,6 +210,23 @@ export default function DownloadPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-white transition-colors font-sans">
                       Windows (ARM64)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[11px] font-sans font-medium bg-zinc-100 dark:bg-[#27272a] text-zinc-600 dark:text-zinc-400 border border-zinc-200/80 dark:border-white/5">
+                      .exe
+                    </span>
+                  </div>
+                  <span className="text-xs font-sans font-normal text-zinc-400 dark:text-zinc-500">v0.0.1</span>
+                </button>
+
+                {/* Windows (Universal) */}
+                <button
+                  type="button"
+                  onClick={() => handleDownload('win-universal')}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-[#262626] bg-white dark:bg-[#18181b] hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-[#202024] transition-all text-left group shadow-xs cursor-pointer font-sans"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-white transition-colors font-sans">
+                      Windows (Universal)
                     </span>
                     <span className="px-2 py-0.5 rounded text-[11px] font-sans font-medium bg-zinc-100 dark:bg-[#27272a] text-zinc-600 dark:text-zinc-400 border border-zinc-200/80 dark:border-white/5">
                       .exe
