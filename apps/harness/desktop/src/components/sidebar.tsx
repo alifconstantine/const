@@ -740,7 +740,7 @@ export function Sidebar({
             type="button"
             onClick={() => onNewChat?.()}
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
-            title={`New chat (${isMac ? "⌘K" : "Ctrl+K"})`}
+            title={`New chat (${isMac ? "⌘N" : "Ctrl+N"})`}
           >
             <div className="flex items-center gap-2">
               <MessageCirclePlus className="w-4 h-4 text-black dark:text-white transition-colors stroke-[1.8]" />
@@ -749,7 +749,7 @@ export function Sidebar({
               </span>
             </div>
             <span className="text-xs text-black/70 dark:text-white/70 group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none tracking-tight">
-              {isMac ? "⌘K" : "Ctrl+K"}
+              {isMac ? "⌘N" : "Ctrl+N"}
             </span>
           </button>
         </div>
@@ -761,10 +761,16 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenSearch}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+            title={`Search (${isMac ? "⌘K" : "Ctrl+K"})`}
           >
-            <Search className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-            <span>{t("common.search")}</span>
+            <div className="flex items-center gap-2.5">
+              <Search className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
+              <span>{t("common.search")}</span>
+            </div>
+            <span className="text-[11px] text-[#888888] dark:text-[#777777] group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none">
+              {isMac ? "⌘K" : "Ctrl+K"}
+            </span>
           </button>
 
           {/* Scheduled Tasks */}

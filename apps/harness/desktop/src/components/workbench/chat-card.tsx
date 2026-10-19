@@ -934,6 +934,33 @@ export function ChatCard({
     }
   }, [isThinkingSupported, supportedThinkingLevels, thinkingLevel, currentModelItem]);
 
+  // Global Keyboard Shortcuts: Open Model Menu (Ctrl+M) & Cycle Thought Level (Ctrl+T)
+  useEffect(() => {
+    const handleOpenModelMenu = () => {
+      setIsModelOpen((v) => !v);
+    };
+
+    const handleCycleThoughtLevel = () => {
+      if (!isThinkingSupported || supportedThinkingLevels.length === 0) return;
+      setThinkingLevel((prev) => {
+        const curIdx = supportedThinkingLevels.indexOf(prev);
+        const nextIdx = (curIdx + 1) % supportedThinkingLevels.length;
+        const next = supportedThinkingLevels[nextIdx] ?? prev;
+        localStorage.setItem("const_harness_thinking_level", next);
+        localStorage.setItem("const_harness_user_thinking_override", "true");
+        toast.info(`Thinking depth: ${next}`);
+        return next;
+      });
+    };
+
+    window.addEventListener("const:open-model-menu", handleOpenModelMenu);
+    window.addEventListener("const:cycle-thought-level", handleCycleThoughtLevel);
+    return () => {
+      window.removeEventListener("const:open-model-menu", handleOpenModelMenu);
+      window.removeEventListener("const:cycle-thought-level", handleCycleThoughtLevel);
+    };
+  }, [isThinkingSupported, supportedThinkingLevels]);
+
   // Fetch available models and user config from engine
   useEffect(() => {
     if (window.electron?.getModels) {

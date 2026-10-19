@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Avatar,
   AvatarImage,
@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
+import { useKeyboardShortcuts, DEFAULT_KEYBOARD_SHORTCUTS, type ShortcutItem } from "../lib/shortcuts";
 import type { UserProfile } from "./sidebar";
 import { getUserInitials } from "./sidebar";
 import type { UserConfig } from "../vite-env";
@@ -680,62 +681,109 @@ export function SettingsView({
     toast.success(t("toast.activeModelSet", { model: displayName }));
   };
 
-  // Keyboard Shortcuts state & definitions
+  // Keyboard Shortcuts state & definitions matching ZCode
   const [shortcutsSearch, setShortcutsSearch] = useState<string>("");
+  const { shortcuts, updateShortcut, deleteShortcut, resetAll } = useKeyboardShortcuts();
+  const [recordingTarget, setRecordingTarget] = useState<{
+    id: string;
+    comboIndex: number;
+    command: string;
+    keys: string[];
+  } | null>(null);
 
   const isMac = useMemo(() => {
     return typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
   }, []);
 
-  const KEYBOARD_SHORTCUTS = useMemo(
-    () => [
-      {
-        category: "General & Navigation",
-        items: [
-          { label: "Open Command Palette", keys: [isMac ? "⌘" : "Ctrl", "K"] },
-          { label: "Open Settings", keys: [isMac ? "⌘" : "Ctrl", ","] },
-          { label: "Toggle Left Sidebar", keys: [isMac ? "⌘" : "Ctrl", "B"] },
-          { label: "Quick Switch Workspace", keys: [isMac ? "⌘" : "Ctrl", "O"] },
-          { label: "Close Modal or Dismiss", keys: ["Esc"] },
-        ],
-      },
-      {
-        category: "Workbench & Prompts",
-        items: [
-          { label: "Send Message", keys: ["Enter"] },
-          { label: "Insert New Line", keys: ["Shift", "Enter"] },
-          { label: "Stop Agent Execution", keys: ["Esc"] },
-          { label: "Attach Media & Files", keys: [isMac ? "⌘" : "Ctrl", "U"] },
-          { label: "Mention Context or Files", keys: ["@"] },
-          { label: "Slash Command Palette", keys: ["/"] },
-        ],
-      },
-      {
-        category: "Workspace & Panes",
-        items: [
-          { label: "Toggle Right Pane", keys: [isMac ? "⌘" : "Ctrl", "."] },
-          { label: "Clear Terminal Logs", keys: [isMac ? "⌘" : "Ctrl", "L"] },
-          { label: "Zoom In Interface", keys: [isMac ? "⌘" : "Ctrl", "+"] },
-          { label: "Zoom Out Interface", keys: [isMac ? "⌘" : "Ctrl", "-"] },
-          { label: "Reset Interface Zoom", keys: [isMac ? "⌘" : "Ctrl", "0"] },
-        ],
-      },
-    ],
-    [isMac]
+  const getCommandName = useCallback(
+    (item: ShortcutItem) => {
+      const camelId = item.id.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      const transKey = `shortcuts.${camelId}` as any;
+      const translated = t(transKey);
+      return translated && translated !== transKey ? translated : item.command;
+    },
+    [t]
   );
 
+  const getScopeName = useCallback(
+    (scope: string) => {
+      const transKey = `shortcuts.scope${scope}` as any;
+      const translated = t(transKey);
+      return translated && translated !== transKey ? translated : scope;
+    },
+    [t]
+  );
+
+  // Listen to keyboard recording when changing keybindings
+  useEffect(() => {
+    if (!recordingTarget) return;
+
+    const handleKeyRecord = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === "Escape") {
+        setRecordingTarget(null);
+        return;
+      }
+
+      if (e.key === "Enter" && recordingTarget.keys.length > 0) {
+        const item = shortcuts.find((s) => s.id === recordingTarget.id);
+        if (item) {
+          const nextCombos = [...item.keybindings];
+          nextCombos[recordingTarget.comboIndex] = recordingTarget.keys;
+          updateShortcut(recordingTarget.id, nextCombos);
+          const cmdName = getCommandName(item);
+          toast.success(t("shortcuts.updatedToast" as any, { command: cmdName }));
+        }
+        setRecordingTarget(null);
+        return;
+      }
+
+      const isModifier = ["Control", "Shift", "Alt", "Meta"].includes(e.key);
+      if (isModifier) return;
+
+      const keys: string[] = [];
+      if (e.ctrlKey || e.metaKey) keys.push(isMac ? "⌘" : "Ctrl");
+      if (e.shiftKey) keys.push("Shift");
+      if (e.altKey) keys.push("Alt");
+
+      let keyName = e.key;
+      if (keyName === " ") keyName = "Space";
+      else if (keyName === "ArrowUp") keyName = "Up";
+      else if (keyName === "ArrowDown") keyName = "Down";
+      else if (keyName === "ArrowLeft") keyName = "Left";
+      else if (keyName === "ArrowRight") keyName = "Right";
+      else if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+      keys.push(keyName);
+      setRecordingTarget((prev) => (prev ? { ...prev, keys } : null));
+    };
+
+    window.addEventListener("keydown", handleKeyRecord, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyRecord, { capture: true });
+  }, [recordingTarget, shortcuts, updateShortcut, isMac, getCommandName, t]);
+
   const filteredShortcuts = useMemo(() => {
-    if (!shortcutsSearch.trim()) return KEYBOARD_SHORTCUTS;
-    const q = shortcutsSearch.toLowerCase();
-    return KEYBOARD_SHORTCUTS.map((cat) => ({
-      ...cat,
-      items: cat.items.filter(
-        (item) =>
-          item.label.toLowerCase().includes(q) ||
-          item.keys.some((k) => k.toLowerCase().includes(q))
-      ),
-    })).filter((cat) => cat.items.length > 0);
-  }, [KEYBOARD_SHORTCUTS, shortcutsSearch]);
+    if (!shortcutsSearch.trim()) return shortcuts;
+    const q = shortcutsSearch.toLowerCase().trim();
+    return shortcuts.filter((item) => {
+      const cmdName = getCommandName(item).toLowerCase();
+      const rawCmd = item.command.toLowerCase();
+      const scopeName = getScopeName(item.scope).toLowerCase();
+      const rawScope = item.scope.toLowerCase();
+      const matchCombo = item.keybindings.some((combo) =>
+        combo.some((k) => k.toLowerCase().includes(q))
+      );
+      return (
+        cmdName.includes(q) ||
+        rawCmd.includes(q) ||
+        scopeName.includes(q) ||
+        rawScope.includes(q) ||
+        matchCombo
+      );
+    });
+  }, [shortcuts, shortcutsSearch, getCommandName, getScopeName]);
 
   // Const Harness Nav Categories
   const navCategories = [
@@ -1631,71 +1679,146 @@ export function SettingsView({
               </div>
             ) : activeTab === "keyboard-shortcuts" ? (
               /* --------------------------------------------------------- */
-              /* Keyboard Shortcuts Tab                                    */
+              /* Keyboard Shortcuts Tab (Matching ZCode UI & Hotkeys)      */
               /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-4 max-w-2xl pb-6">
-                {/* Search Bar */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#969696]" />
-                  <input
-                    type="text"
-                    value={shortcutsSearch}
-                    onChange={(e) => setShortcutsSearch(e.target.value)}
-                    placeholder="Search shortcuts..."
-                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] text-[#262626] dark:text-white placeholder-[#888888] dark:placeholder-[#666666] outline-none focus:border-[#737373] dark:focus:border-[#969696] transition-colors"
-                  />
-                  {shortcutsSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setShortcutsSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white p-0.5 rounded cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+              <div className="flex flex-col gap-4 w-full pb-8 select-none">
+                {/* Search Bar & Reset to defaults */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#888888] pointer-events-none" />
+                    <input
+                      type="text"
+                      value={shortcutsSearch}
+                      onChange={(e) => setShortcutsSearch(e.target.value)}
+                      placeholder={t("shortcuts.searchPlaceholder")}
+                      className="w-full pl-9 pr-9 py-2 text-xs rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] text-[#262626] dark:text-[#ececec] placeholder-[#888888] dark:placeholder-[#737373] outline-none focus:border-[#737373] dark:focus:border-[#525256] transition-colors"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center text-[#737373] dark:text-[#6e6e72]">
+                      <Keyboard className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetAll();
+                      toast.success(t("shortcuts.resetSuccess"));
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-xs text-[#737373] dark:text-[#969696] hover:text-[#111111] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer shrink-0"
+                    title={t("shortcuts.resetAllTooltip")}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{t("shortcuts.resetAll")}</span>
+                  </button>
                 </div>
 
-                {/* Shortcuts List */}
-                {filteredShortcuts.length > 0 ? (
-                  <div className="flex flex-col gap-4">
-                    {filteredShortcuts.map((cat) => (
-                      <div key={cat.category} className="flex flex-col gap-2">
-                        <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                          {cat.category}
-                        </span>
-                        <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] divide-y divide-[#dedee2] dark:divide-[#383838] overflow-hidden">
-                          {cat.items.map((item) => (
-                            <div
-                              key={item.label}
-                              className="px-4 py-2.5 flex items-center justify-between gap-4 text-xs hover:bg-black/2 dark:hover:bg-white/2 transition-colors"
-                            >
-                              <span className="text-[#262626] dark:text-[#d4d4d4] font-medium">
-                                {item.label}
-                              </span>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {item.keys.map((k, idx) => (
-                                  <kbd
-                                    key={idx}
-                                    className="px-2 py-0.5 text-[11px] font-mono font-medium rounded-md bg-[#ffffff] dark:bg-[#2c2c2c] border border-[#dedee2] dark:border-[#404040] text-[#262626] dark:text-white shadow-2xs"
-                                  >
-                                    {k}
-                                  </kbd>
-                                ))}
-                              </div>
+                {/* Shortcuts Table */}
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] overflow-hidden">
+                  {/* Table Header */}
+                  <div className="px-4 py-2.5 border-b border-[#dedee2] dark:border-[#383838] bg-[#f0f0f4] dark:bg-[#282828] grid grid-cols-12 text-xs font-medium text-[#737373] dark:text-[#a0a0a5] select-none">
+                    <div className="col-span-5">{t("shortcuts.columnCommand")}</div>
+                    <div className="col-span-4 pl-1">{t("shortcuts.columnKeybinding")}</div>
+                    <div className="col-span-2 text-left">{t("shortcuts.columnScope")}</div>
+                    <div className="col-span-1 text-right pr-1">{t("shortcuts.columnActions")}</div>
+                  </div>
+
+                  {/* Table Body */}
+                  {filteredShortcuts.length > 0 ? (
+                    <div className="divide-y divide-[#dedee2] dark:divide-[#333333]">
+                      {filteredShortcuts.map((item) => {
+                        const cmdName = getCommandName(item);
+                        return (
+                          <div
+                            key={item.id}
+                            className="px-4 py-2.5 grid grid-cols-12 items-center text-xs hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors group"
+                          >
+                            {/* Command */}
+                            <div className="col-span-5 text-[#262626] dark:text-[#ececec] font-normal text-xs sm:text-[13px] pr-2">
+                              {cmdName}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-center">
-                    <Keyboard className="w-8 h-8 text-[#a3a3a3] dark:text-[#555555] mb-2" />
-                    <p className="text-xs text-[#737373] dark:text-[#969696]">
-                      No shortcuts matching "{shortcutsSearch}"
-                    </p>
-                  </div>
-                )}
+
+                            {/* Keybinding */}
+                            <div className="col-span-4 pl-1 flex flex-col gap-1.5">
+                              {item.keybindings.length > 0 ? (
+                                item.keybindings.map((combo, comboIdx) => (
+                                  <div key={comboIdx} className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      {combo.map((k, kIdx) => (
+                                        <kbd
+                                          key={kIdx}
+                                          className="px-2 py-0.5 text-[11px] font-mono font-medium rounded-md bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-[#f0f0f0] shadow-xs"
+                                        >
+                                          {isMac && k === "Ctrl" ? "⌘" : k}
+                                        </kbd>
+                                      ))}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setRecordingTarget({
+                                          id: item.id,
+                                          comboIndex: comboIdx,
+                                          command: item.command,
+                                          keys: [...combo],
+                                        })
+                                      }
+                                      className="p-1 rounded text-[#737373] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
+                                      title={t("shortcuts.editTooltip", { command: cmdName })}
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRecordingTarget({
+                                      id: item.id,
+                                      comboIndex: 0,
+                                      command: item.command,
+                                      keys: [],
+                                    })
+                                  }
+                                  className="text-xs text-[#888888] hover:text-[#555] dark:hover:text-[#aaa] italic text-left cursor-pointer"
+                                >
+                                  {t("shortcuts.recordShortcut")}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Scope */}
+                            <div className="col-span-2 text-[#737373] dark:text-[#8e8e93] text-xs">
+                              {getScopeName(item.scope)}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="col-span-1 flex justify-end pr-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  deleteShortcut(item.id);
+                                  toast.info(t("shortcuts.clearedToast", { command: cmdName }));
+                                }}
+                                className="p-1.5 rounded-lg text-[#737373] dark:text-[#888888] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
+                                title={t("shortcuts.clearTooltip", { command: cmdName })}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-12 flex flex-col items-center justify-center text-center">
+                      <Keyboard className="w-8 h-8 text-[#a3a3a3] dark:text-[#555555] mb-2" />
+                      <p className="text-xs text-[#737373] dark:text-[#969696]">
+                        {t("shortcuts.noMatches", { query: shortcutsSearch })}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : activeTab === "appearance" ? (
               /* --------------------------------------------------------- */
@@ -2203,6 +2326,91 @@ export function SettingsView({
           </ScrollArea>
         </main>
       </div>
+
+      {/* Keybinding Recording Modal */}
+      {recordingTarget && (() => {
+        const targetItem = shortcuts.find((s) => s.id === recordingTarget.id);
+        const cmdName = targetItem ? getCommandName(targetItem) : recordingTarget.command;
+        return (
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+            onClick={() => setRecordingTarget(null)}
+          >
+            <div
+              className="w-[420px] max-w-[95vw] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#262626] dark:text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">{t("shortcuts.changeKeybinding")}</h3>
+                  <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
+                    {cmdName}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRecordingTarget(null)}
+                  className="p-1 rounded-lg text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="min-h-[76px] rounded-xl border border-dashed border-[#737373]/40 dark:border-[#555555]/50 bg-black/5 dark:bg-white/5 flex items-center justify-center p-3 select-none">
+                {recordingTarget.keys.length > 0 ? (
+                  <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                    {recordingTarget.keys.map((k, idx) => (
+                      <kbd
+                        key={idx}
+                        className="px-2.5 py-1 text-xs font-mono font-medium rounded-lg bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-white shadow-xs"
+                      >
+                        {k}
+                      </kbd>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-[#737373] dark:text-[#969696] animate-pulse">
+                    {t("shortcuts.pressKeysPrompt")}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-[#737373] dark:text-[#888888]">
+                {t("shortcuts.pressKeysHint")}
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#dedee2] dark:border-[#383838]">
+                <button
+                  type="button"
+                  onClick={() => setRecordingTarget(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#111] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  {t("common.cancel") || "Cancel"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = shortcuts.find((s) => s.id === recordingTarget.id);
+                    if (item) {
+                      const nextCombos = [...item.keybindings];
+                      if (recordingTarget.keys.length > 0) {
+                        nextCombos[recordingTarget.comboIndex] = recordingTarget.keys;
+                      }
+                      updateShortcut(recordingTarget.id, nextCombos);
+                      toast.success(t("shortcuts.updatedToast", { command: cmdName }));
+                    }
+                    setRecordingTarget(null);
+                  }}
+                  disabled={recordingTarget.keys.length === 0}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#171717] dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity disabled:opacity-40 cursor-pointer"
+                >
+                  {t("shortcuts.saveKeybinding")}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

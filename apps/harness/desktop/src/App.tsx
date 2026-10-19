@@ -10,6 +10,8 @@ import {
   ThumbsDown,
   Play,
   ChevronDown,
+  ChevronUp,
+  Search,
   ArrowLeft,
   Minus,
   Square,
@@ -49,7 +51,20 @@ import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
-import { useConversationWidth } from "./lib/theme";
+import {
+  useConversationWidth,
+  getSavedTheme,
+  setSavedTheme,
+  getSystemTheme,
+  zoomIn,
+  zoomOut,
+  resetZoom,
+} from "./lib/theme";
+import {
+  getSavedShortcuts,
+  matchesShortcutCommand,
+  type ShortcutItem,
+} from "./lib/shortcuts";
 import { useTranslation } from "./lib/i18n";
 import { playTaskCompletionSound } from "./lib/sound";
 import { localDb } from "./lib/db";
@@ -337,6 +352,9 @@ function AuthenticatedContent({
   const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
   const [trajectoryTargetConversationId, setTrajectoryTargetConversationId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string>("general");
+  const [isTaskFindOpen, setIsTaskFindOpen] = useState(false);
+  const [taskFindQuery, setTaskFindQuery] = useState("");
+  const [taskFindIndex, setTaskFindIndex] = useState(0);
   const greeting = getGreeting(t);
 
   const handleOpenSettings = (tab: string = "general") => {
@@ -872,8 +890,8 @@ function AuthenticatedContent({
     setIsOpeningNewTab(false);
   };
 
-  const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCloseTab = (tabId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const tabIndex = rightPaneTabs.findIndex((t) => t.id === tabId);
     const tabToClose = rightPaneTabs.find((t) => t.id === tabId);
     if (tabToClose && tabToClose.type === "terminal") {
@@ -3305,7 +3323,137 @@ function AuthenticatedContent({
     }
   };
 
-  // Keyboard shortcuts: Toggle sidebar (Ctrl+B), New task (Ctrl+K), Search (Ctrl+P / Ctrl+Shift+K)
+  // Find in Task matches calculation & auto-scroll
+  const taskFindMatches = useMemo(() => {
+    if (!taskFindQuery.trim()) return [];
+    const q = taskFindQuery.toLowerCase();
+    const matches: number[] = [];
+    messages.forEach((m, idx) => {
+      const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content || "");
+      if (text.toLowerCase().includes(q)) {
+        matches.push(idx);
+      }
+    });
+    return matches;
+  }, [messages, taskFindQuery]);
+
+  useEffect(() => {
+    if (!isTaskFindOpen || taskFindMatches.length === 0) return;
+    const targetIdx = taskFindMatches[taskFindIndex];
+    if (targetIdx !== undefined && messages[targetIdx]) {
+      const targetMsg = messages[targetIdx];
+      const el = document.querySelector(`[data-chat-anchor-key="${targetMsg.id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [isTaskFindOpen, taskFindIndex, taskFindMatches, messages]);
+
+  // Task Navigation History (for Navigate Back Ctrl+[ and Navigate Forward Ctrl+])
+  const visitedHistoryRef = useRef<string[]>([]);
+  const forwardHistoryRef = useRef<string[]>([]);
+  const isNavigatingHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    if (isNavigatingHistoryRef.current) {
+      isNavigatingHistoryRef.current = false;
+      return;
+    }
+    const stack = visitedHistoryRef.current;
+    if (stack[stack.length - 1] !== conversationId) {
+      stack.push(conversationId);
+      forwardHistoryRef.current = [];
+    }
+  }, [conversationId]);
+
+  const handleNavigateBack = useCallback(() => {
+    const stack = visitedHistoryRef.current;
+    if (stack.length > 1) {
+      const current = stack.pop()!;
+      forwardHistoryRef.current.push(current);
+      const prevId = stack[stack.length - 1];
+      if (prevId) {
+        isNavigatingHistoryRef.current = true;
+        handleSelectConversation(prevId);
+      }
+    }
+  }, [handleSelectConversation]);
+
+  const handleNavigateForward = useCallback(() => {
+    const forward = forwardHistoryRef.current;
+    if (forward.length > 0) {
+      const nextId = forward.pop()!;
+      visitedHistoryRef.current.push(nextId);
+      isNavigatingHistoryRef.current = true;
+      handleSelectConversation(nextId);
+    }
+  }, [handleSelectConversation]);
+
+  const handlePreviousTask = useCallback(() => {
+    const list = conversationsRef.current;
+    if (!list || list.length === 0) return;
+    const curIdx = list.findIndex((c) => c.id === conversationIdRef.current);
+    if (curIdx > 0 && list[curIdx - 1]) {
+      handleSelectConversation(list[curIdx - 1]!.id);
+    }
+  }, [handleSelectConversation]);
+
+  const handleNextTask = useCallback(() => {
+    const list = conversationsRef.current;
+    if (!list || list.length === 0) return;
+    const curIdx = list.findIndex((c) => c.id === conversationIdRef.current);
+    if (curIdx >= 0 && curIdx < list.length - 1 && list[curIdx + 1]) {
+      handleSelectConversation(list[curIdx + 1]!.id);
+    }
+  }, [handleSelectConversation]);
+
+  const handleCycleSessionMode = useCallback(() => {
+    const modes: Array<"ask_before_changes" | "request_review" | "full_access"> = [
+      "ask_before_changes",
+      "request_review",
+      "full_access",
+    ];
+    const curIdx = modes.indexOf(currentModeRef.current);
+    const nextMode = modes[(curIdx + 1) % modes.length] ?? "ask_before_changes";
+    setCurrentMode(nextMode);
+    toast({
+      title: "Session Mode Changed",
+      description: `Mode set to: ${nextMode.replace(/_/g, " ")}`,
+    });
+  }, []);
+
+  const handleCloseCurrentContext = useCallback(() => {
+    if (isSettingsOpen) {
+      setIsSettingsOpen(false);
+      return;
+    }
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+      return;
+    }
+    if (isScheduledTasksOpen) {
+      setIsScheduledTasksOpen(false);
+      return;
+    }
+    if (isSkillsOpen) {
+      setIsSkillsOpen(false);
+      return;
+    }
+    if (isTaskFindOpen) {
+      setIsTaskFindOpen(false);
+      return;
+    }
+    if (isRightSidebarOpenRef.current) {
+      if (activeRightPaneTabIdRef.current) {
+        handleCloseTab(activeRightPaneTabIdRef.current);
+      } else {
+        setIsRightSidebarOpen(false);
+      }
+    }
+  }, [isSettingsOpen, isSearchOpen, isScheduledTasksOpen, isSkillsOpen, isTaskFindOpen, handleCloseTab]);
+
+  // Global Keyboard Shortcuts matching ZCode Reference
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -3315,41 +3463,162 @@ function AuthenticatedContent({
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
 
-      // Toggle sidebar: Ctrl+B or Cmd+B
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      const activeShortcuts = getSavedShortcuts();
+      const check = (id: string) => matchesShortcutCommand(e, id, activeShortcuts);
+
+      // 1. Open Command Center: Ctrl+K or Ctrl+Shift+P (or Ctrl+P)
+      if (check("open_command_center") || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p")) {
         e.preventDefault();
-        setIsSidebarOpen((prev) => !prev);
+        setIsSearchOpen(true);
+        return;
       }
 
-      // New chat: Ctrl+K (Win/Linux) or Cmd+K (Mac)
-      const isMacUser = typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac");
-      const isNewChatShortcut =
-        !e.shiftKey &&
-        e.key.toLowerCase() === "k" &&
-        (isMacUser ? e.metaKey : e.ctrlKey);
+      // 2. Open Settings: Ctrl+,
+      if (check("open_settings")) {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
+        return;
+      }
 
-      if (isNewChatShortcut) {
+      // 3. Find in Task: Ctrl+F
+      if (check("find_in_task")) {
+        e.preventDefault();
+        setIsTaskFindOpen(true);
+        window.dispatchEvent(new CustomEvent("const:find-in-task"));
+        return;
+      }
+
+      // 4. Toggle Sidebar: Ctrl+B
+      if (check("toggle_sidebar")) {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
+        return;
+      }
+
+      // 5. Toggle Light/Dark Theme: Ctrl+Shift+L
+      if (check("toggle_theme")) {
+        e.preventDefault();
+        const curTheme = getSavedTheme();
+        const isDark = curTheme === "dark" || (curTheme === "system" && getSystemTheme() === "dark");
+        setSavedTheme(isDark ? "light" : "dark");
+        return;
+      }
+
+      // 6. Toggle Terminal: Ctrl+J
+      if (check("toggle_terminal")) {
+        e.preventDefault();
+        const rightTabs = rightPaneTabsRef.current;
+        const activeTabId = activeRightPaneTabIdRef.current;
+        const isRightOpen = isRightSidebarOpenRef.current;
+        const activeTab = rightTabs.find((t) => t.id === activeTabId);
+
+        if (isRightOpen && activeTab?.type === "terminal") {
+          setIsRightSidebarOpen(false);
+        } else {
+          handleOpenTerminal();
+        }
+        return;
+      }
+
+      // 7. Toggle Side Pane: Ctrl+Alt+B
+      if (check("toggle_side_pane")) {
+        e.preventDefault();
+        setIsRightSidebarOpen((prev) => !prev);
+        return;
+      }
+
+      // 8. Previous Task: Ctrl+Shift+[
+      if (check("previous_task")) {
+        e.preventDefault();
+        handlePreviousTask();
+        return;
+      }
+
+      // 9. Next Task: Ctrl+Shift+]
+      if (check("next_task")) {
+        e.preventDefault();
+        handleNextTask();
+        return;
+      }
+
+      // 10. Navigate Back: Ctrl+[
+      if (check("navigate_back") && !isInput) {
+        e.preventDefault();
+        handleNavigateBack();
+        return;
+      }
+
+      // 11. Navigate Forward: Ctrl+]
+      if (check("navigate_forward") && !isInput) {
+        e.preventDefault();
+        handleNavigateForward();
+        return;
+      }
+
+      // 12. Open Model Menu: Ctrl+M
+      if (check("open_model_menu")) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("const:open-model-menu"));
+        return;
+      }
+
+      // 13. Cycle Session Mode: Ctrl+Shift+M
+      if (check("cycle_session_mode")) {
+        e.preventDefault();
+        handleCycleSessionMode();
+        return;
+      }
+
+      // 14. Cycle Thought Level: Ctrl+T
+      if (check("cycle_thought_level")) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("const:cycle-thought-level"));
+        return;
+      }
+
+      // 15. New Task: Ctrl+N (Reference from ZCode)
+      if (check("new_task")) {
         const isInModal = target?.closest?.("[role='dialog'], [data-modal]");
-        const isSingleLineInput = target?.tagName === "INPUT";
-        if (!isInModal && !isSingleLineInput) {
+        if (!isInModal) {
           e.preventDefault();
           handleNewChat();
+          return;
         }
       }
 
-      // Search / Command Palette: Ctrl+P, Cmd+P or Ctrl+Shift+K
-      if (
-        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "k")
-      ) {
+      // 16. Open Workspace: Ctrl+O
+      if (check("open_workspace")) {
         e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
+        handleOpenWorkspaceFromPalette();
+        return;
       }
 
-      // Settings: Ctrl+, or Cmd+,
-      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      // 17. Close Current Context: Ctrl+W
+      if (check("close_current_context")) {
         e.preventDefault();
-        setIsSettingsOpen((prev) => !prev);
+        handleCloseCurrentContext();
+        return;
+      }
+
+      // 18. Zoom In: Ctrl++
+      if (check("zoom_in")) {
+        e.preventDefault();
+        zoomIn();
+        return;
+      }
+
+      // 19. Zoom Out: Ctrl+-
+      if (check("zoom_out")) {
+        e.preventDefault();
+        zoomOut();
+        return;
+      }
+
+      // 20. Reset Zoom: Ctrl+0
+      if (check("reset_zoom")) {
+        e.preventDefault();
+        resetZoom();
+        return;
       }
     };
 
@@ -3361,7 +3630,17 @@ function AuthenticatedContent({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("const:open-command-palette", handleOpenCommandPalette);
     };
-  }, []);
+  }, [
+    handleNewChat,
+    handleOpenTerminal,
+    handleOpenWorkspaceFromPalette,
+    handlePreviousTask,
+    handleNextTask,
+    handleNavigateBack,
+    handleNavigateForward,
+    handleCycleSessionMode,
+    handleCloseCurrentContext,
+  ]);
 
   return (
     <div
@@ -3593,6 +3872,80 @@ function AuthenticatedContent({
                   onKillAgent={handleKillSubAgent}
                   className="pointer-events-auto"
                 />
+              </div>
+            )}
+
+            {/* In-Task Find Bar (Ctrl+F) */}
+            {isTaskFindOpen && (
+              <div className="absolute top-4 right-6 z-40 flex items-center gap-1.5 p-1.5 rounded-xl border border-[#dedee2] dark:border-[#38383c] bg-white dark:bg-[#1c1c1e] shadow-xl text-xs text-[#262626] dark:text-white animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="relative flex items-center">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 text-[#737373] dark:text-[#888888] pointer-events-none" />
+                  <input
+                    type="text"
+                    autoFocus
+                    value={taskFindQuery}
+                    onChange={(e) => {
+                      setTaskFindQuery(e.target.value);
+                      setTaskFindIndex(0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (taskFindMatches.length > 0) {
+                          if (e.shiftKey) {
+                            setTaskFindIndex((prev) => (prev - 1 + taskFindMatches.length) % taskFindMatches.length);
+                          } else {
+                            setTaskFindIndex((prev) => (prev + 1) % taskFindMatches.length);
+                          }
+                        }
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setIsTaskFindOpen(false);
+                      }
+                    }}
+                    placeholder="Find in task..."
+                    className="w-48 pl-8 pr-2 py-1 text-xs rounded-lg border border-[#e2e2e4] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#141416] text-[#262626] dark:text-white placeholder-[#888888] dark:placeholder-[#666666] outline-none focus:border-[#737373] dark:focus:border-[#6e6e72]"
+                  />
+                </div>
+
+                <span className="text-[11px] text-[#737373] dark:text-[#888888] px-1 select-none whitespace-nowrap min-w-[50px] text-center">
+                  {taskFindQuery.trim()
+                    ? taskFindMatches.length > 0
+                      ? `${taskFindIndex + 1} of ${taskFindMatches.length}`
+                      : "0 results"
+                    : ""}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={taskFindMatches.length === 0}
+                  onClick={() =>
+                    setTaskFindIndex((prev) => (prev - 1 + taskFindMatches.length) % taskFindMatches.length)
+                  }
+                  className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer"
+                  title="Previous match (Shift+Enter)"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={taskFindMatches.length === 0}
+                  onClick={() =>
+                    setTaskFindIndex((prev) => (prev + 1) % taskFindMatches.length)
+                  }
+                  className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer"
+                  title="Next match (Enter)"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTaskFindOpen(false)}
+                  className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer ml-0.5"
+                  title="Close (Esc)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 

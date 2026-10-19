@@ -279,7 +279,7 @@ export function CommandPaletteModal({
       {
         id: "act-new-chat",
         title: t("commandPalette.newChat"),
-        shortcut: typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "⌘K" : "Ctrl+K",
+        shortcut: typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "⌘N" : "Ctrl+N",
         icon: <MessageCirclePlus size={16} />,
         category: "suggested",
         run: () => {

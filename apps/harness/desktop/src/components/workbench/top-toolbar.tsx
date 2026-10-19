@@ -214,7 +214,7 @@ export function TopToolbar({
               type="button"
               onClick={() => onNewChat?.()}
               className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer flex items-center justify-center"
-              title={typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? `${t("sidebar.newChat")} (⌘K)` : `${t("sidebar.newChat")} (Ctrl+K)`}
+              title={typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? `${t("sidebar.newChat")} (⌘N)` : `${t("sidebar.newChat")} (Ctrl+N)`}
               aria-label={t("sidebar.newChat")}
             >
               <MessageCirclePlus className="w-4 h-4" />
