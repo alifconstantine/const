@@ -19,7 +19,7 @@ import {
   Box,
   Brain,
   Bot,
-  Puzzle,
+  Blocks,
   BarChart3,
   Settings,
   Plus,
@@ -81,6 +81,7 @@ import {
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { SkillsSettings } from "./settings/skills-settings";
+import { UsageStatsView } from "./settings/usage-stats-view";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
 import { playTaskCompletionSound } from "../lib/sound";
@@ -743,7 +744,7 @@ export function SettingsView({
       items: [
         { id: "memory", label: t("settings.memory"), icon: Brain },
         { id: "subagents", label: t("settings.subagents"), icon: Bot },
-        { id: "plugins", label: t("settings.plugins"), icon: Puzzle },
+        { id: "plugins", label: t("settings.plugins"), icon: Blocks },
         { id: "mcp-servers", label: t("settings.mcpServers"), icon: Cable },
         { id: "skills", label: t("settings.skills"), icon: PencilSparkles },
       ],
@@ -2033,96 +2034,13 @@ export function SettingsView({
               </div>
             ) : activeTab === "usage-stats" ? (
               /* --------------------------------------------------------- */
-              /* Usage Stats Tab                                           */
+              /* Usage Stats Tab (matching user Image 1 & Image 2)          */
               /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* 3 Metric Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-1">
-                    <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                      Remaining
-                    </span>
-                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
-                      {formatTokenDisplay(quota?.remainingTokens ?? 7_000_000)}
-                    </span>
-                    <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                      {percentRemaining.toFixed(1)}% available
-                    </span>
-                  </div>
-
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-1">
-                    <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                      Weekly Quota
-                    </span>
-                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
-                      {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)}
-                    </span>
-                    <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                      Included free weekly
-                    </span>
-                  </div>
-
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-1">
-                    <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                      Resets In
-                    </span>
-                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
-                      {quota?.resetsInText || "7d 0h"}
-                    </span>
-                    <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                      Rolling weekly cycle
-                    </span>
-                  </div>
-                </div>
-
-                {/* Quota Progress Card */}
-                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 sm:p-5 flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        Token Allocation
-                      </span>
-                      <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                        {formatTokenDisplay((quota?.weeklyLimitTokens ?? 7_000_000) - (quota?.remainingTokens ?? 7_000_000))} used of {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} limit
-                      </span>
-                    </div>
-                    <span className="font-sans tabular-nums text-xs font-medium px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4]">
-                      {percentRemaining.toFixed(0)}% Left
-                    </span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full h-2.5 rounded-full bg-[#e5e5e8] dark:bg-[#1b1b1b] overflow-hidden border border-[#dedee2] dark:border-[#383838]">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all duration-300",
-                        percentRemaining > 50
-                          ? "bg-[#22c55e]"
-                          : percentRemaining > 20
-                          ? "bg-[#eab308]"
-                          : "bg-[#ef4444]"
-                      )}
-                      style={{ width: `${percentRemaining}%` }}
-                    />
-                  </div>
-
-                  <div className="font-sans tabular-nums text-[11px] text-[#737373] dark:text-[#969696] flex items-center justify-between">
-                    <span>0 tokens</span>
-                    <span>{formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} max</span>
-                  </div>
-                </div>
-
-                {/* Informational note */}
-                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#1e1e1e] p-3.5 flex items-start gap-2.5 text-xs text-[#737373] dark:text-[#969696]">
-                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#737373] dark:text-[#969696]" />
-                  <div className="flex flex-col gap-1 leading-relaxed">
-                    <span className="font-medium text-[#262626] dark:text-[#d4d4d4]">Router Native Gateway</span>
-                    <span>
-                      Your weekly quota of 7,000,000 tokens covers all queries routed through the Const native router. Custom external providers configured in Models use your own API keys directly.
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <UsageStatsView
+                quota={quota}
+                activeModel={activeModel}
+                user={user}
+              />
             ) : activeTab === "personalization" ? (
               /* --------------------------------------------------------- */
               /* Personalization Tab (matching user Image 2 & Image 3)    */

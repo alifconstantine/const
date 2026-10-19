@@ -390,14 +390,66 @@ export const getLogMetrics = query({
   },
 });
 
+// Helper to extract user ID from auth context or SSO token payload
+async function resolveLogUserId(
+  ctx: any,
+  rawApiKey?: string,
+  ssoToken?: string
+): Promise<Id<"users"> | null> {
+  const sessionUserId = await getAuthUserId(ctx);
+  if (sessionUserId) return sessionUserId;
+
+  if (ssoToken) {
+    try {
+      const parts = ssoToken.split(".");
+      const b64Part = parts[1];
+      if (parts.length >= 2 && b64Part) {
+        const base64 = b64Part.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonStr =
+          typeof atob === "function"
+            ? atob(base64)
+            : typeof Buffer !== "undefined"
+            ? Buffer.from(base64, "base64").toString("utf-8")
+            : null;
+        if (jsonStr) {
+          const payload = JSON.parse(jsonStr);
+          const sub = payload.sub || payload.userId;
+          if (typeof sub === "string" && sub) {
+            const [subUserId] = sub.split("|");
+            if (subUserId) {
+              const userDoc = await ctx.db.get(subUserId as Id<"users">);
+              if (userDoc) return userDoc._id;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (rawApiKey) {
+    const keyHash = await hashKey(rawApiKey.trim());
+    const apiKeyDoc = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_key_hash", (q: any) => q.eq("keyHash", keyHash))
+      .first();
+    if (apiKeyDoc && apiKeyDoc.status === "active") {
+      return apiKeyDoc.userId;
+    }
+  }
+
+  return null;
+}
+
 // 4. Comprehensive Dashboard Analytics
 export const getDashboardAnalytics = query({
   args: {
+    rawApiKey: v.optional(v.string()),
+    ssoToken: v.optional(v.string()),
     timeRange: v.optional(v.string()), // "today", "7d", "30d", "90d", "all"
     tzOffset: v.optional(v.number()),  // Client timezone offset in minutes (e.g. from -new Date().getTimezoneOffset())
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await resolveLogUserId(ctx, args.rawApiKey, args.ssoToken);
     if (!userId) {
       return null;
     }
@@ -550,14 +602,36 @@ export const getDashboardAnalytics = query({
       .sort((a, b) => b.totalTokens - a.totalTokens);
 
     // 4. Build Timeline Buckets for Usage Trend
-    const timeline: Array<{ label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }> = [];
+    const timeline: Array<{
+      label: string;
+      date: string;
+      totalTokens: number;
+      promptTokens: number;
+      completionTokens: number;
+      requests: number;
+      models: Record<string, number>;
+    }> = [];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     if (args.timeRange === "today") {
       // 24 hourly buckets from 23 hours ago up to the current hour ("Now")
       for (let i = 23; i >= 0; i--) {
         const bucketTime = now - i * 60 * 60 * 1000;
-        const localD = new Date(bucketTime - tzOffsetMs);
+        const localD = new Date(bucketTime + tzOffsetMs);
         const hourLabel = `${String(localD.getUTCHours()).padStart(2, "0")}:00`;
-        timeline.push({ label: hourLabel, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
+        const yyyy = localD.getUTCFullYear();
+        const mm = String(localD.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(localD.getUTCDate()).padStart(2, "0");
+        const dateKey = `${yyyy}-${mm}-${dd}T${hourLabel}`;
+        timeline.push({
+          label: hourLabel,
+          date: dateKey,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          requests: 0,
+          models: {},
+        });
       }
 
       logs.forEach((l) => {
@@ -570,39 +644,66 @@ export const getDashboardAnalytics = query({
             timeline[bucketIndex].promptTokens += l.promptTokens;
             timeline[bucketIndex].completionTokens += l.completionTokens;
             timeline[bucketIndex].requests++;
+            const m = l.model || "unknown";
+            timeline[bucketIndex].models[m] = (timeline[bucketIndex].models[m] || 0) + l.totalTokens;
           }
         }
       });
     } else {
       let daysCount = 30;
       if (args.timeRange === "7d") {
-        daysCount = 7;
+        daysCount = 8; // 7 days ago through today (e.g. Oct 12 through Oct 19, matching 8 tick points)
       } else if (args.timeRange === "90d") {
         daysCount = 90;
       } else if (args.timeRange === "all") {
         if (logs.length > 0) {
           const oldestLog = logs[logs.length - 1];
           const daysSpan = Math.ceil((now - (oldestLog?.createdAt || now)) / (24 * 60 * 60 * 1000));
-          daysCount = Math.max(7, Math.min(180, daysSpan + 1));
+          daysCount = Math.max(8, Math.min(180, daysSpan + 1));
         } else {
           daysCount = 30;
         }
       }
 
-      const dayMap = new Map<string, { label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }>();
-      
+      const dayMap = new Map<
+        string,
+        {
+          label: string;
+          date: string;
+          totalTokens: number;
+          promptTokens: number;
+          completionTokens: number;
+          requests: number;
+          models: Record<string, number>;
+        }
+      >();
+
+      const localNow = new Date(now + tzOffsetMs);
+      const nowY = localNow.getUTCFullYear();
+      const nowM = localNow.getUTCMonth();
+      const nowD = localNow.getUTCDate();
+
       for (let i = daysCount - 1; i >= 0; i--) {
-        const d = new Date(now - i * 24 * 60 * 60 * 1000 - tzOffsetMs);
+        const d = new Date(Date.UTC(nowY, nowM, nowD - i, 12, 0, 0));
         const yyyy = d.getUTCFullYear();
-        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const mIdx = d.getUTCMonth();
+        const mm = String(mIdx + 1).padStart(2, "0");
         const dd = String(d.getUTCDate()).padStart(2, "0");
         const key = `${yyyy}-${mm}-${dd}`;
-        const label = `${mm}/${dd}`;
-        dayMap.set(key, { label, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
+        const label = `${monthNames[mIdx] || ""} ${d.getUTCDate()}`;
+        dayMap.set(key, {
+          label,
+          date: key,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          requests: 0,
+          models: {},
+        });
       }
 
       logs.forEach((l) => {
-        const d = new Date(l.createdAt - tzOffsetMs);
+        const d = new Date(l.createdAt + tzOffsetMs);
         const yyyy = d.getUTCFullYear();
         const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
         const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -613,26 +714,29 @@ export const getDashboardAnalytics = query({
           item.promptTokens += l.promptTokens;
           item.completionTokens += l.completionTokens;
           item.requests++;
+          const m = l.model || "unknown";
+          item.models[m] = (item.models[m] || 0) + l.totalTokens;
         }
       });
 
       dayMap.forEach((v) => timeline.push(v));
     }
 
-    // 5. Activity Heatmap: Past 365 Days
-    const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+    // 5. Activity Heatmap: 53 weeks aligned to Sunday-Saturday calendar
+    // Fetch logs from the past 380 days
+    const heatmapStartTime = now - 380 * 24 * 60 * 60 * 1000;
     const yearLogs = await ctx.db
       .query("routerLogs")
-      .withIndex("by_user_created", (q) => q.eq("userId", userId).gte("createdAt", oneYearAgo))
+      .withIndex("by_user_created", (q) => q.eq("userId", userId).gte("createdAt", heatmapStartTime))
       .order("desc")
-      .take(2000);
+      .take(5000);
 
     const heatmapMap = new Map<string, { count: number; tokens: number }>();
     let maxDayTokens = 0;
     let mostActiveDay = { date: "—", tokens: 0, requests: 0 };
 
     yearLogs.forEach((l) => {
-      const d = new Date(l.createdAt - tzOffsetMs);
+      const d = new Date(l.createdAt + tzOffsetMs);
       const yyyy = d.getUTCFullYear();
       const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
       const dd = String(d.getUTCDate()).padStart(2, "0");
@@ -648,17 +752,81 @@ export const getDashboardAnalytics = query({
       }
     });
 
-    const dailyHeatmap: Array<{ date: string; count: number; tokens: number; level: 0 | 1 | 2 | 3 | 4 }> = [];
-    for (let i = 363; i >= 0; i--) {
-      const d = new Date(now - i * 24 * 60 * 60 * 1000 - tzOffsetMs);
+    const localNow = new Date(now + tzOffsetMs);
+    const todayY = localNow.getUTCFullYear();
+    const todayM = localNow.getUTCMonth();
+    const todayD = localNow.getUTCDate();
+    const todayDayOfWeek = localNow.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const todayKey = `${todayY}-${String(todayM + 1).padStart(2, "0")}-${String(todayD).padStart(2, "0")}`;
+
+    // 53 weeks * 7 days = 371 days ending on this week's Saturday
+    const dailyHeatmap: Array<{
+      date: string;
+      count: number;
+      tokens: number;
+      level: 0 | 1 | 2 | 3 | 4;
+      dayOfWeek: number;
+      weekIndex: number;
+      isToday: boolean;
+      isFuture: boolean;
+      weekTokens: number;
+      cumulativeTokens: number;
+    }> = [];
+
+    const weekTotals = new Array(53).fill(0);
+    let runningCumulative = 0;
+    const seenMonths = new Set<string>();
+    const monthLabels: Array<{ label: string; weekIndex: number }> = [];
+
+    // First pass: aggregate week totals
+    for (let i = 0; i < 371; i++) {
+      const d = new Date(Date.UTC(todayY, todayM, todayD - todayDayOfWeek - 52 * 7 + i, 12, 0, 0));
       const yyyy = d.getUTCFullYear();
       const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
       const dd = String(d.getUTCDate()).padStart(2, "0");
       const dateKey = `${yyyy}-${mm}-${dd}`;
-      const data = heatmapMap.get(dateKey) || { count: 0, tokens: 0 };
+      const weekIndex = Math.floor(i / 7);
+      const isFuture = dateKey > todayKey;
+      if (!isFuture) {
+        const data = heatmapMap.get(dateKey);
+        if (data) {
+          weekTotals[weekIndex] = (weekTotals[weekIndex] || 0) + data.tokens;
+        }
+      }
+    }
+
+    let maxWeekTokens = 0;
+    for (const w of weekTotals) {
+      if (w > maxWeekTokens) maxWeekTokens = w;
+    }
+
+    // Second pass: construct cells
+    for (let i = 0; i < 371; i++) {
+      const d = new Date(Date.UTC(todayY, todayM, todayD - todayDayOfWeek - 52 * 7 + i, 12, 0, 0));
+      const yyyy = d.getUTCFullYear();
+      const mIdx = d.getUTCMonth();
+      const mm = String(mIdx + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      const dateKey = `${yyyy}-${mm}-${dd}`;
+      const dayOfWeek = d.getUTCDay();
+      const weekIndex = Math.floor(i / 7);
+      const isFuture = dateKey > todayKey;
+      const isToday = dateKey === todayKey;
+
+      // Track month labels: record first week where the month appears (when day <= 14)
+      const monthKey = `${yyyy}-${mm}`;
+      if (!seenMonths.has(monthKey) && d.getUTCDate() <= 14 && weekIndex > 0 && weekIndex < 52) {
+        seenMonths.add(monthKey);
+        monthLabels.push({ label: monthNames[mIdx] || "", weekIndex });
+      }
+
+      const data = isFuture ? { count: 0, tokens: 0 } : (heatmapMap.get(dateKey) || { count: 0, tokens: 0 });
+      if (!isFuture) {
+        runningCumulative += data.tokens;
+      }
 
       let level: 0 | 1 | 2 | 3 | 4 = 0;
-      if (data.tokens > 0) {
+      if (!isFuture && data.tokens > 0) {
         if (maxDayTokens > 0) {
           const ratio = data.tokens / maxDayTokens;
           if (ratio > 0.75) level = 4;
@@ -675,6 +843,12 @@ export const getDashboardAnalytics = query({
         count: data.count,
         tokens: data.tokens,
         level,
+        dayOfWeek,
+        weekIndex,
+        isToday,
+        isFuture,
+        weekTokens: weekTotals[weekIndex] || 0,
+        cumulativeTokens: runningCumulative,
       });
     }
 
@@ -701,7 +875,11 @@ export const getDashboardAnalytics = query({
       apiKeyBreakdown,
       timeline,
       dailyHeatmap,
+      monthLabels,
       mostActiveDay,
+      maxDayTokens,
+      maxWeekTokens,
+      totalYearTokens: runningCumulative,
     };
   },
 });
