@@ -191,7 +191,7 @@ export function RightPane({
 
   return (
     <aside
-      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-[10px] shrink-0 overflow-hidden z-20 shadow-xs"
+      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-r-[10px] rounded-l-none shrink-0 overflow-hidden z-20 shadow-xs"
       style={{ width: `${width}px` }}
     >
       {/* Draggable resize handle on the left edge */}

@@ -597,6 +597,32 @@ function AuthenticatedContent({
     setIsRightSidebarOpen((prev) => !prev);
   };
 
+  const handleMouseDownRightResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingRightSidebar(true);
+    const startX = e.clientX;
+    const startWidth = rightSidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = startX - moveEvent.clientX;
+      const newWidth = clampRightSidebarWidth(startWidth + deltaX);
+      setRightSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingRightSidebar(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
+
   // Background Tasks Management
   const [runningTasks, setRunningTasks] = useState<BackgroundTaskItem[]>([]);
 
@@ -3358,7 +3384,7 @@ function AuthenticatedContent({
       <main
         className={cn(
           "flex-1 min-w-0 h-full flex flex-row overflow-hidden relative",
-          isRightSidebarOpen ? "gap-2.5" : "gap-0"
+          isRightSidebarOpen ? "gap-1" : "gap-0"
         )}
       >
         {isSkillsOpen ? (
@@ -3447,7 +3473,8 @@ function AuthenticatedContent({
             {/* Center Main Chat Panel Card */}
             <div
               className={cn(
-                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
+                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
+                isRightSidebarOpen ? "rounded-l-[10px] rounded-r-none" : "rounded-[10px]",
                 !isDraggingRightSidebar && "transition-[flex,width] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
               )}
             >
@@ -3723,6 +3750,18 @@ function AuthenticatedContent({
               </div>
             </div>
 
+            {/* Splitter resize handle in the gap between Main Chat and SidePanel */}
+            {isRightSidebarOpen && (
+              <div
+                onMouseDown={handleMouseDownRightResize}
+                onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
+                className="w-2 -mx-1 h-full cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors z-30 shrink-0 select-none flex items-center justify-center group"
+                title={t("rightPane.dragToResize")}
+              >
+                <div className="w-[1px] h-full bg-transparent group-hover:bg-blue-500 transition-colors" />
+              </div>
+            )}
+
             {/* Right SidePanel Card matching Image 1 & 2 with smooth animated open/close */}
             <div
               className={cn(
@@ -3776,6 +3815,7 @@ function AuthenticatedContent({
                   onInsertToMainPrompt={(text) => {
                     setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
                   }}
+                  onCollapse={() => setIsRightSidebarOpen(false)}
                 />
               </div>
             </div>
