@@ -18,6 +18,8 @@ import {
   Square,
   Copy,
   PanelRight,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -33,6 +35,8 @@ interface TabHeaderProps {
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
   onToggleMuteTab?: (tabId: string) => void;
   onCollapse?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -104,6 +108,8 @@ export function TabHeader({
   onReorderTabs,
   onToggleMuteTab,
   onCollapse,
+  isExpanded = false,
+  onToggleExpand,
 }: TabHeaderProps) {
   const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -481,11 +487,31 @@ export function TabHeader({
         </button>
       </div>
 
-      {/* 3. Window Controls on the far right (Minimize, Maximize/Restore, Close) */}
+      {/* 3. Window Controls on the far right (Expand full, Toggle SidePanel, Minimize, Maximize/Restore, Close) */}
       <div
         className="flex items-center gap-0.5 ml-auto pl-1 pr-1.5 shrink-0 select-none z-30"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+        {onToggleExpand && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onToggleExpand();
+            }}
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer mr-0.5 select-none"
+            title={isExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
+            aria-label={isExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
+          >
+            {isExpanded ? (
+              <Minimize2 className="w-3.5 h-3.5" />
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+
         {onCollapse && (
           <button
             type="button"

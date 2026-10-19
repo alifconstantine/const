@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   toast,
+  cn,
 } from "@const/ui";
 import { AutoScrollTitle } from "../auto-scroll-title";
 import { useTranslation } from "../../lib/i18n";
@@ -42,6 +43,8 @@ interface TopToolbarProps {
   onToggleRightSidebar?: () => void;
   onOpenTerminal?: () => void;
   onOpenBrowser?: () => void;
+  isBottomPanelOpen?: boolean;
+  onToggleBottomPanel?: () => void;
 }
 
 export function TopToolbar({
@@ -62,6 +65,8 @@ export function TopToolbar({
   onToggleRightSidebar,
   onOpenTerminal,
   onOpenBrowser,
+  isBottomPanelOpen = false,
+  onToggleBottomPanel,
 }: TopToolbarProps) {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -359,10 +364,15 @@ export function TopToolbar({
 
         <button
           type="button"
-          onClick={onOpenTerminal}
-          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-          title={t("topToolbar.openTerminal")}
-          aria-label={t("topToolbar.openTerminal")}
+          onClick={onToggleBottomPanel || onOpenTerminal}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors cursor-pointer",
+            isBottomPanelOpen
+              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white"
+              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
+          )}
+          title={isBottomPanelOpen ? "Close bottom panel (Ctrl+J)" : "Toggle bottom panel (Ctrl+J)"}
+          aria-label="Toggle bottom panel (Ctrl+J)"
         >
           <SquareTerminal className="w-4 h-4" />
         </button>

@@ -49,6 +49,7 @@ import { SkillsSettings } from "./components/settings/skills-settings";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
+import { BottomPanel } from "./components/bottom-panel";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
 import {
@@ -247,9 +248,17 @@ function formatChatMessageForLlm(
 
 interface ConversationRightPaneState {
   isOpen: boolean;
+  isExpanded?: boolean;
   tabs: RightPaneTab[];
   activeTabId: string | null;
   reviewMutations?: FileMutationRecord[] | null;
+}
+
+interface ConversationBottomPanelState {
+  isOpen: boolean;
+  tabs: RightPaneTab[];
+  activeTabId: string | null;
+  height: number;
 }
 
 const getStoredRightPaneState = (convoId: string): ConversationRightPaneState | null => {
@@ -261,6 +270,7 @@ const getStoredRightPaneState = (convoId: string): ConversationRightPaneState | 
       if (typeof parsed === "object" && parsed !== null) {
         return {
           isOpen: Boolean(parsed.isOpen),
+          isExpanded: Boolean(parsed.isExpanded && parsed.isOpen),
           tabs: Array.isArray(parsed.tabs) ? parsed.tabs : [],
           activeTabId: typeof parsed.activeTabId === "string" ? parsed.activeTabId : null,
           reviewMutations: Array.isArray(parsed.reviewMutations) ? parsed.reviewMutations : null,
@@ -488,22 +498,43 @@ function AuthenticatedContent({
 
   // Right Sidebar (Side Pane) state & tab management - initialized closed on startup
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
+  const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState<boolean>(false);
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
   const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
   const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
   const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState<boolean>(false);
 
+  // Bottom Panel (Terminal) state management - dockable below main chat
+  const [isBottomPanelOpen, setIsBottomPanelOpen] = useState<boolean>(false);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState<number>(260);
+  const [bottomPanelTabs, setBottomPanelTabs] = useState<RightPaneTab[]>([]);
+  const [activeBottomTabId, setActiveBottomTabId] = useState<string | null>(null);
+  const [isDraggingBottomPanel, setIsDraggingBottomPanel] = useState<boolean>(false);
+
   // Per-conversation right pane cache and live state references
   const convoRightPaneMapRef = useRef<Map<string, ConversationRightPaneState>>(new Map());
   const isRightSidebarOpenRef = useRef(isRightSidebarOpen);
   isRightSidebarOpenRef.current = isRightSidebarOpen;
+  const isRightSidebarExpandedRef = useRef(isRightSidebarExpanded);
+  isRightSidebarExpandedRef.current = isRightSidebarExpanded;
   const rightPaneTabsRef = useRef(rightPaneTabs);
   rightPaneTabsRef.current = rightPaneTabs;
   const activeRightPaneTabIdRef = useRef<string | null>(activeRightPaneTabId);
   activeRightPaneTabIdRef.current = activeRightPaneTabId;
   const sidebarReviewMutationsRef = useRef(sidebarReviewMutations);
   sidebarReviewMutationsRef.current = sidebarReviewMutations;
+
+  // Per-conversation bottom panel cache and live state references
+  const convoBottomPanelMapRef = useRef<Map<string, ConversationBottomPanelState>>(new Map());
+  const isBottomPanelOpenRef = useRef(isBottomPanelOpen);
+  isBottomPanelOpenRef.current = isBottomPanelOpen;
+  const bottomPanelTabsRef = useRef(bottomPanelTabs);
+  bottomPanelTabsRef.current = bottomPanelTabs;
+  const activeBottomTabIdRef = useRef<string | null>(activeBottomTabId);
+  activeBottomTabIdRef.current = activeBottomTabId;
+  const bottomPanelHeightRef = useRef(bottomPanelHeight);
+  bottomPanelHeightRef.current = bottomPanelHeight;
 
   // Cleanup legacy global open state on mount so it never forces sidepanel open at startup
   useEffect(() => {
@@ -548,25 +579,35 @@ function AuthenticatedContent({
     if (!conversationId) return;
     const state: ConversationRightPaneState = {
       isOpen: isRightSidebarOpen,
+      isExpanded: Boolean(isRightSidebarOpen && isRightSidebarExpanded),
       tabs: rightPaneTabs,
       activeTabId: activeRightPaneTabId,
       reviewMutations: sidebarReviewMutations,
     };
     convoRightPaneMapRef.current.set(conversationId, state);
     storeRightPaneState(conversationId, state);
-  }, [conversationId, isRightSidebarOpen, rightPaneTabs, activeRightPaneTabId, sidebarReviewMutations]);
+  }, [conversationId, isRightSidebarOpen, isRightSidebarExpanded, rightPaneTabs, activeRightPaneTabId, sidebarReviewMutations]);
 
   const saveCurrentConversationRightPaneState = useCallback(() => {
     const currentId = conversationIdRef.current;
     if (!currentId) return;
     const state: ConversationRightPaneState = {
       isOpen: isRightSidebarOpenRef.current,
+      isExpanded: Boolean(isRightSidebarOpenRef.current && isRightSidebarExpandedRef.current),
       tabs: rightPaneTabsRef.current,
       activeTabId: activeRightPaneTabIdRef.current,
       reviewMutations: sidebarReviewMutationsRef.current,
     };
     convoRightPaneMapRef.current.set(currentId, state);
     storeRightPaneState(currentId, state);
+
+    const bottomState: ConversationBottomPanelState = {
+      isOpen: isBottomPanelOpenRef.current,
+      tabs: bottomPanelTabsRef.current,
+      activeTabId: activeBottomTabIdRef.current,
+      height: bottomPanelHeightRef.current,
+    };
+    convoBottomPanelMapRef.current.set(currentId, bottomState);
   }, []);
 
   const restoreConversationRightPaneState = useCallback((targetConvoId: string) => {
@@ -576,6 +617,7 @@ function AuthenticatedContent({
       getStoredRightPaneState(targetConvoId) ||
       {
         isOpen: false,
+        isExpanded: false,
         tabs: [],
         activeTabId: null,
         reviewMutations: null,
@@ -583,6 +625,7 @@ function AuthenticatedContent({
 
     convoRightPaneMapRef.current.set(targetConvoId, state);
     setIsRightSidebarOpen(state.isOpen);
+    setIsRightSidebarExpanded(Boolean(state.isOpen && state.isExpanded));
     setRightPaneTabs(state.tabs || []);
     setActiveRightPaneTabId(state.activeTabId || null);
     setSidebarReviewMutations(state.reviewMutations || null);
@@ -595,6 +638,18 @@ function AuthenticatedContent({
       if (activeBrowserTab) {
         window.electron?.browser?.setActiveTab(activeBrowserTab.id);
       }
+    }
+
+    const bottomState = convoBottomPanelMapRef.current.get(targetConvoId);
+    if (bottomState) {
+      setIsBottomPanelOpen(bottomState.isOpen);
+      setBottomPanelTabs(bottomState.tabs || []);
+      setActiveBottomTabId(bottomState.activeTabId || null);
+      if (bottomState.height) setBottomPanelHeight(bottomState.height);
+    } else {
+      setIsBottomPanelOpen(false);
+      setBottomPanelTabs([]);
+      setActiveBottomTabId(null);
     }
   }, []);
 
@@ -612,9 +667,130 @@ function AuthenticatedContent({
     setRightSidebarWidth((prev) => clampRightSidebarWidth(prev, isSidebarOpen));
   }, [isSidebarOpen, clampRightSidebarWidth]);
 
+  // Measure exact main container pixel width for continuous, glitch-free panel expansion animations
+  const mainContainerRef = useRef<HTMLElement | null>(null);
+  const [mainContainerWidth, setMainContainerWidth] = useState<number>(0);
+
+  useEffect(() => {
+    if (!mainContainerRef.current) return;
+    const updateWidth = () => {
+      if (mainContainerRef.current) {
+        setMainContainerWidth(mainContainerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(mainContainerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   const handleToggleRightSidebar = () => {
-    setIsRightSidebarOpen((prev) => !prev);
+    setIsRightSidebarOpen((prev) => {
+      if (prev) {
+        setIsRightSidebarExpanded(false);
+      }
+      return !prev;
+    });
   };
+
+  const handleToggleBottomPanel = useCallback(async () => {
+    if (!isBottomPanelOpenRef.current && bottomPanelTabsRef.current.length === 0) {
+      let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
+      if (window.electron?.resolveWorkspacePath) {
+        try {
+          resolvedCwd = await window.electron.resolveWorkspacePath({
+            project: currentProject,
+            conversationId,
+          });
+        } catch {}
+      }
+      const baseTitle =
+        currentProject && currentProject !== "Outside Project"
+          ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
+          : "outside";
+
+      const initialTabId = `bottom_terminal_${Date.now()}`;
+      const newTab: RightPaneTab = {
+        id: initialTabId,
+        type: "terminal",
+        title: baseTitle,
+        cwd: resolvedCwd,
+        project: currentProject,
+        conversationId,
+      };
+      setBottomPanelTabs([newTab]);
+      setActiveBottomTabId(initialTabId);
+      setIsBottomPanelOpen(true);
+      return;
+    }
+
+    setIsBottomPanelOpen((prev) => !prev);
+  }, [currentProject, conversationId]);
+
+  const handleNewBottomTab = useCallback(async () => {
+    let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
+    if (window.electron?.resolveWorkspacePath) {
+      try {
+        resolvedCwd = await window.electron.resolveWorkspacePath({
+          project: currentProject,
+          conversationId,
+        });
+      } catch {}
+    }
+    const baseTitle =
+      currentProject && currentProject !== "Outside Project"
+        ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
+        : "outside";
+
+    const countWithBase = bottomPanelTabsRef.current.filter(
+      (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
+    ).length;
+    const title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
+
+    const newTab: RightPaneTab = {
+      id: `bottom_terminal_${Date.now()}`,
+      type: "terminal",
+      title,
+      cwd: resolvedCwd,
+      project: currentProject,
+      conversationId,
+    };
+    setBottomPanelTabs((prev) => [...prev, newTab]);
+    setActiveBottomTabId(newTab.id);
+    setIsBottomPanelOpen(true);
+  }, [currentProject, conversationId]);
+
+  const handleReorderBottomTabs = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setBottomPanelTabs((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      if (moved) {
+        next.splice(toIndex, 0, moved);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleClearBottomTerminal = useCallback((tabId: string) => {
+    if (window.electron?.terminal?.write) {
+      window.electron.terminal.write({ id: tabId, data: "\x0c" });
+    }
+  }, []);
+
+  const handleCloseBottomTab = useCallback((tabId: string) => {
+    window.electron?.terminal?.destroy(tabId);
+    setBottomPanelTabs((prev) => {
+      const remaining = prev.filter((t) => t.id !== tabId);
+      if (remaining.length === 0) {
+        setIsBottomPanelOpen(false);
+        setActiveBottomTabId(null);
+      } else if (activeBottomTabId === tabId) {
+        setActiveBottomTabId(remaining[remaining.length - 1]?.id ?? null);
+      }
+      return remaining;
+    });
+  }, [activeBottomTabId]);
 
   const handleMouseDownRightResize = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -695,52 +871,7 @@ function AuthenticatedContent({
   };
 
   const handleOpenTerminal = async () => {
-    setIsRightSidebarOpen(true);
-    let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
-    if (window.electron?.resolveWorkspacePath) {
-      try {
-        resolvedCwd = await window.electron.resolveWorkspacePath({
-          project: currentProject,
-          conversationId,
-        });
-      } catch {}
-    }
-
-    const baseTitle =
-      currentProject !== "Outside Project"
-        ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
-        : "outside";
-
-    const existingMatchingTerm = rightPaneTabs.find(
-      (t) =>
-        t.type === "terminal" &&
-        ((resolvedCwd && t.cwd === resolvedCwd) ||
-          (t.project === currentProject &&
-            (currentProject !== "Outside Project" || t.conversationId === conversationId)))
-    );
-
-    if (existingMatchingTerm) {
-      setActiveRightPaneTabId(existingMatchingTerm.id);
-      setIsOpeningNewTab(false);
-      return;
-    }
-
-    const countWithBase = rightPaneTabs.filter(
-      (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
-    ).length;
-    const title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
-
-    const newTab: RightPaneTab = {
-      id: `terminal_${Date.now()}`,
-      type: "terminal",
-      title,
-      cwd: resolvedCwd,
-      project: currentProject,
-      conversationId,
-    };
-    setRightPaneTabs((prev) => [...prev, newTab]);
-    setActiveRightPaneTabId(newTab.id);
-    setIsOpeningNewTab(false);
+    handleToggleBottomPanel();
   };
 
   const handleOpenBrowser = useCallback(
@@ -3165,6 +3296,7 @@ function AuthenticatedContent({
     // Reset right pane for fresh new chat session - default closed
     const freshRightPane: ConversationRightPaneState = {
       isOpen: false,
+      isExpanded: false,
       tabs: [],
       activeTabId: null,
       reviewMutations: null,
@@ -3172,10 +3304,23 @@ function AuthenticatedContent({
     convoRightPaneMapRef.current.set(newSessionId, freshRightPane);
     storeRightPaneState(newSessionId, freshRightPane);
     setIsRightSidebarOpen(false);
+    setIsRightSidebarExpanded(false);
     setRightPaneTabs([]);
     setActiveRightPaneTabId(null);
     setSidebarReviewMutations(null);
     setIsOpeningNewTab(false);
+
+    // Reset bottom panel for fresh new chat session
+    const freshBottomPane: ConversationBottomPanelState = {
+      isOpen: false,
+      tabs: [],
+      activeTabId: null,
+      height: 260,
+    };
+    convoBottomPanelMapRef.current.set(newSessionId, freshBottomPane);
+    setIsBottomPanelOpen(false);
+    setBottomPanelTabs([]);
+    setActiveBottomTabId(null);
 
     // Only update project if targetProject is a valid string, not a MouseEvent or "[object Object]"
     if (
@@ -3507,23 +3652,14 @@ function AuthenticatedContent({
       // 6. Toggle Terminal: Ctrl+J
       if (check("toggle_terminal")) {
         e.preventDefault();
-        const rightTabs = rightPaneTabsRef.current;
-        const activeTabId = activeRightPaneTabIdRef.current;
-        const isRightOpen = isRightSidebarOpenRef.current;
-        const activeTab = rightTabs.find((t) => t.id === activeTabId);
-
-        if (isRightOpen && activeTab?.type === "terminal") {
-          setIsRightSidebarOpen(false);
-        } else {
-          handleOpenTerminal();
-        }
+        handleToggleBottomPanel();
         return;
       }
 
       // 7. Toggle Side Pane: Ctrl+Alt+B
       if (check("toggle_side_pane")) {
         e.preventDefault();
-        setIsRightSidebarOpen((prev) => !prev);
+        handleToggleRightSidebar();
         return;
       }
 
@@ -3633,6 +3769,8 @@ function AuthenticatedContent({
   }, [
     handleNewChat,
     handleOpenTerminal,
+    handleToggleBottomPanel,
+    handleToggleRightSidebar,
     handleOpenWorkspaceFromPalette,
     handlePreviousTask,
     handleNextTask,
@@ -3689,9 +3827,12 @@ function AuthenticatedContent({
       </div>
 
       {/* 2. Main Content Area */}
-      <main className="flex-1 min-w-0 h-full flex flex-row overflow-hidden relative gap-0">
+      <main
+        ref={mainContainerRef}
+        className="flex-1 min-w-0 h-full relative overflow-hidden"
+      >
         {isSkillsOpen ? (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
+          <div className="h-full w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
             {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
             <div
               className="h-10 px-4 flex items-center justify-between shrink-0 select-none relative z-30"
@@ -3761,7 +3902,7 @@ function AuthenticatedContent({
             </ScrollArea>
           </div>
         ) : isScheduledTasksOpen ? (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
+          <div className="h-full w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
             <ScheduledTasksView
               onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
               onOpenSession={(sessionId) => {
@@ -3776,10 +3917,14 @@ function AuthenticatedContent({
             {/* Center Main Chat Panel Card */}
             <div
               className={cn(
-                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
-                isRightSidebarOpen ? "rounded-l-[10px] rounded-r-none border-r-0" : "rounded-[10px]",
-                !isDraggingRightSidebar && "transition-[flex,width] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+                "h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px]",
+                !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
               )}
+              style={{
+                width: !isRightSidebarOpen
+                  ? "100%"
+                  : `calc(100% - ${rightSidebarWidth + 10}px)`,
+              }}
             >
               {(() => {
                 const activeConvo = conversations.find((c) => c.id === conversationId);
@@ -3800,14 +3945,16 @@ function AuthenticatedContent({
                     onOpenTrajectory={() => handleOpenTrajectory()}
                     isRightSidebarOpen={isRightSidebarOpen}
                     onToggleRightSidebar={handleToggleRightSidebar}
-                    onOpenTerminal={handleOpenTerminal}
+                    onOpenTerminal={handleToggleBottomPanel}
+                    isBottomPanelOpen={isBottomPanelOpen}
+                    onToggleBottomPanel={handleToggleBottomPanel}
                     onOpenBrowser={handleOpenBrowser}
                   />
                 );
               })()}
 
               {/* Main Conversation Canvas (Landing or Stream) */}
-              <div className="flex-1 min-w-0 h-full flex flex-col relative overflow-hidden">
+              <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
                 {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
                 {messages.length === 0 ? (
           <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
@@ -4125,34 +4272,80 @@ function AuthenticatedContent({
           </div>
         )}
               </div>
+
+              {/* Bottom Panel (Docked Terminal matching reference video) */}
+              {bottomPanelTabs.length > 0 && (
+                <div
+                  className={cn(
+                    "w-full shrink-0 overflow-hidden transition-[height,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] z-30",
+                    isBottomPanelOpen ? "opacity-100" : "h-0 opacity-0 pointer-events-none"
+                  )}
+                  style={{ height: isBottomPanelOpen ? `${bottomPanelHeight}px` : 0 }}
+                >
+                  <BottomPanel
+                    height={bottomPanelHeight}
+                    onHeightChange={setBottomPanelHeight}
+                    tabs={bottomPanelTabs}
+                    activeTabId={activeBottomTabId}
+                    onSelectTab={setActiveBottomTabId}
+                    onCloseTab={handleCloseBottomTab}
+                    onNewTab={handleNewBottomTab}
+                    onReorderTabs={handleReorderBottomTabs}
+                    onClearTerminal={handleClearBottomTerminal}
+                    onClose={() => setIsBottomPanelOpen(false)}
+                    onDraggingChange={setIsDraggingBottomPanel}
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Splitter resize handle in the gap between Main Chat and SidePanel */}
-            {isRightSidebarOpen && (
-              <div
-                onMouseDown={handleMouseDownRightResize}
-                onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
-                className="w-1.5 -mx-0.5 h-full cursor-col-resize hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 dark:active:bg-white/10 transition-colors z-40 shrink-0 select-none flex items-center justify-center group"
-                title={t("rightPane.dragToResize")}
-              >
-                <div className="w-[1px] h-full bg-[#dedee2] dark:bg-[#282828] group-hover:bg-[#888888] dark:group-hover:bg-[#888888] transition-colors" />
-              </div>
-            )}
-
-            {/* Right SidePanel Card matching Image 1 & 2 with smooth animated open/close */}
+            {/* Splitter resize handle in the 10px gap between Main Chat and SidePanel */}
             <div
+              onMouseDown={handleMouseDownRightResize}
+              onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
               className={cn(
-                "shrink-0 h-full overflow-hidden z-20",
-                !isDraggingRightSidebar && "transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-                isRightSidebarOpen ? "opacity-100" : "w-0 opacity-0 pointer-events-none"
+                "absolute top-0 bottom-0 cursor-col-resize select-none flex items-center justify-center z-25 overflow-hidden",
+                !isDraggingRightSidebar && "transition-[right,opacity] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                isRightSidebarOpen && !isRightSidebarExpanded
+                  ? "opacity-100 pointer-events-auto"
+                  : "opacity-0 pointer-events-none"
               )}
               style={{
-                width: isRightSidebarOpen ? `${rightSidebarWidth}px` : 0,
+                right: `${rightSidebarWidth}px`,
+                width: "10px",
+              }}
+              title={t("rightPane.dragToResize")}
+            >
+              <div className="w-[1px] h-full bg-transparent group-hover:bg-[#dedee2] dark:group-hover:bg-[#282828] transition-colors" />
+            </div>
+
+            {/* Right SidePanel Card: Anchored to the right edge, smoothly expands from right to left */}
+            <div
+              className={cn(
+                "absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30",
+                !isDraggingRightSidebar && "transition-[width,opacity] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                isRightSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+              )}
+              style={{
+                width: !isRightSidebarOpen
+                  ? 0
+                  : isRightSidebarExpanded
+                  ? "100%"
+                  : `${rightSidebarWidth}px`,
               }}
             >
-              <div style={{ width: `${rightSidebarWidth}px` }} className="h-full">
+              <div
+                className="h-full overflow-hidden shrink-0"
+                style={{
+                  width: isRightSidebarExpanded ? "100%" : `${rightSidebarWidth}px`,
+                  minWidth: isRightSidebarExpanded ? "100%" : `${rightSidebarWidth}px`,
+                  transition: !isDraggingRightSidebar
+                    ? "width 300ms cubic-bezier(0.16,1,0.3,1), min-width 300ms cubic-bezier(0.16,1,0.3,1)"
+                    : "none",
+                }}
+              >
                 <RightPane
-                  width={rightSidebarWidth}
+                  width={isRightSidebarExpanded ? (mainContainerWidth || (typeof window !== "undefined" ? window.innerWidth : 1280)) : rightSidebarWidth}
                   maxWidth={clampRightSidebarWidth(window.innerWidth)}
                   minWidth={300}
                   onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
@@ -4192,7 +4385,12 @@ function AuthenticatedContent({
                   onInsertToMainPrompt={(text) => {
                     setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
                   }}
-                  onCollapse={() => setIsRightSidebarOpen(false)}
+                  onCollapse={() => {
+                    setIsRightSidebarExpanded(false);
+                    setIsRightSidebarOpen(false);
+                  }}
+                  isExpanded={isRightSidebarExpanded}
+                  onToggleExpand={() => setIsRightSidebarExpanded((prev) => !prev)}
                 />
               </div>
             </div>

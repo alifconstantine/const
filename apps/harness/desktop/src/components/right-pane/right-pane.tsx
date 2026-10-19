@@ -48,6 +48,8 @@ interface RightPaneProps {
   defaultModel?: string;
   onInsertToMainPrompt?: (text: string) => void;
   onCollapse?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export function RightPane({
@@ -83,42 +85,10 @@ export function RightPane({
   defaultModel,
   onInsertToMainPrompt,
   onCollapse,
+  isExpanded = false,
+  onToggleExpand,
 }: RightPaneProps) {
   const { t } = useTranslation();
-  const isDraggingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(width);
-
-  // Resize handler
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isDraggingRef.current = true;
-    onDraggingChange?.(true);
-    startXRef.current = e.clientX;
-    startWidthRef.current = width;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      const deltaX = startXRef.current - moveEvent.clientX;
-      const effectiveMin = minWidth ?? 300;
-      const effectiveMax = maxWidth ?? Math.max(effectiveMin, window.innerWidth * 0.55);
-      const newWidth = Math.max(effectiveMin, Math.min(effectiveMax, startWidthRef.current + deltaX));
-      onWidthChange(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      isDraggingRef.current = false;
-      onDraggingChange?.(false);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -190,21 +160,8 @@ export function RightPane({
   };
 
   return (
-    <aside
-      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] border-l-0 rounded-r-[10px] rounded-l-none shrink-0 overflow-hidden z-20 shadow-xs"
-      style={{ width: `${width}px` }}
-    >
-      {/* Draggable resize handle on the left edge */}
-      <div
-        onMouseDown={handleMouseDown}
-        onDoubleClick={() => onWidthChange(480)}
-        className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-black/5 dark:hover:bg-white/5 transition-colors z-40 group"
-        title={t("rightPane.dragToResize")}
-      >
-        <div className="w-0.5 h-full bg-transparent group-hover:bg-[#888888] dark:group-hover:bg-[#888888]" />
-      </div>
-
-      {/* Top Tab Bar matching Image 1 */}
+    <aside className="h-full w-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-[10px] overflow-hidden z-20 shadow-xs">
+      {/* Top Tab Bar matching Image 1 & 2 */}
       <TabHeader
         tabs={tabs}
         activeTabId={activeTabId}
@@ -214,6 +171,8 @@ export function RightPane({
         onNewTab={onNewTab}
         onReorderTabs={onReorderTabs}
         onCollapse={onCollapse}
+        isExpanded={isExpanded}
+        onToggleExpand={onToggleExpand}
         onToggleMuteTab={(tabId) => {
           const target = tabs.find((t) => t.id === tabId);
           if (target && onUpdateTab) {

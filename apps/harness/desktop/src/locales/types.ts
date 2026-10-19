@@ -313,6 +313,19 @@ export interface TranslationDictionary {
     artifact: string;
     terminateSubAgent: string;
     dragToResize: string;
+    expandPanel: string;
+    restorePanel: string;
+    hidePanel: string;
+  };
+  bottomPanel: {
+    terminal: string;
+    newTerminal: string;
+    closePanel: string;
+    dragToResize: string;
+    clearTerminal: string;
+    expandPanel: string;
+    restorePanel: string;
+    toggleBottomPanel: string;
   };
   settings: {
     title: string;
