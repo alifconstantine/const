@@ -95,48 +95,15 @@ export async function executeComboChat(
       rawApiKey: apiKey || undefined,
     });
   } catch (queryErr) {
-    console.warn("[Combo Executor] Failed to query getCombo from Convex, checking built-in fallback:", queryErr);
-  }
-
-  // Robust fallback for system built-in combos if Convex returns null or fails
-  if (!combo && (comboSlug === "auto" || comboSlug === "fast" || comboSlug === "coding")) {
-    const defaultModelsMap: Record<string, ComboTargetModel[]> = {
-      coding: [
-        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
-        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
-        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 5 },
-      ],
-      auto: [
-        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
-        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
-        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 5 },
-      ],
-      fast: [
-        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
-        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
-        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 5 },
-      ],
-    };
-
-    const defaultContextLengths: Record<string, number> = {
-      coding: 1000000,
-      auto: 272000,
-      fast: 272000,
-    };
-
-    combo = {
-      name: `combo/${comboSlug}`,
-      slug: comboSlug,
-      contextLength: defaultContextLengths[comboSlug] || 1000000,
-      strategy: "priority",
-      models: defaultModelsMap[comboSlug] || [],
-    };
+    return new Response(
+      JSON.stringify({
+        error: {
+          message: `Failed to load combo '${comboSlug}' from database: ${queryErr instanceof Error ? queryErr.message : String(queryErr)}`,
+          code: "combo_database_error",
+        },
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   if (!combo) {
@@ -298,8 +265,10 @@ export async function executeComboChat(
         const constBaseUrl = (
           process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
         ).replace(/\/+$/, "");
-        const constEngineKey =
-          process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
+        const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim();
+        if (!constEngineKey) {
+          throw new Error("Server configuration error: CONST_ENGINE_API_KEY environment variable is not configured.");
+        }
 
         const targetModel = normalizeConstModelName(target.modelId);
 

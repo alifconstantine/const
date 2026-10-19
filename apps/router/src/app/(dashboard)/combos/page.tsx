@@ -181,8 +181,10 @@ export default function CombosPage() {
         status: "active",
         models: [
           { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash (Managed)" },
-          { modelId: "gemini-3.7-flash", name: "Gemini 3.7 Flash (Managed)" },
-          { modelId: "qwen-3.8-27b", name: "Qwen 3.8 27B (Managed)" },
+          { modelId: "glm-5.3-flash", name: "GLM 5.3 Flash (Managed)" },
+          { modelId: "deepseek-v4.1-flash", name: "Deepseek v4.1 Flash (Managed)" },
+          { modelId: "qwen-3.8-omni-flash", name: "Qwen 3.8 Omni Flash (Managed)" },
+          { modelId: "gpt-6-luna", name: "GPT 6 Luna (Managed)" },
         ],
       },
     ];

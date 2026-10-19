@@ -46,16 +46,22 @@ export async function POST(req: NextRequest) {
       const constBaseUrl = (
         process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
       ).replace(/\/+$/, "");
-      const constApiKey =
-        process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
+      const constApiKey = process.env.CONST_ENGINE_API_KEY?.trim();
+      if (!constApiKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Server configuration error: CONST_ENGINE_API_KEY environment variable is not configured.",
+          },
+          { status: 500 }
+        );
+      }
       const mappedModel = normalizeConstModelName(model);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${constApiKey}`,
       };
-      if (constApiKey) {
-        headers["Authorization"] = `Bearer ${constApiKey}`;
-      }
 
       // Const Search tests against /v1/search
       if (model === "const-search" || model === "Const Search" || mappedModel === "Const Search") {

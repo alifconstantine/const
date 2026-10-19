@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const convexUrl =
     process.env.NEXT_PUBLIC_CONVEX_URL ||
     process.env.CONVEX_URL ||
-    "https://earnest-hawk-132.convex.cloud";
+    "";
 
   const telemetryMeta: TelemetryMetadata = {
     requestId,
@@ -153,8 +153,19 @@ export async function POST(req: NextRequest) {
     const constBaseUrl = (
       process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
     ).replace(/\/+$/, "");
-    const constEngineKey =
-      process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
+    const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim();
+    if (!constEngineKey) {
+      return corsJson(
+        {
+          error: {
+            message: "Server configuration error: CONST_ENGINE_API_KEY environment variable is not configured.",
+            type: "configuration_error",
+            code: "missing_engine_api_key",
+          },
+        },
+        { status: 500 }
+      );
+    }
 
     const upstreamHeaders: Record<string, string> = {};
     if (constEngineKey) {

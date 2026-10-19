@@ -240,23 +240,7 @@ export const CONST_SPEECH_PROVIDER: SpeechProvider = {
   speed: 1.0,
   isDefault: true,
   isCustom: false,
-  models: [
-    {
-      id: "tts-1",
-      name: "TTS 1",
-      badge: "Standard",
-      latency: "~180ms",
-      description: "Low-latency neural text-to-speech model optimized for real-time dialogue.",
-      isDefault: true,
-    },
-    {
-      id: "tts-1-hd",
-      name: "TTS 1 HD",
-      badge: "High Def",
-      latency: "~320ms",
-      description: "High-definition neural audio synthesis with crystal-clear vocal fidelity.",
-    },
-  ],
+  models: [],
 };
 
 export const PRESET_SPEECH_PROVIDERS: Array<{
@@ -280,7 +264,7 @@ export const PRESET_SPEECH_PROVIDERS: Array<{
   {
     id: "custom-speech-endpoint",
     name: "Custom Audio Endpoint",
-    baseUrl: "https://api.example.com/v1",
+    baseUrl: "",
     protocol: "custom",
     defaultModel: "tts-1",
     defaultVoice: "alloy",
@@ -322,21 +306,7 @@ export const CONST_IMAGE_PROVIDER: ImageProvider = {
   aspectRatio: "1:1",
   isDefault: true,
   isCustom: false,
-  models: [
-    {
-      id: "black-forest-labs/flux-1.1-pro",
-      name: "FLUX 1.1 Pro",
-      badge: "Flagship",
-      description: "State-of-the-art visual fidelity, typography adherence, and photorealism.",
-      isDefault: true,
-    },
-    {
-      id: "stabilityai/stable-diffusion-3.5-large",
-      name: "SD 3.5 Large",
-      badge: "Open Weights",
-      description: "Customizable high-performance image transformer model.",
-    },
-  ],
+  models: [],
 };
 
 export const PRESET_IMAGE_PROVIDERS: Array<{
@@ -398,21 +368,7 @@ export const CONST_VIDEO_PROVIDER: VideoProvider = {
   aspectRatio: "16:9",
   isDefault: true,
   isCustom: false,
-  models: [
-    {
-      id: "sora-1.0",
-      name: "Sora 1.0",
-      badge: "Cinematic",
-      description: "Frontier video synthesis with consistent physics, lighting, and camera motions.",
-      isDefault: true,
-    },
-    {
-      id: "kling-v1.6",
-      name: "Kling 1.6",
-      badge: "Motion",
-      description: "Fluid physical motion and dynamic camera reframing.",
-    },
-  ],
+  models: [],
 };
 
 export const PRESET_VIDEO_PROVIDERS: Array<{
@@ -432,7 +388,7 @@ export const PRESET_VIDEO_PROVIDERS: Array<{
   {
     id: "custom-video-preset",
     name: "Custom Video Endpoint",
-    baseUrl: "https://api.example.com/v1",
+    baseUrl: "",
     protocol: "custom",
     defaultModels: [],
   },

@@ -748,40 +748,52 @@ export function ChatCard({
       contextWindow: 1048576,
     },
     {
-      id: "gemini-3.7-flash",
-      name: "Gemini 3.7 Flash",
-      desc: "Hybrid frontier reasoning model",
+      id: "glm-5.3-flash",
+      name: "GLM 5.3 Flash",
+      desc: "Ultra-fast response model optimized for real-time coding and execution",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
-      contextWindow: 1048576,
+      contextWindow: 1000000,
     },
     {
-      id: "gemini-3.6-flash",
-      name: "Gemini 3.6 Flash",
-      desc: "Frontier multimodal reasoning & code generation",
+      id: "deepseek-v4.1-flash",
+      name: "Deepseek v4.1 Flash",
+      desc: "High-performance MoE reasoning model specializing in algorithmic coding",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
-      contextWindow: 1048576,
+      contextWindow: 1000000,
     },
     {
-      id: "qwen-3.8-27b",
-      name: "Qwen 3.8 27B",
-      desc: "Open-weight reasoning powerhouse with deep thinking capabilities",
+      id: "qwen-3.8-omni-flash",
+      name: "Qwen 3.8 Omni Flash",
+      desc: "Native omni-modal foundation model strong across multilingual tasks and code",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
-      maxOutputTokens: 65536,
-      contextWindow: 131072,
+      maxOutputTokens: 128000,
+      contextWindow: 1000000,
+    },
+    {
+      id: "gpt-6-luna",
+      name: "GPT 6 Luna",
+      desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
+      provider: "const",
+      providerName: "ConstRouter",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
+      contextWindow: 272000,
     },
     {
       id: "combo/auto",
@@ -862,9 +874,10 @@ export function ChatCard({
       return "Gemini 3.8 Flash";
     }
     if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
-    if (saved === "gemini-3.7-flash") return "Gemini 3.7 Flash";
-    if (saved === "gemini-3.6-flash") return "Gemini 3.6 Flash";
-    if (saved === "qwen-3.8-27b") return "Qwen 3.8 27B";
+    if (saved === "glm-5.3-flash") return "GLM 5.3 Flash";
+    if (saved === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
+    if (saved === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
+    if (saved === "gpt-6-luna") return "GPT 6 Luna";
     if (saved === "Auto Router" || saved === "Auto (Best Available)" || saved === "combo/auto") return "combo/auto";
     if (saved === "Low-Latency Fast Chain" || saved === "Fast (Low Latency)" || saved === "combo/fast") return "combo/fast";
     if (saved === "Coding Agent Chain" || saved === "Coding & Reasoning" || saved === "combo/coding") return "combo/coding";
@@ -1033,7 +1046,7 @@ export function ChatCard({
             // Normalize selectedModel with freshly loaded models
             setSelectedModel((prev) => {
               const current = prev || localStorage.getItem("const_harness_active_model");
-              if (!current || current === "gemini-3.8-flash" || current === "gemini-3.7-flash" || current === "gemini-3.6-flash" || current === "qwen-3.8-27b") {
+              if (!current || current === "gemini-3.8-flash") {
                 const foundDefault = deduped.find((m) => m.id === "gemini-3.8-flash");
                 const defaultName = foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
                 localStorage.setItem("const_harness_active_model", defaultName);

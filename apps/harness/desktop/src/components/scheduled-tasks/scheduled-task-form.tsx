@@ -161,25 +161,33 @@ export function ScheduledTaskForm({
       supportsThinking: true,
     },
     {
-      id: "gemini-3.7-flash",
-      name: "Gemini 3.7 Flash",
-      desc: "Hybrid frontier reasoning model",
+      id: "glm-5.3-flash",
+      name: "GLM 5.3 Flash",
+      desc: "Ultra-fast response model optimized for real-time coding and execution",
       provider: "const",
       providerName: "Const",
       supportsThinking: true,
     },
     {
-      id: "gemini-3.6-flash",
-      name: "Gemini 3.6 Flash",
-      desc: "Frontier multimodal reasoning & code generation",
+      id: "deepseek-v4.1-flash",
+      name: "Deepseek v4.1 Flash",
+      desc: "High-performance MoE reasoning model specializing in algorithmic coding",
       provider: "const",
       providerName: "Const",
       supportsThinking: true,
     },
     {
-      id: "qwen-3.8-27b",
-      name: "Qwen 3.8 27B",
-      desc: "Open-weight reasoning powerhouse with deep thinking capabilities",
+      id: "qwen-3.8-omni-flash",
+      name: "Qwen 3.8 Omni Flash",
+      desc: "Native omni-modal foundation model strong across multilingual tasks and code",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+    },
+    {
+      id: "gpt-6-luna",
+      name: "GPT 6 Luna",
+      desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
       provider: "const",
       providerName: "Const",
       supportsThinking: true,
@@ -216,9 +224,12 @@ export function ScheduledTaskForm({
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     const saved = initialValues?.model || localStorage.getItem("const_harness_active_model");
-    if (!saved || saved === "Const" || saved === "gemini-3.6-flash") return "Gemini 3.8 Flash";
+    if (!saved || saved === "Const") return "Gemini 3.8 Flash";
     if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
-    if (saved === "gemini-3.7-flash") return "Gemini 3.7 Flash";
+    if (saved === "glm-5.3-flash") return "GLM 5.3 Flash";
+    if (saved === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
+    if (saved === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
+    if (saved === "gpt-6-luna") return "GPT 6 Luna";
     return saved;
   });
   const [isModelOpen, setIsModelOpen] = useState(false);
@@ -257,7 +268,7 @@ export function ScheduledTaskForm({
           setModels(mapped);
           setSelectedModel((prev) => {
             const current = prev || localStorage.getItem("const_harness_active_model");
-            if (!current || current === "gemini-3.8-flash" || current === "gemini-3.6-flash") {
+            if (!current || current === "gemini-3.8-flash") {
               const foundDefault = mapped.find((m: any) => m.id === "gemini-3.8-flash");
               return foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
             }

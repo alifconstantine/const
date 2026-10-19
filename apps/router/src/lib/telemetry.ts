@@ -98,7 +98,10 @@ export function createTelemetryStream(
       const resolvedConvexUrl =
         meta.convexUrl ||
         process.env.NEXT_PUBLIC_CONVEX_URL ||
-        "https://earnest-hawk-132.convex.cloud";
+        process.env.CONVEX_URL;
+      if (!resolvedConvexUrl) {
+        return;
+      }
       const client = new ConvexHttpClient(resolvedConvexUrl);
       if (meta.ssoToken) {
         client.setAuth(meta.ssoToken);
@@ -271,7 +274,10 @@ export async function recordDirectTelemetry(
     const resolvedConvexUrl =
       meta.convexUrl ||
       process.env.NEXT_PUBLIC_CONVEX_URL ||
-      "https://earnest-hawk-132.convex.cloud";
+      process.env.CONVEX_URL;
+    if (!resolvedConvexUrl) {
+      return;
+    }
     const client = new ConvexHttpClient(resolvedConvexUrl);
     if (meta.ssoToken) {
       client.setAuth(meta.ssoToken);

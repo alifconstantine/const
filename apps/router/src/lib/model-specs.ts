@@ -144,14 +144,12 @@ export const BUILTIN_MODELS: ModelSpec[] = [
 /**
  * Find model specification by modelId, checking built-in models first, then any custom/BYOK models.
  */
-export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): ModelSpec {
+export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): ModelSpec | undefined {
   const clean = modelId.toLowerCase().trim();
-  const matched =
+  return (
     customModels.find((m) => m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean || m.name.toLowerCase() === clean) ||
-    BUILTIN_MODELS.find((m) => m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean || m.name.toLowerCase() === clean);
-
-  if (matched) return matched;
-  return BUILTIN_MODELS[0]!;
+    BUILTIN_MODELS.find((m) => m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean || m.name.toLowerCase() === clean)
+  );
 }
 
 /**
@@ -176,9 +174,7 @@ export function normalizeConstModelName(modelId: string): string {
   if (
     clean === "gemini-3.8-flash" ||
     clean === "gemini 3.8 flash" ||
-    clean === "gemini-3.7-flash" ||
     clean.startsWith("gemini-3.8") ||
-    clean.startsWith("gemini-3.7") ||
     clean.startsWith("antigravity/gemini-3.8")
   ) {
     return "Gemini 3.8 Flash";
@@ -199,8 +195,6 @@ export function normalizeConstModelName(modelId: string): string {
   if (
     clean === "qwen-3.8-omni-flash" ||
     clean === "qwen 3.8 omni flash" ||
-    clean === "qwen-3.8-27b" ||
-    clean === "qwen 3.8 27b" ||
     clean.includes("qwen")
   ) {
     return "atmo/ali/qwen3.8-omni-flash";
@@ -211,7 +205,6 @@ export function normalizeConstModelName(modelId: string): string {
     clean === "gpt-6-luna" ||
     clean === "gpt 6 luna" ||
     clean === "gpt-luna-6" ||
-    clean === "gpt-5.6-luna" ||
     clean.includes("luna")
   ) {
     return "GPT 6 Luna";
@@ -254,7 +247,6 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
     clean === "deepseek-v4.1-flash" || clean === "deepseek v4.1 flash" || clean.includes("deepseek-v4") ||
     clean === "qwen-3.8-omni-flash" || clean === "qwen 3.8 omni flash" || clean.includes("qwen") ||
     clean === "gpt-6-luna" || clean === "gpt 6 luna" || clean.includes("luna") ||
-    clean === "gemini-3.7-flash" || clean === "qwen-3.8-27b" ||
     clean === "whisper-large-v3-turbo" || clean === "whisper large v3 turbo" ||
     clean === "whisper-1" || clean === "whisper"
   ) {

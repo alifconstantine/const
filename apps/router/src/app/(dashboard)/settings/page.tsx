@@ -198,7 +198,10 @@ export default function SettingsPage() {
               </SelectTrigger>
               <SelectContent className="rounded-xl bg-card border-none text-foreground">
                 <SelectItem value="gemini-3.8-flash">gemini-3.8-flash (Recommended)</SelectItem>
-                <SelectItem value="gemini-3.7-flash">gemini-3.7-flash</SelectItem>
+                <SelectItem value="glm-5.3-flash">glm-5.3-flash</SelectItem>
+                <SelectItem value="deepseek-v4.1-flash">deepseek-v4.1-flash</SelectItem>
+                <SelectItem value="qwen-3.8-omni-flash">qwen-3.8-omni-flash</SelectItem>
+                <SelectItem value="gpt-6-luna">gpt-6-luna</SelectItem>
                 <SelectItem value="combo/coding">combo/coding (Coding Chain)</SelectItem>
                 <SelectItem value="combo/fast">combo/fast (Low-Latency)</SelectItem>
                 <SelectItem value="combo/auto">combo/auto (Auto-Router)</SelectItem>

@@ -211,9 +211,6 @@ function UsageStatsInner({
     if (activeModel.includes("gemini-3.8-flash") || activeModel.includes("agy")) {
       return "agy/gemini-3.8-flash-tiered";
     }
-    if (activeModel.includes("gemini-3.7-flash")) {
-      return "agy/gemini-3.7-flash";
-    }
     return activeModel || "agy/gemini-3.8-flash-tiered";
   }, [activeModel]);
 

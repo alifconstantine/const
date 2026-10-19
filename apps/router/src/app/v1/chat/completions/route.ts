@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   const convexUrl =
     process.env.NEXT_PUBLIC_CONVEX_URL ||
     process.env.CONVEX_URL ||
-    "https://earnest-hawk-132.convex.cloud";
+    "";
 
   try {
     const body: OpenAIChatRequestBody = await req.json();
@@ -224,7 +224,19 @@ export async function POST(req: NextRequest) {
       comboSlug = "coding";
     }
 
-    if (comboSlug && convexUrl) {
+    if (comboSlug) {
+      if (!convexUrl) {
+        return NextResponse.json(
+          {
+            error: {
+              message: "Server configuration error: NEXT_PUBLIC_CONVEX_URL environment variable is not configured.",
+              type: "configuration_error",
+              code: "missing_convex_url",
+            },
+          },
+          { status: 500 }
+        );
+      }
       telemetryMeta.model = `combo/${comboSlug}`;
       telemetryMeta.provider = "Virtual Combo";
 
@@ -364,8 +376,19 @@ async function dispatchSingleModel({
     const constBaseUrl = (
       process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
     ).replace(/\/+$/, "");
-    const constEngineKey =
-      process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
+    const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim();
+    if (!constEngineKey) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Server configuration error: CONST_ENGINE_API_KEY environment variable is not configured.",
+            type: "configuration_error",
+            code: "missing_engine_api_key",
+          },
+        },
+        { status: 500 }
+      );
+    }
 
     let resolvedModel = normalizeConstModelName(targetModel);
     if (resolvedModel === "Const Search" || targetModel === "const-search") {
