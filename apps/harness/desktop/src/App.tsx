@@ -452,6 +452,20 @@ function AuthenticatedContent({
       }
     } catch {}
   }, []);
+
+  const setSafeCurrentProject = useCallback((newProject: any) => {
+    if (typeof newProject === "string" && newProject.trim() && newProject !== "[object Object]") {
+      setCurrentProject(newProject);
+      try {
+        localStorage.setItem("const_harness_current_project", newProject);
+      } catch {}
+    } else {
+      setCurrentProject("Outside Project");
+      try {
+        localStorage.setItem("const_harness_current_project", "Outside Project");
+      } catch {}
+    }
+  }, []);
   const [currentMode, setCurrentMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => {
     return getDefaultAgentMode();
   });
@@ -3975,7 +3989,7 @@ function AuthenticatedContent({
                   onAbort={() => handleAbort()}
                   showContextUsage={false}
                   project={currentProject}
-                  onProjectChange={setCurrentProject}
+                  onProjectChange={setSafeCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
                   onModelChange={setActiveModelItem}
@@ -4244,7 +4258,7 @@ function AuthenticatedContent({
                       contextUsage={contextUsage}
                       metrics={conversationMetrics}
                       project={currentProject}
-                      onProjectChange={setCurrentProject}
+                      onProjectChange={setSafeCurrentProject}
                       onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                       initialPrompt={editingPrompt}
                       onModelChange={setActiveModelItem}

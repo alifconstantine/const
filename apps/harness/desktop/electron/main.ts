@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -263,8 +263,11 @@ try {
   // Ignore env loading errors
 }
 
-// Explicitly set app name and userData
+// Explicitly set app name, AUMID and userData
 app.setName("Const Harness");
+if (process.platform === "win32") {
+  app.setAppUserModelId("id.web.const.harness.desktop");
+}
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
 app.setPath("userData", userDataPath);
 
@@ -395,19 +398,27 @@ app.on("open-url", (event, url) => {
 
 function createWindow() {
   const isDark = nativeTheme.shouldUseDarkColors;
-  const iconCandidate = process.platform === "win32"
-    ? path.join(__dirname, "../build/icon.ico")
-    : path.join(__dirname, "../build/icon.png");
+  const iconCandidates = [
+    path.join(__dirname, "../build/icon.ico"),
+    path.join(__dirname, "../build/icon.png"),
+    path.join(process.cwd(), "build/icon.ico"),
+    path.join(process.cwd(), "build/icon.png"),
+    path.join(__dirname, "../public/icon.png"),
+    path.join(process.cwd(), "public/icon.png"),
+  ];
 
-  const appIcon = fs.existsSync(iconCandidate)
-    ? iconCandidate
-    : fs.existsSync(path.join(__dirname, "../build/icon.png"))
-    ? path.join(__dirname, "../build/icon.png")
-    : fs.existsSync(path.join(__dirname, "build/icon.png"))
-    ? path.join(__dirname, "build/icon.png")
-    : fs.existsSync(path.join(__dirname, "../public/icon.png"))
-    ? path.join(__dirname, "../public/icon.png")
-    : undefined;
+  let appIcon: Electron.NativeImage | undefined;
+  for (const candidate of iconCandidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        const img = nativeImage.createFromPath(candidate);
+        if (!img.isEmpty()) {
+          appIcon = img;
+          break;
+        }
+      } catch {}
+    }
+  }
 
   win = new BrowserWindow({
     title: "Const Harness",
@@ -427,6 +438,10 @@ function createWindow() {
     },
   });
 
+  if (appIcon && !appIcon.isEmpty()) {
+    win.setIcon(appIcon);
+  }
+
   browserController.setParentWindow(win);
   win.on("closed", () => {
     browserController.setParentWindow(null);
@@ -444,6 +459,43 @@ function createWindow() {
     if (win && !win.isDestroyed()) {
       win.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0c0c0c" : "#ffffff");
       win.webContents.send("theme:system-changed", nativeTheme.shouldUseDarkColors ? "dark" : "light");
+    }
+  });
+
+  // Enable F12/Ctrl+Shift+I for DevTools, F5/Ctrl+R for reload
+  win.webContents.on("before-input-event", (event, input) => {
+    if (
+      (input.key === "F12" || (input.control && input.shift && input.key.toLowerCase() === "i")) &&
+      input.type === "keyDown"
+    ) {
+      win?.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (
+      (input.key === "F5" || (input.control && input.key.toLowerCase() === "r")) &&
+      input.type === "keyDown"
+    ) {
+      win?.webContents.reload();
+      event.preventDefault();
+    }
+  });
+
+  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron Main] Failed to load URL: ${validatedURL} (${errorCode}: ${errorDescription})`);
+    if (process.env.VITE_DEV_SERVER_URL && validatedURL.includes(process.env.VITE_DEV_SERVER_URL)) {
+      console.log("[Electron Main] Retrying dev server load in 1000ms...");
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) {
+          win.loadURL(process.env.VITE_DEV_SERVER_URL!);
+        }
+      }, 1000);
+    }
+  });
+
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error("[Electron Main] Render process gone:", details);
+    if (details.reason !== "clean-exit") {
+      win?.reload();
     }
   });
 
@@ -470,9 +522,6 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 app.whenReady().then(() => {
-  if (process.platform === "win32") {
-    app.setAppUserModelId("id.web.const.harness.desktop");
-  }
 
   // Window control handlers
   ipcMain.on("window:minimize", () => {

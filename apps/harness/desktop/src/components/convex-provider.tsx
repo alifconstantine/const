@@ -3,11 +3,8 @@ import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 
 const convexUrl =
   (import.meta.env.VITE_CONVEX_URL as string) ||
-  (import.meta.env.NEXT_PUBLIC_CONVEX_URL as string);
-
-if (!convexUrl) {
-  throw new Error("Missing VITE_CONVEX_URL or NEXT_PUBLIC_CONVEX_URL environment variable.");
-}
+  (import.meta.env.NEXT_PUBLIC_CONVEX_URL as string) ||
+  "https://wooden-alpaca-210.convex.cloud";
 
 export const convex = new ConvexReactClient(convexUrl);
 
