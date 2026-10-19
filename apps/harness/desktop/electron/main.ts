@@ -86,6 +86,8 @@ export interface UserConfig {
   autoCheckUpdates?: boolean;
   launchOnStartup?: boolean;
   soundAlerts?: boolean;
+  personalizationWorkRole?: string;
+  personalizationCustomInstructions?: string;
 }
 
 const defaultUserConfig: UserConfig = {
@@ -100,6 +102,8 @@ const defaultUserConfig: UserConfig = {
   autoCheckUpdates: true,
   launchOnStartup: false,
   soundAlerts: true,
+  personalizationWorkRole: "",
+  personalizationCustomInstructions: "",
   providers: {
     const: {
       name: "Const",
@@ -1003,6 +1007,16 @@ app.whenReady().then(() => {
         }
       }
 
+      // Assemble personalization systemPrompt from user configuration
+      const personalizationParts: string[] = [];
+      if (config.personalizationWorkRole?.trim()) {
+        personalizationParts.push(`Primary Domain / Role of User: ${config.personalizationWorkRole.trim()}`);
+      }
+      if (config.personalizationCustomInstructions?.trim()) {
+        personalizationParts.push(`User Custom Instructions:\n${config.personalizationCustomInstructions.trim()}`);
+      }
+      const systemPrompt = personalizationParts.length > 0 ? personalizationParts.join("\n\n") : undefined;
+
       const agent = createConstAgent({
         baseUrl,
         apiKey,
@@ -1010,6 +1024,7 @@ app.whenReady().then(() => {
         workspacePath: targetWorkspace,
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
+        systemPrompt,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         maxTurns: payload.maxTurns ?? 200,

@@ -226,6 +226,8 @@ export interface UserConfig {
   autoCheckUpdates?: boolean;
   launchOnStartup?: boolean;
   soundAlerts?: boolean;
+  personalizationWorkRole?: string;
+  personalizationCustomInstructions?: string;
 }
 
 export interface MemoryFileInfo {

@@ -595,9 +595,61 @@ export function SettingsView({
         if (cfg?.soundAlerts !== undefined) {
           setSoundAlerts(cfg.soundAlerts);
         }
+        if (cfg?.personalizationWorkRole !== undefined) {
+          setWorkRole(cfg.personalizationWorkRole);
+        }
+        if (cfg?.personalizationCustomInstructions !== undefined) {
+          setCustomInstructions(cfg.personalizationCustomInstructions);
+        }
       });
     }
   }, [refreshKey]);
+
+  // Personalization settings state
+  const [workRole, setWorkRole] = useState<string>(() => {
+    return localStorage.getItem("const_personalization_work_role") || "";
+  });
+  const [customInstructions, setCustomInstructions] = useState<string>(() => {
+    return localStorage.getItem("const_personalization_custom_instructions") || "";
+  });
+  const [isSavingPersonalization, setIsSavingPersonalization] = useState(false);
+
+  const WORK_ROLE_OPTIONS = useMemo(
+    () => [
+      { id: "", label: "Select..." },
+      { id: "Software Engineer / Developer", label: "Software Engineer / Developer" },
+      { id: "Full-Stack Engineer", label: "Full-Stack Engineer" },
+      { id: "Frontend Engineer", label: "Frontend Engineer" },
+      { id: "Backend Engineer", label: "Backend Engineer" },
+      { id: "AI / ML Researcher", label: "AI / ML Researcher" },
+      { id: "Data Scientist / Analyst", label: "Data Scientist / Analyst" },
+      { id: "DevOps / Infrastructure Engineer", label: "DevOps / Infrastructure Engineer" },
+      { id: "Product Manager", label: "Product Manager" },
+      { id: "Student / Academic", label: "Student / Academic" },
+      { id: "Designer / Creative", label: "Designer / Creative" },
+      { id: "Technical Writer", label: "Technical Writer" },
+      { id: "Other", label: "Other" },
+    ],
+    []
+  );
+
+  const handleSavePersonalization = () => {
+    setIsSavingPersonalization(true);
+    localStorage.setItem("const_personalization_work_role", workRole);
+    localStorage.setItem("const_personalization_custom_instructions", customInstructions);
+    if (window.electron?.saveConfig) {
+      window.electron
+        .saveConfig({
+          personalizationWorkRole: workRole,
+          personalizationCustomInstructions: customInstructions,
+        })
+        .catch(() => {});
+    }
+    setTimeout(() => {
+      setIsSavingPersonalization(false);
+      toast.success("Personalization saved successfully");
+    }, 200);
+  };
 
   const handleSelectActiveModel = (modelId: string) => {
     setActiveModel(modelId);
@@ -725,7 +777,7 @@ export function SettingsView({
       case "personalization":
         return {
           title: t("settings.personalization"),
-          desc: "This capability is currently being configured and will be available in an upcoming update.",
+          desc: "Give Const extra guidance and context for all your chats and tasks.",
         };
       case "keyboard-shortcuts":
         return {
@@ -2097,6 +2149,78 @@ export function SettingsView({
                     <span>
                       Your weekly quota of 7,000,000 tokens covers all queries routed through the Const native router. Custom external providers configured in Models use your own API keys directly.
                     </span>
+                  </div>
+                </div>
+              </div>
+            ) : activeTab === "personalization" ? (
+              /* --------------------------------------------------------- */
+              /* Personalization Tab (matching user Image 2 & Image 3)    */
+              /* --------------------------------------------------------- */
+              <div className="flex flex-col gap-5 max-w-2xl pb-6">
+                {/* 1. What best describes your work? (Image 2 & 3) */}
+                <div className="flex flex-col gap-2">
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                      What best describes your work?
+                    </span>
+
+                    <div className="relative shrink-0 w-full sm:w-auto">
+                      <select
+                        value={workRole}
+                        onChange={(e) => setWorkRole(e.target.value)}
+                        className="w-full sm:w-60 px-3 py-1.5 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer transition-colors appearance-none pr-8"
+                      >
+                        {WORK_ROLE_OPTIONS.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Custom Instructions (Image 3) */}
+                <div className="flex flex-col gap-2">
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Custom instructions
+                      </span>
+                      <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
+                        Give Const extra guidance and context that applies to all your chats and tasks (regular conversations, coding, and automation).
+                        <button
+                          type="button"
+                          onClick={() => toast.info("Instructions added here will be prepended to the AI prompt across all tasks and projects.")}
+                          className="ml-1 text-[#3b82f6] hover:underline cursor-pointer inline-block"
+                        >
+                          Learn more
+                        </button>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <textarea
+                        value={customInstructions}
+                        onChange={(e) => setCustomInstructions(e.target.value)}
+                        placeholder="Add custom instructions..."
+                        rows={7}
+                        className="w-full p-3.5 text-xs font-mono leading-relaxed rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#171717] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a3a3a3] dark:placeholder:text-[#666666] focus:outline-none focus:ring-1 focus:ring-primary resize-y min-h-[160px] transition-colors"
+                      />
+
+                      {/* Save Button matching Image 3 */}
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          disabled={isSavingPersonalization}
+                          onClick={handleSavePersonalization}
+                          className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[#262626] hover:bg-[#111111] dark:bg-[#ffffff] dark:hover:bg-[#ebebed] text-white dark:text-black transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                        >
+                          {isSavingPersonalization ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
