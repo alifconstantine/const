@@ -377,45 +377,49 @@ export function TopToolbar({
           <PanelRight className="w-4 h-4" />
         </button>
 
-        {/* Hairline Divider */}
-        <div className="w-[1px] h-3.5 bg-[#e2e2e4] dark:bg-[#383838]/70 mx-1" />
+        {/* Hairline Divider & Window Controls (Only when right sidebar is closed) */}
+        {!isRightSidebarOpen && (
+          <>
+            <div className="w-[1px] h-3.5 bg-[#e2e2e4] dark:bg-[#383838]/70 mx-1" />
 
-        {/* Window Controls (Minimize, Maximize/Restore, Close) */}
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={handleMinimize}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-            title={t("common.minimize")}
-            aria-label={t("common.minimize")}
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
+            {/* Window Controls (Minimize, Maximize/Restore, Close) */}
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={handleMinimize}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                title={t("common.minimize")}
+                aria-label={t("common.minimize")}
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
 
-          <button
-            type="button"
-            onClick={handleMaximize}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-            title={isMaximized ? t("common.restore") : t("common.maximize")}
-            aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
-          >
-            {isMaximized ? (
-              <Copy className="w-3 h-3 rotate-180" />
-            ) : (
-              <Square className="w-3 h-3" />
-            )}
-          </button>
+              <button
+                type="button"
+                onClick={handleMaximize}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                title={isMaximized ? t("common.restore") : t("common.maximize")}
+                aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
+              >
+                {isMaximized ? (
+                  <Copy className="w-3 h-3 rotate-180" />
+                ) : (
+                  <Square className="w-3 h-3" />
+                )}
+              </button>
 
-          <button
-            type="button"
-            onClick={handleClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
-            title={t("common.close")}
-            aria-label={t("common.close")}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+                title={t("common.close")}
+                aria-label={t("common.close")}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -189,14 +189,14 @@ export function RightPane({
 
   return (
     <aside
-      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border-l border-t border-b border-[#dedee2] dark:border-[#282828] rounded-tl-2xl rounded-bl-2xl shrink-0 overflow-hidden z-20 shadow-xs"
+      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-lg shrink-0 overflow-hidden z-20 shadow-xs"
       style={{ width: `${width}px` }}
     >
       {/* Draggable resize handle on the left edge */}
       <div
         onMouseDown={handleMouseDown}
         onDoubleClick={() => onWidthChange(480)}
-        className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-white/20 transition-colors z-30 group"
+        className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-white/20 transition-colors z-40 group"
         title={t("rightPane.dragToResize")}
       >
         <div className="w-0.5 h-full bg-transparent group-hover:bg-blue-500/50" />
@@ -220,7 +220,7 @@ export function RightPane({
       />
 
       {/* Main Tab Body (Persistent Stack keeping tabs alive in DOM) */}
-      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414] z-10">
+      <div className="flex-1 w-full h-[calc(100%-44px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414] z-10">
         {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
           /* Empty / New Tab Picker matching Image 2 1:1 */
           <OpenTabView

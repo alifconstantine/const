@@ -3309,10 +3309,10 @@ function AuthenticatedContent({
   }, []);
 
   return (
-    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#121212] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-1 sm:p-1.5 gap-1 sm:gap-1.5">
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
-        className={`shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${
+        className={`shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
           isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
@@ -3349,10 +3349,10 @@ function AuthenticatedContent({
         </div>
       </div>
 
-      {/* 2. Main Content Area (Floating card with rounded corners on all sides: top, right, bottom, left) */}
-      <main className="flex-1 min-w-0 bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative rounded-2xl sm:rounded-3xl border border-[#dedee2] dark:border-[#333333]/60 shadow-sm m-2 sm:m-2.5">
+      {/* 2. Main Content Area */}
+      <main className="flex-1 min-w-0 h-full flex flex-row overflow-hidden relative gap-1 sm:gap-1.5">
         {isSkillsOpen ? (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-background text-foreground">
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-lg border border-[#dedee2] dark:border-[#282828] shadow-xs">
             {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
             <div
               className="h-10 px-4 flex items-center justify-between shrink-0 select-none relative z-30"
@@ -3422,49 +3422,52 @@ function AuthenticatedContent({
             </ScrollArea>
           </div>
         ) : isScheduledTasksOpen ? (
-          <ScheduledTasksView
-            onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
-            onOpenSession={(sessionId) => {
-              setIsScheduledTasksOpen(false);
-              handleSelectConversation(sessionId);
-            }}
-            currentWorkspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-          />
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-lg border border-[#dedee2] dark:border-[#282828] shadow-xs">
+            <ScheduledTasksView
+              onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
+              onOpenSession={(sessionId) => {
+                setIsScheduledTasksOpen(false);
+                handleSelectConversation(sessionId);
+              }}
+              currentWorkspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+            />
+          </div>
         ) : (
           <>
-            {(() => {
-              const activeConvo = conversations.find((c) => c.id === conversationId);
-              return (
-                <TopToolbar
-                  isSidebarOpen={isSidebarOpen}
-                  onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-                  onNewChat={() => handleNewChat()}
-                  conversationTitle={conversationTitle}
-                  project={displayProject}
-                  conversationId={conversationId}
-                  isPinned={Boolean(activeConvo?.isPinned)}
-                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-                  onTogglePin={() => handleTogglePinConversation(conversationId)}
-                  onOpenRename={() => setIsRenameDialogOpen(true)}
-                  onArchive={() => handleArchiveConversation(conversationId)}
-                  onOpenSettings={handleOpenSettings}
-                  onOpenTrajectory={() => handleOpenTrajectory()}
-                  isRightSidebarOpen={isRightSidebarOpen}
-                  onToggleRightSidebar={handleToggleRightSidebar}
-                  onOpenTerminal={handleOpenTerminal}
-                  onOpenBrowser={handleOpenBrowser}
-                />
-              );
-            })()}
+            {/* Center Main Chat Panel Card */}
+            <div
+              className={cn(
+                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-lg border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
+                !isDraggingRightSidebar && "transition-[flex,width] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
+              )}
+            >
+              {(() => {
+                const activeConvo = conversations.find((c) => c.id === conversationId);
+                return (
+                  <TopToolbar
+                    isSidebarOpen={isSidebarOpen}
+                    onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                    onNewChat={() => handleNewChat()}
+                    conversationTitle={conversationTitle}
+                    project={displayProject}
+                    conversationId={conversationId}
+                    isPinned={Boolean(activeConvo?.isPinned)}
+                    workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+                    onTogglePin={() => handleTogglePinConversation(conversationId)}
+                    onOpenRename={() => setIsRenameDialogOpen(true)}
+                    onArchive={() => handleArchiveConversation(conversationId)}
+                    onOpenSettings={handleOpenSettings}
+                    onOpenTrajectory={() => handleOpenTrajectory()}
+                    isRightSidebarOpen={isRightSidebarOpen}
+                    onToggleRightSidebar={handleToggleRightSidebar}
+                    onOpenTerminal={handleOpenTerminal}
+                    onOpenBrowser={handleOpenBrowser}
+                  />
+                );
+              })()}
 
-            {/* Main Workbench Body: Center Conversation Canvas + Collapsible Right Sidebar */}
-            <div className="flex-1 min-w-0 flex flex-row overflow-hidden relative">
-              <div
-                className={cn(
-                  "flex-1 min-w-0 h-full flex flex-col relative overflow-hidden",
-                  !isDraggingRightSidebar && "transition-[width,flex] duration-300 ease-in-out"
-                )}
-              >
+              {/* Main Conversation Canvas (Landing or Stream) */}
+              <div className="flex-1 min-w-0 h-full flex flex-col relative overflow-hidden">
                 {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
                 {messages.length === 0 ? (
           <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
@@ -3708,62 +3711,62 @@ function AuthenticatedContent({
           </div>
         )}
               </div>
+            </div>
 
-              {/* Right Sidebar (Side Pane) matching Image 1 & 2 with smooth animated open/close */}
-              <div
-                className={cn(
-                  "shrink-0 h-full overflow-hidden z-20",
-                  !isDraggingRightSidebar && "transition-[width,opacity] duration-300 ease-in-out",
-                  isRightSidebarOpen ? "opacity-100" : "w-0 opacity-0 pointer-events-none"
-                )}
-                style={{
-                  width: isRightSidebarOpen ? `${rightSidebarWidth}px` : 0,
-                }}
-              >
-                <div style={{ width: `${rightSidebarWidth}px` }} className="h-full">
-                  <RightPane
-                    width={rightSidebarWidth}
-                    maxWidth={clampRightSidebarWidth(window.innerWidth)}
-                    minWidth={300}
-                    onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
-                    onDraggingChange={setIsDraggingRightSidebar}
-                    tabs={rightPaneTabs}
-                    activeTabId={activeRightPaneTabId}
-                    isOpeningNewTab={isOpeningNewTab}
-                    onSelectTab={(tabId) => {
-                      setActiveRightPaneTabId(tabId);
-                      setIsOpeningNewTab(false);
-                    }}
-                    onCloseTab={handleCloseTab}
-                    onNewTab={handleNewTab}
-                    onOpenTabType={handleOpenTabType}
-                    onReorderTabs={handleReorderTabs}
-                    workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-                    mutations={
-                      sidebarReviewMutations && sidebarReviewMutations.length > 0
-                        ? sidebarReviewMutations
-                        : allSessionMutations
-                    }
-                    onRollbackFile={handleRollback}
-                    onRollbackAll={handleRollbackAll}
-                    onOpenFileDiff={handleOpenFileDiff}
-                    onStopTask={handleStopBackgroundTask}
-                    onUpdateTab={handleUpdateTab}
-                    onSelectElementForChat={handleSelectElementForChat}
-                    subagents={activeSubAgents || []}
-                    onKillAgent={handleKillSubAgent}
-                    parentMessages={messages}
-                    parentConversationTitle={conversationTitle}
-                    parentConversationId={conversationId}
-                    defaultModel={activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash"}
-                    onOpenFilePreview={handleOpenFilePreview}
-                    onOpenTrajectory={handleOpenTrajectory}
-                    conversations={conversations}
-                    onInsertToMainPrompt={(text) => {
-                      setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
-                    }}
-                  />
-                </div>
+            {/* Right SidePanel Card matching Image 1 & 2 with smooth animated open/close */}
+            <div
+              className={cn(
+                "shrink-0 h-full overflow-hidden z-20",
+                !isDraggingRightSidebar && "transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                isRightSidebarOpen ? "opacity-100" : "w-0 opacity-0 pointer-events-none"
+              )}
+              style={{
+                width: isRightSidebarOpen ? `${rightSidebarWidth}px` : 0,
+              }}
+            >
+              <div style={{ width: `${rightSidebarWidth}px` }} className="h-full">
+                <RightPane
+                  width={rightSidebarWidth}
+                  maxWidth={clampRightSidebarWidth(window.innerWidth)}
+                  minWidth={300}
+                  onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
+                  onDraggingChange={setIsDraggingRightSidebar}
+                  tabs={rightPaneTabs}
+                  activeTabId={activeRightPaneTabId}
+                  isOpeningNewTab={isOpeningNewTab}
+                  onSelectTab={(tabId) => {
+                    setActiveRightPaneTabId(tabId);
+                    setIsOpeningNewTab(false);
+                  }}
+                  onCloseTab={handleCloseTab}
+                  onNewTab={handleNewTab}
+                  onOpenTabType={handleOpenTabType}
+                  onReorderTabs={handleReorderTabs}
+                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+                  mutations={
+                    sidebarReviewMutations && sidebarReviewMutations.length > 0
+                      ? sidebarReviewMutations
+                      : allSessionMutations
+                  }
+                  onRollbackFile={handleRollback}
+                  onRollbackAll={handleRollbackAll}
+                  onOpenFileDiff={handleOpenFileDiff}
+                  onStopTask={handleStopBackgroundTask}
+                  onUpdateTab={handleUpdateTab}
+                  onSelectElementForChat={handleSelectElementForChat}
+                  subagents={activeSubAgents || []}
+                  onKillAgent={handleKillSubAgent}
+                  parentMessages={messages}
+                  parentConversationTitle={conversationTitle}
+                  parentConversationId={conversationId}
+                  defaultModel={activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash"}
+                  onOpenFilePreview={handleOpenFilePreview}
+                  onOpenTrajectory={handleOpenTrajectory}
+                  conversations={conversations}
+                  onInsertToMainPrompt={(text) => {
+                    setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
+                  }}
+                />
               </div>
             </div>
           </>

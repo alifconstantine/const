@@ -14,6 +14,9 @@ import {
   VolumeX,
   Bot,
   FolderTree,
+  Minus,
+  Square,
+  Copy,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -104,6 +107,30 @@ export function TabHeader({
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
+
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    window.electron?.isMaximized?.().then((max) => setIsMaximized(Boolean(max)));
+    const cleanup = window.electron?.onMaximizedChange?.((max) => {
+      setIsMaximized(max);
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, []);
+
+  const handleMinimize = () => {
+    window.electron?.minimize?.();
+  };
+
+  const handleMaximize = () => {
+    window.electron?.maximize?.();
+  };
+
+  const handleClose = () => {
+    window.electron?.close?.();
+  };
 
   // Drag and drop state
   const isDraggingRef = useRef(false);
@@ -196,9 +223,16 @@ export function TabHeader({
   );
 
   return (
-    <div className="h-10 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-30">
+    <div
+      className="h-11 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-30"
+      style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+    >
       {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
-      <div className={`relative shrink-0 ${isDropdownOpen ? "z-50" : ""}`} ref={dropdownRef}>
+      <div
+        className={`relative shrink-0 ${isDropdownOpen ? "z-50" : ""}`}
+        ref={dropdownRef}
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
         <button
           type="button"
           onClick={() => {
@@ -303,6 +337,7 @@ export function TabHeader({
       {/* 2. Middle: Scrollable Tab Strip with tabs and '+' button immediately following the last tab */}
       <div
         ref={tabListRef}
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         onDragOver={(e) => {
           if (draggedIndex !== null) {
             e.preventDefault();
@@ -440,6 +475,46 @@ export function TabHeader({
           aria-label={t("rightPane.openNewTab")}
         >
           <Plus className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* 3. Window Controls on the far right (Minimize, Maximize/Restore, Close) */}
+      <div
+        className="flex items-center gap-0.5 ml-auto pl-1 pr-0.5 shrink-0 select-none z-30"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
+        <button
+          type="button"
+          onClick={handleMinimize}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+          title={t("common.minimize")}
+          aria-label={t("common.minimize")}
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleMaximize}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+          title={isMaximized ? t("common.restore") : t("common.maximize")}
+          aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
+        >
+          {isMaximized ? (
+            <Copy className="w-3 h-3 rotate-180" />
+          ) : (
+            <Square className="w-3 h-3" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleClose}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#666666] dark:text-[#999999] hover:text-white transition-colors cursor-pointer"
+          title={t("common.close")}
+          aria-label={t("common.close")}
+        >
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
