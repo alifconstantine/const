@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Copy, Check, ChevronRight, Eye, Code, ExternalLink, Loader2 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "../workbench/file-icon";
 import { MarkdownContent } from "../workbench/markdown-content";
+import { highlightCodeLines } from "../settings/skills-settings";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
 
@@ -55,6 +56,12 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
   };
 
   const lines = content.split(/\r?\n/);
+
+  const ext = fileName.includes(".") ? fileName.split(".").pop()?.toLowerCase() || "" : "";
+  const highlightedLines = useMemo(() => {
+    if (isMarkdown && mode === "formatted") return [];
+    return highlightCodeLines(content, ext);
+  }, [content, ext, isMarkdown, mode]);
 
   return (
     <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-[#141414] select-none font-sans">
@@ -182,9 +189,12 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
                   <div className="w-12 px-2 text-right select-none text-[11px] text-neutral-600 dark:text-[#555555] shrink-0 border-r border-[#262626] self-stretch">
                     {idx + 1}
                   </div>
-                  <div className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4]">
-                    {line || " "}
-                  </div>
+                  <div
+                    className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4]"
+                    dangerouslySetInnerHTML={{
+                      __html: highlightedLines[idx] || "&nbsp;",
+                    }}
+                  />
                 </div>
               ))}
             </div>

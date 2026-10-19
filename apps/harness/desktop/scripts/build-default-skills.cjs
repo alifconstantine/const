@@ -37,8 +37,21 @@ function getAuthorForSkill(slug, metaAuthor) {
   ) {
     return 'Anthropic';
   }
-  if (s === 'grill-me' || s.startsWith('mattpocock') || ['grilling', 'loop-me'].includes(s)) {
+  if (
+    s === 'grill-me' ||
+    s === 'grill-with-docs' ||
+    s === 'grilling' ||
+    s === 'tdd' ||
+    s.startsWith('mattpocock') ||
+    ['grilling', 'loop-me'].includes(s)
+  ) {
     return 'Matt Pocock';
+  }
+  if (s === 'ui-taste' || s === 'ios-design') {
+    return 'Uizze';
+  }
+  if (s === 'no-ai-slop') {
+    return 'Peter Yang';
   }
   if (s.includes('manim')) {
     return 'Adithya S K';
@@ -189,7 +202,7 @@ dirs.forEach((dir) => {
     id: 'skill_' + dir.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
     slug: dir.name,
     name: name,
-    description: description.slice(0, 320),
+    description: "",
     content: content,
     icon: 'PencilSparkles',
     category: 'custom',

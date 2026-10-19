@@ -58,6 +58,8 @@ import {
   DEFAULT_BUILTIN_SKILLS,
   DEFAULT_BUILTIN_BUNDLES,
 } from "../../lib/skills/default-skills";
+import { FileIcon } from "../workbench/file-icon";
+import { MarkdownContent } from "../workbench/markdown-content";
 
 function escapeHtml(str: string): string {
   return str
@@ -68,95 +70,182 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function highlightSyntax(code: string, language: string): string {
-  const lang = (language || "").toLowerCase().trim();
-  const lines = code.split("\n");
+function highlightPythonLine(line: string): string {
+  const regex =
+    /(#.*$)|(f?["'](?:\\.|[^"'\\])*["'])|(\b(?:def|class|return|if|elif|else|for|while|try|except|finally|with|as|import|from|in|is|not|and|or|lambda|yield|raise|pass|break|continue|async|await|global|nonlocal|assert)\b)|(\b(?:True|False|None|self|cls|print|len|range|open|int|str|float|bool|list|dict|set|tuple|enumerate|zip|map|filter|type)\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z_]\w*(?=\s*\())|([a-zA-Z_]\w*)|([^\s\w]+)|(\s+)/g;
 
-  return lines
-    .map((line) => {
-      if (lang === "python" || lang === "py") {
-        const regex =
-          /(#.*$)|(f?["'](?:\\.|[^"'\\])*["'])|(\b(?:def|class|return|if|elif|else|for|while|try|except|finally|with|as|import|from|in|is|not|and|or|lambda|yield|raise|pass|break|continue|async|await|global|nonlocal|assert)\b)|(\b(?:True|False|None|self|cls|print|len|range|open|int|str|float|bool|list|dict|set|tuple|enumerate|zip|map|filter|type)\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z_]\w*(?=\s*\())|([a-zA-Z_]\w*)|([^\s\w]+)|(\s+)/g;
-
-        return line.replace(
-          regex,
-          (match, comment, str, kw, builtin, num, fnCall, _ident, _symbol, spaces) => {
-            if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-            if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-            if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-            if (builtin) return `<span class="text-sky-600 dark:text-sky-400">${escapeHtml(builtin)}</span>`;
-            if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-            if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
-            if (spaces) return spaces;
-            return escapeHtml(match);
-          }
-        );
-      }
-
-      if (lang === "bash" || lang === "sh" || lang === "shell" || lang === "zsh") {
-        const regex =
-          /(#.*$)|(["'](?:\\.|[^"'\\])*["'])|(\$[a-zA-Z0-9_]+|\$\{[^}]+\})|(\b(?:echo|cd|mkdir|rm|cp|mv|cat|grep|sed|awk|curl|wget|chmod|chown|git|npm|npx|pnpm|yarn|python|python3|pip|uv|if|then|else|elif|fi|for|in|do|done|while|case|esac|function)\b)|(\b\d+\b)|([^\s\w$]+)|(\s+)/g;
-
-        return line.replace(regex, (match, comment, str, variable, kw, num, _symbol, spaces) => {
-          if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-          if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-          if (variable) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(variable)}</span>`;
-          if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-          if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-          if (spaces) return spaces;
-          return escapeHtml(match);
-        });
-      }
-
-      if (lang === "json") {
-        const regex =
-          /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b)|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|([^\s\w"]+)|(\s+)/g;
-
-        return line.replace(regex, (match, key, str, bool, num, _symbol, spaces) => {
-          if (key) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(key)}</span>`;
-          if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-          if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
-          if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-          if (spaces) return spaces;
-          return escapeHtml(match);
-        });
-      }
-
-      if (lang === "yaml" || lang === "yml") {
-        const regex =
-          /(#.*$)|(^[ \t]*[a-zA-Z0-9_-]+(?=\s*:))|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:true|false|null|yes|no)\b)|(\b\d+(?:\.\d+)?\b)|([^\s\w"']+)|(\s+)/g;
-
-        return line.replace(regex, (match, comment, key, str, bool, num, _symbol, spaces) => {
-          if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-          if (key) return `<span class="text-sky-600 dark:text-sky-400 font-semibold">${escapeHtml(key)}</span>`;
-          if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-          if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
-          if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-          if (spaces) return spaces;
-          return escapeHtml(match);
-        });
-      }
-
-      return escapeHtml(line);
-    })
-    .join("\n");
+  return line.replace(
+    regex,
+    (match, comment, str, kw, builtin, num, fnCall, _ident, _symbol, spaces) => {
+      if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
+      if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+      if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
+      if (builtin) return `<span class="text-sky-600 dark:text-sky-400">${escapeHtml(builtin)}</span>`;
+      if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+      if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
+      if (spaces) return spaces;
+      return escapeHtml(match);
+    }
+  );
 }
 
-// Configure marked with syntax-highlighted code block renderer
-marked.use({
-  renderer: {
-    code({ text, lang }: { text: string; lang?: string }) {
-      const language = (lang || "text").toLowerCase();
-      const highlighted = highlightSyntax(text, language);
-      return `<div class="rounded-xl overflow-hidden bg-secondary/30 border border-border my-3 select-none">
-        <div class="flex items-center justify-between px-3.5 py-1.5 bg-secondary/60 border-b border-border text-xs">
-          <span class="font-mono text-[11px] text-muted-foreground uppercase font-semibold">${language}</span>
-        </div>
-        <pre class="p-3.5 overflow-x-auto text-xs leading-relaxed font-mono text-foreground select-text whitespace-pre"><code>${highlighted}</code></pre>
-      </div>`;
-    },
-  },
-});
+function highlightJsTsLine(line: string): string {
+  const regex =
+    /(\/\/.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b(?:import|export|from|as|default|const|let|var|function|return|if|else|switch|case|break|continue|for|while|do|try|catch|finally|throw|new|class|extends|implements|interface|type|enum|public|private|protected|readonly|static|async|await|yield|typeof|instanceof|void|null|undefined|this|super|true|false)\b)|(\b(?:string|number|boolean|any|unknown|never|object|Symbol|BigInt|Array|Record|Promise|Map|Set|Date|RegExp|Error|JSON|Math|console)\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z_$][\w$]*(?=\s*\())|([a-zA-Z_$][\w$]*)|([^\s\w$]+)|(\s+)/g;
+
+  return line.replace(
+    regex,
+    (match, comment, str, kw, builtin, num, fnCall, _ident, _symbol, spaces) => {
+      if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
+      if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+      if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
+      if (builtin) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(builtin)}</span>`;
+      if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+      if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
+      if (spaces) return spaces;
+      return escapeHtml(match);
+    }
+  );
+}
+
+function highlightBashLine(line: string): string {
+  const regex =
+    /(#.*$)|(["'](?:\\.|[^"'\\])*["'])|(\$[a-zA-Z0-9_]+|\$\{[^}]+\})|(\b(?:echo|cd|mkdir|rm|cp|mv|cat|grep|sed|awk|curl|wget|chmod|chown|git|npm|npx|pnpm|yarn|python|python3|pip|uv|if|then|else|elif|fi|for|in|do|done|while|case|esac|function)\b)|(\b\d+\b)|([^\s\w$]+)|(\s+)/g;
+
+  return line.replace(regex, (match, comment, str, variable, kw, num, _symbol, spaces) => {
+    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
+    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+    if (variable) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(variable)}</span>`;
+    if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
+    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+    if (spaces) return spaces;
+    return escapeHtml(match);
+  });
+}
+
+function highlightJsonLine(line: string): string {
+  const regex =
+    /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b)|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|([^\s\w"]+)|(\s+)/g;
+
+  return line.replace(regex, (match, key, str, bool, num, _symbol, spaces) => {
+    if (key) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(key)}</span>`;
+    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+    if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
+    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+    if (spaces) return spaces;
+    return escapeHtml(match);
+  });
+}
+
+function highlightYamlLine(line: string): string {
+  const regex =
+    /(#.*$)|(^[ \t]*[a-zA-Z0-9_-]+(?=\s*:))|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:true|false|null|yes|no)\b)|(\b\d+(?:\.\d+)?\b)|([^\s\w"']+)|(\s+)/g;
+
+  return line.replace(regex, (match, comment, key, str, bool, num, _symbol, spaces) => {
+    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
+    if (key) return `<span class="text-sky-600 dark:text-sky-400 font-semibold">${escapeHtml(key)}</span>`;
+    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+    if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
+    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+    if (spaces) return spaces;
+    return escapeHtml(match);
+  });
+}
+
+function highlightMarkdownLine(line: string): string {
+  if (/^#{1,6}\s+/.test(line)) {
+    return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(line)}</span>`;
+  }
+  if (/^>\s+/.test(line)) {
+    return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(line)}</span>`;
+  }
+  if (/^(\s*[-*+]|\s*\d+\.)\s/.test(line)) {
+    return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(line)}</span>`;
+  }
+  return escapeHtml(line);
+}
+
+function highlightSqlLine(line: string): string {
+  const regex =
+    /(--.*$)|('(?:''|[^'])*')|(\b(?:SELECT|FROM|WHERE|INSERT|INTO|UPDATE|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|CREATE|TABLE|DROP|ALTER|ADD|INDEX|VIEW|UNION|ALL|AS|ON|AND|OR|NOT|IN|IS|NULL|LIKE|BETWEEN|CASE|WHEN|THEN|ELSE|END)\b)|(\b\d+\b)|([^\s\w']+)|\s+/gi;
+
+  return line.replace(regex, (match, comment, str, kw, num) => {
+    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
+    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
+    if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
+    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
+    return escapeHtml(match);
+  });
+}
+
+export function highlightCodeLines(code: string, language: string): string[] {
+  const lang = (language || "").toLowerCase().trim();
+  const rawLines = code.split(/\r?\n/);
+
+  let inPyDocstring: '"""' | "'''" | null = null;
+
+  return rawLines.map((line) => {
+    if (lang === "python" || lang === "py") {
+      if (inPyDocstring) {
+        const closeIdx = line.indexOf(inPyDocstring);
+        if (closeIdx !== -1) {
+          const beforeClose = line.slice(0, closeIdx + 3);
+          const afterClose = line.slice(closeIdx + 3);
+          inPyDocstring = null;
+          return (
+            `<span class="text-emerald-600 dark:text-emerald-400 italic">${escapeHtml(beforeClose)}</span>` +
+            (afterClose ? highlightPythonLine(afterClose) : "")
+          );
+        }
+        return `<span class="text-emerald-600 dark:text-emerald-400 italic">${escapeHtml(line)}</span>`;
+      }
+
+      const tripleDoubleIdx = line.indexOf('"""');
+      const tripleSingleIdx = line.indexOf("'''");
+      if (tripleDoubleIdx !== -1 && (tripleSingleIdx === -1 || tripleDoubleIdx < tripleSingleIdx)) {
+        const secondIdx = line.indexOf('"""', tripleDoubleIdx + 3);
+        if (secondIdx === -1) inPyDocstring = '"""';
+      } else if (tripleSingleIdx !== -1) {
+        const secondIdx = line.indexOf("'''", tripleSingleIdx + 3);
+        if (secondIdx === -1) inPyDocstring = "'''";
+      }
+      return highlightPythonLine(line);
+    }
+
+    if (
+      lang === "typescript" ||
+      lang === "ts" ||
+      lang === "tsx" ||
+      lang === "javascript" ||
+      lang === "js" ||
+      lang === "jsx"
+    ) {
+      return highlightJsTsLine(line);
+    }
+
+    if (lang === "bash" || lang === "sh" || lang === "shell" || lang === "zsh") {
+      return highlightBashLine(line);
+    }
+
+    if (lang === "json") {
+      return highlightJsonLine(line);
+    }
+
+    if (lang === "yaml" || lang === "yml") {
+      return highlightYamlLine(line);
+    }
+
+    if (lang === "markdown" || lang === "md") {
+      return highlightMarkdownLine(line);
+    }
+
+    if (lang === "sql") {
+      return highlightSqlLine(line);
+    }
+
+    return escapeHtml(line);
+  });
+}
 
 function SkillCodeViewer({
   code,
@@ -186,7 +275,8 @@ function SkillCodeViewer({
       ? "markdown"
       : ext;
 
-  const lines = code.split("\n");
+  const lines = useMemo(() => code.split(/\r?\n/), [code]);
+  const highlightedLines = useMemo(() => highlightCodeLines(code, lang), [code, lang]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -199,9 +289,12 @@ function SkillCodeViewer({
     <div className="w-full flex flex-col rounded-xl border border-border bg-secondary/15 overflow-hidden text-xs">
       <div className="flex items-center justify-between px-3.5 py-2 bg-secondary/40 border-b border-border">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono font-semibold uppercase text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
-            {lang}
-          </span>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary">
+            <FileIcon filename={filename} className="w-3.5 h-3.5 shrink-0" />
+            <span className="text-[11px] font-mono font-semibold uppercase">
+              {lang}
+            </span>
+          </div>
           <span className="text-[11px] font-mono text-muted-foreground">
             {lines.length} {lines.length === 1 ? "line" : "lines"}
           </span>
@@ -235,12 +328,12 @@ function SkillCodeViewer({
         </div>
         {/* Highlighted code lines */}
         <div className="flex-1 pl-3.5 pr-4 overflow-x-auto leading-relaxed font-mono text-[11.5px] text-foreground">
-          {lines.map((line, i) => (
+          {highlightedLines.map((htmlLine, i) => (
             <div
               key={i}
               className="whitespace-pre"
               dangerouslySetInnerHTML={{
-                __html: highlightSyntax(line, lang) || "&nbsp;",
+                __html: htmlLine || "&nbsp;",
               }}
             />
           ))}
@@ -254,12 +347,14 @@ export interface SkillsSettingsProps {
   onClose?: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  isModal?: boolean;
 }
 
 export function SkillsSettings({
   onClose,
   isSidebarOpen,
   onToggleSidebar,
+  isModal = false,
 }: SkillsSettingsProps = {}) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -685,7 +780,7 @@ export function SkillsSettings({
   // ---------------------------------------------------------------------------
   if (viewMode === "upload") {
     return (
-      <div className="w-full flex flex-col space-y-6 font-sans select-none">
+      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
         {/* Top Back Navigation Bar */}
         <div className="flex items-center justify-between">
           <Button
@@ -698,7 +793,7 @@ export function SkillsSettings({
             <span>{t("backToSkills")}</span>
           </Button>
 
-          {onClose && (
+          {onClose && !isModal && (
             <Button
               variant="ghost"
               size="sm"
@@ -1002,7 +1097,7 @@ export function SkillsSettings({
     const activeFileContent = bundleFilesMap[selectedFileName] || "";
 
     return (
-      <div className="w-full flex flex-col space-y-6 font-sans select-none">
+      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
         {/* Top Back Navigation Bar */}
         <div className="flex items-center justify-between">
           <Button
@@ -1015,7 +1110,7 @@ export function SkillsSettings({
             <span>{t("backToSkills")}</span>
           </Button>
 
-          {onClose && (
+          {onClose && !isModal && (
             <Button
               variant="ghost"
               size="sm"
@@ -1119,12 +1214,11 @@ export function SkillsSettings({
         {/* Tab 1: OVERVIEW */}
         {bundleActiveTab === "overview" && (
           <div className="max-w-3xl flex flex-col gap-6 pt-2">
-            <div
-              className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-foreground"
-              dangerouslySetInnerHTML={{
-                __html: marked.parse(selectedBundle.overview || selectedBundle.description) as string,
-              }}
-            />
+            <div className="select-text">
+              <MarkdownContent
+                content={selectedBundle.overview || selectedBundle.description || ""}
+              />
+            </div>
 
             {/* Skills included list */}
             <div className="flex flex-col gap-2 pt-2">
@@ -1143,7 +1237,7 @@ export function SkillsSettings({
                     className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3 group"
                   >
                     <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
-                      <FileCode className="w-4 h-4" />
+                      <FileIcon filename="SKILL.md" className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -1154,9 +1248,11 @@ export function SkillsSettings({
                           /{sub.slug}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
-                        {sub.description}
-                      </p>
+                      {sub.description && sub.description.trim() && sub.description !== ">" && sub.description !== "|" && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                          {sub.description}
+                        </p>
+                      )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
                   </div>
@@ -1168,7 +1264,7 @@ export function SkillsSettings({
 
         {/* Tab 2: CONTENT (Split Pane) */}
         {bundleActiveTab === "content" && (
-          <div className="w-full h-[520px] rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs">
+          <div className={cn("w-full rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs", isModal ? "h-[360px]" : "h-[520px]")}>
             {/* Left File Tree Sidebar */}
             <div className="w-56 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
               <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1190,7 +1286,7 @@ export function SkillsSettings({
                             : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                         )}
                       >
-                        <FileText className="w-3.5 h-3.5 shrink-0" />
+                        <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">{fileName}</span>
                       </button>
                     );
@@ -1240,9 +1336,12 @@ export function SkillsSettings({
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[11px] font-mono font-semibold uppercase text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
-                      {selectedFileName.split(".").pop() || "code"}
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                      <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-[11px] font-mono font-semibold uppercase">
+                        {selectedFileName.split(".").pop() || "code"}
+                      </span>
+                    </div>
                   )}
 
                   {/* Copy button */}
@@ -1262,10 +1361,9 @@ export function SkillsSettings({
               <ScrollArea className="flex-1 p-5">
                 {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
                   contentViewMode === "preview" ? (
-                    <div
-                      className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-0 [&_pre]:bg-transparent [&_pre]:border-0 [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:p-1.5 [&_th]:bg-secondary/40 [&_td]:border [&_td]:border-border [&_td]:p-1.5"
-                      dangerouslySetInnerHTML={{ __html: marked.parse(activeFileContent) as string }}
-                    />
+                    <div className="p-2 select-text">
+                      <MarkdownContent content={activeFileContent} />
+                    </div>
                   ) : (
                     <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
                   )
@@ -1295,7 +1393,7 @@ export function SkillsSettings({
                   className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3.5 group"
                 >
                   <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
-                    <FileCode className="w-4 h-4" />
+                    <FileIcon filename="SKILL.md" className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1306,9 +1404,11 @@ export function SkillsSettings({
                         /{sub.slug}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
-                      {sub.description}
-                    </p>
+                    {sub.description && sub.description.trim() && sub.description !== ">" && sub.description !== "|" && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                        {sub.description}
+                      </p>
+                    )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
                 </div>
@@ -1328,7 +1428,7 @@ export function SkillsSettings({
     const filesList = Object.keys(skillFilesMap);
 
     return (
-      <div className="w-full flex flex-col space-y-6 font-sans select-none">
+      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
         {/* Top Back Navigation Bar */}
         <div className="flex items-center justify-between">
           <Button
@@ -1348,7 +1448,7 @@ export function SkillsSettings({
             <span>{originBundle ? originBundle.name : t("backToSkills")}</span>
           </Button>
 
-          {onClose && (
+          {onClose && !isModal && (
             <Button
               variant="ghost"
               size="sm"
@@ -1430,16 +1530,15 @@ export function SkillsSettings({
 
         {/* Tab 1: OVERVIEW */}
         {skillActiveTab === "overview" && (
-          <div className="max-w-3xl flex flex-col gap-6 pt-2">
+          <div className={cn("max-w-3xl flex flex-col pt-2", isModal ? "gap-4 pb-8" : "gap-6 pb-6")}>
             {selectedSkill.overview && (
               <div>
                 <span className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">
                   {t("tabOverview")}
                 </span>
-                <div
-                  className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-foreground"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(selectedSkill.overview) as string }}
-                />
+                <div className="select-text">
+                  <MarkdownContent content={selectedSkill.overview} />
+                </div>
               </div>
             )}
 
@@ -1461,7 +1560,7 @@ export function SkillsSettings({
 
         {/* Tab 2: CONTENT (Split Pane) */}
         {skillActiveTab === "content" && (
-          <div className="w-full h-[520px] rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs">
+          <div className={cn("w-full rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs", isModal ? "h-[360px]" : "h-[520px]")}>
             {/* Left File Tree Sidebar */}
             <div className="w-52 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
               <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1471,7 +1570,6 @@ export function SkillsSettings({
                 <div className="flex flex-col gap-0.5">
                   {filesList.map((fileName) => {
                     const isSelected = selectedFileName === fileName;
-                    const isPy = fileName.endsWith(".py");
                     return (
                       <button
                         key={fileName}
@@ -1484,11 +1582,7 @@ export function SkillsSettings({
                             : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                         )}
                       >
-                        {isPy ? (
-                          <Code className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5 shrink-0" />
-                        )}
+                        <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">{fileName}</span>
                       </button>
                     );
@@ -1538,9 +1632,12 @@ export function SkillsSettings({
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[11px] font-mono font-semibold uppercase text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
-                      {selectedFileName.split(".").pop() || "code"}
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                      <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-[11px] font-mono font-semibold uppercase">
+                        {selectedFileName.split(".").pop() || "code"}
+                      </span>
+                    </div>
                   )}
 
                   <Button
@@ -1559,10 +1656,9 @@ export function SkillsSettings({
               <ScrollArea className="flex-1 p-5">
                 {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
                   contentViewMode === "preview" ? (
-                    <div
-                      className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-0 [&_pre]:bg-transparent [&_pre]:border-0 [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:p-1.5 [&_th]:bg-secondary/40 [&_td]:border [&_td]:border-border [&_td]:p-1.5"
-                      dangerouslySetInnerHTML={{ __html: marked.parse(activeFileContent) as string }}
-                    />
+                    <div className="p-2 select-text">
+                      <MarkdownContent content={activeFileContent} />
+                    </div>
                   ) : (
                     <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
                   )
@@ -1581,174 +1677,310 @@ export function SkillsSettings({
   // RENDER: VIEW 0 — MAIN SKILLS & BUNDLES LIST
   // ---------------------------------------------------------------------------
   return (
-    <div className="w-full flex flex-col space-y-6 font-sans select-none">
-      {/* 1. Header Section - Strict match with sources-view, models-view & learn-home */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+    <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
+      {/* 1. Header & Controls Section */}
+      {isModal ? (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          {/* Left: Scope Switcher + Total Skills Badge */}
           <div className="flex items-center gap-2.5">
-            {!isSidebarOpen && onToggleSidebar && (
+            <div className="relative flex items-center h-8 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
+              <div
+                className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+                style={{
+                  transform: `translateX(${scopeIndicatorStyle.left}px)`,
+                  width: `${scopeIndicatorStyle.width}px`,
+                  opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
+                  transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              />
+
               <button
+                ref={allScopeRef}
                 type="button"
-                onClick={onToggleSidebar}
-                className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
-                title="Open sidebar"
-                aria-label="Open sidebar"
+                onClick={() => setSelectedScope("all")}
+                className={cn(
+                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "all"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <PanelLeft className="w-4 h-4" />
+                {t("allScope") || "All"}
               </button>
-            )}
-            <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
-              {t("skillsTitle")}
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
+              <button
+                ref={userScopeRef}
+                type="button"
+                onClick={() => setSelectedScope("user")}
+                className={cn(
+                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "user"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t("userScope") || "Personal"}
+              </button>
+              <button
+                ref={workspaceScopeRef}
+                type="button"
+                onClick={() => setSelectedScope("workspace")}
+                className={cn(
+                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "workspace"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t("workspaceScope") || "Workspace"}
+              </button>
+            </div>
+
+            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
               {skills.length}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {t("skillsSubtitle")}
-          </p>
-        </div>
 
-        {/* Search Bar & Primary Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <Input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("searchSkills")}
-              className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+          {/* Right: Search Bar & Primary Actions */}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("searchSkills")}
+                className="h-8 w-36 sm:w-44 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => setViewMode("upload")}
+              className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
+            >
+              <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span>{t("uploadBtn")}</span>
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
+                  title={t("moreOptions")}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+                <DropdownMenuItem
+                  onClick={() => setIsManualCreateOpen(true)}
+                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                >
+                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>Create from Scratch</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => ensureDefaultSkillsSeeded()}
+                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>{t("update")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem
+                  onClick={handleResetToDefault}
+                  className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{t("resetSkills")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                {!isSidebarOpen && onToggleSidebar && (
+                  <button
+                    type="button"
+                    onClick={onToggleSidebar}
+                    className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
+                    title="Open sidebar"
+                    aria-label="Open sidebar"
+                  >
+                    <PanelLeft className="w-4 h-4" />
+                  </button>
+                )}
+                <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
+                  {t("skillsTitle")}
+                </h1>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
+                  {skills.length}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("skillsSubtitle")}
+              </p>
+            </div>
+
+            {/* Search Bar & Primary Actions */}
+            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchSkills")}
+                  className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Upload Skill Button (Primary) */}
+              <Button
+                size="sm"
+                onClick={() => setViewMode("upload")}
+                className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
+              >
+                <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
+                <span>{t("uploadBtn")}</span>
+              </Button>
+
+              {/* More Options Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
+                    title={t("moreOptions")}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
+                >
+                  <DropdownMenuItem
+                    onClick={() => setIsManualCreateOpen(true)}
+                    className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Create from Scratch</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => ensureDefaultSkillsSeeded()}
+                    className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>{t("update")}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-border" />
+                  <DropdownMenuItem
+                    onClick={handleResetToDefault}
+                    className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span>{t("resetSkills")}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Upload Skill Button (Primary) */}
-          <Button
-            size="sm"
-            onClick={() => setViewMode("upload")}
-            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
-          >
-            <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
-            <span>{t("uploadBtn")}</span>
-          </Button>
+          {/* 2. Scope Switcher Sliding Pill */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
+              <div
+                className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+                style={{
+                  transform: `translateX(${scopeIndicatorStyle.left}px)`,
+                  width: `${scopeIndicatorStyle.width}px`,
+                  opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
+                  transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              />
 
-          {/* More Options Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
               <button
+                ref={allScopeRef}
                 type="button"
-                className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
-                title={t("moreOptions")}
+                onClick={() => setSelectedScope("all")}
+                className={cn(
+                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "all"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <MoreHorizontal className="w-4 h-4" />
+                {t("allScope") || "All"}
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
-            >
-              <DropdownMenuItem
-                onClick={() => setIsManualCreateOpen(true)}
-                className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+              <button
+                ref={userScopeRef}
+                type="button"
+                onClick={() => setSelectedScope("user")}
+                className={cn(
+                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "user"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>Create from Scratch</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => ensureDefaultSkillsSeeded()}
-                className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+                {t("userScope") || "Personal"}
+              </button>
+              <button
+                ref={workspaceScopeRef}
+                type="button"
+                onClick={() => setSelectedScope("workspace")}
+                className={cn(
+                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+                  selectedScope === "workspace"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>{t("update")}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem
-                onClick={handleResetToDefault}
-                className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-              >
-                <RotateCw className="w-3.5 h-3.5" />
-                <span>{t("resetSkills")}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Scope Switcher Sliding Pill */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
-          <div
-            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
-            style={{
-              transform: `translateX(${scopeIndicatorStyle.left}px)`,
-              width: `${scopeIndicatorStyle.width}px`,
-              opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
-              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-            }}
-          />
-
-          <button
-            ref={allScopeRef}
-            type="button"
-            onClick={() => setSelectedScope("all")}
-            className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-              selectedScope === "all"
-                ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("allScope") || "All"}
-          </button>
-          <button
-            ref={userScopeRef}
-            type="button"
-            onClick={() => setSelectedScope("user")}
-            className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-              selectedScope === "user"
-                ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("userScope") || "Personal"}
-          </button>
-          <button
-            ref={workspaceScopeRef}
-            type="button"
-            onClick={() => setSelectedScope("workspace")}
-            className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-              selectedScope === "workspace"
-                ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("workspaceScope") || "Workspace"}
-          </button>
-        </div>
-      </div>
+                {t("workspaceScope") || "Workspace"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* 3. Main List Content (Natural scroll flowing with parent page) */}
       {filteredSkills.length === 0 ? (
@@ -1791,8 +2023,8 @@ export function SkillsSettings({
                     setViewMode("skill-detail");
                   }}
                 >
-                  {/* Skill Item Info (No icon, No description) */}
-                  <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                  {/* Skill Item Info */}
+                  <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
                     <span className="text-xs font-semibold text-foreground tracking-tight">
                       {skill.name}
                     </span>

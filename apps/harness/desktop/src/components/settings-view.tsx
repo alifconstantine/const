@@ -2241,7 +2241,9 @@ export function SettingsView({
               /* --------------------------------------------------------- */
               /* Agent Skills Settings View                                */
               /* --------------------------------------------------------- */
-              <SkillsSettings />
+              <div className="pb-10">
+                <SkillsSettings isModal={true} />
+              </div>
             ) : (
               /* --------------------------------------------------------- */
               /* Generic Placeholder for other capabilities                */

@@ -319,6 +319,18 @@ function AuthenticatedContent({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
+  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
+
+  useEffect(() => {
+    window.electron?.isMaximized?.().then((max) => setIsWindowMaximized(Boolean(max)));
+    const cleanup = window.electron?.onMaximizedChange?.((max) => {
+      setIsWindowMaximized(max);
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, []);
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
@@ -3337,7 +3349,7 @@ function AuthenticatedContent({
           <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-background text-foreground">
             {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
             <div
-              className="h-10 px-4 flex items-center justify-between shrink-0 select-none border-b border-[#dedee2] dark:border-[#2b2b2e]"
+              className="h-10 px-4 flex items-center justify-between shrink-0 select-none relative z-30"
               style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
             >
               <div
@@ -3354,7 +3366,7 @@ function AuthenticatedContent({
                 </button>
               </div>
 
-              {/* Window Controls */}
+              {/* Window Controls matching ScheduledTasksView and TopToolbar */}
               <div
                 className="flex items-center gap-0.5 text-[#969696] shrink-0 ml-auto"
                 style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -3363,8 +3375,8 @@ function AuthenticatedContent({
                   type="button"
                   onClick={() => window.electron?.minimize?.()}
                   className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  title="Minimize"
-                  aria-label="Minimize"
+                  title={t("topToolbar.minimize")}
+                  aria-label={t("topToolbar.minimize")}
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -3372,30 +3384,33 @@ function AuthenticatedContent({
                   type="button"
                   onClick={() => window.electron?.maximize?.()}
                   className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  title="Maximize"
-                  aria-label="Maximize"
+                  title={isWindowMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
+                  aria-label={isWindowMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
                 >
-                  <Square className="w-3.5 h-3.5" />
+                  {isWindowMaximized ? (
+                    <Copy className="w-3 h-3 rotate-180" />
+                  ) : (
+                    <Square className="w-3 h-3" />
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => window.electron?.close?.()}
-                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
-                  title="Close"
-                  aria-label="Close"
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] hover:text-white transition-colors cursor-pointer"
+                  title={t("topToolbar.close")}
+                  aria-label={t("topToolbar.close")}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Scroll Area with SkillsSettings (exact 1:1 match with learn-home.tsx) */}
+            {/* Scroll Area with SkillsSettings */}
             <ScrollArea className="flex-1 w-full h-full min-h-0">
               <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
                 <SkillsSettings
                   isSidebarOpen={isSidebarOpen}
                   onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-                  onClose={() => setIsSkillsOpen(false)}
                 />
               </div>
             </ScrollArea>

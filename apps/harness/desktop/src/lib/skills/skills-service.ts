@@ -113,6 +113,7 @@ export async function ensureDefaultSkillsSeeded(forceReset = false): Promise<voi
       } else if (existing.isBuiltIn) {
         if (
           existing.content !== skill.content ||
+          existing.description !== skill.description ||
           existing.author !== skill.author ||
           !existing.files ||
           Object.keys(existing.files).length !== Object.keys(files).length
@@ -123,6 +124,7 @@ export async function ensureDefaultSkillsSeeded(forceReset = false): Promise<voi
             content: skill.content,
             category: skill.category,
             author: skill.author || "skills.sh",
+            overview: generateSkillOverview(skill.name, skill.slug, skill.content, skill.description),
             files,
             updatedAt: Date.now(),
           });
@@ -140,7 +142,7 @@ export async function ensureDefaultSkillsSeeded(forceReset = false): Promise<voi
 export async function createCustomSkill(data: {
   slug: string;
   name: string;
-  description: string;
+  description?: string;
   content: string;
   category?: SkillCategory;
   author?: string;
@@ -159,7 +161,7 @@ export async function createCustomSkill(data: {
     id,
     slug,
     name: data.name.trim(),
-    description: data.description.trim(),
+    description: data.description?.trim() || "",
     content: data.content.trim(),
     category: data.category || "custom",
     isBuiltIn: false,
@@ -184,7 +186,7 @@ export function generateSkillOverview(
   name: string,
   slug: string,
   content: string,
-  description: string
+  description?: string
 ): string {
   const headings = Array.from(content.matchAll(/^##\s+(.+)$/gm)).map((m) => m[1]?.trim());
   const keyPoints = headings.filter(
@@ -195,7 +197,10 @@ export function generateSkillOverview(
       !h.toLowerCase().includes("installation")
   );
 
-  let overviewText = `${description}\n\n`;
+  let overviewText = "";
+  if (description && description.trim() && description !== ">" && description !== "|") {
+    overviewText += `${description.trim()}\n\n`;
+  }
   overviewText += `### Trigger & Activation\n`;
   overviewText += `- Command: \`/${slug}\`\n`;
   overviewText += `- Autonomous Trigger: Automatically selected when working on relevant tasks or requests matching this domain.\n\n`;
