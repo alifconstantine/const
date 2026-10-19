@@ -87,9 +87,6 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
           <div className="flex items-center gap-1.5 shrink-0 text-white font-medium" title={rawPath}>
             <FileIcon filename={fileName} />
             <span className="truncate">{fileName}</span>
-            <span className="text-[10px] font-sans px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 ml-1">
-              {t("rightPane.singleEdit")}
-            </span>
           </div>
         </div>
 
