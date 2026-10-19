@@ -48,9 +48,9 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     outputTypes: ["text"],
   },
   {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash",
-    modelId: "gemini-3.7-flash",
+    id: "glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    modelId: "glm-5.3-flash",
     provider: "const",
     providerName: "Const",
     category: "llm",
@@ -60,20 +60,52 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    inputTypes: ["text", "image", "video"],
+    inputTypes: ["text"],
     outputTypes: ["text"],
   },
   {
-    id: "qwen-3.8-27b",
-    name: "Qwen 3.8 27B",
-    modelId: "qwen-3.8-27b",
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek v4.1 Flash",
+    modelId: "deepseek-v4.1-flash",
     provider: "const",
     providerName: "Const",
     category: "llm",
     endpoint: "/v1/chat/completions",
-    contextLength: 131072,
-    contextWindow: "131K",
-    maxOutputTokens: "65K",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    inputTypes: ["text"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "qwen-3.8-omni-flash",
+    name: "Qwen 3.8 Omni Flash",
+    modelId: "qwen-3.8-omni-flash",
+    provider: "const",
+    providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    inputTypes: ["text", "image", "audio", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    modelId: "gpt-6-luna",
+    provider: "const",
+    providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 272000,
+    contextWindow: "272K",
+    maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
     inputTypes: ["text"],
@@ -123,40 +155,69 @@ export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): 
 }
 
 /**
- * Normalizes any variation of Const managed model IDs to the exact OmniRoute combo model title.
- * - "gemini-3.7-flash", "gemini 3.7 flash", "Gemini 3.7 Flash" -> "Gemini 3.7 Flash"
- * - "gemini-3.8-flash", "gemini 3.8 flash", "Gemini 3.8 Flash" -> "Gemini 3.8 Flash"
- * - "qwen-3.8-27b", "qwen 3.8 27b", "Qwen 3.8 27B" -> "Qwen 3.8 27B"
- * - "whisper-large-v3-turbo", "whisper-1" -> "Whisper Large v3 Turbo"
+ * Normalizes any variation of Const managed model IDs to the exact upstream OmniRoute model identifier.
  */
 export function normalizeConstModelName(modelId: string): string {
   if (!modelId) return modelId;
   const clean = modelId.toLowerCase().trim();
+
+  // 1. GLM 5.3 Flash
   if (
-    clean === "gemini-3.7-flash" ||
-    clean === "gemini 3.7 flash" ||
-    clean.startsWith("antigravity/gemini-3.7") ||
-    clean.startsWith("gemini-3.7")
+    clean === "glm-5.3-flash" ||
+    clean === "glm 5.3 flash" ||
+    clean === "glm5.3-flash" ||
+    clean.includes("glm-5.3") ||
+    clean.includes("glm 5.3")
   ) {
-    return "Gemini 3.7 Flash";
+    return "oc-nara/glm-5.3-flash";
   }
+
+  // 2. Gemini 3.8 Flash
   if (
     clean === "gemini-3.8-flash" ||
     clean === "gemini 3.8 flash" ||
-    clean.startsWith("antigravity/gemini-3.8") ||
-    clean.startsWith("gemini-3.8")
+    clean === "gemini-3.7-flash" ||
+    clean.startsWith("gemini-3.8") ||
+    clean.startsWith("gemini-3.7") ||
+    clean.startsWith("antigravity/gemini-3.8")
   ) {
     return "Gemini 3.8 Flash";
   }
+
+  // 3. Deepseek v4.1 Flash
   if (
+    clean === "deepseek-v4.1-flash" ||
+    clean === "deepseek v4.1 flash" ||
+    clean.includes("deepseek-v4.1") ||
+    clean.includes("deepseek v4.1") ||
+    clean.includes("deepseek-v4")
+  ) {
+    return "oc-nara/deepseek-v4.1-flash";
+  }
+
+  // 4. Qwen 3.8 Omni Flash
+  if (
+    clean === "qwen-3.8-omni-flash" ||
+    clean === "qwen 3.8 omni flash" ||
     clean === "qwen-3.8-27b" ||
     clean === "qwen 3.8 27b" ||
-    clean === "qwen3.8-27b" ||
-    clean.startsWith("qwen-3.8") ||
-    clean.startsWith("qwen 3.8")
+    clean.includes("qwen")
   ) {
-    return "Qwen 3.8 27B";
+    return "atmo/ali/qwen3.8-omni-flash";
   }
+
+  // 5. GPT 6 Luna
+  if (
+    clean === "gpt-6-luna" ||
+    clean === "gpt 6 luna" ||
+    clean === "gpt-luna-6" ||
+    clean === "gpt-5.6-luna" ||
+    clean.includes("luna")
+  ) {
+    return "GPT 6 Luna";
+  }
+
+  // Audio: Whisper Large v3 Turbo
   if (
     clean === "whisper-large-v3-turbo" ||
     clean === "whisper large v3 turbo" ||
@@ -166,6 +227,8 @@ export function normalizeConstModelName(modelId: string): string {
   ) {
     return "Whisper Large v3 Turbo";
   }
+
+  // Const Search
   if (
     clean === "const-search" ||
     clean === "const search" ||
@@ -173,6 +236,7 @@ export function normalizeConstModelName(modelId: string): string {
   ) {
     return "Const Search";
   }
+
   return modelId;
 }
 
@@ -185,10 +249,12 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   if (clean.startsWith("antigravity/")) return true;
   if (clean === "const-search" || clean === "const search") return true;
   if (
-    clean === "gemini-3.7-flash" || clean === "gemini 3.7 flash" ||
-    clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" ||
-    clean.startsWith("gemini-3.8") || clean.startsWith("gemini-3.7") ||
-    clean === "qwen-3.8-27b" || clean === "qwen 3.8 27b" || clean.startsWith("qwen-3.8") ||
+    clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" || clean.startsWith("gemini-3.8") ||
+    clean === "glm-5.3-flash" || clean === "glm 5.3 flash" || clean.includes("glm-5.3") ||
+    clean === "deepseek-v4.1-flash" || clean === "deepseek v4.1 flash" || clean.includes("deepseek-v4") ||
+    clean === "qwen-3.8-omni-flash" || clean === "qwen 3.8 omni flash" || clean.includes("qwen") ||
+    clean === "gpt-6-luna" || clean === "gpt 6 luna" || clean.includes("luna") ||
+    clean === "gemini-3.7-flash" || clean === "qwen-3.8-27b" ||
     clean === "whisper-large-v3-turbo" || clean === "whisper large v3 turbo" ||
     clean === "whisper-1" || clean === "whisper"
   ) {

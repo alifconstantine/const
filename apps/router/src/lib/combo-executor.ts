@@ -101,27 +101,39 @@ export async function executeComboChat(
   // Robust fallback for system built-in combos if Convex returns null or fails
   if (!combo && (comboSlug === "auto" || comboSlug === "fast" || comboSlug === "coding")) {
     const defaultModelsMap: Record<string, ComboTargetModel[]> = {
+      coding: [
+        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
+        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 5 },
+      ],
       auto: [
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 3 },
+        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
+        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 5 },
       ],
       fast: [
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+        { modelId: "gpt-6-luna", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "deepseek-v4.1-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+        { modelId: "glm-5.3-flash", providerId: "const", providerName: "Const Gateway", priority: 4 },
+        { modelId: "qwen-3.8-omni-flash", providerId: "const", providerName: "Const Gateway", priority: 5 },
       ],
-      coding: [
-        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
-      ],
+    };
+
+    const defaultContextLengths: Record<string, number> = {
+      coding: 1000000,
+      auto: 272000,
+      fast: 272000,
     };
 
     combo = {
       name: `combo/${comboSlug}`,
       slug: comboSlug,
-      contextLength: 1000000,
+      contextLength: defaultContextLengths[comboSlug] || 1000000,
       strategy: "priority",
       models: defaultModelsMap[comboSlug] || [],
     };
@@ -300,13 +312,13 @@ export async function executeComboChat(
           headers["Authorization"] = `Bearer ${apiKey}`;
         }
 
-        // Context clamping safeguard for Qwen (131K limit)
+        // Context clamping safeguard for models with 272K limit (GPT 6 Luna)
         let targetMessages = formattedMessages;
-        if (targetModel.includes("Qwen") || target.modelId.toLowerCase().includes("qwen")) {
+        if (targetModel.includes("Luna") || target.modelId.toLowerCase().includes("luna")) {
           let curTokens = estimateMessagesTokens(targetMessages);
-          if (curTokens > 125000 && targetMessages.length > 2) {
+          if (curTokens > 265000 && targetMessages.length > 2) {
             targetMessages = [...formattedMessages];
-            while (curTokens > 125000 && targetMessages.length > 2) {
+            while (curTokens > 265000 && targetMessages.length > 2) {
               targetMessages.splice(1, 1);
               curTokens = estimateMessagesTokens(targetMessages);
             }

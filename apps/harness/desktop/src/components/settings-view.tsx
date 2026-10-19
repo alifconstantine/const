@@ -108,51 +108,43 @@ export const BUILTIN_CONST_MODELS = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     isDefault: true,
-    desc: "Advanced frontier thinking with extended reasoning depth (up to max). Included in your 7M weekly tokens quota.",
+    desc: "Advanced frontier thinking with 1M context, extended reasoning depth, and multimodal vision. Included in free weekly quota.",
   },
   {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash",
+    id: "glm-5.3-flash",
+    name: "GLM 5.3 Flash",
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Hybrid frontier reasoning model with dynamic thinking effort. Included in your 7M weekly tokens quota.",
+    desc: "Ultra-fast response model optimized for real-time coding, tool execution, and responsive natural dialogue.",
   },
   {
-    id: "gemini-3.6-flash",
-    name: "Gemini 3.6 Flash",
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek v4.1 Flash",
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
+    desc: "High-performance MoE reasoning model specializing in complex algorithmic coding, mathematics, and architectural refactoring.",
   },
   {
-    id: "qwen-3.8-27b",
-    name: "Qwen 3.8 27B",
-    contextWindow: "131K Context",
-    maxOutput: "65K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Open-weight reasoning powerhouse with deep thinking capabilities. Included in your 7M weekly tokens quota.",
-  },
-  {
-    id: "combo/auto",
-    name: "combo/auto",
+    id: "qwen-3.8-omni-flash",
+    name: "Qwen 3.8 Omni Flash",
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Intelligent dynamic router balancing latency, reasoning, and multi-model failover.",
+    desc: "Native omni-modal foundation model strong across multilingual tasks, software engineering, vision, and audio.",
   },
   {
-    id: "combo/fast",
-    name: "combo/fast",
-    contextWindow: "1M Context",
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    contextWindow: "272K Context",
     maxOutput: "128K Output",
-    supportsThinking: false,
-    desc: "Sub-second time-to-first-token and ultra-high throughput for instant conversational feedback.",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    desc: "Frontier reasoning powerhouse with 272K context, nuanced writing, and high-fidelity problem solving.",
   },
   {
     id: "combo/coding",
@@ -161,7 +153,24 @@ export const BUILTIN_CONST_MODELS = [
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
+    desc: "Priority failover coding chain: GLM 5.3 Flash -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> Qwen Omni -> GPT 6 Luna.",
+  },
+  {
+    id: "combo/auto",
+    name: "combo/auto",
+    contextWindow: "272K Context",
+    maxOutput: "128K Output",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    desc: "Balanced reasoning router: GPT 6 Luna -> Deepseek v4.1 Flash -> Gemini 3.8 Flash -> Qwen Omni -> GLM 5.3 Flash.",
+  },
+  {
+    id: "combo/fast",
+    name: "combo/fast",
+    contextWindow: "272K Context",
+    maxOutput: "128K Output",
+    supportsThinking: false,
+    desc: "Low-latency sub-second chain: GPT 6 Luna -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> GLM 5.3 Flash -> Qwen Omni.",
   },
 ];
 
@@ -261,10 +270,12 @@ export function SettingsView({
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [activeModel, setActiveModel] = useState<string>(() => {
     const saved = localStorage.getItem("const_harness_active_model");
-    if (!saved || saved === "Const" || saved === "gemini-3.6-flash") return "gemini-3.8-flash";
+    if (!saved || saved === "Const" || saved === "gemini-3.6-flash" || saved === "gemini-3.7-flash" || saved === "qwen-3.8-27b") return "gemini-3.8-flash";
     if (saved === "Gemini 3.8 Flash") return "gemini-3.8-flash";
-    if (saved === "Gemini 3.7 Flash") return "gemini-3.7-flash";
-    if (saved === "Gemini 3.6 Flash") return "gemini-3.6-flash";
+    if (saved === "GLM 5.3 Flash") return "glm-5.3-flash";
+    if (saved === "Deepseek v4.1 Flash") return "deepseek-v4.1-flash";
+    if (saved === "Qwen 3.8 Omni Flash") return "qwen-3.8-omni-flash";
+    if (saved === "GPT 6 Luna") return "gpt-6-luna";
     return saved;
   });
 

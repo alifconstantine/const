@@ -1006,7 +1006,7 @@ export function ChatCard({
             // Normalize selectedModel with freshly loaded models
             setSelectedModel((prev) => {
               const current = prev || localStorage.getItem("const_harness_active_model");
-              if (!current || current === "gemini-3.8-flash" || current === "gemini-3.6-flash") {
+              if (!current || current === "gemini-3.8-flash" || current === "gemini-3.7-flash" || current === "gemini-3.6-flash" || current === "qwen-3.8-27b") {
                 const foundDefault = deduped.find((m) => m.id === "gemini-3.8-flash");
                 const defaultName = foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
                 localStorage.setItem("const_harness_active_model", defaultName);
@@ -1030,9 +1030,10 @@ export function ChatCard({
           const raw = cfg.activeModel;
           let modelName = raw;
           if (raw === "gemini-3.8-flash") modelName = "Gemini 3.8 Flash";
-          else if (raw === "gemini-3.7-flash") modelName = "Gemini 3.7 Flash";
-          else if (raw === "gemini-3.6-flash") modelName = "Gemini 3.6 Flash";
-          else if (raw === "qwen-3.8-27b") modelName = "Qwen 3.8 27B";
+          else if (raw === "glm-5.3-flash") modelName = "GLM 5.3 Flash";
+          else if (raw === "deepseek-v4.1-flash") modelName = "Deepseek v4.1 Flash";
+          else if (raw === "qwen-3.8-omni-flash" || raw === "qwen-3.8-27b") modelName = "Qwen 3.8 Omni Flash";
+          else if (raw === "gpt-6-luna") modelName = "GPT 6 Luna";
           else if (raw === "combo/auto" || raw === "Auto Router" || raw === "Auto (Best Available)") modelName = "combo/auto";
           else if (raw === "combo/fast" || raw === "Low-Latency Fast Chain" || raw === "Fast (Low Latency)") modelName = "combo/fast";
           else if (raw === "combo/coding" || raw === "Coding Agent Chain" || raw === "Coding & Reasoning") modelName = "combo/coding";
@@ -1211,9 +1212,8 @@ export function ChatCard({
       return currentModelItem.contextWindow;
     }
     const id = (currentModelItem?.id || selectedModel || "").toLowerCase();
-    if (id.includes("gemini")) return 1_048_576;
-    if (id.includes("combo")) return 1_000_000;
-    if (id.includes("deepseek")) return 128_000;
+    if (id.includes("luna") || id === "gpt-6-luna" || id === "combo/auto" || id === "combo/fast") return 272_000;
+    if (id.includes("gemini") || id.includes("glm") || id.includes("deepseek") || id.includes("qwen") || id === "combo/coding") return 1_000_000;
     if (id.includes("claude")) return 200_000;
     if (id.includes("gpt-4")) return 128_000;
     return contextUsage?.totalTokens ?? 1_000_000;
