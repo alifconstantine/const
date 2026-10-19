@@ -375,11 +375,23 @@ declare global {
           kind?: "file" | "directory";
         }>
       >;
+      readDirectory?: (
+        dirPath?: string,
+        workspacePath?: string
+      ) => Promise<
+        Array<{
+          name: string;
+          path: string;
+          fullPath: string;
+          isDirectory: boolean;
+        }>
+      >;
       readFile?: (
         filePath: string,
         workspacePath?: string
       ) => Promise<{ content?: string; truncated?: boolean; error?: string; isDirectory?: boolean }>;
       openPath?: (targetPath: string) => Promise<boolean>;
+      showInFolder?: (targetPath: string) => Promise<boolean>;
       resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
       onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
       scheduledTasks?: {

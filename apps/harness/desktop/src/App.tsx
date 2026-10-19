@@ -818,6 +818,12 @@ function AuthenticatedContent({
     } else if (type === "side_conversation") {
       const count = rightPaneTabs.filter((t) => t.type === type).length;
       title = count === 0 ? "Side chat" : `Side chat ${count + 1}`;
+    } else if (type === "directory") {
+      const baseTitle =
+        currentProject && currentProject !== "Outside Project"
+          ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Direktori"
+          : "Direktori";
+      title = baseTitle;
     } else {
       const count = rightPaneTabs.filter((t) => t.type === type).length;
       title = count === 0 ? "Browser" : `Browser ${count + 1}`;

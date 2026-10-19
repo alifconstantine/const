@@ -5,6 +5,7 @@ export type RightPaneTabType =
   | "review"
   | "file_diff"
   | "file_preview"
+  | "directory"
   | "terminal"
   | "browser"
   | "task_output"

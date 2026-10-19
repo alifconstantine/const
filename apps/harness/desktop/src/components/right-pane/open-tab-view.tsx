@@ -3,16 +3,22 @@ import {
   SquareTerminal,
   Globe,
   Layers,
+  FolderTree,
 } from "lucide-react";
 import type { RightPaneTabType } from "./types";
 import { useTranslation } from "../../lib/i18n";
 
 interface OpenTabViewProps {
   onSelectTabType: (type: RightPaneTabType) => void;
+  workspacePath?: string;
 }
 
-export function OpenTabView({ onSelectTabType }: OpenTabViewProps) {
+export function OpenTabView({ onSelectTabType, workspacePath }: OpenTabViewProps) {
   const { t } = useTranslation();
+
+  const isInsideWorkspace = Boolean(
+    workspacePath && workspacePath !== "Outside Project"
+  );
 
   const tabOptions = [
     {
@@ -35,6 +41,15 @@ export function OpenTabView({ onSelectTabType }: OpenTabViewProps) {
       title: t("rightPane.browser"),
       icon: Globe,
     },
+    ...(isInsideWorkspace
+      ? [
+          {
+            type: "directory" as RightPaneTabType,
+            title: t("rightPane.directory"),
+            icon: FolderTree,
+          },
+        ]
+      : []),
   ];
 
   return (

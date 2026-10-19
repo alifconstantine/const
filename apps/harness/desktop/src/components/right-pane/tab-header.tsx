@@ -13,6 +13,7 @@ import {
   Volume2,
   VolumeX,
   Bot,
+  FolderTree,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -35,6 +36,8 @@ function getTabIcon(type: RightPaneTabType) {
       return SquareTerminal;
     case "review":
       return Layers;
+    case "directory":
+      return FolderTree;
     case "file_diff":
     case "file_preview":
       return FileText;
@@ -253,7 +256,7 @@ export function TabHeader({
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        {tItem.type === "file_diff" || tItem.type === "file_preview" ? (
+                        {tItem.type === "file_diff" || tItem.type === "file_preview" || (tItem.type === "directory" && tItem.filePath) ? (
                           <FileIcon filename={tItem.filePath || tItem.title} className="w-3.5 h-3.5 shrink-0" />
                         ) : tItem.type === "browser" ? (
                           <TabFavicon favicon={tItem.favicon} fallbackIcon={Icon} isActive={isActive} />
@@ -350,7 +353,7 @@ export function TabHeader({
                 <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
               )}
 
-              {tab.type === "file_diff" || tab.type === "file_preview" ? (
+              {tab.type === "file_diff" || tab.type === "file_preview" || (tab.type === "directory" && tab.filePath) ? (
                 <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
               ) : tab.type === "browser" ? (
                 <TabFavicon favicon={tab.favicon} fallbackIcon={Icon} isActive={isActive} />

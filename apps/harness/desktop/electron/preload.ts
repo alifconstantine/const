@@ -128,11 +128,14 @@ contextBridge.exposeInMainWorld("electron", {
   getTranscript: (conversationId: string) => ipcRenderer.invoke("conversations:get-transcript", conversationId),
   importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
   listFiles: (workspacePath?: string) => ipcRenderer.invoke("workspace:list-files", workspacePath),
+  readDirectory: (dirPath?: string, workspacePath?: string) =>
+    ipcRenderer.invoke("workspace:read-directory", dirPath, workspacePath),
   readFile: (filePath: string, workspacePath?: string) =>
     ipcRenderer.invoke("workspace:read-file", filePath, workspacePath),
   resolveWorkspacePath: (options?: { project?: string; conversationId?: string }) =>
     ipcRenderer.invoke("workspace:resolve-path", options),
   openPath: (targetPath: string) => ipcRenderer.invoke("shell:open-path", targetPath),
+  showInFolder: (targetPath: string) => ipcRenderer.invoke("shell:show-in-folder", targetPath),
   onConversationsChanged: (callback: (data: { conversationId?: string }) => void) => {
     const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on("conversations:changed", handler);

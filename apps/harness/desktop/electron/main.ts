@@ -1734,6 +1734,76 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle(
+    "workspace:read-directory",
+    async (_event, dirPath?: string, workspacePath?: string) => {
+      try {
+        let targetDir: string;
+        if (dirPath && path.isAbsolute(dirPath)) {
+          targetDir = dirPath;
+        } else if (dirPath && workspacePath) {
+          targetDir = path.resolve(workspacePath, dirPath);
+        } else if (workspacePath) {
+          targetDir = path.resolve(workspacePath);
+        } else {
+          return [];
+        }
+
+        if (!fs.existsSync(targetDir)) return [];
+        const stat = fs.statSync(targetDir);
+        if (!stat.isDirectory()) return [];
+
+        const dirents = fs.readdirSync(targetDir, { withFileTypes: true });
+        const entries: Array<{
+          name: string;
+          path: string;
+          fullPath: string;
+          isDirectory: boolean;
+        }> = [];
+
+        for (const ent of dirents) {
+          const fullPath = path.join(targetDir, ent.name);
+          const relPath = workspacePath
+            ? path.relative(workspacePath, fullPath).replace(/\\/g, "/")
+            : ent.name;
+
+          entries.push({
+            name: ent.name,
+            path: relPath,
+            fullPath,
+            isDirectory: ent.isDirectory(),
+          });
+        }
+
+        entries.sort((a, b) => {
+          if (a.isDirectory !== b.isDirectory) {
+            return a.isDirectory ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        });
+
+        return entries;
+      } catch (err) {
+        console.error("[Electron Main] Failed to read directory:", err);
+        return [];
+      }
+    }
+  );
+
+  ipcMain.handle("shell:show-in-folder", async (_event, targetPath: string) => {
+    if (!targetPath) return false;
+    try {
+      if (fs.existsSync(targetPath)) {
+        shell.showItemInFolder(targetPath);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("[Electron Main] Failed to show item in folder:", err);
+      return false;
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Scheduled Tasks Manager & IPC Handlers
   // ---------------------------------------------------------------------------

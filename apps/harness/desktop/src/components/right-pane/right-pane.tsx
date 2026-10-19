@@ -138,7 +138,15 @@ export function RightPane({
       case "file_diff":
         return <FileDiffTab tab={tab} onRollbackFile={onRollbackFile} />;
       case "file_preview":
-        return <FilePreviewTab tab={tab} />;
+      case "directory":
+        return (
+          <FilePreviewTab
+            tab={tab}
+            workspacePath={workspacePath}
+            onOpenFilePreview={onOpenFilePreview}
+            onUpdateTab={onUpdateTab}
+          />
+        );
       case "subagent":
         return (
           <SubagentTab
@@ -215,7 +223,10 @@ export function RightPane({
       <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414] z-10">
         {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
           /* Empty / New Tab Picker matching Image 2 1:1 */
-          <OpenTabView onSelectTabType={onOpenTabType} />
+          <OpenTabView
+            onSelectTabType={onOpenTabType}
+            workspacePath={workspacePath}
+          />
         ) : null}
 
         {tabs.map((tab) => {

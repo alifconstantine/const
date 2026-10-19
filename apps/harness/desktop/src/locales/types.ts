@@ -247,6 +247,13 @@ export interface TranslationDictionary {
     terminal: string;
     taskOutput: string;
     filePreview: string;
+    directory: string;
+    workspace: string;
+    revealInExplorer: string;
+    copyRelativePath: string;
+    toggleFileTree: string;
+    refreshDirectory: string;
+    selectFileToView: string;
     fileDiff: string;
     browser: string;
     review: string;
