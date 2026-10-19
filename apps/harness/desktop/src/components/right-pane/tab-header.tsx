@@ -224,7 +224,7 @@ export function TabHeader({
 
   return (
     <div
-      className="h-11 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-30"
+      className="h-11 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-3 shrink-0 select-none relative z-30"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
@@ -480,7 +480,7 @@ export function TabHeader({
 
       {/* 3. Window Controls on the far right (Minimize, Maximize/Restore, Close) */}
       <div
-        className="flex items-center gap-0.5 ml-auto pl-1 pr-0.5 shrink-0 select-none z-30"
+        className="flex items-center gap-0.5 ml-auto pl-1 pr-1.5 shrink-0 select-none z-30"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <button
