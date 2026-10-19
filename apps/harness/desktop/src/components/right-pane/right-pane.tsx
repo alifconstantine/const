@@ -191,17 +191,17 @@ export function RightPane({
 
   return (
     <aside
-      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-r-[10px] rounded-l-none shrink-0 overflow-hidden z-20 shadow-xs"
+      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] border-l-0 rounded-r-[10px] rounded-l-none shrink-0 overflow-hidden z-20 shadow-xs"
       style={{ width: `${width}px` }}
     >
       {/* Draggable resize handle on the left edge */}
       <div
         onMouseDown={handleMouseDown}
         onDoubleClick={() => onWidthChange(480)}
-        className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-white/20 transition-colors z-40 group"
+        className="absolute top-0 left-0 w-1.5 h-full cursor-col-resize hover:bg-black/5 dark:hover:bg-white/5 transition-colors z-40 group"
         title={t("rightPane.dragToResize")}
       >
-        <div className="w-0.5 h-full bg-transparent group-hover:bg-blue-500/50" />
+        <div className="w-0.5 h-full bg-transparent group-hover:bg-[#888888] dark:group-hover:bg-[#888888]" />
       </div>
 
       {/* Top Tab Bar matching Image 1 */}

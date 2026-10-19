@@ -720,8 +720,12 @@ export function Sidebar({
           >
             <button
               type="button"
-              onClick={onCollapse}
-              className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onCollapse();
+              }}
+              className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
               title="Collapse sidebar (Ctrl+B)"
               aria-label="Collapse sidebar"
             >

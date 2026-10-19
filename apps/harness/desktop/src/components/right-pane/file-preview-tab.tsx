@@ -622,9 +622,10 @@ export function FilePreviewTab({
           {workspacePath && (
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setIsWorkspaceTreeOpen((prev) => !prev)}
               className={cn(
-                "p-1.5 rounded transition-colors cursor-pointer",
+                "p-1.5 rounded transition-colors cursor-pointer outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 select-none",
                 isWorkspaceTreeOpen
                   ? "bg-white/10 text-white"
                   : "text-neutral-400 hover:text-white hover:bg-white/5"

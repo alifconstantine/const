@@ -198,8 +198,12 @@ export function TopToolbar({
           <>
             <button
               type="button"
-              onClick={onToggleSidebar}
-              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center justify-center"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onToggleSidebar();
+              }}
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer flex items-center justify-center select-none"
               title={t("topToolbar.toggleSidebar")}
               aria-label={t("topToolbar.toggleSidebar")}
             >
@@ -366,8 +370,12 @@ export function TopToolbar({
         {!isRightSidebarOpen && (
           <button
             type="button"
-            onClick={onToggleRightSidebar}
-            className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onToggleRightSidebar?.();
+            }}
+            className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
             title={t("topToolbar.openRightSidebar")}
             aria-label={t("topToolbar.toggleRightPane")}
           >
@@ -384,8 +392,12 @@ export function TopToolbar({
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={handleMinimize}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  handleMinimize();
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
                 title={t("common.minimize")}
                 aria-label={t("common.minimize")}
               >
@@ -394,8 +406,12 @@ export function TopToolbar({
 
               <button
                 type="button"
-                onClick={handleMaximize}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  handleMaximize();
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
                 title={isMaximized ? t("common.restore") : t("common.maximize")}
                 aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
               >
@@ -408,8 +424,12 @@ export function TopToolbar({
 
               <button
                 type="button"
-                onClick={handleClose}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.currentTarget.blur();
+                  handleClose();
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-[#e81123] transition-colors cursor-pointer select-none"
                 title={t("common.close")}
                 aria-label={t("common.close")}
               >

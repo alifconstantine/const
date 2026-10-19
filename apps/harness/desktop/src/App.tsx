@@ -3381,12 +3381,7 @@ function AuthenticatedContent({
       </div>
 
       {/* 2. Main Content Area */}
-      <main
-        className={cn(
-          "flex-1 min-w-0 h-full flex flex-row overflow-hidden relative",
-          isRightSidebarOpen ? "gap-1" : "gap-0"
-        )}
-      >
+      <main className="flex-1 min-w-0 h-full flex flex-row overflow-hidden relative gap-0">
         {isSkillsOpen ? (
           <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
             {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
@@ -3474,7 +3469,7 @@ function AuthenticatedContent({
             <div
               className={cn(
                 "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
-                isRightSidebarOpen ? "rounded-l-[10px] rounded-r-none" : "rounded-[10px]",
+                isRightSidebarOpen ? "rounded-l-[10px] rounded-r-none border-r-0" : "rounded-[10px]",
                 !isDraggingRightSidebar && "transition-[flex,width] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
               )}
             >
@@ -3755,10 +3750,10 @@ function AuthenticatedContent({
               <div
                 onMouseDown={handleMouseDownRightResize}
                 onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
-                className="w-2 -mx-1 h-full cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors z-30 shrink-0 select-none flex items-center justify-center group"
+                className="w-1.5 -mx-0.5 h-full cursor-col-resize hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 dark:active:bg-white/10 transition-colors z-40 shrink-0 select-none flex items-center justify-center group"
                 title={t("rightPane.dragToResize")}
               >
-                <div className="w-[1px] h-full bg-transparent group-hover:bg-blue-500 transition-colors" />
+                <div className="w-[1px] h-full bg-[#dedee2] dark:bg-[#282828] group-hover:bg-[#888888] dark:group-hover:bg-[#888888] transition-colors" />
               </div>
             )}
 

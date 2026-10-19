@@ -385,10 +385,10 @@ export function TabHeader({
             >
               {/* Drop position indicator lines */}
               {isDropTarget && dropPosition === "left" && (
-                <div className="absolute -left-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
+                <div className="absolute -left-[3px] top-1 bottom-1 w-[2.5px] bg-[#888888] dark:bg-[#aaaaaa] rounded-full z-30 pointer-events-none" />
               )}
               {isDropTarget && dropPosition === "right" && (
-                <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
+                <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-[#888888] dark:bg-[#aaaaaa] rounded-full z-30 pointer-events-none" />
               )}
 
               {tab.type === "file_diff" || tab.type === "file_preview" || (tab.type === "directory" && tab.filePath) ? (
@@ -489,8 +489,12 @@ export function TabHeader({
         {onCollapse && (
           <button
             type="button"
-            onClick={onCollapse}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer mr-0.5"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onCollapse();
+            }}
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer mr-0.5 select-none"
             title={t("rightPane.hidePanel")}
             aria-label={t("rightPane.hidePanel")}
           >
@@ -500,8 +504,12 @@ export function TabHeader({
 
         <button
           type="button"
-          onClick={handleMinimize}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.currentTarget.blur();
+            handleMinimize();
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
           title={t("common.minimize")}
           aria-label={t("common.minimize")}
         >
@@ -510,8 +518,12 @@ export function TabHeader({
 
         <button
           type="button"
-          onClick={handleMaximize}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.currentTarget.blur();
+            handleMaximize();
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
           title={isMaximized ? t("common.restore") : t("common.maximize")}
           aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
         >
@@ -524,8 +536,12 @@ export function TabHeader({
 
         <button
           type="button"
-          onClick={handleClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#666666] dark:text-[#999999] hover:text-white transition-colors cursor-pointer"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.currentTarget.blur();
+            handleClose();
+          }}
+          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#666666] dark:text-[#999999] hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-[#e81123] transition-colors cursor-pointer select-none"
           title={t("common.close")}
           aria-label={t("common.close")}
         >
