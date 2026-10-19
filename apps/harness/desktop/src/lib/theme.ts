@@ -232,18 +232,32 @@ export function useInterfaceZoom(): [number, (zoom: number) => void] {
 }
 
 // ============================================================================
-// UI Font Size (Default 14px)
+// UI Font Size (Default 16px)
 // ============================================================================
-export const DEFAULT_UI_FONT_SIZE = 14;
-export const MIN_UI_FONT_SIZE = 11;
-export const MAX_UI_FONT_SIZE = 20;
+export const DEFAULT_UI_FONT_SIZE = 16;
+export const MIN_UI_FONT_SIZE = 12;
+export const MAX_UI_FONT_SIZE = 22;
 
 export function getSavedUiFontSize(): number {
   if (typeof window === "undefined") return DEFAULT_UI_FONT_SIZE;
-  const saved = localStorage.getItem("const_ui_font_size");
-  if (saved) {
-    const parsed = parseInt(saved, 10);
+  const savedV2 = localStorage.getItem("const_ui_font_size_v2");
+  if (savedV2) {
+    const parsed = parseInt(savedV2, 10);
     if (!isNaN(parsed) && parsed >= MIN_UI_FONT_SIZE && parsed <= MAX_UI_FONT_SIZE) {
+      return parsed;
+    }
+  }
+  const savedV1 = localStorage.getItem("const_ui_font_size");
+  if (savedV1) {
+    const parsed = parseInt(savedV1, 10);
+    // If it was the previous default 14, migrate to 16
+    if (parsed === 14) {
+      localStorage.setItem("const_ui_font_size_v2", "16");
+      localStorage.setItem("const_ui_font_size", "16");
+      return 16;
+    }
+    if (!isNaN(parsed) && parsed >= MIN_UI_FONT_SIZE && parsed <= MAX_UI_FONT_SIZE) {
+      localStorage.setItem("const_ui_font_size_v2", String(parsed));
       return parsed;
     }
   }
@@ -253,6 +267,7 @@ export function getSavedUiFontSize(): number {
 export function applyUiFontSize(size: number = DEFAULT_UI_FONT_SIZE) {
   if (typeof document === "undefined") return;
   document.documentElement.style.setProperty("--ui-font-size", `${size}px`);
+  document.documentElement.style.fontSize = `${size}px`;
   if (document.body) {
     document.body.style.fontSize = `${size}px`;
   }
@@ -261,6 +276,7 @@ export function applyUiFontSize(size: number = DEFAULT_UI_FONT_SIZE) {
 export function setSavedUiFontSize(size: number) {
   if (typeof window === "undefined") return;
   const clamped = Math.max(MIN_UI_FONT_SIZE, Math.min(MAX_UI_FONT_SIZE, Math.round(size)));
+  localStorage.setItem("const_ui_font_size_v2", String(clamped));
   localStorage.setItem("const_ui_font_size", String(clamped));
   applyUiFontSize(clamped);
   window.dispatchEvent(new CustomEvent("const-ui-font-size-change", { detail: clamped }));
@@ -280,7 +296,7 @@ export function useUiFontSize(): [number, (size: number) => void] {
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_ui_font_size") {
+      if (e.key === "const_ui_font_size" || e.key === "const_ui_font_size_v2") {
         setFontSizeState(getSavedUiFontSize());
       }
     };
