@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, Plus } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { computeDiff, type DiffLine } from "../workbench/review-dialog";
 import { useTranslation } from "../../lib/i18n";
+import { useDiffMarks, useCodeFontSize } from "../../lib/theme";
 
 export interface DiffViewerProps {
   previousContent: string | null | undefined;
@@ -26,6 +27,8 @@ export function DiffViewer({
   maxHeight,
 }: DiffViewerProps) {
   const { t } = useTranslation();
+  const [diffMarks] = useDiffMarks();
+  const [codeFontSize] = useCodeFontSize();
   const [unfoldedHunkIds, setUnfoldedHunkIds] = useState<Set<string>>(new Set());
   const [expandedChunkCounts, setExpandedChunkCounts] = useState<Record<string, number>>({});
 
@@ -204,7 +207,12 @@ export function DiffViewer({
               return (
                 <div key={block.id} className="w-full max-w-full flex flex-col select-none">
                   {visibleTop.map((line, lIdx) => (
-                    <DiffLineRow key={`top_${block.startIndex + lIdx}`} line={line} />
+                    <DiffLineRow
+                      key={`top_${block.startIndex + lIdx}`}
+                      line={line}
+                      diffMarks={diffMarks}
+                      codeFontSize={codeFontSize}
+                    />
                   ))}
 
                   {/* Folded Banner matching Image 1: "+67 more lines" +10 +10 */}
@@ -239,7 +247,12 @@ export function DiffViewer({
                   ) : null}
 
                   {visibleBottom.map((line, lIdx) => (
-                    <DiffLineRow key={`bottom_${block.startIndex + lIdx}`} line={line} />
+                    <DiffLineRow
+                      key={`bottom_${block.startIndex + lIdx}`}
+                      line={line}
+                      diffMarks={diffMarks}
+                      codeFontSize={codeFontSize}
+                    />
                   ))}
                 </div>
               );
@@ -249,7 +262,12 @@ export function DiffViewer({
             return (
               <div key={block.id} className="w-full max-w-full">
                 {block.lines.map((line, lIdx) => (
-                  <DiffLineRow key={`line_${block.startIndex + lIdx}`} line={line} />
+                  <DiffLineRow
+                    key={`line_${block.startIndex + lIdx}`}
+                    line={line}
+                    diffMarks={diffMarks}
+                    codeFontSize={codeFontSize}
+                  />
                 ))}
               </div>
             );
@@ -260,16 +278,29 @@ export function DiffViewer({
   );
 }
 
-function DiffLineRow({ line }: { line: DiffLine }) {
+function DiffLineRow({
+  line,
+  diffMarks = "color",
+  codeFontSize = 12,
+}: {
+  line: DiffLine;
+  diffMarks?: "color" | "symbols";
+  codeFontSize?: number;
+}) {
   const isAdded = line.type === "added";
   const isRemoved = line.type === "removed";
+  const showColorBg = diffMarks === "color";
+  const showSymbols = diffMarks === "symbols";
 
   return (
     <div
+      style={{ fontSize: `${codeFontSize}px` }}
       className={cn(
-        "flex items-start w-full max-w-full leading-5 font-mono text-[12px] group hover:bg-white/[0.03] transition-colors",
-        isAdded && "bg-[#238636]/15 dark:bg-[#238636]/15 text-[#e6edf3]",
-        isRemoved && "bg-[#da3633]/15 dark:bg-[#da3633]/15 text-[#e6edf3]"
+        "flex items-start w-full max-w-full leading-5 font-mono group hover:bg-white/[0.03] transition-colors",
+        showColorBg && isAdded && "bg-[#238636]/15 dark:bg-[#238636]/15 text-[#e6edf3]",
+        showColorBg && isRemoved && "bg-[#da3633]/15 dark:bg-[#da3633]/15 text-[#e6edf3]",
+        !showColorBg && isAdded && "bg-transparent text-[#e6edf3]",
+        !showColorBg && isRemoved && "bg-transparent text-[#e6edf3]"
       )}
     >
       {/* Old Line Number */}
@@ -295,10 +326,11 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       {/* Diff Sign Indicator */}
       <div
         className={cn(
-          "w-5 text-center select-none font-mono text-xs shrink-0 font-bold self-stretch",
+          "w-5 text-center select-none font-mono shrink-0 self-stretch",
           isAdded && "text-[#409D62]",
           isRemoved && "text-[#ff5c5c]",
-          !isAdded && !isRemoved && "text-transparent"
+          !isAdded && !isRemoved && "text-transparent",
+          showSymbols ? "font-black opacity-100" : "font-bold opacity-80"
         )}
       >
         {isAdded ? "+" : isRemoved ? "-" : " "}

@@ -68,6 +68,15 @@ import {
   MAX_ZOOM,
   DEFAULT_ZOOM,
   ZOOM_STEP,
+  useUiFontSize,
+  DEFAULT_UI_FONT_SIZE,
+  MIN_UI_FONT_SIZE,
+  MAX_UI_FONT_SIZE,
+  useCodeFontSize,
+  DEFAULT_CODE_FONT_SIZE,
+  MIN_CODE_FONT_SIZE,
+  MAX_CODE_FONT_SIZE,
+  useDiffMarks,
 } from "../lib/theme";
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
@@ -243,6 +252,9 @@ export function SettingsView({
   const [theme, setTheme] = useTheme();
   const [conversationWidth, setConversationWidth] = useConversationWidth();
   const [zoom, setZoom] = useInterfaceZoom();
+  const [uiFontSize, setUiFontSize] = useUiFontSize();
+  const [codeFontSize, setCodeFontSize] = useCodeFontSize();
+  const [diffMarks, setDiffMarks] = useDiffMarks();
 
   // Local configuration
   const [config, setConfig] = useState<UserConfig | null>(null);
@@ -1655,16 +1667,17 @@ export function SettingsView({
               /* Appearance Settings Tab                                   */
               /* --------------------------------------------------------- */
               <div className="flex flex-col gap-5 max-w-2xl pb-6">
+                {/* Theme & Layout Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Interface & Layout
+                    Theme & Layout
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
-                    {/* Theme row */}
+                    {/* 1. App Theme */}
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Theme
+                          App Theme
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
                           Select light, dark, or follow system appearance.
@@ -1718,8 +1731,8 @@ export function SettingsView({
                       </div>
                     </div>
 
-                    {/* Conversation Width row */}
-                    <div className="flex items-center justify-between gap-4">
+                    {/* 2. Conversation Width */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
                           Conversation Width
@@ -1754,19 +1767,194 @@ export function SettingsView({
                         })}
                       </div>
                     </div>
+                  </div>
+                </div>
 
-                    {/* Font Size & Interface Scale row */}
-                    <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#dedee2] dark:border-[#383838]">
+                {/* Typography & Rendering Card */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+                    Typography & Code
+                  </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
+                    {/* 3. UI Font Size */}
+                    <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Font Size & Interface Scale
+                          UI Font Size
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Adjust font size and UI scale across the entire application (Min {MIN_ZOOM}%, Max {MAX_ZOOM}%).
+                          Base font size for workbench text, prompts, and interface controls (Default: 14px).
                         </span>
                       </div>
 
-                      {/* Stepper Control: [-] [100%] [+] and Reset button */}
+                      {/* Stepper Control: [-] [14px] [+] and Reset */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={uiFontSize <= MIN_UI_FONT_SIZE}
+                            onClick={() => setUiFontSize(Math.max(MIN_UI_FONT_SIZE, uiFontSize - 1))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              uiFontSize <= MIN_UI_FONT_SIZE
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Decrease UI font size (${Math.max(MIN_UI_FONT_SIZE, uiFontSize - 1)}px)`}
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+
+                          <span className="min-w-[44px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
+                            {uiFontSize}px
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={uiFontSize >= MAX_UI_FONT_SIZE}
+                            onClick={() => setUiFontSize(Math.min(MAX_UI_FONT_SIZE, uiFontSize + 1))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              uiFontSize >= MAX_UI_FONT_SIZE
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Increase UI font size (${Math.min(MAX_UI_FONT_SIZE, uiFontSize + 1)}px)`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {uiFontSize !== DEFAULT_UI_FONT_SIZE && (
+                          <button
+                            type="button"
+                            onClick={() => setUiFontSize(DEFAULT_UI_FONT_SIZE)}
+                            className="px-2 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
+                            title="Reset UI font size to default (14px)"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. Code Font Size */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Code Font Size
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Font size for code blocks, terminal logs, and diff lines (Default: 12px).
+                        </span>
+                      </div>
+
+                      {/* Stepper Control: [-] [12px] [+] and Reset */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={codeFontSize <= MIN_CODE_FONT_SIZE}
+                            onClick={() => setCodeFontSize(Math.max(MIN_CODE_FONT_SIZE, codeFontSize - 1))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              codeFontSize <= MIN_CODE_FONT_SIZE
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Decrease code font size (${Math.max(MIN_CODE_FONT_SIZE, codeFontSize - 1)}px)`}
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+
+                          <span className="min-w-[44px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
+                            {codeFontSize}px
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={codeFontSize >= MAX_CODE_FONT_SIZE}
+                            onClick={() => setCodeFontSize(Math.min(MAX_CODE_FONT_SIZE, codeFontSize + 1))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              codeFontSize >= MAX_CODE_FONT_SIZE
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Increase code font size (${Math.min(MAX_CODE_FONT_SIZE, codeFontSize + 1)}px)`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {codeFontSize !== DEFAULT_CODE_FONT_SIZE && (
+                          <button
+                            type="button"
+                            onClick={() => setCodeFontSize(DEFAULT_CODE_FONT_SIZE)}
+                            className="px-2 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
+                            title="Reset code font size to default (12px)"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 5. Diff marks (matching user Image 1) */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Diff marks
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Use colored bars and backgrounds, or show "+" and "-" symbols on each changed line
+                        </span>
+                      </div>
+
+                      {/* Segmented Control matching user Image 1: Color | +/- */}
+                      <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setDiffMarks("color")}
+                          className={cn(
+                            "px-3 py-1 text-[11px] rounded-md transition-all cursor-pointer font-medium outline-none focus:outline-none",
+                            diffMarks === "color"
+                              ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
+                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                          )}
+                          title="Use colored bars and backgrounds"
+                        >
+                          Color
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDiffMarks("symbols")}
+                          className={cn(
+                            "px-3 py-1 text-[11px] rounded-md transition-all cursor-pointer font-medium outline-none focus:outline-none",
+                            diffMarks === "symbols"
+                              ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
+                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                          )}
+                          title="Show '+' and '-' symbols on each changed line"
+                        >
+                          +/-
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 6. Interface Scale / Zoom */}
+                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Window Scale
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Adjust window zoom factor across the desktop interface (Min {MIN_ZOOM}%, Max {MAX_ZOOM}%).
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
                           <button
@@ -1779,7 +1967,7 @@ export function SettingsView({
                                 ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
                                 : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
                             )}
-                            title={`Decrease font size (${Math.max(MIN_ZOOM, zoom - ZOOM_STEP)}%)`}
+                            title={`Decrease window zoom (${Math.max(MIN_ZOOM, zoom - ZOOM_STEP)}%)`}
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
@@ -1798,7 +1986,7 @@ export function SettingsView({
                                 ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
                                 : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
                             )}
-                            title={`Increase font size (${Math.min(MAX_ZOOM, zoom + ZOOM_STEP)}%)`}
+                            title={`Increase window zoom (${Math.min(MAX_ZOOM, zoom + ZOOM_STEP)}%)`}
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -1809,7 +1997,7 @@ export function SettingsView({
                             type="button"
                             onClick={() => setZoom(DEFAULT_ZOOM)}
                             className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
-                            title="Reset font size to default (100%)"
+                            title="Reset window zoom to default (100%)"
                           >
                             <RotateCcw className="w-3 h-3" />
                             <span>Reset</span>

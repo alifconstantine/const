@@ -231,6 +231,190 @@ export function useInterfaceZoom(): [number, (zoom: number) => void] {
   return [zoom, setZoom];
 }
 
+// ============================================================================
+// UI Font Size (Default 14px)
+// ============================================================================
+export const DEFAULT_UI_FONT_SIZE = 14;
+export const MIN_UI_FONT_SIZE = 11;
+export const MAX_UI_FONT_SIZE = 20;
+
+export function getSavedUiFontSize(): number {
+  if (typeof window === "undefined") return DEFAULT_UI_FONT_SIZE;
+  const saved = localStorage.getItem("const_ui_font_size");
+  if (saved) {
+    const parsed = parseInt(saved, 10);
+    if (!isNaN(parsed) && parsed >= MIN_UI_FONT_SIZE && parsed <= MAX_UI_FONT_SIZE) {
+      return parsed;
+    }
+  }
+  return DEFAULT_UI_FONT_SIZE;
+}
+
+export function applyUiFontSize(size: number = DEFAULT_UI_FONT_SIZE) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--ui-font-size", `${size}px`);
+  if (document.body) {
+    document.body.style.fontSize = `${size}px`;
+  }
+}
+
+export function setSavedUiFontSize(size: number) {
+  if (typeof window === "undefined") return;
+  const clamped = Math.max(MIN_UI_FONT_SIZE, Math.min(MAX_UI_FONT_SIZE, Math.round(size)));
+  localStorage.setItem("const_ui_font_size", String(clamped));
+  applyUiFontSize(clamped);
+  window.dispatchEvent(new CustomEvent("const-ui-font-size-change", { detail: clamped }));
+}
+
+export function useUiFontSize(): [number, (size: number) => void] {
+  const [fontSize, setFontSizeState] = useState<number>(getSavedUiFontSize);
+
+  useEffect(() => {
+    const handleCustomChange = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail) {
+        setFontSizeState(customEvent.detail);
+      } else {
+        setFontSizeState(getSavedUiFontSize());
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "const_ui_font_size") {
+        setFontSizeState(getSavedUiFontSize());
+      }
+    };
+
+    window.addEventListener("const-ui-font-size-change", handleCustomChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("const-ui-font-size-change", handleCustomChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const setFontSize = (newSize: number) => {
+    setFontSizeState(newSize);
+    setSavedUiFontSize(newSize);
+  };
+
+  return [fontSize, setFontSize];
+}
+
+// ============================================================================
+// Code Font Size (Default 12px)
+// ============================================================================
+export const DEFAULT_CODE_FONT_SIZE = 12;
+export const MIN_CODE_FONT_SIZE = 10;
+export const MAX_CODE_FONT_SIZE = 18;
+
+export function getSavedCodeFontSize(): number {
+  if (typeof window === "undefined") return DEFAULT_CODE_FONT_SIZE;
+  const saved = localStorage.getItem("const_code_font_size");
+  if (saved) {
+    const parsed = parseInt(saved, 10);
+    if (!isNaN(parsed) && parsed >= MIN_CODE_FONT_SIZE && parsed <= MAX_CODE_FONT_SIZE) {
+      return parsed;
+    }
+  }
+  return DEFAULT_CODE_FONT_SIZE;
+}
+
+export function applyCodeFontSize(size: number = DEFAULT_CODE_FONT_SIZE) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--code-font-size", `${size}px`);
+}
+
+export function setSavedCodeFontSize(size: number) {
+  if (typeof window === "undefined") return;
+  const clamped = Math.max(MIN_CODE_FONT_SIZE, Math.min(MAX_CODE_FONT_SIZE, Math.round(size)));
+  localStorage.setItem("const_code_font_size", String(clamped));
+  applyCodeFontSize(clamped);
+  window.dispatchEvent(new CustomEvent("const-code-font-size-change", { detail: clamped }));
+}
+
+export function useCodeFontSize(): [number, (size: number) => void] {
+  const [fontSize, setFontSizeState] = useState<number>(getSavedCodeFontSize);
+
+  useEffect(() => {
+    const handleCustomChange = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail) {
+        setFontSizeState(customEvent.detail);
+      } else {
+        setFontSizeState(getSavedCodeFontSize());
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "const_code_font_size") {
+        setFontSizeState(getSavedCodeFontSize());
+      }
+    };
+
+    window.addEventListener("const-code-font-size-change", handleCustomChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("const-code-font-size-change", handleCustomChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const setFontSize = (newSize: number) => {
+    setFontSizeState(newSize);
+    setSavedCodeFontSize(newSize);
+  };
+
+  return [fontSize, setFontSize];
+}
+
+// ============================================================================
+// Diff Marks ("color" | "symbols")
+// ============================================================================
+export type DiffMarks = "color" | "symbols";
+
+export function getSavedDiffMarks(): DiffMarks {
+  if (typeof window === "undefined") return "color";
+  return (localStorage.getItem("const_diff_marks") as DiffMarks) || "color";
+}
+
+export function setSavedDiffMarks(marks: DiffMarks) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("const_diff_marks", marks);
+  window.dispatchEvent(new CustomEvent("const-diff-marks-change", { detail: marks }));
+}
+
+export function useDiffMarks(): [DiffMarks, (marks: DiffMarks) => void] {
+  const [marks, setMarksState] = useState<DiffMarks>(getSavedDiffMarks);
+
+  useEffect(() => {
+    const handleCustom = (e: Event) => {
+      const ce = e as CustomEvent<DiffMarks>;
+      setMarksState(ce.detail || getSavedDiffMarks());
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "const_diff_marks") {
+        setMarksState((e.newValue as DiffMarks) || "color");
+      }
+    };
+
+    window.addEventListener("const-diff-marks-change", handleCustom);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("const-diff-marks-change", handleCustom);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const setMarks = (m: DiffMarks) => {
+    setMarksState(m);
+    setSavedDiffMarks(m);
+  };
+
+  return [marks, setMarks];
+}
+
 export function initThemeListener() {
   if (typeof window === "undefined") return () => {};
 
@@ -246,6 +430,9 @@ export function initThemeListener() {
 
   const currentZoom = getSavedZoom();
   applyZoom(currentZoom);
+
+  applyUiFontSize(getSavedUiFontSize());
+  applyCodeFontSize(getSavedCodeFontSize());
 
   // In Electron, preload may finish bridging right as script runs; re-apply to ensure Chromium engine factor is set
   if (typeof window !== "undefined") {

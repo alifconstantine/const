@@ -7,6 +7,11 @@
   -webkit-user-select: text !important;
 }
 
+:root {
+  --ui-font-size: 14px;
+  --code-font-size: 12px;
+}
+
 html,
 body,
 #root {
@@ -15,6 +20,14 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  font-size: var(--ui-font-size, 14px);
+}
+
+pre,
+code,
+.code-block,
+[data-code-block] {
+  font-size: var(--code-font-size, 12px);
 }
 
 webview {
