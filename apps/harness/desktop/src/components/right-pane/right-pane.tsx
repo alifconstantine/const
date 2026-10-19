@@ -47,6 +47,7 @@ interface RightPaneProps {
   parentConversationId?: string;
   defaultModel?: string;
   onInsertToMainPrompt?: (text: string) => void;
+  onCollapse?: () => void;
 }
 
 export function RightPane({
@@ -81,6 +82,7 @@ export function RightPane({
   parentConversationId,
   defaultModel,
   onInsertToMainPrompt,
+  onCollapse,
 }: RightPaneProps) {
   const { t } = useTranslation();
   const isDraggingRef = useRef(false);
@@ -189,7 +191,7 @@ export function RightPane({
 
   return (
     <aside
-      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-2xl shrink-0 overflow-hidden z-20 shadow-xs"
+      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border border-[#dedee2] dark:border-[#282828] rounded-[10px] shrink-0 overflow-hidden z-20 shadow-xs"
       style={{ width: `${width}px` }}
     >
       {/* Draggable resize handle on the left edge */}
@@ -211,6 +213,7 @@ export function RightPane({
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
         onReorderTabs={onReorderTabs}
+        onCollapse={onCollapse}
         onToggleMuteTab={(tabId) => {
           const target = tabs.find((t) => t.id === tabId);
           if (target && onUpdateTab) {

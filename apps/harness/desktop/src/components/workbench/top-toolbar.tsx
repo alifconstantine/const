@@ -363,19 +363,17 @@ export function TopToolbar({
           <SquareTerminal className="w-4 h-4" />
         </button>
 
-        <button
-          type="button"
-          onClick={onToggleRightSidebar}
-          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isRightSidebarOpen
-              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white border border-black/10 dark:border-white/10 shadow-xs"
-              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
-          }`}
-          title={isRightSidebarOpen ? t("topToolbar.closeRightSidebar") : t("topToolbar.openRightSidebar")}
-          aria-label={t("topToolbar.toggleRightPane")}
-        >
-          <PanelRight className="w-4 h-4" />
-        </button>
+        {!isRightSidebarOpen && (
+          <button
+            type="button"
+            onClick={onToggleRightSidebar}
+            className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
+            title={t("topToolbar.openRightSidebar")}
+            aria-label={t("topToolbar.toggleRightPane")}
+          >
+            <PanelRight className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Hairline Divider & Window Controls (Only when right sidebar is closed) */}
         {!isRightSidebarOpen && (

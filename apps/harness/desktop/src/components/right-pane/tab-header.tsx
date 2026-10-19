@@ -17,6 +17,7 @@ import {
   Minus,
   Square,
   Copy,
+  PanelRight,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -31,6 +32,7 @@ interface TabHeaderProps {
   onNewTab: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
   onToggleMuteTab?: (tabId: string) => void;
+  onCollapse?: () => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -101,6 +103,7 @@ export function TabHeader({
   onNewTab,
   onReorderTabs,
   onToggleMuteTab,
+  onCollapse,
 }: TabHeaderProps) {
   const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -483,6 +486,18 @@ export function TabHeader({
         className="flex items-center gap-0.5 ml-auto pl-1 pr-1.5 shrink-0 select-none z-30"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors cursor-pointer mr-0.5"
+            title={t("rightPane.hidePanel")}
+            aria-label={t("rightPane.hidePanel")}
+          >
+            <PanelRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         <button
           type="button"
           onClick={handleMinimize}

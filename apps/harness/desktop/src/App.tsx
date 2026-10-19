@@ -3309,7 +3309,12 @@ function AuthenticatedContent({
   }, []);
 
   return (
-    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-2.5 gap-2.5">
+    <div
+      className={cn(
+        "h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-2.5",
+        isSidebarOpen ? "gap-2.5" : "gap-0"
+      )}
+    >
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
         className={`shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
@@ -3350,9 +3355,14 @@ function AuthenticatedContent({
       </div>
 
       {/* 2. Main Content Area */}
-      <main className="flex-1 min-w-0 h-full flex flex-row overflow-hidden relative gap-2.5">
+      <main
+        className={cn(
+          "flex-1 min-w-0 h-full flex flex-row overflow-hidden relative",
+          isRightSidebarOpen ? "gap-2.5" : "gap-0"
+        )}
+      >
         {isSkillsOpen ? (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-2xl border border-[#dedee2] dark:border-[#282828] shadow-xs">
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
             {/* Top Toolbar matching ScheduledTasks / TopToolbar */}
             <div
               className="h-10 px-4 flex items-center justify-between shrink-0 select-none relative z-30"
@@ -3422,7 +3432,7 @@ function AuthenticatedContent({
             </ScrollArea>
           </div>
         ) : isScheduledTasksOpen ? (
-          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-2xl border border-[#dedee2] dark:border-[#282828] shadow-xs">
+          <div className="flex-1 min-h-0 w-full flex flex-col overflow-hidden bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs">
             <ScheduledTasksView
               onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
               onOpenSession={(sessionId) => {
@@ -3437,7 +3447,7 @@ function AuthenticatedContent({
             {/* Center Main Chat Panel Card */}
             <div
               className={cn(
-                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-2xl border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
+                "flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] rounded-[10px] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative",
                 !isDraggingRightSidebar && "transition-[flex,width] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
               )}
             >
