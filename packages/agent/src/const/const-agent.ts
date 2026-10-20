@@ -1107,12 +1107,22 @@ export class ConstAgent {
                 continue;
               }
 
+              let json: any;
               try {
-                const json = JSON.parse(dataStr);
-                if (json.error) {
-                  const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
-                  throw new Error(`Const stream error: ${errorMsg}`);
-                }
+                json = JSON.parse(dataStr);
+              } catch {
+                continue;
+              }
+
+              if (json?.error) {
+                const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
+                try {
+                  reader.cancel().catch(() => {});
+                } catch {}
+                throw new Error(`Const stream error: ${errorMsg}`);
+              }
+
+              try {
                 if (json.usage) {
                   const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
                   const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
@@ -1191,7 +1201,9 @@ export class ConstAgent {
             errMsg.includes("502") ||
             errMsg.includes("bad_gateway") ||
             errMsg.includes("image_url") ||
-            errMsg.includes("modality");
+            errMsg.includes("modality") ||
+            errMsg.includes("chrome-headless-shell") ||
+            errMsg.includes("Executable doesn't exist");
 
           const msgWithImages = [...conversationHistory].reverse().find(
             (m) => Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
@@ -1239,13 +1251,20 @@ export class ConstAgent {
           const trimmed = buffer.trim();
           const dataStr = trimmed.slice(5).trim();
           if (dataStr && dataStr !== "[DONE]") {
+            let json: any;
             try {
-              const json = JSON.parse(dataStr);
-              if (json.error) {
-                const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
-                throw new Error(`Const stream error: ${errorMsg}`);
-              }
-              if (json.usage) {
+              json = JSON.parse(dataStr);
+            } catch {
+              json = null;
+            }
+
+            if (json?.error) {
+              const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
+              throw new Error(`Const stream error: ${errorMsg}`);
+            }
+
+            try {
+              if (json?.usage) {
                 const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
                 const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
                 const totalTokens = Math.max(0, Math.round(Number(json.usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
