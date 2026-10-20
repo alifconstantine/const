@@ -9,7 +9,8 @@ export type RightPaneTabType =
   | "terminal"
   | "browser"
   | "task_output"
-  | "subagent";
+  | "subagent"
+  | "trajectory";
 
 export interface RightPaneTab {
   id: string;

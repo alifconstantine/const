@@ -20,6 +20,7 @@ import {
   PanelRight,
   Maximize2,
   Minimize2,
+  Waypoints,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -56,6 +57,8 @@ function getTabIcon(type: RightPaneTabType) {
       return Globe;
     case "task_output":
       return Activity;
+    case "trajectory":
+      return Waypoints;
     case "subagent":
       return Bot;
     default:

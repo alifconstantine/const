@@ -261,6 +261,7 @@ export const en: TranslationDictionary = {
     review: "Review",
     subagent: "Subagent",
     sideChat: "Side chat",
+    trajectory: "Trajectory",
     searchOpenTabs: "Search open tabs...",
     noOpenTabs: "No open tabs",
     noOpenTabsDesc: "Select a tool or file to inspect its content",

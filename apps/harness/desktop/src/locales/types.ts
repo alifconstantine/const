@@ -259,6 +259,7 @@ export interface TranslationDictionary {
     review: string;
     subagent: string;
     sideChat: string;
+    trajectory: string;
     searchOpenTabs: string;
     noOpenTabs: string;
     noOpenTabsDesc: string;

@@ -10,6 +10,7 @@ import { FilePreviewTab } from "./file-preview-tab";
 import { BrowserTab } from "./browser-tab";
 import { SubagentTab } from "./subagent-tab";
 import { SideChatTab } from "./side-chat-tab";
+import { TrajectoryTab } from "./trajectory-tab";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 import type { ConversationItem } from "../../lib/conversation-store";
@@ -144,6 +145,19 @@ export function RightPane({
             onUpdateTab={onUpdateTab}
             onOpenTrajectory={onOpenTrajectory}
             conversations={conversations}
+          />
+        );
+      case "trajectory":
+        return (
+          <TrajectoryTab
+            tab={tab}
+            parentMessages={parentMessages}
+            parentConversationTitle={parentConversationTitle}
+            parentConversationId={parentConversationId}
+            conversations={conversations}
+            onOpenFilePreview={onOpenFilePreview}
+            onOpenFileDiff={onOpenFileDiff}
+            onOpenTrajectory={onOpenTrajectory}
           />
         );
       case "browser":

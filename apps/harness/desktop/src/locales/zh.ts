@@ -261,6 +261,7 @@ export const zh: TranslationDictionary = {
     review: "审查",
     subagent: "子智能体",
     sideChat: "侧边对话",
+    trajectory: "轨迹",
     searchOpenTabs: "搜索已打开标签页...",
     noOpenTabs: "没有打开的标签页",
     noOpenTabsDesc: "选择工具或文件以查看其内容",

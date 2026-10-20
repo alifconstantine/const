@@ -261,6 +261,7 @@ export const ja: TranslationDictionary = {
     review: "レビュー",
     subagent: "サブエージェント",
     sideChat: "サイドチャット",
+    trajectory: "軌跡",
     searchOpenTabs: "開いているタブを検索...",
     noOpenTabs: "開いているタブはありません",
     noOpenTabsDesc: "ツールまたはファイルを選択して内容を確認してください",

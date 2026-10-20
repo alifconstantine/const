@@ -261,6 +261,7 @@ export const id: TranslationDictionary = {
     review: "Tinjauan",
     subagent: "Sub-agen",
     sideChat: "Obrolan samping",
+    trajectory: "Trajektori",
     searchOpenTabs: "Cari tab terbuka...",
     noOpenTabs: "Tidak ada tab terbuka",
     noOpenTabsDesc: "Pilih alat atau berkas untuk memeriksa isinya",

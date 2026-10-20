@@ -4,6 +4,7 @@ import {
   Globe,
   Layers,
   FolderTree,
+  Waypoints,
 } from "lucide-react";
 import type { RightPaneTabType } from "./types";
 import { useTranslation } from "../../lib/i18n";
@@ -40,6 +41,11 @@ export function OpenTabView({ onSelectTabType, workspacePath }: OpenTabViewProps
       type: "browser" as RightPaneTabType,
       title: t("rightPane.browser"),
       icon: Globe,
+    },
+    {
+      type: "trajectory" as RightPaneTabType,
+      title: t("rightPane.trajectory") || t("workbench.modelTrajectory"),
+      icon: Waypoints,
     },
     ...(isInsideWorkspace
       ? [

@@ -373,7 +373,7 @@ function AuthenticatedContent({
     setIsSettingsOpen(true);
   };
 
-  const handleOpenTrajectory = useCallback((idOrPath?: string) => {
+  const handleOpenTrajectoryModal = useCallback((idOrPath?: string) => {
     if (!idOrPath) {
       setTrajectoryTargetConversationId(null);
       setIsTrajectoryOpen(true);
@@ -1014,6 +1014,10 @@ function AuthenticatedContent({
           ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Direktori"
           : "Direktori";
       title = baseTitle;
+    } else if (type === "trajectory") {
+      const count = rightPaneTabs.filter((t) => t.type === type).length;
+      const baseTitle = t("rightPane.trajectory") || t("workbench.modelTrajectory") || "Trajectory";
+      title = count === 0 ? baseTitle : `${baseTitle} (${count + 1})`;
     } else {
       const count = rightPaneTabs.filter((t) => t.type === type).length;
       title = count === 0 ? "Browser" : `Browser ${count + 1}`;
@@ -1034,6 +1038,58 @@ function AuthenticatedContent({
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
   };
+
+  const handleOpenTrajectory = useCallback((idOrPath?: string) => {
+    let targetId: string | null = null;
+    if (idOrPath) {
+      const cleaned = idOrPath.replace(/^trajectory:\/\//, "");
+      const brainMatch = cleaned.match(/brain[/\\]([^/\\]+)/i);
+      targetId = (brainMatch ? brainMatch[1] : cleaned.split(/[/\\]/)[0]) || null;
+    }
+
+    const allConvos = loadConversations();
+    const effectiveConvoId = targetId || conversationId;
+    const found = targetId ? allConvos.find((c) => c.id === targetId || (targetId && c.id.includes(targetId))) : null;
+    const resolvedConvoId = found ? found.id : effectiveConvoId;
+    const resolvedConvoTitle = found?.title || (resolvedConvoId === conversationId ? conversationTitle : "");
+
+    setIsRightSidebarOpen(true);
+
+    setRightPaneTabs((prev) => {
+      const existing = prev.find(
+        (t) => t.type === "trajectory" && (t.conversationId === resolvedConvoId || (!t.conversationId && resolvedConvoId === conversationId))
+      );
+      if (existing) {
+        setActiveRightPaneTabId(existing.id);
+        setIsOpeningNewTab(false);
+        return prev;
+      }
+
+      if (!idOrPath) {
+        const anyTrajectory = prev.find((t) => t.type === "trajectory");
+        if (anyTrajectory) {
+          setActiveRightPaneTabId(anyTrajectory.id);
+          setIsOpeningNewTab(false);
+          return prev;
+        }
+      }
+
+      const baseTitle = t("rightPane.trajectory") || t("workbench.modelTrajectory") || "Trajectory";
+      const title = resolvedConvoTitle ? `${resolvedConvoTitle} (${baseTitle})` : baseTitle;
+
+      const newTab: RightPaneTab = {
+        id: `trajectory_${Date.now()}`,
+        type: "trajectory",
+        title,
+        conversationId: resolvedConvoId,
+        parentConversationId: conversationId,
+      };
+
+      setActiveRightPaneTabId(newTab.id);
+      setIsOpeningNewTab(false);
+      return [...prev, newTab];
+    });
+  }, [conversationId, conversationTitle, t]);
 
   const handleCloseTab = (tabId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -4488,6 +4544,9 @@ function AuthenticatedContent({
             conversationId={activeTrajectoryConvoId}
             conversationTitle={activeTrajectoryTitle}
             messages={activeTrajectoryMessages}
+            onOpenFilePreview={handleOpenFilePreview}
+            onOpenFileDiff={handleOpenFileDiff}
+            onOpenTrajectory={handleOpenTrajectory}
           />
         );
       })()}

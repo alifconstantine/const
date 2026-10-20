@@ -6,3 +6,4 @@ export * from "./terminal-tab";
 export * from "./browser-tab";
 export * from "./subagent-tab";
 export * from "./side-chat-tab";
+export * from "./trajectory-tab";
