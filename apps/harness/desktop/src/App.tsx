@@ -4694,7 +4694,10 @@ function AuthenticatedContent({
 export default function App() {
   const { t, language } = useTranslation();
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("const_harness_auth_token");
+    return (
+      localStorage.getItem("const_harness_auth_token") ||
+      localStorage.getItem("const_sso_token")
+    );
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
   const isWaitingAuthRef = useRef(false);
@@ -4726,6 +4729,7 @@ export default function App() {
 
           if (data.token) {
             localStorage.setItem("const_harness_auth_token", data.token);
+            localStorage.setItem("const_sso_token", data.token);
             setToken(data.token);
             setIsWaitingAuth(false);
             isWaitingAuthRef.current = false;
@@ -4738,7 +4742,7 @@ export default function App() {
 
     // 2. Storage event listener (sync across windows or tabs)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_harness_auth_token" && e.newValue && isWaitingAuthRef.current) {
+      if ((e.key === "const_harness_auth_token" || e.key === "const_sso_token") && e.newValue && isWaitingAuthRef.current) {
         setToken(e.newValue);
         setIsWaitingAuth(false);
         isWaitingAuthRef.current = false;
@@ -4751,6 +4755,7 @@ export default function App() {
     const urlToken = searchParams.get("token");
     if (urlToken && isWaitingAuthRef.current) {
       localStorage.setItem("const_harness_auth_token", urlToken);
+      localStorage.setItem("const_sso_token", urlToken);
       setToken(urlToken);
       setIsWaitingAuth(false);
       isWaitingAuthRef.current = false;
@@ -4766,10 +4771,11 @@ export default function App() {
   useEffect(() => {
     if (!isWaitingAuth) return;
     const interval = setInterval(() => {
-      const saved = localStorage.getItem("const_harness_auth_token");
+      const saved = localStorage.getItem("const_harness_auth_token") || localStorage.getItem("const_sso_token");
       if (saved) {
         setToken(saved);
         setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
       }
     }, 800);
     return () => clearInterval(interval);
@@ -4827,6 +4833,7 @@ export default function App() {
       return;
     }
     localStorage.setItem("const_harness_auth_token", cleanToken);
+    localStorage.setItem("const_sso_token", cleanToken);
     setToken(cleanToken);
     setIsWaitingAuth(false);
     toast.success(t("toast.signedIn"));

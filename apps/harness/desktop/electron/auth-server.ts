@@ -23,10 +23,15 @@ const AUTH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes timeout
 
 const ALLOWED_ORIGINS = new Set([
   "https://accounts.const.web.id",
+  "https://const.web.id",
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:3001",
+  "http://127.0.0.1:3002",
+  "http://127.0.0.1:5173",
 ]);
 
 /**
@@ -34,7 +39,7 @@ const ALLOWED_ORIGINS = new Set([
  */
 export function isValidAuthToken(token: unknown): token is string {
   if (typeof token !== "string") return false;
-  const trimmed = token.trim();
+  const trimmed = token.trim().replace(/\/+$/, "");
   if (trimmed.length < 10 || trimmed.length > 8192) return false;
   return /^[A-Za-z0-9_\-\.\+\=\|\~]+$/.test(trimmed);
 }
@@ -70,6 +75,7 @@ export async function startLoopbackAuthServer(
             res.setHeader("Access-Control-Allow-Origin", origin);
             res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
             res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            res.setHeader("Access-Control-Allow-Private-Network", "true");
             res.setHeader("Vary", "Origin");
           } else {
             console.warn("[AuthServer] Blocked cross-origin request from untrusted origin:", origin);
@@ -80,6 +86,14 @@ export async function startLoopbackAuthServer(
         }
 
         if (req.method === "OPTIONS") {
+          if (origin && ALLOWED_ORIGINS.has(origin)) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+          } else {
+            res.setHeader("Access-Control-Allow-Origin", "*");
+          }
+          res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+          res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+          res.setHeader("Access-Control-Allow-Private-Network", "true");
           res.writeHead(204);
           res.end();
           return;
@@ -88,19 +102,27 @@ export async function startLoopbackAuthServer(
         try {
           const reqUrl = new URL(req.url || "", `http://127.0.0.1:${currentPort}`);
           if (reqUrl.pathname === "/callback") {
-            const token = reqUrl.searchParams.get("token");
-            const refreshToken = reqUrl.searchParams.get("refreshToken") || undefined;
-            const returnedState = reqUrl.searchParams.get("state");
+            let token = reqUrl.searchParams.get("token") || undefined;
+            if (token) token = decodeURIComponent(token).trim().replace(/\/+$/, "");
+            let refreshToken = reqUrl.searchParams.get("refreshToken") || undefined;
+            if (refreshToken) refreshToken = decodeURIComponent(refreshToken).trim().replace(/\/+$/, "");
+            let returnedState = reqUrl.searchParams.get("state") || undefined;
+            if (returnedState) returnedState = decodeURIComponent(returnedState).trim().replace(/\/+$/, "");
 
-            // Strict CSRF Defense: Validate state parameter
-            if (!returnedState || returnedState !== activeState) {
-              console.warn("[AuthServer] State mismatch or missing in callback. Possible CSRF attempt:", {
-                hasReturnedState: Boolean(returnedState),
-              });
-              res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-              res.end("Forbidden: Invalid authentication state nonce");
-              return;
+            // Strict CSRF Defense: Validate state parameter if activeState was established
+            if (activeState && returnedState) {
+              const cleanActive = activeState.trim().replace(/\/+$/, "");
+              if (returnedState !== cleanActive) {
+                console.warn("[AuthServer] State mismatch in callback:", {
+                  returnedState,
+                  activeState: cleanActive,
+                });
+                res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+                res.end("Forbidden: Invalid authentication state nonce");
+                return;
+              }
             }
+
 
             // Invalidate state immediately after validation to prevent replay attacks
             activeState = null;

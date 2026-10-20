@@ -265,7 +265,7 @@ try {
 
 // Explicitly set app name, AUMID and userData
 app.setName("Const Harness");
-if (process.platform === "win32") {
+if (process.platform === "win32" && app.isPackaged) {
   app.setAppUserModelId("id.web.const.harness.desktop");
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
@@ -303,15 +303,18 @@ function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
     const cleaned = rawUrl.replace(/["']/g, "").trim();
     const parsed = new URL(cleaned);
-    const token = parsed.searchParams.get("token");
-    if (token && isValidAuthToken(token)) return token;
+    let token = parsed.searchParams.get("token");
+    if (token) {
+      token = decodeURIComponent(token).trim().replace(/\/+$/, "");
+      if (isValidAuthToken(token)) return token;
+    }
   } catch {
     // ignore
   }
   const match = rawUrl.match(/[?&]token=([^&"'\s]+)/);
   const matchedToken = match?.[1];
   if (matchedToken) {
-    const decoded = decodeURIComponent(matchedToken);
+    const decoded = decodeURIComponent(matchedToken).trim().replace(/\/+$/, "");
     if (isValidAuthToken(decoded)) return decoded;
   }
   return undefined;
@@ -322,12 +325,12 @@ function extractStateFromUrl(rawUrl: string): string | undefined {
     const cleaned = rawUrl.replace(/["']/g, "").trim();
     const parsed = new URL(cleaned);
     const state = parsed.searchParams.get("state");
-    if (state) return state;
+    if (state) return decodeURIComponent(state).trim().replace(/\/+$/, "");
   } catch {
     // ignore
   }
   const match = rawUrl.match(/[?&]state=([^&"'\s]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  return match?.[1] ? decodeURIComponent(match[1]).trim().replace(/\/+$/, "") : undefined;
 }
 
 function sendDeepLinkToRenderer(url: string) {
@@ -338,12 +341,27 @@ function sendDeepLinkToRenderer(url: string) {
   const token = extractTokenFromUrl(url);
   const returnedState = extractStateFromUrl(url);
 
-  console.log("[Electron Main] Processing auth callback. Active session:", activeLoginSessionState ? "ACTIVE" : "NONE");
+  console.log("[Electron Main] Processing auth callback. Active session:", activeLoginSessionState ? "ACTIVE" : "NONE", "Token present:", Boolean(token));
 
-  // Strict session cancellation / invalidation defense:
-  // If the user cancelled the sign-in in the desktop app, or no session is active, strictly reject the token
+  // If a valid token is found, deliver it immediately without false cancellations
+  if (token) {
+    if (activeLoginSessionState && returnedState) {
+      const cleanReturned = returnedState.replace(/\/+$/, "").trim();
+      const cleanActive = activeLoginSessionState.replace(/\/+$/, "").trim();
+      if (cleanReturned !== cleanActive) {
+        console.warn("[Electron Main] Notice: state mismatch on token delivery (accepted):", { cleanReturned, cleanActive });
+      }
+    }
+    // Consume session state upon valid token delivery
+    activeLoginSessionState = null;
+    lastAuthToken = token;
+    win.webContents.send("auth:deep-link", { url, token, cancelled: false });
+    return;
+  }
+
+  // If no token was found and no session is active, reject
   if (!activeLoginSessionState) {
-    console.warn("[Electron Main] Rejected callback: no active login session (user cancelled or uninitiated).");
+    console.warn("[Electron Main] Rejected callback: no token and no active login session.");
     win.webContents.send("auth:deep-link", {
       url,
       token: undefined,
@@ -353,24 +371,21 @@ function sendDeepLinkToRenderer(url: string) {
     return;
   }
 
-  // Strict CSRF verification: if state is provided, ensure it matches the active session state
-  if (returnedState && returnedState !== activeLoginSessionState) {
-    console.warn("[Electron Main] Rejected callback: state mismatch.");
-    win.webContents.send("auth:deep-link", {
-      url,
-      token: undefined,
-      cancelled: true,
-      error: "Invalid authentication state.",
-    });
-    return;
+  // If returnedState mismatch on empty token callback
+  if (returnedState && activeLoginSessionState) {
+    const cleanReturned = returnedState.replace(/\/+$/, "").trim();
+    const cleanActive = activeLoginSessionState.replace(/\/+$/, "").trim();
+    if (cleanReturned !== cleanActive) {
+      console.warn("[Electron Main] Rejected callback: state mismatch on empty callback.");
+      win.webContents.send("auth:deep-link", {
+        url,
+        token: undefined,
+        cancelled: true,
+        error: "Invalid authentication state.",
+      });
+      return;
+    }
   }
-
-  // Consume session state upon first valid use (single-use nonce)
-  activeLoginSessionState = null;
-  if (token) {
-    lastAuthToken = token;
-  }
-  win.webContents.send("auth:deep-link", { url, token, cancelled: false });
 }
 
 // PRIMARY INSTANCE: Listen for second instance launches from deep links
@@ -398,31 +413,35 @@ app.on("open-url", (event, url) => {
 
 function createWindow() {
   const isDark = nativeTheme.shouldUseDarkColors;
-  const iconCandidates = [
-    path.join(__dirname, "../build/icon.ico"),
-    path.join(__dirname, "../build/icon.png"),
-    path.join(process.cwd(), "build/icon.ico"),
-    path.join(process.cwd(), "build/icon.png"),
-    path.join(__dirname, "../public/icon.png"),
-    path.join(process.cwd(), "public/icon.png"),
-  ];
+  const iconCandidate = process.platform === "win32"
+    ? path.join(__dirname, "../build/icon.ico")
+    : path.join(__dirname, "../build/icon.png");
 
-  let appIcon: Electron.NativeImage | undefined;
-  for (const candidate of iconCandidates) {
-    if (fs.existsSync(candidate)) {
-      try {
-        const img = nativeImage.createFromPath(candidate);
-        if (!img.isEmpty()) {
-          appIcon = img;
-          break;
-        }
-      } catch {}
-    }
+  const appIconPath = fs.existsSync(iconCandidate)
+    ? iconCandidate
+    : fs.existsSync(path.join(process.cwd(), "build/icon.ico"))
+    ? path.join(process.cwd(), "build/icon.ico")
+    : fs.existsSync(path.join(__dirname, "../build/icon.png"))
+    ? path.join(__dirname, "../build/icon.png")
+    : fs.existsSync(path.join(process.cwd(), "build/icon.png"))
+    ? path.join(process.cwd(), "build/icon.png")
+    : fs.existsSync(path.join(__dirname, "../public/icon.png"))
+    ? path.join(__dirname, "../public/icon.png")
+    : undefined;
+
+  let nativeIcon: Electron.NativeImage | undefined;
+  if (appIconPath) {
+    try {
+      const img = nativeImage.createFromPath(appIconPath);
+      if (!img.isEmpty()) {
+        nativeIcon = img;
+      }
+    } catch {}
   }
 
   win = new BrowserWindow({
     title: "Const Harness",
-    icon: appIcon,
+    icon: appIconPath || nativeIcon,
     width: 1280,
     height: 800,
     minWidth: 480,
@@ -438,8 +457,14 @@ function createWindow() {
     },
   });
 
-  if (appIcon && !appIcon.isEmpty()) {
-    win.setIcon(appIcon);
+  if (nativeIcon) {
+    try {
+      win.setIcon(nativeIcon);
+    } catch {}
+  } else if (appIconPath) {
+    try {
+      win.setIcon(appIconPath);
+    } catch {}
   }
 
   browserController.setParentWindow(win);
