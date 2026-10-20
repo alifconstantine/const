@@ -404,17 +404,6 @@ export function FilePreviewTab({
     return entries.filter((e) => e.name.toLowerCase().includes(q));
   }, [treeData, activeRelPath, searchQuery]);
 
-  const dirStats = useMemo(() => {
-    const entries = treeData[activeRelPath] || [];
-    let folderCount = 0;
-    let fileCount = 0;
-    for (const e of entries) {
-      if (e.isDirectory) folderCount++;
-      else fileCount++;
-    }
-    return { total: entries.length, folderCount, fileCount };
-  }, [treeData, activeRelPath]);
-
   // Close menus on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -928,25 +917,14 @@ export function FilePreviewTab({
             <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col bg-[#141414]">
               {/* Directory Header Bar */}
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#242424] bg-[#161616] shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <Folder className="w-4 h-4 text-neutral-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white truncate">
-                        {activeRelPath.split("/").filter(Boolean).pop() || rootFolderName}
-                      </span>
-                      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5 truncate max-w-[200px]">
-                        {activeRelPath || "/"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      {currentDirEntries.length} {currentDirEntries.length === 1 ? t("common.item") || "item" : t("common.items") || "items"}
-                      {dirStats.folderCount > 0 && ` • ${dirStats.folderCount} ${dirStats.folderCount === 1 ? "folder" : "folders"}`}
-                      {dirStats.fileCount > 0 && ` • ${dirStats.fileCount} ${dirStats.fileCount === 1 ? "file" : "files"}`}
-                    </p>
-                  </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Folder className="w-4 h-4 text-neutral-400 shrink-0" />
+                  <span className="text-sm font-semibold text-white truncate">
+                    {activeRelPath.split("/").filter(Boolean).pop() || rootFolderName}
+                  </span>
+                  <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5 truncate max-w-[200px]">
+                    {activeRelPath || "/"}
+                  </span>
                 </div>
 
                 {/* Directory Controls */}
