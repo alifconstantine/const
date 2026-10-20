@@ -309,6 +309,11 @@ export interface TranslationDictionary {
     toggleFileTree: string;
     refreshDirectory: string;
     selectFileToView: string;
+    emptyFolder: string;
+    noFilesInFolder: string;
+    filterFiles: string;
+    openFolder: string;
+    clickToPreview: string;
     fileDiff: string;
     browser: string;
     review: string;

@@ -134,11 +134,7 @@ export function MarkdownContent({
       if (/^\/[a-zA-Z]:/i.test(cleanDir)) {
         cleanDir = cleanDir.slice(1);
       }
-      if (window.electron?.openPath) {
-        window.electron.openPath(cleanDir);
-      } else {
-        onOpenFilePreview?.(cleanDir);
-      }
+      onOpenFilePreview?.(cleanDir);
       return;
     }
 

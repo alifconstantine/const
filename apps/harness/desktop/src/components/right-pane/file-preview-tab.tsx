@@ -14,6 +14,8 @@ import {
   MoreVertical,
   PanelRight,
   FileCode,
+  Search,
+  X,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "../workbench/file-icon";
@@ -74,10 +76,14 @@ export function FilePreviewTab({
 
   // Active file being viewed
   const [activeFilePath, setActiveFilePath] = useState<string>(tab.filePath || "");
+  const [isDirectory, setIsDirectory] = useState<boolean>(
+    tab.type === "directory" || Boolean(tab.isDirectory)
+  );
   const [content, setContent] = useState<string>(tab.newContent || tab.previousContent || "");
   const [isLoading, setIsLoading] = useState<boolean>(!content && Boolean(tab.filePath));
   const [copied, setCopied] = useState(false);
   const [isWorkspaceTreeOpen, setIsWorkspaceTreeOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Popover menus state
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -99,34 +105,47 @@ export function FilePreviewTab({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set([""]));
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
 
-  // When tab.filePath changes externally, sync activeFilePath
-  useEffect(() => {
-    if (tab.filePath && tab.filePath !== activeFilePath) {
-      setActiveFilePath(tab.filePath);
-      if (tab.newContent) {
-        setContent(tab.newContent);
-      } else {
-        setContent("");
-      }
-    }
-  }, [tab.filePath, tab.newContent]);
+  // Compute normalized paths & breadcrumbs
+  const normalizedRaw = (activeFilePath || tab.title || "").replace(/\\/g, "/");
+  const fileName = normalizedRaw.split("/").filter(Boolean).pop() || normalizedRaw;
+  const isMarkdown =
+    fileName.toLowerCase().endsWith(".md") ||
+    fileName.toLowerCase().endsWith(".markdown");
 
-  // Load file content when activeFilePath changes
-  useEffect(() => {
-    if (activeFilePath && window.electron?.readFile) {
-      setIsLoading(true);
-      window.electron.readFile(activeFilePath, workspacePath).then((res) => {
-        if (res && res.content !== undefined) {
-          setContent(res.content);
-        } else if (res?.error) {
-          setContent(`// Failed to read file: ${res.error}`);
-        }
-        setIsLoading(false);
-      });
-    } else if (!activeFilePath) {
-      setIsLoading(false);
+  const [mode, setMode] = useState<"formatted" | "raw">(
+    tab.previewMode || (isMarkdown ? "formatted" : "raw")
+  );
+
+  const activeRelPath = useMemo(() => {
+    if (!workspacePath || !activeFilePath) return "";
+    const normWorkspace = workspacePath.replace(/\\/g, "/").toLowerCase();
+    const normFile = activeFilePath.replace(/\\/g, "/");
+    if (normFile.toLowerCase().startsWith(normWorkspace)) {
+      return normFile.slice(normWorkspace.length).replace(/^\/+/, "");
     }
-  }, [activeFilePath, workspacePath]);
+    return activeFilePath.replace(/\\/g, "/");
+  }, [workspacePath, activeFilePath]);
+
+  const breadcrumbSegments = useMemo<BreadcrumbCrumb[]>(() => {
+    if (!activeRelPath) return [];
+    const parts = activeRelPath.split("/").filter(Boolean);
+    parts.pop(); // Remove active file/folder name, handled separately
+
+    const list: BreadcrumbCrumb[] = [];
+    let parentRelPath = "";
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i] || "";
+      if (!part) continue;
+      const relPath = parentRelPath ? `${parentRelPath}/${part}` : part;
+      list.push({
+        name: part,
+        relPath,
+        parentRelPath,
+      });
+      parentRelPath = relPath;
+    }
+    return list;
+  }, [activeRelPath]);
 
   // Load directory entries via IPC
   const fetchDirectory = useCallback(
@@ -156,7 +175,7 @@ export function FilePreviewTab({
 
   // Auto-expand directory tree down to current activeFilePath
   const expandToActiveFile = useCallback(
-    async (filePath: string) => {
+    async (filePath: string, isDir = false) => {
       if (!workspacePath || !filePath) return;
       const normWorkspace = workspacePath.replace(/\\/g, "/").toLowerCase();
       let normFile = filePath.replace(/\\/g, "/");
@@ -167,7 +186,9 @@ export function FilePreviewTab({
       }
 
       const segments = rel.split("/").filter(Boolean);
-      segments.pop(); // Remove file name
+      if (!isDir) {
+        segments.pop(); // Remove file name only if it's a file
+      }
 
       const pathsToExpand = new Set<string>([""]);
       let currentAcc = "";
@@ -192,12 +213,89 @@ export function FilePreviewTab({
     [workspacePath, treeData, fetchDirectory]
   );
 
+  // When tab props change externally, sync state
+  useEffect(() => {
+    if (tab.filePath !== undefined && tab.filePath !== activeFilePath) {
+      setActiveFilePath(tab.filePath);
+      if (tab.newContent) {
+        setContent(tab.newContent);
+      } else {
+        setContent("");
+      }
+    }
+    if (tab.type === "directory" || tab.isDirectory) {
+      setIsDirectory(true);
+    }
+  }, [tab.filePath, tab.newContent, tab.type, tab.isDirectory]);
+
+  // Load file or directory content when activeFilePath changes
+  useEffect(() => {
+    if (!activeFilePath) {
+      if (tab.type === "directory" || isDirectory) {
+        setIsDirectory(true);
+        if (workspacePath) {
+          setIsLoading(true);
+          fetchDirectory("").then(() => setIsLoading(false));
+        } else {
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (window.electron?.readFile) {
+      setIsLoading(true);
+      window.electron.readFile(activeFilePath, workspacePath).then(async (res) => {
+        if (res?.isDirectory || res?.error === "Path is a directory") {
+          setIsDirectory(true);
+          setContent("");
+          await fetchDirectory(activeRelPath);
+          setExpandedPaths((prev) => new Set(prev).add(activeRelPath));
+          if (tab.type !== "directory" || !tab.isDirectory) {
+            onUpdateTab?.(tab.id, {
+              type: "directory",
+              isDirectory: true,
+            });
+          }
+        } else if (res && res.content !== undefined) {
+          setIsDirectory(false);
+          setContent(res.content);
+          if (tab.isDirectory) {
+            onUpdateTab?.(tab.id, {
+              type: "file_preview",
+              isDirectory: false,
+            });
+          }
+        } else if (res?.error) {
+          if (res.error.toLowerCase().includes("directory") && window.electron?.readDirectory) {
+            setIsDirectory(true);
+            setContent("");
+            await fetchDirectory(activeRelPath);
+            setExpandedPaths((prev) => new Set(prev).add(activeRelPath));
+            onUpdateTab?.(tab.id, {
+              type: "directory",
+              isDirectory: true,
+            });
+          } else {
+            setIsDirectory(false);
+            setContent(`// Failed to read file: ${res.error}`);
+          }
+        }
+        setIsLoading(false);
+      });
+    } else if (!activeFilePath) {
+      setIsLoading(false);
+    }
+  }, [activeFilePath, workspacePath, activeRelPath]);
+
   // Initial load of root directory & auto-expand
   useEffect(() => {
     if (workspacePath) {
       fetchDirectory("");
       if (activeFilePath) {
-        expandToActiveFile(activeFilePath);
+        expandToActiveFile(activeFilePath, isDirectory);
       }
     }
   }, [workspacePath]);
@@ -205,9 +303,9 @@ export function FilePreviewTab({
   // When activeFilePath changes, expand the tree to it
   useEffect(() => {
     if (activeFilePath && workspacePath) {
-      expandToActiveFile(activeFilePath);
+      expandToActiveFile(activeFilePath, isDirectory);
     }
-  }, [activeFilePath]);
+  }, [activeFilePath, isDirectory, workspacePath]);
 
   // Refresh entire tree
   const handleRefreshTree = async () => {
@@ -237,14 +335,85 @@ export function FilePreviewTab({
     }
   };
 
-  // Select file from tree
-  const handleSelectFile = (entry: TreeEntry) => {
+  // Navigate directly to a folder
+  const handleNavigateToFolder = (entry: TreeEntry) => {
     setActiveFilePath(entry.fullPath);
+    setIsDirectory(true);
+    setSearchQuery("");
+    fetchDirectory(entry.path);
+    setExpandedPaths((prev) => new Set(prev).add(entry.path));
     onUpdateTab?.(tab.id, {
       filePath: entry.fullPath,
       title: entry.name,
+      type: "directory",
+      isDirectory: true,
     });
   };
+
+  // Navigate to breadcrumb crumb
+  const handleNavigateToCrumb = (crumb: BreadcrumbCrumb) => {
+    setActiveFilePath(crumb.relPath);
+    setIsDirectory(true);
+    setSearchQuery("");
+    fetchDirectory(crumb.relPath);
+    setExpandedPaths((prev) => new Set(prev).add(crumb.relPath));
+    onUpdateTab?.(tab.id, {
+      filePath: crumb.relPath,
+      title: crumb.name,
+      type: "directory",
+      isDirectory: true,
+    });
+  };
+
+  // Navigate to workspace root
+  const handleNavigateToRoot = () => {
+    setActiveFilePath("");
+    setIsDirectory(true);
+    setSearchQuery("");
+    fetchDirectory("");
+    onUpdateTab?.(tab.id, {
+      filePath: "",
+      title: rootFolderName,
+      type: "directory",
+      isDirectory: true,
+    });
+  };
+
+  // Select file from tree
+  const handleSelectFile = (entry: TreeEntry) => {
+    if (entry.isDirectory) {
+      handleNavigateToFolder(entry);
+    } else {
+      setActiveFilePath(entry.fullPath);
+      setIsDirectory(false);
+      setSearchQuery("");
+      onUpdateTab?.(tab.id, {
+        filePath: entry.fullPath,
+        title: entry.name,
+        type: "file_preview",
+        isDirectory: false,
+      });
+    }
+  };
+
+  // Filtered entries for main directory view
+  const currentDirEntries = useMemo(() => {
+    const entries = treeData[activeRelPath] || [];
+    if (!searchQuery.trim()) return entries;
+    const q = searchQuery.toLowerCase().trim();
+    return entries.filter((e) => e.name.toLowerCase().includes(q));
+  }, [treeData, activeRelPath, searchQuery]);
+
+  const dirStats = useMemo(() => {
+    const entries = treeData[activeRelPath] || [];
+    let folderCount = 0;
+    let fileCount = 0;
+    for (const e of entries) {
+      if (e.isDirectory) folderCount++;
+      else fileCount++;
+    }
+    return { total: entries.length, folderCount, fileCount };
+  }, [treeData, activeRelPath]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -262,48 +431,6 @@ export function FilePreviewTab({
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
-
-  // Compute normalized paths & breadcrumbs
-  const normalizedRaw = (activeFilePath || tab.title || "").replace(/\\/g, "/");
-  const fileName = normalizedRaw.split("/").filter(Boolean).pop() || normalizedRaw;
-  const isMarkdown =
-    fileName.toLowerCase().endsWith(".md") ||
-    fileName.toLowerCase().endsWith(".markdown");
-
-  const [mode, setMode] = useState<"formatted" | "raw">(
-    tab.previewMode || (isMarkdown ? "formatted" : "raw")
-  );
-
-  const activeRelPath = useMemo(() => {
-    if (!workspacePath || !activeFilePath) return "";
-    const normWorkspace = workspacePath.replace(/\\/g, "/").toLowerCase();
-    const normFile = activeFilePath.replace(/\\/g, "/");
-    if (normFile.toLowerCase().startsWith(normWorkspace)) {
-      return normFile.slice(normWorkspace.length).replace(/^\/+/, "");
-    }
-    return activeFilePath.replace(/\\/g, "/");
-  }, [workspacePath, activeFilePath]);
-
-  const breadcrumbSegments = useMemo<BreadcrumbCrumb[]>(() => {
-    if (!activeRelPath) return [];
-    const parts = activeRelPath.split("/").filter(Boolean);
-    parts.pop(); // Remove filename, handled separately
-
-    const list: BreadcrumbCrumb[] = [];
-    let parentRelPath = "";
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i] || "";
-      if (!part) continue;
-      const relPath = parentRelPath ? `${parentRelPath}/${part}` : part;
-      list.push({
-        name: part,
-        relPath,
-        parentRelPath,
-      });
-      parentRelPath = relPath;
-    }
-    return list;
-  }, [activeRelPath]);
 
   // Click on a breadcrumb folder segment to open sibling dropdown popover
   const handleBreadcrumbClick = async (
@@ -333,10 +460,7 @@ export function FilePreviewTab({
 
   const handleNavigateSibling = async (sibling: TreeEntry) => {
     setOpenBreadcrumbMenu(null);
-    setExpandedPaths((prev) => new Set(prev).add(sibling.path));
-    if (!treeData[sibling.path]) {
-      await fetchDirectory(sibling.path);
-    }
+    handleNavigateToFolder(sibling);
   };
 
   // Actions
@@ -470,6 +594,108 @@ export function FilePreviewTab({
     );
   };
 
+  // Main pane directory items rendering
+  const renderMainDirItem = (entry: TreeEntry, depth = 0) => {
+    const isExpanded = expandedPaths.has(entry.path);
+    const children = treeData[entry.path] || [];
+    const isEntryLoading = loadingPaths.has(entry.path);
+
+    if (entry.isDirectory) {
+      return (
+        <React.Fragment key={entry.path}>
+          <div
+            onClick={() => toggleFolder(entry.path)}
+            style={{ paddingLeft: `${depth * 18 + 12}px` }}
+            className="group flex items-center justify-between py-1.5 pr-3 text-xs text-neutral-300 hover:text-white hover:bg-white/[0.04] rounded-lg cursor-pointer transition-colors select-none my-0.5"
+            title={entry.path}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="p-0.5 text-neutral-500 group-hover:text-neutral-300 rounded">
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                )}
+              </span>
+              {isExpanded ? (
+                <FolderOpen className="w-4 h-4 text-[#8e8e8e] group-hover:text-white shrink-0" />
+              ) : (
+                <Folder className="w-4 h-4 text-[#8e8e8e] group-hover:text-white shrink-0" />
+              )}
+              <span className="truncate font-medium text-[12.5px] text-neutral-200 group-hover:text-white">
+                {entry.name}
+              </span>
+              {isEntryLoading && (
+                <Loader2 className="w-3 h-3 animate-spin text-neutral-500 ml-1 shrink-0" />
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNavigateToFolder(entry);
+                }}
+                className="px-2 py-0.5 rounded text-[11px] text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 flex items-center gap-1 transition-colors cursor-pointer"
+                title={t("rightPane.openFolder")}
+              >
+                <FolderOpen className="w-3 h-3" />
+                <span>{t("rightPane.openFolder")}</span>
+              </button>
+            </div>
+          </div>
+
+          {isExpanded && (
+            <div>
+              {children.length === 0 && isEntryLoading ? (
+                <div
+                  style={{ paddingLeft: `${(depth + 1) * 18 + 24}px` }}
+                  className="py-1.5 text-[11px] text-neutral-500 flex items-center gap-2"
+                >
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>{t("common.loading")}...</span>
+                </div>
+              ) : children.length === 0 ? (
+                <div
+                  style={{ paddingLeft: `${(depth + 1) * 18 + 24}px` }}
+                  className="py-1.5 text-[11px] text-neutral-500 italic"
+                >
+                  {t("rightPane.emptyFolder")}
+                </div>
+              ) : (
+                children.map((child) => renderMainDirItem(child, depth + 1))
+              )}
+            </div>
+          )}
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <div
+        key={entry.path}
+        onClick={() => handleSelectFile(entry)}
+        style={{ paddingLeft: `${depth * 18 + 32}px` }}
+        className="group flex items-center justify-between py-1.5 pr-3 text-xs text-neutral-300 hover:text-white hover:bg-white/[0.04] rounded-lg cursor-pointer transition-colors select-none my-0.5"
+        title={entry.fullPath}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <FileIcon filename={entry.name} className="w-4 h-4 shrink-0" />
+          <span className="truncate text-[12.5px] font-mono text-neutral-300 group-hover:text-white">
+            {entry.name}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <span className="text-[11px] text-neutral-500 mr-1">
+            {t("rightPane.clickToPreview")}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const rootChildren = treeData[""] || [];
 
   return (
@@ -486,28 +712,40 @@ export function FilePreviewTab({
           className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
         >
           {/* Root Workspace Folder */}
-          <span
-            className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0 font-medium"
+          <button
+            type="button"
+            onClick={handleNavigateToRoot}
+            className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0 font-medium cursor-pointer"
             title={workspacePath || rootFolderName}
           >
             {rootFolderName}
-          </span>
+          </button>
 
           {breadcrumbSegments.map((crumb, idx) => (
             <React.Fragment key={crumb.relPath || idx}>
               <span className="text-neutral-600 shrink-0">›</span>
-              <button
-                type="button"
-                onClick={(e) => handleBreadcrumbClick(e, crumb)}
-                className="text-neutral-400 hover:text-white hover:underline transition-colors shrink-0 cursor-pointer"
-                title={`Click to view sibling folders in ${crumb.parentRelPath || rootFolderName}`}
-              >
-                {crumb.name}
-              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateToCrumb(crumb)}
+                  className="text-neutral-400 hover:text-white hover:underline transition-colors shrink-0 cursor-pointer"
+                  title={`Open folder: ${crumb.relPath}`}
+                >
+                  {crumb.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleBreadcrumbClick(e, crumb)}
+                  className="p-0.5 text-neutral-500 hover:text-neutral-300 hover:bg-white/5 rounded cursor-pointer"
+                  title={`View sibling folders in ${crumb.parentRelPath || rootFolderName}`}
+                >
+                  <ChevronDown className="w-2.5 h-2.5" />
+                </button>
+              </div>
             </React.Fragment>
           ))}
 
-          {/* Active File Name with @thesvg/react Icon */}
+          {/* Active File or Folder Name */}
           {activeFilePath && (
             <>
               <span className="text-neutral-600 shrink-0">›</span>
@@ -515,7 +753,11 @@ export function FilePreviewTab({
                 className="flex items-center gap-1.5 shrink-0 text-white font-medium"
                 title={activeFilePath}
               >
-                <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
+                {isDirectory ? (
+                  <Folder className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                ) : (
+                  <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
+                )}
                 <span className="truncate">{fileName}</span>
               </div>
             </>
@@ -525,7 +767,7 @@ export function FilePreviewTab({
         {/* Action Controls matching Image 2 */}
         <div className="flex items-center gap-1 shrink-0">
           {/* Formatted / Raw Toggle for Markdown */}
-          {isMarkdown && activeFilePath && (
+          {isMarkdown && activeFilePath && !isDirectory && (
             <div className="flex items-center rounded-md bg-[#222222] p-0.5 border border-[#2e2e2e] mr-1">
               <button
                 type="button"
@@ -603,7 +845,7 @@ export function FilePreviewTab({
           </div>
 
           {/* Copy File Content Button */}
-          {activeFilePath && (
+          {activeFilePath && !isDirectory && (
             <button
               type="button"
               onClick={handleCopyContent}
@@ -672,14 +914,112 @@ export function FilePreviewTab({
         )}
       </div>
 
-      {/* 2. Main Content Split View: Left (Code Viewer) | Right (Workspace Tree Panel) */}
+      {/* 2. Main Content Split View: Left (Code Viewer / Directory Explorer) | Right (Workspace Tree Panel) */}
       <div className="flex-1 w-full min-h-0 flex overflow-hidden">
-        {/* Left Side: Code Viewer / Placeholder */}
+        {/* Left Side: Code Viewer / Directory Viewer / Placeholder */}
         <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col bg-[#141414]">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center p-12 gap-2 text-xs text-neutral-500 font-sans">
               <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
               <span>{t("common.loading")}</span>
+            </div>
+          ) : isDirectory ? (
+            /* Directory Explorer View for clicked folder or workspace root */
+            <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col bg-[#141414]">
+              {/* Directory Header Bar */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#242424] bg-[#161616] shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                    <Folder className="w-4 h-4 text-neutral-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-white truncate">
+                        {activeRelPath.split("/").filter(Boolean).pop() || rootFolderName}
+                      </span>
+                      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400 border border-white/5 truncate max-w-[200px]">
+                        {activeRelPath || "/"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">
+                      {currentDirEntries.length} {currentDirEntries.length === 1 ? t("common.item") || "item" : t("common.items") || "items"}
+                      {dirStats.folderCount > 0 && ` • ${dirStats.folderCount} ${dirStats.folderCount === 1 ? "folder" : "folders"}`}
+                      {dirStats.fileCount > 0 && ` • ${dirStats.fileCount} ${dirStats.fileCount === 1 ? "file" : "files"}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Directory Controls */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="relative flex items-center">
+                    <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={t("rightPane.filterFiles") || "Filter files..."}
+                      className="w-36 focus:w-48 transition-all pl-7 pr-6 py-1 text-xs rounded-md bg-[#202020] border border-[#2e2e2e] text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-sans"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-1.5 text-neutral-500 hover:text-white p-0.5 rounded cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => fetchDirectory(activeRelPath)}
+                    className="p-1.5 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                    title={t("rightPane.refreshDirectory")}
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRevealInExplorer}
+                    className="p-1.5 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                    title={t("rightPane.revealInExplorer")}
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Directory Content List */}
+              <ScrollArea className="flex-1 w-full h-full">
+                <div className="p-3">
+                  {currentDirEntries.length === 0 && loadingPaths.has(activeRelPath) ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-xs text-neutral-500 font-sans">
+                      <Loader2 className="w-5 h-5 animate-spin text-neutral-400 mb-2" />
+                      <span>{t("common.loading")}...</span>
+                    </div>
+                  ) : currentDirEntries.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center select-none text-neutral-500 font-sans">
+                      <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-3 text-neutral-600">
+                        <Folder className="w-6 h-6 stroke-[1.5]" />
+                      </div>
+                      <p className="text-sm font-medium text-neutral-300">
+                        {searchQuery ? "No matching files or folders" : t("rightPane.emptyFolder") || "Folder is empty"}
+                      </p>
+                      <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                        {searchQuery
+                          ? `No items match "${searchQuery}". Clear the filter to see all files.`
+                          : t("rightPane.noFilesInFolder") || "There are no files or subdirectories in this directory."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5 font-sans">
+                      {currentDirEntries.map((child) => renderMainDirItem(child, 0))}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
           ) : !activeFilePath ? (
             /* Empty / Welcome State when opening Direktori tab */

@@ -1239,8 +1239,12 @@ function AuthenticatedContent({
       filePath ||
       "Preview";
 
+    const isDirHint = filePath.endsWith("/");
+
     const existing = rightPaneTabs.find(
-      (t) => t.type === "file_preview" && (t.filePath === filePath || t.title === fileName)
+      (t) =>
+        (t.type === "file_preview" || t.type === "directory") &&
+        (t.filePath === filePath || t.title === fileName)
     );
 
     if (existing) {
@@ -1258,7 +1262,8 @@ function AuthenticatedContent({
 
     const newTab: RightPaneTab = {
       id: `preview_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type: "file_preview",
+      type: isDirHint ? "directory" : "file_preview",
+      isDirectory: isDirHint ? true : undefined,
       title: fileName,
       filePath,
       newContent: content,

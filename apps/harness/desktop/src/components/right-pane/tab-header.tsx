@@ -17,6 +17,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
+import { cn } from "@const/ui";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 import { useTranslation } from "../../lib/i18n";
 
@@ -272,7 +273,9 @@ export function TabHeader({
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        {tItem.type === "file_diff" || tItem.type === "file_preview" || (tItem.type === "directory" && tItem.filePath) ? (
+                        {tItem.type === "directory" || tItem.isDirectory ? (
+                          <FolderTree className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
+                        ) : tItem.type === "file_diff" || tItem.type === "file_preview" ? (
                           <FileIcon filename={tItem.filePath || tItem.title} className="w-3.5 h-3.5 shrink-0" />
                         ) : tItem.type === "browser" ? (
                           <TabFavicon favicon={tItem.favicon} fallbackIcon={Icon} isActive={isActive} />
@@ -370,7 +373,14 @@ export function TabHeader({
                 <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-[#888888] dark:bg-[#aaaaaa] rounded-full z-30 pointer-events-none" />
               )}
 
-              {tab.type === "file_diff" || tab.type === "file_preview" || (tab.type === "directory" && tab.filePath) ? (
+              {tab.type === "directory" || tab.isDirectory ? (
+                <FolderTree
+                  className={cn(
+                    "w-3.5 h-3.5 shrink-0 pointer-events-none",
+                    isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
+                  )}
+                />
+              ) : tab.type === "file_diff" || tab.type === "file_preview" ? (
                 <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
               ) : tab.type === "browser" ? (
                 <TabFavicon favicon={tab.favicon} fallbackIcon={Icon} isActive={isActive} />

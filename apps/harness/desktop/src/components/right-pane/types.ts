@@ -17,6 +17,7 @@ export interface RightPaneTab {
   type: RightPaneTabType;
   title: string;
   filePath?: string;
+  isDirectory?: boolean;
   previousContent?: string | null;
   newContent?: string | null;
   mutation?: FileMutationRecord;
