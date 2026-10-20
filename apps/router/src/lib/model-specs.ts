@@ -9,7 +9,7 @@ export interface ModelSpec {
   id: string;
   name: string;
   modelId: string;
-  provider: "const" | "google" | "byok" | "combo";
+  provider: "const" | "google" | "byok" | "combo" | "nara";
   providerName: string;
   providerDocId?: string;
   supportsThinking: boolean;
@@ -22,7 +22,7 @@ export interface ModelSpec {
   contextLength?: number;
   contextWindow?: string;
   maxOutputTokens?: string;
-  category?: "llm" | "stt" | "search";
+  category?: "llm" | "stt" | "search" | "image";
   endpoint?: string;
   inputTypes?: string[];
   outputTypes?: string[];
@@ -138,6 +138,20 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "-",
     inputTypes: ["text", "search"],
     outputTypes: ["text"],
+  },
+  {
+    id: "gpt-image-2",
+    name: "GPT Image 2",
+    modelId: "gpt-image-2",
+    provider: "nara",
+    providerName: "NaraRouter",
+    category: "image",
+    endpoint: "/v1/images/generations",
+    supportsThinking: false,
+    contextWindow: "-",
+    maxOutputTokens: "-",
+    inputTypes: ["text", "image"],
+    outputTypes: ["image"],
   },
 ];
 
@@ -281,6 +295,25 @@ export function isNonGenerativeModel(modelId: string): boolean {
     clean.includes("dall-e") ||
     clean.includes("flux") ||
     clean.includes("imagen") ||
+    clean.includes("midjourney") ||
+    clean.includes("stable-diffusion") ||
+    clean.includes("gpt-image") ||
+    clean.includes("image-2")
+  );
+}
+
+/**
+ * Checks if a model identifier belongs to an image generation or editing model.
+ */
+export function isImageModel(modelId: string): boolean {
+  if (!modelId) return false;
+  const clean = modelId.toLowerCase().trim();
+  return (
+    clean === "gpt-image-2" ||
+    clean.includes("gpt-image") ||
+    clean.includes("dall-e") ||
+    clean.includes("imagen") ||
+    clean.includes("flux") ||
     clean.includes("midjourney") ||
     clean.includes("stable-diffusion")
   );

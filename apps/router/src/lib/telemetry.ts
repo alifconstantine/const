@@ -16,6 +16,10 @@ export interface TelemetryMetadata {
   userAgent?: string;
   convexUrl: string;
   ssoToken?: string | null;
+  requestType?: "chat" | "image_generation" | "image_edit";
+  prompt?: string;
+  imageCount?: number;
+  imageUrls?: string[];
 }
 
 // Fast token estimator (approx 4 chars per token for typical multilingual/code text)
@@ -256,6 +260,10 @@ export async function recordDirectTelemetry(
     cachedTokens?: number;
     ttftMs?: number;
     errorMessage?: string;
+    requestType?: "chat" | "image_generation" | "image_edit";
+    prompt?: string;
+    imageCount?: number;
+    imageUrls?: string[];
   }
 ) {
   try {
@@ -304,6 +312,10 @@ export async function recordDirectTelemetry(
       tokensPerSecond: speed,
       ip: meta.ip,
       userAgent: meta.userAgent,
+      requestType: params.requestType ?? meta.requestType ?? "chat",
+      prompt: params.prompt ?? meta.prompt,
+      imageCount: params.imageCount ?? meta.imageCount,
+      imageUrls: params.imageUrls ?? meta.imageUrls,
     });
   } catch (err) {
     console.warn("Failed to write direct telemetry log:", err);

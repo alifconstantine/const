@@ -10,8 +10,13 @@ export interface QuotaLike {
   remainingTokens?: number;
   percentRemaining?: number;
   percentUsed?: number;
+  weeklyLimitImages?: number;
+  usedImages?: number;
+  remainingImages?: number;
+  percentImagesRemaining?: number;
   resetsInText?: string;
   isCapped?: boolean;
+  isImageCapped?: boolean;
 }
 
 export interface QuotaMetrics {
@@ -20,6 +25,11 @@ export interface QuotaMetrics {
   remainingTokens: number;
   percentRemaining: number;
   percentUsed: number;
+  limitImages: number;
+  usedImages: number;
+  remainingImages: number;
+  percentImagesRemaining: number;
+  isImageCapped: boolean;
   resetsInText: string;
   isCapped: boolean;
   isLow: boolean;       // <= 15% remaining
@@ -31,6 +41,7 @@ export interface QuotaMetrics {
 }
 
 export const DEFAULT_WEEKLY_LIMIT = 7_000_000;
+export const DEFAULT_WEEKLY_IMAGE_LIMIT = 20;
 
 /**
  * Consistently format token counts with human-readable SI suffixes (k, M).
@@ -94,12 +105,25 @@ export function calculateQuotaMetrics(quota?: QuotaLike | null): QuotaMetrics {
     barColor = "bg-amber-400";
   }
 
+  const limitImages = quota?.weeklyLimitImages || DEFAULT_WEEKLY_IMAGE_LIMIT;
+  const usedImages = quota?.usedImages ?? 0;
+  const remainingImages = quota?.remainingImages ?? Math.max(0, limitImages - usedImages);
+  const percentImagesRemaining = Math.max(
+    0,
+    Math.min(100, (remainingImages / limitImages) * 100)
+  );
+
   return {
     limitTokens,
     usedTokens,
     remainingTokens,
     percentRemaining,
     percentUsed,
+    limitImages,
+    usedImages,
+    remainingImages,
+    percentImagesRemaining,
+    isImageCapped: quota?.isImageCapped ?? (usedImages >= limitImages),
     resetsInText: quota?.resetsInText || "7d",
     isCapped: quota?.isCapped ?? (usedTokens >= limitTokens),
     isLow,

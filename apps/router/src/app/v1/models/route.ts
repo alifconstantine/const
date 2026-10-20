@@ -28,8 +28,8 @@ interface ModelResponseItem {
   owned_by: string;
   provider?: string;
   provider_name?: string;
-  type?: "chat" | "audio" | "search";
-  category?: "llm" | "stt" | "search";
+  type?: "chat" | "audio" | "search" | "image";
+  category?: "llm" | "stt" | "search" | "image";
   endpoint?: string;
   context_length?: number | null;
   max_input_tokens?: number | null;
@@ -265,6 +265,33 @@ export async function GET(req: NextRequest) {
       output_modalities: ["text"],
     },
     {
+      id: "gpt-image-2",
+      name: "GPT Image 2",
+      display_name: "GPT Image 2 (NaraRouter)",
+      object: "model",
+      created: 1700000000,
+      owned_by: "nara",
+      provider: "nara",
+      provider_name: "NaraRouter",
+      type: "image",
+      category: "image",
+      endpoint: "/v1/images/generations",
+      context_length: null,
+      max_input_tokens: null,
+      max_output_tokens: null,
+      supports_thinking: false,
+      supports_reasoning: false,
+      supportsThinking: false,
+      supportsReasoningEffort: false,
+      capabilities: {
+        image_generation: true,
+        image_edit: true,
+        vision: true,
+      },
+      input_modalities: ["text", "image"],
+      output_modalities: ["image"],
+    },
+    {
       id: "combo/auto",
       name: "combo/auto",
       display_name: "combo/auto",
@@ -458,15 +485,25 @@ export async function GET(req: NextRequest) {
   // - ?type=all: returns all models across modalities
   // - ?type=audio or ?type=stt: returns only audio models
   // - ?type=search: returns only search models
+  // - ?type=image or ?type=images: returns only image generation / edit models
   // - default (no param or ?type=llm / ?type=chat): returns ONLY LLM / Chat models!
   const { searchParams } = new URL(req.url);
   const typeFilter = (searchParams.get("type") || searchParams.get("category"))?.toLowerCase()?.trim();
 
   const finalModels = uniqueModels.filter((m) => {
-    const mType = m.type || (m.input_modalities?.includes("audio") ? "audio" : m.capabilities?.search ? "search" : "chat");
+    const mType =
+      m.type ||
+      (m.input_modalities?.includes("audio")
+        ? "audio"
+        : m.capabilities?.search
+        ? "search"
+        : m.capabilities?.image_generation || m.category === "image"
+        ? "image"
+        : "chat");
     if (typeFilter === "all") return true;
     if (typeFilter === "audio" || typeFilter === "stt") return mType === "audio";
     if (typeFilter === "search") return mType === "search";
+    if (typeFilter === "image" || typeFilter === "images") return mType === "image";
     // Default or "chat" / "llm": only return LLMs / Chat models
     return mType === "chat";
   });

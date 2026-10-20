@@ -659,7 +659,7 @@ data: [DONE]`}</pre>
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
                   <span>CURL EXAMPLE</span>
                   <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/generations" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{\n    "model": "imagen-3.0-generate-002",\n    "prompt": "Minimalist architecture of a modern glass pavilion in mist, editorial photograph",\n    "n": 1,\n    "size": "1024x1024",\n    "response_format": "url"\n  }'`, "img-gen-curl")}
+                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/generations" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{\n    "model": "gpt-image-2",\n    "prompt": "Minimalist architecture of a modern glass pavilion in mist, editorial photograph",\n    "n": 1,\n    "size": "1024x1024",\n    "response_format": "url"\n  }'`, "img-gen-curl")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "img-gen-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
@@ -669,7 +669,7 @@ data: [DONE]`}</pre>
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer sk-const-live-yourkey" \\
   -d '{
-    "model": "imagen-3.0-generate-002",
+    "model": "gpt-image-2",
     "prompt": "Minimalist architecture of a modern glass pavilion in mist, editorial photograph",
     "n": 1,
     "size": "1024x1024",
@@ -680,9 +680,9 @@ data: [DONE]`}</pre>
               <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-2 text-xs text-[#969696] font-light">
                 <span className="font-semibold text-white">Supported Sizes &amp; Formats:</span>
                 <ul className="list-disc list-inside space-y-1 pt-1 text-[#d4d4d4]">
-                  <li><code className="font-mono text-white">size</code>: <code className="font-mono text-[#969696]">1024x1024</code> (1:1), <code className="font-mono text-[#969696]">1792x1024</code> (16:9), <code className="font-mono text-[#969696]">1024x1792</code> (9:16)</li>
+                  <li><code className="font-mono text-white">size</code>: <code className="font-mono text-[#969696]">1024x1024</code> (1k), <code className="font-mono text-[#969696]">2048x2048</code> (2k), <code className="font-mono text-[#969696]">4096x4096</code> (4k)</li>
                   <li><code className="font-mono text-white">response_format</code>: <code className="font-mono text-[#969696]">&quot;url&quot;</code> (temporary signed storage URL) or <code className="font-mono text-[#969696]">&quot;b64_json&quot;</code> (inline Base64 payload)</li>
-                  <li><code className="font-mono text-white">models</code>: <code className="font-mono text-[#969696]">imagen-3.0-generate-002</code>, <code className="font-mono text-[#969696]">dall-e-3</code>, <code className="font-mono text-[#969696]">flux-1-schnell</code></li>
+                  <li><code className="font-mono text-white">models</code>: <code className="font-mono text-white font-semibold">gpt-image-2</code> (NaraRouter), <code className="font-mono text-[#969696]">imagen-3.0-generate-002</code>, <code className="font-mono text-[#969696]">dall-e-3</code>, <code className="font-mono text-[#969696]">flux-1-schnell</code></li>
                 </ul>
               </div>
             </section>
@@ -693,14 +693,14 @@ data: [DONE]`}</pre>
                 Image edits
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Edit, inpaint, or modify existing images by supplying an original image and a prompt specifying the alterations via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/edits</code>. Uses <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">multipart/form-data</code>.
+                Edit, inpaint, or modify existing images by supplying an original image and a prompt specifying the alterations via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/edits</code>. Powered by NaraRouter (<code className="text-white font-mono">gpt-image-2</code>) and OpenAI Images. Uses <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">multipart/form-data</code> or JSON payload.
               </p>
 
               <div className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] p-4 font-mono text-xs text-[#d4d4d4] space-y-2">
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
                   <span>MULTIPART CURL SNIPPET</span>
                   <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/edits" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -F image="@original.png" \\\n  -F mask="@mask.png" \\\n  -F prompt="Add a sleek wooden coffee table in the center of the room" \\\n  -F model="dall-e-2" \\\n  -F size="1024x1024"`, "img-edit-curl")}
+                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/edits" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -F image="@original.png" \\\n  -F mask="@mask.png" \\\n  -F prompt="Add a sleek wooden coffee table in the center of the room" \\\n  -F model="gpt-image-2" \\\n  -F size="1024x1024"`, "img-edit-curl")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "img-edit-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
@@ -711,7 +711,7 @@ data: [DONE]`}</pre>
   -F image="@original.png" \\
   -F mask="@mask.png" \\
   -F prompt="Add a sleek wooden coffee table in the center of the room" \\
-  -F model="dall-e-2" \\
+  -F model="gpt-image-2" \\
   -F size="1024x1024"`}</pre>
               </div>
 

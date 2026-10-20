@@ -5,9 +5,9 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { Card, Skeleton, cn } from "@const/ui";
-import { Zap, Clock } from "lucide-react";
+import { Zap, Clock, ImageIcon } from "lucide-react";
 
-import { calculateQuotaMetrics, formatTokenAmount } from "@/lib/quota";
+import { calculateQuotaMetrics } from "@/lib/quota";
 
 export function QuotaCard({ className }: { className?: string }) {
   const { isAuthenticated } = useRouterAuth();
@@ -25,7 +25,7 @@ export function QuotaCard({ className }: { className?: string }) {
   return (
     <Card
       className={cn(
-        "rounded-3xl border border-border/70 bg-card p-5 sm:p-6 shadow-none transition-colors flex flex-col justify-between h-full",
+        "rounded-3xl border border-border/70 bg-card p-5 sm:p-6 shadow-none transition-colors flex flex-col justify-between h-full gap-5",
         className
       )}
     >
@@ -48,21 +48,21 @@ export function QuotaCard({ className }: { className?: string }) {
             </div>
           </div>
 
-          {/* Main Body: Clean Metric + Sleek Linear Bar */}
-          <div className="space-y-3.5 my-auto py-1">
+          {/* Tokens Quota */}
+          <div className="space-y-3">
             {/* Top row: Big Number on Left, Percentage on Right */}
             <div className="flex items-baseline justify-between gap-2">
               <div className="space-y-0.5">
-                <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
+                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
                   {metrics.formattedRemaining}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground font-normal font-sans pt-0.5">
-                  token left
+                <div className="text-xs text-muted-foreground font-normal font-sans pt-0.5">
+                  tokens left
                 </div>
               </div>
 
               <div className="text-right">
-                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
+                <div className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
                   {metrics.percentRemaining.toFixed(0)}%
                 </div>
                 <div className="text-[11px] text-muted-foreground font-light font-sans pt-1">
@@ -71,8 +71,8 @@ export function QuotaCard({ className }: { className?: string }) {
               </div>
             </div>
 
-            {/* Sleek Minimalist Progress Bar */}
-            <div className="h-3 w-full bg-secondary rounded-full overflow-hidden border border-border/40 p-[1.5px]">
+            {/* Progress Bar */}
+            <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden border border-border/40 p-[1px]">
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700 ease-out",
@@ -82,7 +82,7 @@ export function QuotaCard({ className }: { className?: string }) {
               />
             </div>
 
-            {/* Bottom Row Details: Used vs Limit */}
+            {/* Details: Used vs Limit */}
             <div className="flex items-center justify-between text-xs text-muted-foreground font-sans tabular-nums">
               <span>
                 <strong className="font-medium text-foreground/90">
@@ -96,6 +96,58 @@ export function QuotaCard({ className }: { className?: string }) {
                   {metrics.formattedLimit}
                 </strong>{" "}
                 limit
+              </span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px w-full bg-border/50" />
+
+          {/* Images Quota (Generations & Edits) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Images</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-normal">
+                  Generate &amp; Edit
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground tabular-nums">
+                <strong className="font-semibold text-foreground">
+                  {metrics.remainingImages}
+                </strong>{" "}
+                left
+              </div>
+            </div>
+
+            <div className="h-2 w-full bg-secondary rounded-full overflow-hidden border border-border/40 p-[1px]">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-700 ease-out",
+                  metrics.isImageCapped
+                    ? "bg-rose-500"
+                    : metrics.percentImagesRemaining <= 25
+                    ? "bg-amber-400"
+                    : "bg-foreground"
+                )}
+                style={{ width: `${metrics.percentImagesRemaining}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-sans tabular-nums">
+              <span>
+                <strong className="font-medium text-foreground/90">
+                  {metrics.usedImages}
+                </strong>{" "}
+                used
+              </span>
+              <span>
+                of{" "}
+                <strong className="font-medium text-foreground/90">
+                  {metrics.limitImages}
+                </strong>{" "}
+                images / week
               </span>
             </div>
           </div>

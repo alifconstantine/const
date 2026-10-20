@@ -266,7 +266,7 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} limit`}
+            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} tokens · ${metrics.usedImages} of ${metrics.limitImages} images`}
             className="block p-3 rounded-xl bg-card hover:bg-card/90 border border-border transition-all font-mono group"
           >
             <div className="flex items-center justify-between text-xs text-foreground mb-2">
@@ -291,7 +291,7 @@ export function Sidebar({
 
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="tabular-nums font-medium text-foreground/90">
-                {quota ? `${metrics.formattedRemaining} left` : "7M left"}
+                {quota ? `${metrics.formattedRemaining} tok · ${metrics.remainingImages} img` : "7M tok · 20 img"}
               </span>
               <span className="uppercase text-muted-foreground">
                 {metrics.resetsInText ? `reset in ${metrics.resetsInText}` : ""}

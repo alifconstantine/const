@@ -40,6 +40,69 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     // ========================================================
+    // CASE NARA: NaraRouter Image Models (gpt-image-2)
+    // ========================================================
+    if (
+      model === "gpt-image-2" ||
+      model.toLowerCase().includes("gpt-image") ||
+      providerId === "nara" ||
+      providerId === "nararouter"
+    ) {
+      const naraBaseUrl = (
+        process.env.NARA_ROUTER_BASE_URL?.trim() || "https://api-images.bynara.id"
+      ).replace(/\/+$/, "");
+      const naraApiKey = apiKey?.trim() || process.env.NARA_ROUTER_API_KEY?.trim();
+
+      if (!naraApiKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "NARA_ROUTER_API_KEY environment variable is not configured and no API key was provided.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const res = await fetch(`${naraBaseUrl}/v1/images/generations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${naraApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-image-2",
+          prompt: "A minimalist ping test dot",
+          n: 1,
+          size: "1024x1024",
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      const latency = Date.now() - startTime;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg =
+          data?.error?.message ||
+          data?.message ||
+          `NaraRouter error (HTTP ${res.status} ${res.statusText})`;
+        return NextResponse.json(
+          { success: false, error: errorMsg, status: res.status, latency },
+          { status: res.status }
+        );
+      }
+
+      const imgUrl = data?.data?.[0]?.url || "(image generated)";
+      return NextResponse.json({
+        success: true,
+        latency,
+        reply: `NaraRouter gpt-image-2 connected successfully (${imgUrl})`,
+        model: "gpt-image-2",
+      });
+    }
+
+    // ========================================================
     // CASE A: Const (Built-in Managed)
     // ========================================================
     if (providerId === "const" || isBuiltinModel(model) || (!providerDocId && !baseUrl && !apiKey && !providerId)) {

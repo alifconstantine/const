@@ -47,6 +47,7 @@ import {
   Brain,
   Mic,
   MessageSquare,
+  ImageIcon,
 } from "lucide-react";
 import { ModelConfigDialog } from "@/components/models/model-config-dialog";
 import { formatTokenDisplay, isReasoningModel } from "@/lib/model-specs";
@@ -65,7 +66,7 @@ interface ModelItem {
   outputTypes?: string[];
   isDefault?: boolean;
   supportsThinking?: boolean;
-  category?: "llm" | "stt" | "search";
+  category?: "llm" | "stt" | "search" | "image";
   endpoint?: string;
 }
 
@@ -177,6 +178,26 @@ const PROVIDERS_DATA: ProviderGroup[] = [
       },
     ],
   },
+  {
+    id: "nara",
+    name: "NaraRouter",
+    type: "builtin",
+    models: [
+      {
+        id: "gpt-image-2",
+        name: "GPT Image 2",
+        modelId: "gpt-image-2",
+        provider: "nara",
+        category: "image",
+        endpoint: "/v1/images/generations",
+        contextWindow: "-",
+        maxOutputTokens: "-",
+        inputTypes: ["text", "image"],
+        outputTypes: ["image"],
+        supportsThinking: false,
+      },
+    ],
+  },
 ];
 
 export default function ModelsPage() {
@@ -197,7 +218,7 @@ export default function ModelsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "stt" | "search">("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "image" | "stt" | "search">("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
   const [editingModel, setEditingModel] = useState<ModelItem | null>(null);
@@ -303,11 +324,13 @@ export default function ModelsPage() {
         if (selectedCategory !== "all") {
           const isAudio = model.category === "stt" || model.inputTypes?.includes("audio") || model.modelId.includes("whisper");
           const isSearch = model.category === "search" || model.inputTypes?.includes("search") || model.modelId === "const-search";
-          const isLlm = !isAudio && !isSearch;
+          const isImage = model.category === "image" || model.inputTypes?.includes("image") || model.outputTypes?.includes("image") || model.modelId.includes("image");
+          const isLlm = !isAudio && !isSearch && !isImage;
 
           if (selectedCategory === "llm" && !isLlm) return false;
           if (selectedCategory === "stt" && !isAudio) return false;
           if (selectedCategory === "search" && !isSearch) return false;
+          if (selectedCategory === "image" && !isImage) return false;
         }
 
         if (!query) return true;
@@ -447,6 +470,7 @@ export default function ModelsPage() {
             {[
               { id: "all", label: "All Modalities", icon: null },
               { id: "llm", label: "LLM / Chat", icon: MessageSquare },
+              { id: "image", label: "Image", icon: ImageIcon },
               { id: "stt", label: "Audio / STT", icon: Mic },
               { id: "search", label: "Search", icon: Search },
             ].map((cat) => {

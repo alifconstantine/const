@@ -35,6 +35,16 @@ export const recordLog = mutation({
     tokensPerSecond: v.optional(v.number()),
     ip: v.optional(v.string()),
     userAgent: v.optional(v.string()),
+    requestType: v.optional(
+      v.union(
+        v.literal("chat"),
+        v.literal("image_generation"),
+        v.literal("image_edit")
+      )
+    ),
+    imageCount: v.optional(v.number()),
+    imageUrls: v.optional(v.array(v.string())),
+    prompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     let resolvedUserId: Id<"users"> | null = null;
@@ -142,6 +152,10 @@ export const recordLog = mutation({
       tokensPerSecond: args.tokensPerSecond,
       ip: args.ip,
       userAgent: args.userAgent,
+      requestType: args.requestType || "chat",
+      imageCount: args.imageCount,
+      imageUrls: args.imageUrls,
+      prompt: args.prompt,
       createdAt: Date.now(),
     });
 
@@ -209,6 +223,7 @@ export const listLogs = query({
     statusFilter: v.optional(v.string()), // "all", "200", "errors"
     modelFilter: v.optional(v.string()),
     providerFilter: v.optional(v.string()),
+    typeFilter: v.optional(v.string()), // "all", "chat", "image"
     timeRange: v.optional(v.string()), // "today", "7d", "30d", "all"
     searchQuery: v.optional(v.string()),
     limit: v.optional(v.number()),
@@ -244,6 +259,15 @@ export const listLogs = query({
       logs = logs.filter((l) => l.status >= 400);
     }
 
+    // Apply Type Filter
+    if (args.typeFilter && args.typeFilter !== "all") {
+      if (args.typeFilter === "image") {
+        logs = logs.filter((l) => l.requestType === "image_generation" || l.requestType === "image_edit");
+      } else if (args.typeFilter === "chat") {
+        logs = logs.filter((l) => !l.requestType || l.requestType === "chat");
+      }
+    }
+
     // Apply Model Filter
     if (args.modelFilter && args.modelFilter !== "all") {
       const mf = args.modelFilter.toLowerCase();
@@ -256,7 +280,7 @@ export const listLogs = query({
       logs = logs.filter((l) => l.provider.toLowerCase() === pf);
     }
 
-    // Apply Search Query (matches requestId, model, provider, keyName)
+    // Apply Search Query (matches requestId, model, provider, keyName, prompt, requestType)
     if (args.searchQuery && args.searchQuery.trim()) {
       const q = args.searchQuery.toLowerCase().trim();
       logs = logs.filter(
@@ -264,7 +288,9 @@ export const listLogs = query({
           l.requestId.toLowerCase().includes(q) ||
           l.model.toLowerCase().includes(q) ||
           l.provider.toLowerCase().includes(q) ||
-          (l.keyName && l.keyName.toLowerCase().includes(q))
+          (l.keyName && l.keyName.toLowerCase().includes(q)) ||
+          (l.prompt && l.prompt.toLowerCase().includes(q)) ||
+          (l.requestType && l.requestType.toLowerCase().includes(q))
       );
     }
 

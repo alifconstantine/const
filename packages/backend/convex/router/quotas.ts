@@ -4,6 +4,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id, Doc } from "../_generated/dataModel";
 
 export const WEEKLY_QUOTA_TOKENS = 7_000_000; // 7 Million tokens
+export const WEEKLY_QUOTA_IMAGES = 20; // 20 Image generations/edits per week
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 // Format remaining milliseconds to "Xd Yh" or "Xh Ym"
@@ -46,15 +47,21 @@ export function calculateQuotaState(
       remainingTokens: WEEKLY_QUOTA_TOKENS,
       percentUsed: 0,
       percentRemaining: 100,
+      weeklyLimitImages: WEEKLY_QUOTA_IMAGES,
+      usedImages: 0,
+      remainingImages: WEEKLY_QUOTA_IMAGES,
+      percentImagesRemaining: 100,
       periodStartAt: now,
       periodEndAt: now + WEEK_MS,
       resetsInMs: WEEK_MS,
       resetsInText: formatCountdown(WEEK_MS),
       isCapped: false,
+      isImageCapped: false,
     };
   }
 
   let usedTokens = quotaDoc.usedTokens;
+  let usedImages = quotaDoc.usedImages ?? 0;
   let periodStartAt = quotaDoc.periodStartAt;
   let periodEndAt = quotaDoc.periodEndAt;
 
@@ -64,6 +71,7 @@ export function calculateQuotaState(
     periodStartAt = periodStartAt + cyclesElapsed * WEEK_MS;
     periodEndAt = periodStartAt + WEEK_MS;
     usedTokens = 0;
+    usedImages = 0;
   }
 
   const weeklyLimit = quotaDoc.weeklyLimitTokens || WEEKLY_QUOTA_TOKENS;
@@ -76,6 +84,14 @@ export function calculateQuotaState(
     0,
     parseFloat(((remainingTokens / weeklyLimit) * 100).toFixed(1))
   );
+
+  const weeklyLimitImages = quotaDoc.weeklyLimitImages || WEEKLY_QUOTA_IMAGES;
+  const remainingImages = Math.max(0, weeklyLimitImages - usedImages);
+  const percentImagesRemaining = Math.max(
+    0,
+    parseFloat(((remainingImages / weeklyLimitImages) * 100).toFixed(1))
+  );
+
   const resetsInMs = Math.max(0, periodEndAt - now);
 
   return {
@@ -84,11 +100,16 @@ export function calculateQuotaState(
     remainingTokens,
     percentUsed,
     percentRemaining,
+    weeklyLimitImages,
+    usedImages,
+    remainingImages,
+    percentImagesRemaining,
     periodStartAt,
     periodEndAt,
     resetsInMs,
     resetsInText: formatCountdown(resetsInMs),
     isCapped: usedTokens >= weeklyLimit,
+    isImageCapped: usedImages >= weeklyLimitImages,
   };
 }
 
@@ -300,12 +321,119 @@ export const resetUserQuota = mutation({
     for (const q of allQuotas) {
       await ctx.db.patch(q._id, {
         usedTokens: 0,
+        usedImages: 0,
         periodStartAt: now,
         periodEndAt: now + WEEK_MS,
         updatedAt: now,
       });
     }
     return { success: true, reset: allQuotas.length };
+  },
+});
+
+// 5. Pre-flight check for Image Generation / Edits (20 images/week shared limit)
+export const checkImageGatewayQuota = query({
+  args: {
+    rawApiKey: v.optional(v.string()),
+    ssoToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const targetUserId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
+    if (!targetUserId) {
+      return {
+        allowed: false,
+        reason: "unauthorized",
+        remainingImages: 0,
+        usedImages: 0,
+        weeklyLimitImages: WEEKLY_QUOTA_IMAGES,
+        resetsInText: formatCountdown(WEEK_MS),
+      };
+    }
+
+    const quotaDoc = await ctx.db
+      .query("userQuotas")
+      .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+      .first();
+
+    const state = calculateQuotaState(quotaDoc);
+
+    return {
+      allowed: !state.isImageCapped,
+      reason: state.isImageCapped ? "weekly_quota_exceeded" : "within_quota",
+      remainingImages: state.remainingImages,
+      usedImages: state.usedImages,
+      weeklyLimitImages: state.weeklyLimitImages,
+      resetsInText: state.resetsInText,
+    };
+  },
+});
+
+// 6. Deduct Image Generation / Edits quota (1 per image generated/edited)
+export const deductImageQuota = mutation({
+  args: {
+    rawApiKey: v.optional(v.string()),
+    ssoToken: v.optional(v.string()),
+    count: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const countToDeduct = Math.max(1, args.count || 1);
+    const targetUserId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
+    if (!targetUserId) return { success: false, reason: "unauthorized" };
+
+    const quotaDoc = await ctx.db
+      .query("userQuotas")
+      .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+      .first();
+
+    if (!quotaDoc) {
+      const newId = await ctx.db.insert("userQuotas", {
+        userId: targetUserId,
+        weeklyLimitTokens: WEEKLY_QUOTA_TOKENS,
+        usedTokens: 0,
+        weeklyLimitImages: WEEKLY_QUOTA_IMAGES,
+        usedImages: countToDeduct,
+        periodStartAt: now,
+        periodEndAt: now + WEEK_MS,
+        lastDeductedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { success: true, quotaId: newId, usedImages: countToDeduct };
+    }
+
+    let currentUsedImages = quotaDoc.usedImages ?? 0;
+    let periodStartAt = quotaDoc.periodStartAt;
+    let periodEndAt = quotaDoc.periodEndAt;
+    let usedTokens = quotaDoc.usedTokens;
+
+    if (now >= periodEndAt) {
+      const cyclesElapsed = Math.floor((now - periodStartAt) / WEEK_MS);
+      periodStartAt = periodStartAt + cyclesElapsed * WEEK_MS;
+      periodEndAt = periodStartAt + WEEK_MS;
+      currentUsedImages = 0;
+      usedTokens = 0;
+    }
+
+    const limit = quotaDoc.weeklyLimitImages ?? WEEKLY_QUOTA_IMAGES;
+    const newUsedImages = Math.min(limit, currentUsedImages + countToDeduct);
+
+    await ctx.db.patch(quotaDoc._id, {
+      usedTokens,
+      usedImages: newUsedImages,
+      weeklyLimitImages: limit,
+      periodStartAt,
+      periodEndAt,
+      lastDeductedAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      usedImages: newUsedImages,
+      remainingImages: Math.max(0, limit - newUsedImages),
+      isImageCapped: newUsedImages >= limit,
+    };
   },
 });
 

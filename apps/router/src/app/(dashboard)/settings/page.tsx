@@ -259,7 +259,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 2. Token Quota & Fair Use Card */}
+      {/* 2. Token & Image Quota Card */}
       <div className="p-6 rounded-2xl bg-card space-y-5">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -269,14 +269,15 @@ export default function SettingsPage() {
             </h2>
           </div>
           <p className="text-xs text-muted-foreground font-light">
-            Every user receives 7,000,000 free tokens every 7-day rolling cycle.
+            Every user receives 7,000,000 free tokens and 20 free image generations/edits every 7-day rolling cycle.
           </p>
         </div>
 
+        {/* Tokens Balance */}
         <div className="p-4 rounded-xl bg-secondary/40 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground font-mono uppercase text-[10px]">
-              Active Balance
+              Tokens Balance
             </span>
             <span className="font-mono font-bold text-foreground">
               {metrics.formattedRemaining} / {metrics.formattedLimit} tokens left
@@ -296,6 +297,37 @@ export default function SettingsPage() {
             <span>
               {metrics.resetsInText ? `Resets in ${metrics.resetsInText}` : "Resets weekly"}
             </span>
+          </div>
+        </div>
+
+        {/* Images Balance */}
+        <div className="p-4 rounded-xl bg-secondary/40 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground font-mono uppercase text-[10px]">
+              Images Balance (Generations &amp; Edits)
+            </span>
+            <span className="font-mono font-bold text-foreground">
+              {metrics.remainingImages} / {metrics.limitImages} images left
+            </span>
+          </div>
+
+          <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+            <div
+              className={cn(
+                "h-full transition-all duration-500 rounded-full",
+                metrics.isImageCapped
+                  ? "bg-rose-500"
+                  : metrics.percentImagesRemaining <= 25
+                  ? "bg-amber-400"
+                  : "bg-foreground"
+              )}
+              style={{ width: `${metrics.percentImagesRemaining}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>{metrics.percentImagesRemaining.toFixed(0)}% remaining</span>
+            <span>20 generations / edits per week</span>
           </div>
         </div>
 

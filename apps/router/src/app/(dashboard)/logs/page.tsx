@@ -57,7 +57,10 @@ import {
   Database,
   CheckCircle2,
   AlertCircle,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react";
+import { isImageModel } from "@/lib/model-specs";
 
 function formatTokens(tokens?: number): string {
   if (tokens === undefined || tokens === null) return "0";
@@ -88,6 +91,7 @@ export default function LogsPage() {
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [timeRange, setTimeRange] = useState("today");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
@@ -99,6 +103,7 @@ export default function LogsPage() {
     isAuthenticated
       ? {
           statusFilter,
+          typeFilter,
           timeRange,
           searchQuery: searchQuery.trim() || undefined,
         }
@@ -129,6 +134,7 @@ export default function LogsPage() {
   const handleResetFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
+    setTypeFilter("all");
     setTimeRange("today");
   };
 
@@ -311,6 +317,23 @@ export default function LogsPage() {
               </SelectContent>
             </Select>
 
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-10 w-[130px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground shrink-0">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
+                <SelectItem value="all" className="cursor-pointer">
+                  All Types
+                </SelectItem>
+                <SelectItem value="chat" className="cursor-pointer">
+                  Chat Completions
+                </SelectItem>
+                <SelectItem value="image" className="cursor-pointer">
+                  Image Gen &amp; Edit
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="h-10 w-[140px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground shrink-0">
                 <SelectValue placeholder="Time Range" />
@@ -473,9 +496,19 @@ export default function LogsPage() {
 
                         {/* 3. Model */}
                         <TableCell className="py-3 px-3 whitespace-nowrap">
-                          <span className="text-xs font-medium font-sans text-foreground">
-                            {log.model}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-medium font-sans text-foreground">
+                              {log.model}
+                            </span>
+                            {(log.requestType === "image_generation" ||
+                              log.requestType === "image_edit" ||
+                              isImageModel(log.model)) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                                <ImageIcon className="h-2.5 w-2.5" />
+                                {log.requestType === "image_edit" ? "Edit" : "Image"}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
 
                         {/* 4. Provider */}
@@ -495,7 +528,9 @@ export default function LogsPage() {
 
                         {/* 7. Output Tokens */}
                         <TableCell className="py-3 px-3 whitespace-nowrap text-xs font-sans font-medium text-foreground tabular-nums">
-                          {formatTokens(log.completionTokens)}
+                          {log.requestType === "image_generation" || log.requestType === "image_edit"
+                            ? `${log.imageCount || 1} img`
+                            : formatTokens(log.completionTokens)}
                         </TableCell>
 
                         {/* 8. Speed (tok/s) */}
@@ -628,6 +663,62 @@ export default function LogsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Generated / Edited Images Preview if applicable */}
+                  {selectedLog.imageUrls && selectedLog.imageUrls.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans flex items-center gap-1.5">
+                          <ImageIcon className="h-3.5 w-3.5 text-foreground" />
+                          Generated Output ({selectedLog.imageUrls.length} {selectedLog.imageUrls.length === 1 ? "Image" : "Images"})
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {selectedLog.imageUrls.map((url: string, idx: number) => (
+                          <div
+                            key={idx}
+                            className="rounded-2xl border border-border/70 overflow-hidden bg-secondary/20 p-3 space-y-3"
+                          >
+                            <div className="relative rounded-xl overflow-hidden bg-black/40 border border-border/50 flex items-center justify-center min-h-[220px]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={selectedLog.prompt || `Image output ${idx + 1}`}
+                                className="w-full max-h-96 object-contain rounded-lg"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground font-mono text-[11px] truncate max-w-[220px]">
+                                Image {idx + 1}
+                              </span>
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground font-medium text-xs transition-colors"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                <span>Open Full Image</span>
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prompt Text if present */}
+                  {selectedLog.prompt && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
+                        Prompt Input
+                      </span>
+                      <div className="p-3.5 rounded-2xl bg-secondary/30 border border-border/60 text-xs text-foreground font-sans leading-relaxed select-text">
+                        {selectedLog.prompt}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Performance Metrics Breakdown */}
                   <div className="space-y-2">

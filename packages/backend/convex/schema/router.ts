@@ -119,6 +119,16 @@ export const routerTables = {
     tokensPerSecond: v.optional(v.number()), // Speed in tok/s
     ip: v.optional(v.string()),
     userAgent: v.optional(v.string()),
+    requestType: v.optional(
+      v.union(
+        v.literal("chat"),
+        v.literal("image_generation"),
+        v.literal("image_edit")
+      )
+    ),
+    imageCount: v.optional(v.number()),
+    imageUrls: v.optional(v.array(v.string())),
+    prompt: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
@@ -163,6 +173,8 @@ export const routerTables = {
     periodStartAt: v.number(),      // Cycle start timestamp (ms)
     periodEndAt: v.number(),        // Cycle reset timestamp (ms) (periodStartAt + 7 * 24 * 60 * 60 * 1000)
     lastDeductedAt: v.optional(v.number()),
+    weeklyLimitImages: v.optional(v.number()), // Default 20 generations/edits per week
+    usedImages: v.optional(v.number()),        // Count of images generated/edited this cycle
     createdAt: v.number(),
     updatedAt: v.number(),
   })
