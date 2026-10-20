@@ -265,7 +265,12 @@ export function searchMentionCandidates({
             id: `file:${file.fullPath || file.path}`,
             kind: isDir ? "directory" : "file",
             title: displayTitle,
-            subtitle: targetDir ? undefined : file.parentDir,
+            subtitle:
+              file.parentDir ||
+              (file.path.includes("/")
+                ? file.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/")
+                : undefined) ||
+              undefined,
             insertion: formatFileMention(file.path, isDir ? "directory" : "file", quoted),
             drillPath,
             drill: isDir,
@@ -289,7 +294,12 @@ export function searchMentionCandidates({
             id: `file:${file.fullPath || file.path}`,
             kind: isDir ? "directory" : "file",
             title: displayTitle,
-            subtitle: file.parentDir || undefined,
+            subtitle:
+              file.parentDir ||
+              (file.path.includes("/")
+                ? file.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/")
+                : undefined) ||
+              undefined,
             insertion: formatFileMention(file.path, isDir ? "directory" : "file", quoted),
             drillPath,
             drill: isDir,

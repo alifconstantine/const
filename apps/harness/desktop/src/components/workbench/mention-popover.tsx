@@ -112,24 +112,45 @@ export function MentionPopover({
                             : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2c2c2c] hover:text-black dark:hover:text-white"
                         )}
                       >
-                        {/* Left: Icon and Name */}
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                        {/* Left: Icon, Name, and Parent Path (Subtitle) */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
                           <CandidateIcon candidate={candidate} />
-                          <span className="text-[13px] font-normal leading-tight truncate">
+                          <span
+                            className={cn(
+                              "text-[13px] font-normal leading-tight truncate",
+                              candidate.subtitle ? "shrink-0 max-w-[55%]" : "flex-1"
+                            )}
+                          >
                             {candidate.title}
                           </span>
+                          {candidate.subtitle && (
+                            <span
+                              className={cn(
+                                "text-[11.5px] font-sans truncate min-w-0",
+                                isSelected
+                                  ? "text-[#666666] dark:text-[#a0a0a0]"
+                                  : "text-[#888888] dark:text-[#777777]"
+                              )}
+                            >
+                              {candidate.subtitle}
+                            </span>
+                          )}
                         </div>
 
                         {/* Right: Browse folder Tab hint or subtle chevron for directories */}
-                        {isDir ? (
+                        {isDir && (
                           <div
                             role="button"
                             tabIndex={-1}
-                            onClick={(e) => {
+                            onMouseDown={(e) => {
                               e.stopPropagation();
+                              e.preventDefault();
                               onDrill?.(candidate);
                             }}
-                            className="flex items-center gap-1.5 text-[11px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white shrink-0 font-sans cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white shrink-0 font-sans cursor-pointer ml-auto"
                           >
                             {isSelected && (
                               <kbd className="px-1.5 py-0.5 text-[9.5px] font-mono bg-black/5 dark:bg-white/10 rounded border border-black/10 dark:border-white/10 text-[#666666] dark:text-[#a0a0a0] leading-none">
@@ -138,11 +159,7 @@ export function MentionPopover({
                             )}
                             <ChevronRight className="w-3.5 h-3.5 text-[#888888] dark:text-[#777777]" />
                           </div>
-                        ) : candidate.subtitle ? (
-                          <span className="text-[11px] text-[#888888] dark:text-[#777777] font-sans shrink-0 truncate max-w-[140px]">
-                            {candidate.subtitle}
-                          </span>
-                        ) : null}
+                        )}
                       </button>
                     );
                   })}
