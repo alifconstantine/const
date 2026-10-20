@@ -529,19 +529,19 @@ export function Sidebar({
         }}
         onMouseEnter={() => setHoveredConvoId(convo.id)}
         onMouseLeave={() => setHoveredConvoId(null)}
-        className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+        className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
           isActive
-            ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
-            : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
+            ? "bg-[#dedee2] dark:bg-[#383838] text-[#161616] dark:text-white font-medium shadow-xs"
+            : "text-[#666666] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
         }`}
       >
         <AutoScrollTitle
           text={getCleanConversationTitle(convo.title)}
-          className="flex-1 mr-2"
+          className="flex-1 mr-1.5"
           textClassName={
             isActive
-              ? "font-medium text-[#262626] dark:text-white"
-              : "font-normal text-[#666666] dark:text-[#999999] group-hover/chat:text-black dark:group-hover/chat:text-white transition-colors"
+              ? "font-medium text-[#161616] dark:text-white"
+              : "font-normal text-[#666666] dark:text-[#969696] group-hover/chat:text-[#161616] dark:group-hover/chat:text-white transition-colors"
           }
           isParentHovered={isHovered}
         />
@@ -549,7 +549,7 @@ export function Sidebar({
         <div
           data-no-select="true"
           onPointerDown={(e) => e.stopPropagation()}
-          className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
+          className="flex items-center justify-end shrink-0 select-none min-w-[46px]"
         >
           {/* Relative time or Loading Spinner or Approval Waiting */}
           {pendingApprovals?.has(convo.id) ? (
@@ -563,7 +563,7 @@ export function Sidebar({
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
           ) : (
             <div
-              className={`items-center gap-1 ${
+              className={`items-center justify-end gap-1 w-full ${
                 isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
               }`}
             >
@@ -573,7 +573,7 @@ export function Sidebar({
               <span
                 className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
                   isActive
-                    ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
+                    ? "text-[#161616] dark:text-[#b0b0b0] font-medium"
                     : "text-[#888888] dark:text-[#777777]"
                 }`}
               >
@@ -584,7 +584,7 @@ export function Sidebar({
 
           {/* Actions on hover or when dropdown menu is open */}
           <div
-            className={`items-center gap-0.5 ${
+            className={`items-center justify-end gap-0.5 ${
               isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
             }`}
           >
@@ -594,7 +594,7 @@ export function Sidebar({
                 e.stopPropagation();
                 onArchiveConversation?.(convo.id);
               }}
-              className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
               title={t("sidebar.archiveConvo")}
               aria-label={t("sidebar.archiveConvo")}
             >
@@ -611,8 +611,8 @@ export function Sidebar({
                   onClick={(e) => e.stopPropagation()}
                   className={`p-1 rounded transition-colors cursor-pointer outline-none ${
                     isMenuOpen
-                      ? "bg-[#dedee2] dark:bg-[#484848] text-[#262626] dark:text-white"
-                      : "hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
+                      ? "bg-[#dedee2] dark:bg-[#484848] text-[#161616] dark:text-white"
+                      : "hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
                   }`}
                   title={t("common.actions")}
                   aria-label={t("common.actions")}
@@ -624,7 +624,7 @@ export function Sidebar({
                 side="bottom"
                 align="end"
                 sideOffset={4}
-                className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#161616] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
               >
                 <DropdownMenuItem
                   onClick={(e) => {
@@ -632,7 +632,7 @@ export function Sidebar({
                     setOpenMenuConvoId(null);
                     handleOpenRename(convo);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#161616] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
                 >
                   <Pencil className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
                   <span>{t("sidebar.renameConvo")}</span>
@@ -643,7 +643,7 @@ export function Sidebar({
                     setOpenMenuConvoId(null);
                     onArchiveConversation?.(convo.id);
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#161616] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
                 >
                   <Archive className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
                   <span>{t("sidebar.archived")}</span>
@@ -693,14 +693,14 @@ export function Sidebar({
   return (
     <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#666666] dark:text-[#999999] p-3">
       {/* Top Header & Navigation Actions (No dividing lines, following DESIGN.md) */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col shrink-0">
         {/* Logo and Collapse Button */}
         <div
-          className="flex items-center justify-between h-9 mb-1"
+          className="flex items-center justify-between h-9 mb-2"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         >
           <div
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 px-0.5"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
             <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
@@ -735,14 +735,14 @@ export function Sidebar({
         </div>
 
         {/* Action: Create New Chat Button (Always crisp white as primary action) */}
-        <div className="pt-1 pb-1.5">
+        <div className="mb-2">
           <button
             type="button"
             onClick={() => onNewChat?.()}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            className="w-full h-9 flex items-center justify-between px-2.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
             title={`New chat (${isMac ? "⌘N" : "Ctrl+N"})`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <MessageCirclePlus className="w-4 h-4 text-black dark:text-white transition-colors stroke-[1.8]" />
               <span className="font-medium text-black dark:text-white">
                 {t("sidebar.newChat")}
@@ -755,13 +755,12 @@ export function Sidebar({
         </div>
 
         {/* Navigation Items (Gray by default, white on hover) */}
-        <div className="space-y-0.5 text-xs font-medium">
-
+        <div className="space-y-0.5 mb-3 text-xs font-medium">
           {/* Search */}
           <button
             type="button"
             onClick={onOpenSearch}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+            className="w-full h-8 flex items-center justify-between px-2.5 rounded-lg text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
             title={`Search (${isMac ? "⌘K" : "Ctrl+K"})`}
           >
             <div className="flex items-center gap-2.5">
@@ -777,7 +776,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenScheduledTasks}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
+            className={`w-full h-8 flex items-center gap-2.5 px-2.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
               isScheduledTasksActive
                 ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
                 : "text-[#666666] dark:text-[#999999]"
@@ -795,7 +794,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenSkills}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
+            className={`w-full h-8 flex items-center gap-2.5 px-2.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
               isSkillsActive
                 ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
                 : "text-[#666666] dark:text-[#999999]"
@@ -811,132 +810,133 @@ export function Sidebar({
         </div>
 
         {/* Switcher Dropdown (Recent, Project, Conversation) & Action Icons */}
-        <div className="pt-3 pb-1 mt-1">
-          <div className="flex items-center justify-between">
-            {/* Left: Dropdown Switcher */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-2 py-1 bg-transparent hover:bg-[#dedee2] dark:hover:bg-[#383838] data-[state=open]:bg-[#dedee2] dark:data-[state=open]:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white dark:data-[state=open]:text-white rounded-lg text-[13px] font-medium transition-colors cursor-pointer outline-none select-none group"
-                >
-                  {activeTab === "project" && (
-                    <>
-                      <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
-                      <span>{t("sidebar.projects")}</span>
-                    </>
-                  )}
-                  {activeTab === "outside" && (
-                    <>
-                      <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
-                      <span>{t("sidebar.outsideProject")}</span>
-                    </>
-                  )}
-                  {activeTab === "recent" && (
-                    <>
-                      <Clock className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
-                      <span>{t("sidebar.recent")}</span>
-                    </>
-                  )}
-                  <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white ml-0.5 transition-colors shrink-0" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={4}
-                className="w-44 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 font-sans text-xs"
-              >
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("project")}
-                  className={cn(
-                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
-                    activeTab === "project"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
-                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Folder className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("sidebar.projects")}</span>
-                  </div>
-                  {activeTab === "project" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("outside")}
-                  className={cn(
-                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
-                    activeTab === "outside"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
-                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("sidebar.outsideProject")}</span>
-                  </div>
-                  {activeTab === "outside" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setActiveTab("recent")}
-                  className={cn(
-                    "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
-                    activeTab === "recent"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
-                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("sidebar.recent")}</span>
-                  </div>
-                  {activeTab === "recent" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Right: Collapse all (ONLY when in Projects view) & Archive */}
-            <div className="flex items-center gap-0.5 text-[#777777] dark:text-[#888888]">
-              {activeTab === "project" && sortedProjectKeys.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleCollapseAllProjects}
-                  className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
-                  title={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
-                  aria-label={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
-                >
-                  <div className="transition-transform duration-200 flex items-center justify-center">
-                    {areAllFoldersCollapsed ? (
-                      <ChevronsUpDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
-                    ) : (
-                      <ChevronsDownUp className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
-                    )}
-                  </div>
-                </button>
-              )}
+        <div className="flex items-center justify-between pb-1.5 mb-1">
+          {/* Left: Dropdown Switcher */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                onClick={handleOpenArchiveModal}
-                className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                title={t("sidebar.archivedSessions")}
-                aria-label={t("sidebar.archivedSessions")}
+                className="inline-flex items-center gap-2 px-2 py-1 bg-transparent hover:bg-[#dedee2] dark:hover:bg-[#383838] data-[state=open]:bg-[#dedee2] dark:data-[state=open]:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white dark:data-[state=open]:text-white rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none group"
               >
-                <Archive className="w-3.5 h-3.5" />
+                {activeTab === "project" && (
+                  <>
+                    <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
+                    <span>{t("sidebar.projects")}</span>
+                  </>
+                )}
+                {activeTab === "outside" && (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
+                    <span>{t("sidebar.outsideProject")}</span>
+                  </>
+                )}
+                {activeTab === "recent" && (
+                  <>
+                    <Clock className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors shrink-0" />
+                    <span>{t("sidebar.recent")}</span>
+                  </>
+                )}
+                <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white ml-0.5 transition-colors shrink-0" />
               </button>
-            </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={4}
+              className="w-44 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 font-sans text-xs"
+            >
+              <DropdownMenuItem
+                onClick={() => setActiveTab("project")}
+                className={cn(
+                  "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
+                  activeTab === "project"
+                    ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                    : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <Folder className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t("sidebar.projects")}</span>
+                </div>
+                {activeTab === "project" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setActiveTab("outside")}
+                className={cn(
+                  "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
+                  activeTab === "outside"
+                    ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                    : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t("sidebar.outsideProject")}</span>
+                </div>
+                {activeTab === "outside" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setActiveTab("recent")}
+                className={cn(
+                  "flex items-center justify-between !px-2.5 !py-1.5 !text-xs rounded-lg cursor-pointer transition-colors",
+                  activeTab === "recent"
+                    ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                    : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <span>{t("sidebar.recent")}</span>
+                </div>
+                {activeTab === "recent" && <Check className="w-3 h-3 text-black dark:text-white shrink-0" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Right: Collapse all (ONLY when in Projects view) & Archive */}
+          <div className="flex items-center gap-0.5 text-[#777777] dark:text-[#888888]">
+            {activeTab === "project" && sortedProjectKeys.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleCollapseAllProjects}
+                className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+                title={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
+                aria-label={areAllFoldersCollapsed ? t("sidebar.expandAll") : t("sidebar.collapseAll")}
+              >
+                <div className="transition-transform duration-200 flex items-center justify-center">
+                  {areAllFoldersCollapsed ? (
+                    <ChevronsUpDown className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
+                  ) : (
+                    <ChevronsDownUp className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-all duration-200" />
+                  )}
+                </div>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleOpenArchiveModal}
+              className="p-1 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+              title={t("sidebar.archivedSessions")}
+              aria-label={t("sidebar.archivedSessions")}
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Middle: Chat History (Image 1, 2, 3 style with ScrollArea) */}
-      <div className="flex-1 overflow-hidden flex flex-col my-1 w-full max-w-full">
+      {/* Middle: Chat History (ScrollArea) */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col w-full max-w-full">
         <ScrollArea className="flex-1 w-full [&>div>div[style]]:!block" viewportClassName="[&>div[style]]:!block">
-          <div className="flex flex-col gap-2 py-1 pr-1.5 w-full max-w-full">
+          <div className="flex flex-col gap-1.5 py-1 pr-1 w-full max-w-full">
             {activeTab === "recent" ? (
               <TooltipProvider delayDuration={150}>
-                <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+                <div className="flex flex-col gap-0.5 w-full max-w-full">
                   {recentConversations.length === 0 ? (
-                    <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
-                      No recent tasks
+                    <div className="py-8 px-2 flex flex-col items-center justify-center gap-1.5 text-center select-none">
+                      <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+                      </div>
+                      <span className="text-xs text-[#888888] dark:text-[#777777]">No recent tasks</span>
                     </div>
                   ) : (
                     <>
@@ -959,10 +959,13 @@ export function Sidebar({
                 </div>
               </TooltipProvider>
             ) : activeTab === "outside" ? (
-              <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+              <div className="flex flex-col gap-0.5 w-full max-w-full">
                 {outsideConversations.length === 0 ? (
-                  <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
-                    No conversations outside project
+                  <div className="py-8 px-2 flex flex-col items-center justify-center gap-1.5 text-center select-none">
+                    <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
+                      <MessageSquare className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+                    </div>
+                    <span className="text-xs text-[#888888] dark:text-[#777777]">No conversations outside project</span>
                   </div>
                 ) : (
                   <>
@@ -984,15 +987,18 @@ export function Sidebar({
                 )}
               </div>
             ) : sortedProjectKeys.length === 0 && outsideConversations.length === 0 ? (
-              <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
-                No tasks yet
+              <div className="py-8 px-2 flex flex-col items-center justify-center gap-1.5 text-center select-none">
+                <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
+                  <Folder className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+                </div>
+                <span className="text-xs text-[#888888] dark:text-[#777777]">No tasks yet</span>
               </div>
             ) : (
               <div className="flex flex-col gap-1">
                 {/* Project Folders List */}
                 {sortedProjectKeys.length === 0 ? (
-                  <div className="px-2.5 py-2 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
-                    No project folders
+                  <div className="py-6 px-2 flex flex-col items-center justify-center gap-1.5 text-center select-none">
+                    <span className="text-xs text-[#888888] dark:text-[#777777]">No project folders</span>
                   </div>
                 ) : (
                   sortedProjectKeys.map((projectName, index) => {
@@ -1020,13 +1026,13 @@ export function Sidebar({
                             >
                               {/* Collapsible Project / Group Header */}
                               <div
-                                className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-md text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
+                                className="relative w-full max-w-full h-8 overflow-hidden flex items-center justify-between px-2 rounded-lg text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
                                 title={`Drag to reorder • ${projectName}`}
                               >
                                 <button
                                   type="button"
                                   onClick={() => toggleFolder(projectName)}
-                                  className="w-full flex items-center gap-2 min-w-0 pr-14 cursor-pointer text-left cursor-grab active:cursor-grabbing"
+                                  className="w-full h-full flex items-center gap-2 min-w-0 pr-14 cursor-pointer text-left cursor-grab active:cursor-grabbing"
                                 >
                                   {isCollapsed ? (
                                     <Folder className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover/folder:text-black dark:group-hover/folder:text-white transition-colors shrink-0" />
@@ -1078,7 +1084,7 @@ export function Sidebar({
 
                               {/* Task / Conversation Items inside Project */}
                               {!isCollapsed && (
-                                <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+                                <div className="flex flex-col gap-0.5 ml-3 pl-2.5 border-l border-[#dedee2]/60 dark:border-[#383838]/50 w-[calc(100%-12px)] max-w-[calc(100%-12px)]">
                                   {(() => {
                                     const isExpanded = Boolean(expandedProjects[projectName]);
                                     const displayItems = isExpanded
@@ -1112,11 +1118,11 @@ export function Sidebar({
                 {/* Collapsible Outside Project group when inside Project View */}
                 {outsideConversations.length > 0 && (
                   <div className="flex flex-col gap-1 mt-1 pt-1">
-                    <div className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-md text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5">
+                    <div className="relative w-full max-w-full h-8 overflow-hidden flex items-center justify-between px-2 rounded-lg text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5">
                       <button
                         type="button"
                         onClick={toggleConversationsCollapsed}
-                        className="w-full flex items-center gap-2 min-w-0 pr-8 cursor-pointer text-left"
+                        className="w-full h-full flex items-center gap-2 min-w-0 pr-8 cursor-pointer text-left"
                       >
                         <MessageSquare className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover/folder:text-black dark:group-hover/folder:text-white transition-colors shrink-0" />
                         <span className="truncate group-hover/folder:text-black dark:group-hover/folder:text-white transition-colors">
@@ -1150,7 +1156,7 @@ export function Sidebar({
                     </div>
 
                     {!isConversationsCollapsed && (
-                      <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+                      <div className="flex flex-col gap-0.5 ml-3 pl-2.5 border-l border-[#dedee2]/60 dark:border-[#383838]/50 w-[calc(100%-12px)] max-w-[calc(100%-12px)]">
                         {(isOutsideExpanded
                           ? outsideConversations
                           : outsideConversations.slice(0, VISIBLE_CHATS_LIMIT)
@@ -1176,16 +1182,16 @@ export function Sidebar({
       </div>
 
       {/* Bottom: Preserved Full Account Settings (No borders) */}
-      <div className="pt-2">
+      <div className="pt-2 mt-auto shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="w-full flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
+              className="w-full flex items-center justify-between gap-2.5 px-2 py-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
               aria-label="Account menu"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <Avatar className="h-8 w-8 rounded-full border border-[#d5d5d9] dark:border-[#383838] shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Avatar className="h-7 w-7 rounded-full border border-[#d5d5d9] dark:border-[#383838] shrink-0">
                   {user?.image ? (
                     <AvatarImage
                       src={user.image}
