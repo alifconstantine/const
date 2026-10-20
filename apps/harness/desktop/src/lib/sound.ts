@@ -1,9 +1,33 @@
+import notificationSoundUrl from "../assets/notification_sound.mp3";
+
 /**
- * Audio synthesis helper using Web Audio API for task completion and notification sounds.
- * Works natively without requiring any external audio assets or network requests.
+ * Audio notification helper for Const Desktop Harness.
+ * Plays the configured notification sound ("notification_sound.mp3") with Web Audio synthesis fallback.
  */
 
-export function playTaskCompletionSound(): void {
+let audioInstance: HTMLAudioElement | null = null;
+
+function getAudioInstance(): HTMLAudioElement | null {
+  if (typeof window === "undefined") return null;
+  if (!audioInstance) {
+    try {
+      audioInstance = new Audio(notificationSoundUrl);
+      audioInstance.volume = 0.85;
+    } catch (err) {
+      console.warn("[Sound] Failed to initialize Audio with notification_sound.mp3:", err);
+    }
+  }
+  return audioInstance;
+}
+
+// Pre-load audio in renderer
+if (typeof window !== "undefined") {
+  try {
+    getAudioInstance();
+  } catch {}
+}
+
+function playSynthFallback(): void {
   try {
     if (typeof window === "undefined") return;
     const AudioContextClass =
@@ -46,6 +70,31 @@ export function playTaskCompletionSound(): void {
       } catch {}
     }, 600);
   } catch {
-    // Silently ignore audio playback failures (e.g. strict autoplay policy before user interaction)
+    // Silently ignore audio playback failures
   }
 }
+
+export function playTaskCompletionSound(): void {
+  try {
+    if (typeof window === "undefined") return;
+
+    const audio = getAudioInstance();
+    if (audio) {
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("[Sound] notification_sound.mp3 playback failed, falling back to synth chime:", err);
+          playSynthFallback();
+        });
+      }
+    } else {
+      playSynthFallback();
+    }
+  } catch (err) {
+    console.warn("[Sound] Error playing notification sound:", err);
+    playSynthFallback();
+  }
+}
+
+export const playNotificationSound = playTaskCompletionSound;

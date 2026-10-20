@@ -2210,10 +2210,12 @@ function AuthenticatedContent({
               window.electron.showNotification({
                 title: "Task Completed",
                 body: "Agent has finished executing the task.",
+                silent: true,
               }).catch(() => {});
             } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
               new Notification("Task Completed", {
                 body: "Agent has finished executing the task.",
+                silent: true,
               });
             }
           }
