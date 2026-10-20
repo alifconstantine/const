@@ -2012,7 +2012,7 @@ export function ChatCard({
                             type="text"
                             value={searchModelQuery}
                             onChange={(e) => setSearchModelQuery(e.target.value)}
-                            placeholder="Search models..."
+                            placeholder={t("workbench.searchModels")}
                             className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#777777] outline-none font-sans"
                             autoFocus
                           />
@@ -2085,7 +2085,7 @@ export function ChatCard({
                           </ScrollArea>
                         ) : (
                           <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
-                            No models found
+                            {t("workbench.noModelsFound")}
                           </div>
                         )}
 
@@ -2100,7 +2100,7 @@ export function ChatCard({
                             className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                           >
                             <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                            <span>Manage models</span>
+                            <span>{t("workbench.manageModels")}</span>
                           </button>
                         </div>
                       </>
@@ -2110,10 +2110,10 @@ export function ChatCard({
                           <Cpu className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75]" />
                         </div>
                         <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                          No models configured
+                          {t("workbench.noModelsConfigured")}
                         </div>
                         <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
-                          Connect or configure model providers to start executing tasks.
+                          {t("workbench.connectModelsDesc")}
                         </p>
                         <button
                           type="button"
@@ -2124,7 +2124,7 @@ export function ChatCard({
                           className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                         >
                           <Plus className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                          <span>Manage models</span>
+                          <span>{t("workbench.manageModels")}</span>
                         </button>
                       </div>
                     )}
@@ -2269,7 +2269,7 @@ export function ChatCard({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                      title="Session statistics"
+                      title={t("workbench.sessionStatistics")}
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>
@@ -2285,15 +2285,15 @@ export function ChatCard({
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <span className="font-medium text-[13px] text-foreground">Session statistics</span>
+                      <span className="font-medium text-[13px] text-foreground">{t("workbench.sessionStatistics")}</span>
                     </div>
                     <div className="space-y-2 text-[12.5px] font-sans">
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">LLM time</span>
+                        <span className="text-muted-foreground">{t("workbench.llmTime")}</span>
                         <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.llmDurationMs)}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Tool time</span>
+                        <span className="text-muted-foreground">{t("workbench.toolTime")}</span>
                         <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.toolDurationMs)}</span>
                       </div>
                       <div className="flex items-center justify-between">

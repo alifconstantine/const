@@ -883,7 +883,7 @@ export function SettingsView({
       default:
         return {
           title: activeTab.replace(/-/g, " "),
-          desc: "This capability is currently being configured and will be available in an upcoming update.",
+          desc: t("settings.capabilityUpcoming"),
         };
     }
   }, [activeTab, t]);
@@ -993,7 +993,7 @@ export function SettingsView({
                 {/* Account Profile Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    User Profile & Identity
+                    {t("settings.userProfileIdentity")}
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-5">
                     {/* Avatar & Username Header Section */}
@@ -1018,10 +1018,10 @@ export function SettingsView({
                             type="button"
                             onClick={() => setIsAvatarPickerOpen((v) => !v)}
                             className="absolute inset-0 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[1px]"
-                            title="Change avatar"
+                            title={t("settings.changeAvatar")}
                           >
                             <Camera className="w-5 h-5" />
-                            <span className="text-[9px] font-medium mt-0.5">Edit</span>
+                            <span className="text-[9px] font-medium mt-0.5">{t("settings.editAvatar")}</span>
                           </button>
                         </div>
 
@@ -1042,14 +1042,14 @@ export function SettingsView({
                                     }
                                   }}
                                   autoFocus
-                                  placeholder="Enter your username"
+                                  placeholder={t("settings.enterUsername")}
                                   className="px-2.5 py-1 text-sm font-semibold rounded-lg border border-primary/50 bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white focus:outline-none focus:ring-1 focus:ring-primary w-44 sm:w-56"
                                 />
                                 <button
                                   type="button"
                                   onClick={handleSaveUsername}
                                   className="p-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
-                                  title="Save username"
+                                  title={t("settings.saveUsername")}
                                 >
                                   <Check className="w-4 h-4" />
                                 </button>
@@ -1077,7 +1077,7 @@ export function SettingsView({
                                     setIsEditingUsername(true);
                                   }}
                                   className="opacity-60 hover:opacity-100 p-1 rounded-md hover:bg-[#eaeaea] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer"
-                                  title="Edit username"
+                                  title={t("settings.editUsername")}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
@@ -1102,7 +1102,7 @@ export function SettingsView({
                         className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
                       >
                         <Camera className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>Change Avatar</span>
+                        <span>{t("settings.changeAvatar")}</span>
                       </button>
                     </div>
 
@@ -1112,7 +1112,7 @@ export function SettingsView({
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-[#262626] dark:text-white flex items-center gap-1.5">
                             <Sparkles className="w-3.5 h-3.5 text-primary" />
-                            Choose an Avatar or Upload
+                            {t("settings.chooseAvatarOrUpload")}
                           </span>
                           <button
                             type="button"
@@ -1126,7 +1126,7 @@ export function SettingsView({
                         {/* Preset Gradients */}
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
-                            Avatar Presets
+                            {t("settings.avatarPresets")}
                           </span>
                           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                             {AVATAR_PRESETS.map((preset) => (
@@ -1164,7 +1164,7 @@ export function SettingsView({
                             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                           >
                             <Upload className="w-3.5 h-3.5 text-primary" />
-                            <span>Upload Custom Image</span>
+                            <span>{t("settings.uploadCustomImage")}</span>
                           </button>
 
                           {user?.image && (
@@ -1174,7 +1174,7 @@ export function SettingsView({
                               className="px-2.5 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove Avatar</span>
+                              <span>{t("settings.removeAvatar")}</span>
                             </button>
                           )}
                         </div>
@@ -1186,9 +1186,9 @@ export function SettingsView({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Mail className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
                         <div className="flex flex-col min-w-0">
-                          <span className="text-[11px] text-[#737373] dark:text-[#969696]">Email Address</span>
+                          <span className="text-[11px] text-[#737373] dark:text-[#969696]">{t("settings.emailAddress")}</span>
                           <span className="text-xs font-medium text-[#262626] dark:text-white truncate">
-                            {user?.email || "No email linked (Local Workspace)"}
+                            {user?.email || t("settings.noEmailLinked")}
                           </span>
                         </div>
                       </div>
@@ -1200,7 +1200,7 @@ export function SettingsView({
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#eaeaea] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696]">
-                            Offline Mode
+                            {t("settings.offlineMode")}
                           </span>
                         )}
                       </div>
@@ -1209,7 +1209,7 @@ export function SettingsView({
                     {/* Account Identifier */}
                     <div className="flex items-center justify-between pt-1 border-t border-[#dedee2] dark:border-[#383838] text-xs">
                       <div className="flex flex-col">
-                        <span className="text-[#737373] dark:text-[#969696]">Account Identifier</span>
+                        <span className="text-[#737373] dark:text-[#969696]">{t("settings.accountIdentifier")}</span>
                         <span className="font-mono text-[#262626] dark:text-[#d4d4d4] mt-0.5 text-[11px]">
                           {user?.id || "local-user-session"}
                         </span>
@@ -1218,12 +1218,12 @@ export function SettingsView({
                         type="button"
                         onClick={() => {
                           navigator.clipboard.writeText(user?.id || user?.email || "local-user-session");
-                          toast.success("Account ID copied to clipboard");
+                          toast.success(t("settings.accountIdCopied"));
                         }}
                         className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5"
                       >
                         <Copy className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>Copy ID</span>
+                        <span>{t("settings.copyId")}</span>
                       </button>
                     </div>
 
@@ -1237,7 +1237,7 @@ export function SettingsView({
                             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <ArrowLeftRight className="w-3.5 h-3.5" />
-                            <span>Switch Account</span>
+                            <span>{t("sidebar.switchAccount")}</span>
                           </button>
                         )}
                         {onSignOut && (
@@ -1247,7 +1247,7 @@ export function SettingsView({
                             className="px-3 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <LogOut className="w-3.5 h-3.5" />
-                            <span>Sign Out</span>
+                            <span>{t("sidebar.signOut")}</span>
                           </button>
                         )}
                       </div>
@@ -1259,11 +1259,11 @@ export function SettingsView({
                 {quota && (
                   <div className="flex flex-col gap-2">
                     <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                      Token Allocation
+                      {t("settings.tokenAllocation")}
                     </span>
                     <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-[#262626] dark:text-white">Weekly Quota</span>
+                        <span className="font-medium text-[#262626] dark:text-white">{t("settings.weeklyQuota")}</span>
                         <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
                           {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)} tokens
                         </span>
@@ -1275,8 +1275,8 @@ export function SettingsView({
                         />
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-[#737373] dark:text-[#969696]">
-                        <span>{percentRemaining.toFixed(1)}% remaining</span>
-                        <span>Resets in {quota.resetsInText || "7 days"}</span>
+                        <span>{t("settings.percentRemaining", { percent: percentRemaining.toFixed(1) })}</span>
+                        <span>{t("settings.resetsIn", { time: quota.resetsInText || "7 days" })}</span>
                       </div>
                     </div>
                   </div>
@@ -1290,17 +1290,17 @@ export function SettingsView({
                 {/* 1. Workspace & Execution Section */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Workspace & Execution
+                    {t("settings.workspaceAndExecution")}
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
                     {/* Default Project Location */}
                     <div className="flex flex-col gap-2.5">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Default Project Location
+                          {t("settings.defaultProjectLocation")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Fallback directory used for outside workspace sessions and new scratch tasks.
+                          {t("settings.defaultProjectLocationDesc")}
                         </span>
                       </div>
 
@@ -1319,14 +1319,14 @@ export function SettingsView({
                             className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
                           >
                             <FolderOpen className="w-3.5 h-3.5" />
-                            <span>Browse...</span>
+                            <span>{t("settings.browse")}</span>
                           </button>
                           {defaultProjectLocation && (
                             <button
                               type="button"
                               onClick={handleResetDefaultLocation}
                               className="px-2 py-1 text-[11px] font-medium rounded-md border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838] hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
-                              title="Reset to default session location"
+                              title={t("settings.resetDefaultLocation")}
                             >
                               <RotateCcw className="w-3 h-3" />
                               <span>Reset</span>
@@ -1342,11 +1342,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <ShieldCheck className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Default Permission
+                            {t("settings.defaultPermission")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Controls default tool execution, terminal commands, and file mutation approvals.
+                          {t("settings.defaultPermissionDesc")}
                         </span>
                       </div>
 
@@ -1358,10 +1358,10 @@ export function SettingsView({
                         >
                           <span>
                             {defaultConfirmationMode === "full_access"
-                              ? "Full Machine"
+                              ? t("settings.fullMachine")
                               : defaultConfirmationMode === "request_review"
-                              ? "Request Review"
-                              : "Ask Before Changes"}
+                              ? t("settings.requestReview")
+                              : t("settings.askBeforeChanges")}
                           </span>
                           <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                         </button>
@@ -1379,9 +1379,9 @@ export function SettingsView({
                               )}
                             >
                               <div className="flex flex-col">
-                                <span className="text-[12px]">Ask Before Changes (Default)</span>
+                                <span className="text-[12px]">{t("settings.askBeforeChangesDefault")}</span>
                                 <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  Prompts for confirmation before command execution or file modifications.
+                                  {t("settings.askBeforeChangesDesc")}
                                 </span>
                               </div>
                               {defaultConfirmationMode === "ask_before_changes" && (
@@ -1400,9 +1400,9 @@ export function SettingsView({
                               )}
                             >
                               <div className="flex flex-col">
-                                <span className="text-[12px]">Full Machine</span>
+                                <span className="text-[12px]">{t("settings.fullMachine")}</span>
                                 <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  Autonomous agent execution without prompt interruptions.
+                                  {t("settings.fullMachineDesc")}
                                 </span>
                               </div>
                               {defaultConfirmationMode === "full_access" && (
@@ -1421,9 +1421,9 @@ export function SettingsView({
                               )}
                             >
                               <div className="flex flex-col">
-                                <span className="text-[12px]">Request Review</span>
+                                <span className="text-[12px]">{t("settings.requestReview")}</span>
                                 <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  Always stages changes for side-by-side visual diff inspection.
+                                  {t("settings.requestReviewDesc")}
                                 </span>
                               </div>
                               {defaultConfirmationMode === "request_review" && (
@@ -1441,11 +1441,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Queue Message
+                            {t("settings.queueMessageTitle")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Behavior when sending a message while the agent is actively executing a task.
+                          {t("settings.queueMessageDesc")}
                         </span>
                       </div>
 
@@ -1459,9 +1459,9 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Queue messages to run sequentially after current task"
+                          title={t("settings.queueModeQueueTitle")}
                         >
-                          <span>Queue Message</span>
+                          <span>{t("settings.queueModeQueue")}</span>
                         </button>
                         <button
                           type="button"
@@ -1472,9 +1472,9 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Send message immediately to steer the running agent"
+                          title={t("settings.queueModeSteerTitle")}
                         >
-                          <span>Send Directly</span>
+                          <span>{t("settings.queueModeSteer")}</span>
                         </button>
                       </div>
                     </div>
@@ -1484,7 +1484,7 @@ export function SettingsView({
                 {/* 2. Preferences & System Section */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Preferences & System
+                    {t("settings.preferencesAndSystem")}
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
                     {/* Interface Language */}
@@ -1493,11 +1493,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <Globe className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Interface Language
+                            {t("settings.interfaceLanguage")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Select the display language for the application interface and controls.
+                          {t("settings.interfaceLanguageDesc")}
                         </span>
                       </div>
 
@@ -1553,11 +1553,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <Bell className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Task Notifications
+                            {t("settings.taskNotifications")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Display desktop notifications when an agent finishes a task or requires confirmation.
+                          {t("settings.taskNotificationsDesc")}
                         </span>
                       </div>
 
@@ -1573,11 +1573,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <Volume2 className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Completion Sound Effects
+                            {t("settings.completionSounds")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Play a subtle audio chime when agent execution completes.
+                          {t("settings.completionSoundsDesc")}
                         </span>
                       </div>
 
@@ -1586,10 +1586,10 @@ export function SettingsView({
                           type="button"
                           onClick={() => playTaskCompletionSound()}
                           className="px-2 py-1 text-[11px] rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#d4d4d4] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
-                          title="Preview completion chime"
+                          title={t("settings.previewChime")}
                         >
                           <Play className="w-3 h-3 fill-current" />
-                          <span>Test</span>
+                          <span>{t("settings.test")}</span>
                         </button>
                         <Switch
                           checked={soundAlerts}
@@ -1604,11 +1604,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <RefreshCw className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Automatically Download and Install Updates
+                            {t("settings.autoUpdates")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Keep Const Harness updated with the latest agent capabilities and improvements.
+                          {t("settings.autoUpdatesDesc")}
                         </span>
                       </div>
 
@@ -1620,7 +1620,7 @@ export function SettingsView({
                           className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none disabled:opacity-50"
                         >
                           <RefreshCw className={cn("w-3 h-3", isCheckingUpdate && "animate-spin")} />
-                          <span>Check Updates</span>
+                          <span>{isCheckingUpdate ? t("settings.checkingUpdates") : t("settings.checkUpdates")}</span>
                         </button>
                         <Switch
                           checked={autoUpdates}
@@ -1635,11 +1635,11 @@ export function SettingsView({
                         <div className="flex items-center gap-1.5">
                           <Laptop className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Launch on System Startup
+                            {t("settings.launchOnStartup")}
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Automatically start Const Harness in background when logging in to your system.
+                          {t("settings.launchOnStartupDesc")}
                         </span>
                       </div>
 
@@ -1654,14 +1654,14 @@ export function SettingsView({
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            Local App Storage & Diagnostics
+                            {t("settings.localStorageTitle")}
                           </span>
                           <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-black/5 dark:bg-white/10 text-[#737373] dark:text-[#a3a3a3]">
                             v0.1.0-alpha
                           </span>
                         </div>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          Config files, agent logs, and outside brain session storage (~/.const).
+                          {t("settings.localStorageDesc")}
                         </span>
                       </div>
 
@@ -1671,7 +1671,7 @@ export function SettingsView({
                         className="self-start sm:self-center px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none shrink-0"
                       >
                         <FolderOpen className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>Open Folder</span>
+                        <span>{t("settings.openFolder")}</span>
                       </button>
                     </div>
                   </div>
@@ -1828,17 +1828,17 @@ export function SettingsView({
                 {/* Theme & Layout Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Theme & Layout
+                    {t("settings.themeAndLayout")}
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
                     {/* 1. App Theme */}
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          App Theme
+                          {t("settings.appTheme")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Select light, dark, or follow system appearance.
+                          {t("settings.appThemeDesc")}
                         </span>
                       </div>
 
@@ -1853,10 +1853,10 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Follow system appearance"
+                          title={t("settings.themeSystemTitle")}
                         >
                           <Monitor className="w-3.5 h-3.5" />
-                          <span>System</span>
+                          <span>{t("settings.themeSystem")}</span>
                         </button>
                         <button
                           type="button"
@@ -1867,10 +1867,10 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Light theme"
+                          title={t("settings.themeLightTitle")}
                         >
                           <Sun className="w-3.5 h-3.5" />
-                          <span>Light</span>
+                          <span>{t("settings.themeLight")}</span>
                         </button>
                         <button
                           type="button"
@@ -1881,10 +1881,10 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Dark theme"
+                          title={t("settings.themeDarkTitle")}
                         >
                           <Moon className="w-3.5 h-3.5" />
-                          <span>Dark</span>
+                          <span>{t("settings.themeDark")}</span>
                         </button>
                       </div>
                     </div>
@@ -1893,10 +1893,10 @@ export function SettingsView({
                     <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Conversation Width
+                          {t("settings.conversationWidth")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Maximum width of the conversation container in workbench.
+                          {t("settings.conversationWidthDesc")}
                         </span>
                       </div>
 
@@ -1904,7 +1904,7 @@ export function SettingsView({
                       <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
                         {(["default", "narrow", "wide"] as const).map((w) => {
                           const isSelected = conversationWidth === w;
-                          const label = w === "default" ? "Default" : w === "narrow" ? "Narrow" : "Wide";
+                          const label = w === "default" ? t("settings.widthDefault") : w === "narrow" ? t("settings.widthNarrow") : t("settings.widthWide");
                           const sizeHint = w === "default" ? "672px" : w === "narrow" ? "540px" : "896px";
                           return (
                             <button
@@ -1931,17 +1931,17 @@ export function SettingsView({
                 {/* Typography & Rendering Card */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    Typography & Code
+                    {t("settings.typographyAndCode")}
                   </span>
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
                     {/* 3. UI Font Size */}
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          UI Font Size
+                          {t("settings.uiFontSize")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Base font size for workbench text, prompts, and interface controls (Default: 16px).
+                          {t("settings.uiFontSizeDesc")}
                         </span>
                       </div>
 
@@ -2001,10 +2001,10 @@ export function SettingsView({
                     <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Code Font Size
+                          {t("settings.codeFontSize")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Font size for code blocks, terminal logs, and diff lines (Default: 12px).
+                          {t("settings.codeFontSizeDesc")}
                         </span>
                       </div>
 
@@ -2064,10 +2064,10 @@ export function SettingsView({
                     <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Diff marks
+                          {t("settings.diffMarksTitle")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Use colored bars and backgrounds, or show "+" and "-" symbols on each changed line
+                          {t("settings.diffMarksDesc")}
                         </span>
                       </div>
 
@@ -2082,9 +2082,9 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Use colored bars and backgrounds"
+                          title={t("settings.diffMarksColorTitle")}
                         >
-                          Color
+                          {t("settings.diffMarksColor")}
                         </button>
                         <button
                           type="button"
@@ -2095,9 +2095,9 @@ export function SettingsView({
                               ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
                               : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                           )}
-                          title="Show '+' and '-' symbols on each changed line"
+                          title={t("settings.diffMarksSymbolsTitle")}
                         >
-                          +/-
+                          {t("settings.diffMarksSymbols")}
                         </button>
                       </div>
                     </div>
@@ -2106,10 +2106,10 @@ export function SettingsView({
                     <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          Window Scale
+                          {t("settings.windowScale")}
                         </span>
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          Adjust window zoom factor across the desktop interface (Min {MIN_ZOOM}%, Max {MAX_ZOOM}%).
+                          {t("settings.windowScaleDesc", { min: MIN_ZOOM, max: MAX_ZOOM })}
                         </span>
                       </div>
 
@@ -2184,7 +2184,7 @@ export function SettingsView({
                 <div className="flex flex-col gap-2">
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                      What best describes your work?
+                      {t("settings.whatBestDescribesWork")}
                     </span>
 
                     <div className="relative shrink-0 w-full sm:w-64" ref={roleDropdownRef}>
@@ -2194,7 +2194,7 @@ export function SettingsView({
                         className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] hover:bg-[#f9f9fb] dark:hover:bg-[#262626] text-[#262626] dark:text-white flex items-center justify-between gap-2 transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-primary"
                       >
                         <span className="truncate">
-                          {WORK_ROLE_OPTIONS.find((r) => r.id === workRole)?.label || "Select..."}
+                          {WORK_ROLE_OPTIONS.find((r) => r.id === workRole)?.label || t("settings.selectWorkRole")}
                         </span>
                         <ChevronDown className={cn("w-3.5 h-3.5 text-[#737373] dark:text-[#969696] shrink-0 transition-transform duration-150", isRoleDropdownOpen && "rotate-180")} />
                       </button>
@@ -2236,16 +2236,16 @@ export function SettingsView({
                   <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-4">
                     <div className="flex flex-col gap-1">
                       <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        Custom instructions
+                        {t("settings.customInstructions")}
                       </span>
                       <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
-                        Give Const extra guidance and context that applies to all your chats and tasks (regular conversations, coding, and automation).
+                        {t("settings.customInstructionsDesc")}
                         <button
                           type="button"
-                          onClick={() => toast.info("Instructions added here will be prepended to the AI prompt across all tasks and projects.")}
+                          onClick={() => toast.info(t("settings.instructionsAppliedToast"))}
                           className="ml-1 text-[#3b82f6] hover:underline cursor-pointer inline-block"
                         >
-                          Learn more
+                          {t("settings.learnMore")}
                         </button>
                       </p>
                     </div>
@@ -2254,7 +2254,7 @@ export function SettingsView({
                       <textarea
                         value={customInstructions}
                         onChange={(e) => setCustomInstructions(e.target.value)}
-                        placeholder="Add custom instructions..."
+                        placeholder={t("settings.customInstructionsPlaceholder")}
                         rows={7}
                         className="w-full p-3.5 text-xs font-mono leading-relaxed rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#171717] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a3a3a3] dark:placeholder:text-[#666666] focus:outline-none focus:ring-1 focus:ring-primary resize-y min-h-[160px] transition-colors"
                       />
@@ -2267,7 +2267,7 @@ export function SettingsView({
                           onClick={handleSavePersonalization}
                           className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[#262626] hover:bg-[#111111] dark:bg-[#ffffff] dark:hover:bg-[#ebebed] text-white dark:text-black transition-all cursor-pointer shadow-2xs disabled:opacity-50"
                         >
-                          {isSavingPersonalization ? "Saving..." : "Save"}
+                          {isSavingPersonalization ? t("settings.saving") : t("settings.save")}
                         </button>
                       </div>
                     </div>
@@ -2315,7 +2315,7 @@ export function SettingsView({
                           {currentItem?.label || activeTab.replace(/-/g, " ")}
                         </h3>
                         <p className="text-xs text-[#737373] dark:text-[#969696] max-w-md">
-                          This capability is currently being configured and will be available in an upcoming update.
+                          {t("settings.capabilityUpcoming")}
                         </p>
                       </div>
                     </div>

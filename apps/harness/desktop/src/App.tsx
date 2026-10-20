@@ -4138,7 +4138,7 @@ function AuthenticatedContent({
                         setIsTaskFindOpen(false);
                       }
                     }}
-                    placeholder="Find in task..."
+                    placeholder={t("workbench.findInTask")}
                     className="w-48 pl-8 pr-2 py-1 text-xs rounded-lg border border-[#e2e2e4] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#141416] text-[#262626] dark:text-white placeholder-[#888888] dark:placeholder-[#666666] outline-none focus:border-[#737373] dark:focus:border-[#6e6e72]"
                   />
                 </div>
@@ -4147,7 +4147,7 @@ function AuthenticatedContent({
                   {taskFindQuery.trim()
                     ? taskFindMatches.length > 0
                       ? `${taskFindIndex + 1} of ${taskFindMatches.length}`
-                      : "0 results"
+                      : t("workbench.noResults")
                     : ""}
                 </span>
 
@@ -4158,7 +4158,7 @@ function AuthenticatedContent({
                     setTaskFindIndex((prev) => (prev - 1 + taskFindMatches.length) % taskFindMatches.length)
                   }
                   className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer"
-                  title="Previous match (Shift+Enter)"
+                  title={t("workbench.previousMatch")}
                 >
                   <ChevronUp className="w-3.5 h-3.5" />
                 </button>
@@ -4169,7 +4169,7 @@ function AuthenticatedContent({
                     setTaskFindIndex((prev) => (prev + 1) % taskFindMatches.length)
                   }
                   className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-30 cursor-pointer"
-                  title="Next match (Enter)"
+                  title={t("workbench.nextMatch")}
                 >
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
@@ -4177,7 +4177,7 @@ function AuthenticatedContent({
                   type="button"
                   onClick={() => setIsTaskFindOpen(false)}
                   className="p-1 rounded text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer ml-0.5"
-                  title="Close (Esc)"
+                  title={t("workbench.closeEsc")}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -4226,7 +4226,7 @@ function AuthenticatedContent({
                               type="button"
                               onClick={() => handleCopyMessage(msg.id, msg.content)}
                               className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                              title="Copy response"
+                              title={t("workbench.copyResponse")}
                             >
                               {copiedId === msg.id ? (
                                 <Check className="w-3.5 h-3.5 text-[#4ade80]" />
@@ -4243,7 +4243,7 @@ function AuthenticatedContent({
                                   ? "text-[#4ade80]"
                                   : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                               )}
-                              title="Good response"
+                              title={t("workbench.goodResponse")}
                             >
                               <ThumbsUp className="w-3.5 h-3.5" />
                             </button>
@@ -4256,7 +4256,7 @@ function AuthenticatedContent({
                                   ? "text-[#ef4444]"
                                   : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                               )}
-                              title="Bad response"
+                              title={t("workbench.badResponse")}
                             >
                               <ThumbsDown className="w-3.5 h-3.5" />
                             </button>
@@ -4281,8 +4281,8 @@ function AuthenticatedContent({
                       type="button"
                       onClick={scrollToBottom}
                       className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
-                      title="Scroll to bottom"
-                      aria-label="Scroll to bottom"
+                      title={t("workbench.scrollToBottom")}
+                      aria-label={t("workbench.scrollToBottom")}
                     >
                       <ChevronDown className="w-4 h-4 stroke-[2.5]" />
                     </button>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useTranslation } from "../../lib/i18n";
 import {
   cn,
   toast,
@@ -94,9 +95,12 @@ interface DonutModelItem {
 }
 
 function UsageStatsInner({
+  // i18n hook
+
   quota,
   activeModel = "agy/gemini-3.8-flash-tiered",
 }: UsageStatsViewProps) {
+  const { t } = useTranslation();
   // Time range selection: "7d" (Last 7 days) or "30d" (Last 30 days)
   const [timeRange, setTimeRange] = useState<"7d" | "30d">("7d");
   // Activity tab mode: "daily" | "weekly" | "cumulative"
@@ -480,10 +484,10 @@ function UsageStatsInner({
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2.5">
             <h2 className="text-xl font-bold tracking-tight text-[#262626] dark:text-white font-sans">
-              Usage stats
+              {t("settings.usageStats")}
             </h2>
             <span className="px-2.5 py-0.5 rounded-full bg-[#ebebed] dark:bg-[#252528] border border-[#dedee2] dark:border-[#333336] text-[11px] font-medium text-[#737373] dark:text-[#a0a0a3]">
-              App usage
+              {t("settings.appUsage")}
             </span>
           </div>
 
@@ -491,12 +495,12 @@ function UsageStatsInner({
             type="button"
             onClick={handleRefresh}
             className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-[#dedee2] dark:border-[#38383e] bg-[#ffffff] dark:bg-[#232427] hover:bg-[#f4f4f6] dark:hover:bg-[#2d2e33] text-xs font-medium text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer shadow-xs active:scale-95"
-            title="Refresh usage statistics"
+            title={t("settings.refreshUsageStats")}
           >
             <RefreshCw
               className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-primary")}
             />
-            <span>Refresh</span>
+            <span>{t("common.refresh")}</span>
           </button>
         </div>
 
@@ -511,7 +515,7 @@ function UsageStatsInner({
                 {totalTokensStr}
               </span>
               <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] mt-0.5">
-                Total tokens
+                {t("settings.totalTokens")}
               </span>
             </div>
 
@@ -521,7 +525,7 @@ function UsageStatsInner({
                 {peakTokensStr}
               </span>
               <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] mt-0.5">
-                Peak tokens
+                {t("settings.peakTokens")}
               </span>
             </div>
 
@@ -531,7 +535,7 @@ function UsageStatsInner({
                 {longestSessionStr}
               </span>
               <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] mt-0.5">
-                Longest session
+                {t("settings.longestSession")}
               </span>
             </div>
 
@@ -541,7 +545,7 @@ function UsageStatsInner({
                 {currentStreakStr}
               </span>
               <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] mt-0.5">
-                Current streak
+                {t("settings.currentStreak")}
               </span>
             </div>
 
@@ -551,7 +555,7 @@ function UsageStatsInner({
                 {longestStreakStr}
               </span>
               <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] mt-0.5">
-                Longest streak
+                {t("settings.longestStreak")}
               </span>
             </div>
           </div>
@@ -563,7 +567,7 @@ function UsageStatsInner({
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-[#262626] dark:text-white">
-              Token Activity
+              {t("settings.tokenActivity")}
             </span>
 
             {/* Surface Theme Variant Picker */}
@@ -601,7 +605,7 @@ function UsageStatsInner({
         {/* ------------------------------------------------------------- */}
         <div className="flex items-center justify-between pt-1">
           <span className="text-sm font-medium text-[#262626] dark:text-white">
-            Time range
+            {t("settings.timeRange")}
           </span>
           <div className="inline-flex items-center rounded-lg bg-[#ececef] dark:bg-[#232427] p-0.5 border border-[#dedee2] dark:border-[#333338]">
             <button
@@ -614,7 +618,7 @@ function UsageStatsInner({
                   : "text-[#737373] dark:text-[#a0a0a5] hover:text-[#171717] dark:hover:text-white"
               )}
             >
-              Last 7 days
+              {t("settings.last7Days")}
             </button>
             <button
               type="button"
@@ -626,7 +630,7 @@ function UsageStatsInner({
                   : "text-[#737373] dark:text-[#a0a0a5] hover:text-[#171717] dark:hover:text-white"
               )}
             >
-              Last 30 days
+              {t("settings.last30Days")}
             </button>
           </div>
         </div>
@@ -638,7 +642,7 @@ function UsageStatsInner({
           {/* Title & Legend */}
           <div className="flex flex-col gap-3">
             <span className="text-sm font-medium text-[#262626] dark:text-white">
-              Daily token trend chart
+              {t("settings.dailyTokenTrend")}
             </span>
 
             <div className="flex items-center gap-2">
@@ -742,7 +746,7 @@ function UsageStatsInner({
 
             {!hasTrendData && (
               <div className="text-center py-2 text-xs text-[#737373] dark:text-[#969696]">
-                No token usage recorded yet for this period
+                {t("settings.noTrendData")}
               </div>
             )}
           </div>
@@ -759,10 +763,10 @@ function UsageStatsInner({
           <div className="rounded-xl border border-[#dedee2] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#18181a] p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3.5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                Weekly Quota
+                {t("settings.weeklyQuotaCard")}
               </span>
               <span className="font-sans tabular-nums text-[11px] font-medium px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2e] text-[#262626] dark:text-[#d4d4d4]">
-                {percentRemaining.toFixed(0)}% Left
+                {percentRemaining.toFixed(0)}% {t("settings.percentLeft")}
               </span>
             </div>
 
@@ -770,7 +774,7 @@ function UsageStatsInner({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-[#737373] dark:text-[#969696] font-medium">
-                  Token Allocation
+                  {t("settings.tokenAllocation")}
                 </span>
                 <span className="font-sans tabular-nums text-[#262626] dark:text-white font-medium text-[11px]">
                   {formatTokens(usedTokens)} / {formatTokens(weeklyLimit)}
@@ -795,7 +799,7 @@ function UsageStatsInner({
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
                 <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  Remaining
+                  {t("settings.remaining")}
                 </span>
                 <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
                   {formatTokens(remainingTokens)}
@@ -804,7 +808,7 @@ function UsageStatsInner({
 
               <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
                 <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  Limit
+                  {t("settings.limit")}
                 </span>
                 <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
                   {formatTokens(weeklyLimit)}
@@ -813,7 +817,7 @@ function UsageStatsInner({
 
               <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
                 <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  Resets In
+                  {t("settings.resetsInLabel")}
                 </span>
                 <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
                   {quota?.resetsInText || "7d 0h"}
@@ -825,7 +829,7 @@ function UsageStatsInner({
             <div className="flex items-start gap-2 pt-1 text-[11px] text-[#737373] dark:text-[#969696] leading-tight">
               <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#737373] dark:text-[#969696]" />
               <span>
-                Free 7M tokens included weekly via native router. Resets on a rolling 7-day cycle.
+                {t("settings.quotaNote")}
               </span>
             </div>
           </div>
@@ -834,10 +838,10 @@ function UsageStatsInner({
           <div className="rounded-xl border border-[#dedee2] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#18181a] p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3.5">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                Model usage
+                {t("settings.modelUsage")}
               </span>
               <span className="text-xs font-sans tabular-nums text-[#737373] dark:text-[#969696]">
-                {formatTokens(totalDonutTokens)} total
+                {formatTokens(totalDonutTokens)} {t("settings.modelUsageTotal")}
               </span>
             </div>
 
@@ -916,12 +920,12 @@ function UsageStatsInner({
             ) : (
               <div className="py-6 flex flex-col items-center justify-center text-center gap-1.5 text-xs text-[#737373] dark:text-[#969696]">
                 <Database className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
-                <span>No model usage recorded yet</span>
+                <span>{t("settings.noUsageRecorded")}</span>
               </div>
             )}
 
             <div className="text-[11px] text-[#737373] dark:text-[#969696] truncate">
-              Aggregated across all conversations in this workspace.
+              {t("settings.workspaceAggregate")}
             </div>
           </div>
         </div>
@@ -933,7 +937,7 @@ function UsageStatsInner({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                Local Requests & Tool Calls
+                {t("settings.localRequestsLog")}
               </span>
               <span className="px-2 py-0.5 rounded-full bg-[#3b82f6]/10 text-[#3b82f6] text-[11px] font-medium font-sans">
                 {localLogs ? localLogs.length : 0} logs
@@ -945,10 +949,10 @@ function UsageStatsInner({
                 type="button"
                 onClick={handleClearLogs}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-[#737373] dark:text-[#969696] hover:text-[#ef4444] transition-colors cursor-pointer"
-                title="Clear local logs"
+                title={t("settings.clearLocalLogs")}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear history</span>
+                <span>{t("settings.clearHistory")}</span>
               </button>
             )}
           </div>
@@ -962,12 +966,12 @@ function UsageStatsInner({
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#f0f0f3] dark:bg-[#202024] text-[#737373] dark:text-[#969696] font-medium sticky top-0 z-10 border-b border-[#dedee2] dark:border-[#28282c]">
                   <tr>
-                    <th className="py-2 px-3">Type</th>
-                    <th className="py-2 px-3">Target / Model</th>
-                    <th className="py-2 px-3 text-right">Tokens</th>
-                    <th className="py-2 px-3 text-right">Duration</th>
-                    <th className="py-2 px-3 text-center">Status</th>
-                    <th className="py-2 px-3 text-right">Time</th>
+                    <th className="py-2 px-3">{t("settings.colType")}</th>
+                    <th className="py-2 px-3">{t("settings.colTargetModel")}</th>
+                    <th className="py-2 px-3 text-right">{t("settings.colTokens")}</th>
+                    <th className="py-2 px-3 text-right">{t("settings.colDuration")}</th>
+                    <th className="py-2 px-3 text-center">{t("settings.colStatus")}</th>
+                    <th className="py-2 px-3 text-right">{t("settings.colTime")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#dedee2] dark:divide-[#242428] font-sans">

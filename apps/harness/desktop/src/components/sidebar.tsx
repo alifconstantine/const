@@ -726,8 +726,8 @@ export function Sidebar({
                 onCollapse();
               }}
               className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
-              title="Collapse sidebar (Ctrl+B)"
-              aria-label="Collapse sidebar"
+              title={t("sidebar.collapseSidebar")}
+              aria-label={t("sidebar.collapseSidebar")}
             >
               <PanelLeft className="w-4 h-4" />
             </button>
@@ -936,7 +936,7 @@ export function Sidebar({
                       <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
                         <Clock className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
                       </div>
-                      <span className="text-xs text-[#888888] dark:text-[#777777]">No recent tasks</span>
+                      <span className="text-xs text-[#888888] dark:text-[#777777]">{t("sidebar.noRecentTasks")}</span>
                     </div>
                   ) : (
                     <>
@@ -951,7 +951,7 @@ export function Sidebar({
                           onClick={() => setIsRecentExpanded((prev) => !prev)}
                           className="w-full h-8 flex items-center px-2.5 rounded-lg text-xs font-normal text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5 transition-colors cursor-pointer text-left select-none"
                         >
-                          <span>{isRecentExpanded ? "Show less" : `See all (${recentConversations.length})`}</span>
+                          <span>{isRecentExpanded ? t("sidebar.showLess") : `${t("sidebar.seeAll")} (${recentConversations.length})`}</span>
                         </button>
                       )}
                     </>
@@ -965,7 +965,7 @@ export function Sidebar({
                     <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
                       <MessageSquare className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
                     </div>
-                    <span className="text-xs text-[#888888] dark:text-[#777777]">No conversations outside project</span>
+                    <span className="text-xs text-[#888888] dark:text-[#777777]">{t("sidebar.noOutsideConversations")}</span>
                   </div>
                 ) : (
                   <>
@@ -980,7 +980,7 @@ export function Sidebar({
                         onClick={() => setIsOutsideExpanded((prev) => !prev)}
                         className="w-full h-8 flex items-center px-2 rounded-lg text-xs font-normal text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5 transition-colors cursor-pointer text-left select-none"
                       >
-                        <span>{isOutsideExpanded ? "Show less" : `See all (${outsideConversations.length})`}</span>
+                        <span>{isOutsideExpanded ? t("sidebar.showLess") : `${t("sidebar.seeAll")} (${outsideConversations.length})`}</span>
                       </button>
                     )}
                   </>
@@ -991,14 +991,14 @@ export function Sidebar({
                 <div className="w-8 h-8 rounded-xl bg-[#dedee2]/50 dark:bg-[#282828] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center">
                   <Folder className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
                 </div>
-                <span className="text-xs text-[#888888] dark:text-[#777777]">No tasks yet</span>
+                <span className="text-xs text-[#888888] dark:text-[#777777]">{t("sidebar.noTasksYet")}</span>
               </div>
             ) : (
               <div className="flex flex-col gap-1">
                 {/* Project Folders List */}
                 {sortedProjectKeys.length === 0 ? (
                   <div className="py-6 px-2 flex flex-col items-center justify-center gap-1.5 text-center select-none">
-                    <span className="text-xs text-[#888888] dark:text-[#777777]">No project folders</span>
+                    <span className="text-xs text-[#888888] dark:text-[#777777]">{t("sidebar.noProjectFolders")}</span>
                   </div>
                 ) : (
                   sortedProjectKeys.map((projectName, index) => {
@@ -1027,7 +1027,7 @@ export function Sidebar({
                               {/* Collapsible Project / Group Header */}
                               <div
                                 className="relative w-full max-w-full h-8 overflow-hidden flex items-center justify-between px-2 rounded-lg text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
-                                title={`Drag to reorder • ${projectName}`}
+                                title={`${t("sidebar.dragToReorder")} • ${projectName}`}
                               >
                                 <button
                                   type="button"
@@ -1055,7 +1055,7 @@ export function Sidebar({
                                         ? "text-[#262626] dark:text-white opacity-100"
                                         : "text-[#777777] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white opacity-0 group-hover/folder:opacity-100"
                                     }`}
-                                    title={pinnedProjects.includes(projectName) ? "Unpin project" : "Pin project"}
+                                    title={pinnedProjects.includes(projectName) ? t("sidebar.unpinProject") : t("sidebar.pinProject")}
                                     aria-label="Pin project"
                                   >
                                     <Pin
@@ -1074,7 +1074,7 @@ export function Sidebar({
                                       onNewChat?.(projectName);
                                     }}
                                     className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#777777] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer opacity-0 group-hover/folder:opacity-100"
-                                    title={`New task in ${getProjectDisplayName(projectName)}`}
+                                    title={`${t("sidebar.newTaskIn")} ${getProjectDisplayName(projectName)}`}
                                     aria-label="New chat in this project"
                                   >
                                     <MessageCirclePlus className="w-3.5 h-3.5" />
@@ -1402,14 +1402,14 @@ export function Sidebar({
 
               <div className="w-full min-w-0 max-h-80 overflow-y-auto overflow-x-hidden flex flex-col gap-1.5 pr-1">
                 {isArchiveLoading ? (
-                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">Loading archived sessions...</div>
+                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">{t("sidebar.loadingArchivedSessions")}</div>
                 ) : archivedSessions.length === 0 ? (
                   <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#a9a9a9] dark:text-[#777777]">
                     <Archive className="w-8 h-8 opacity-40" />
-                    <span className="text-xs">No archived conversations</span>
+                    <span className="text-xs">{t("sidebar.noArchivedConversations")}</span>
                   </div>
                 ) : filteredArchivedSessions.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">No matching archived conversations</div>
+                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">{t("sidebar.noMatchingArchived")}</div>
                 ) : (
                   filteredArchivedSessions.map((convo) => (
                     <div
@@ -1459,7 +1459,7 @@ export function Sidebar({
                               type="button"
                               onClick={(e) => e.stopPropagation()}
                               className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none shrink-0"
-                              title="More actions"
+                              title={t("sidebar.moreActions")}
                             >
                               <MoreHorizontal className="w-3.5 h-3.5" />
                             </button>
@@ -1476,7 +1476,7 @@ export function Sidebar({
                               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
                             >
                               <ArchiveRestore className="w-3.5 h-3.5" />
-                              <span>Unarchive session</span>
+                              <span>{t("sidebar.unarchiveSession")}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={(e) => {
@@ -1486,7 +1486,7 @@ export function Sidebar({
                               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete session</span>
+                              <span>{t("sidebar.deleteSession")}</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

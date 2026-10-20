@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "../../lib/i18n";
 import {
   toast,
   cn,
@@ -71,6 +72,7 @@ function getInitialProjectOptions(activeWorkspace: string | null): ProjectOption
 }
 
 export function MemorySettings({ currentProject }: MemorySettingsProps) {
+  const { t } = useTranslation();
   // 1. Workspace Memory master toggle
   const [memoryEnabled, setMemoryEnabled] = useState<boolean>(true);
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
@@ -369,10 +371,10 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors">
         <div className="flex flex-col gap-1 pr-2">
           <span className="text-[14px] font-medium text-[#262626] dark:text-white tracking-tight">
-            Workspace Memory
+            {t("settings.workspaceMemory")}
           </span>
           <p className="text-[12px] leading-relaxed text-[#737373] dark:text-[#969696] max-w-xl">
-            Save and reuse long-term context in workspaces. Applies to new sessions and may increase model requests and token costs.
+            {t("settings.workspaceMemoryDesc")}
           </p>
         </div>
 
@@ -400,7 +402,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               type="button"
               onClick={() => setIsScopeDropdownOpen((prev) => !prev)}
               className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
-              title="Select workspace memory scope"
+              title={t("settings.selectScope")}
             >
               {selectedProjectObj.isGlobal ? (
                 <Globe className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
@@ -417,7 +419,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             {isScopeDropdownOpen && (
               <div className="absolute left-0 top-full mt-1.5 w-64 max-h-60 overflow-y-auto bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
                 <span className="text-[10px] uppercase font-semibold text-[#737373] dark:text-[#888888] px-2.5 py-1">
-                  Memory Scope
+                  {t("settings.memoryScope")}
                 </span>
                 {projectsList.map((p) => {
                   const isSelected = selectedScopeId === p.id;
@@ -454,7 +456,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
 
           {/* Memory Count Indicator */}
           <span className="text-xs text-[#737373] dark:text-[#969696] tabular-nums whitespace-nowrap">
-            {filteredFiles.length} {filteredFiles.length === 1 ? "memory" : "memories"}
+            {filteredFiles.length} {filteredFiles.length === 1 ? t("settings.memoryUnit") : t("settings.memoriesUnit")}
           </span>
         </div>
 
@@ -467,7 +469,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search memory files..."
+              placeholder={t("settings.searchMemoryFiles")}
               className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] text-[#262626] dark:text-white placeholder:text-[#888888] dark:placeholder:text-[#737373] focus:outline-none transition-colors"
             />
             {searchQuery && (
@@ -486,7 +488,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             type="button"
             onClick={() => fetchMemoryFiles(selectedScopeId)}
             className="p-2 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
-            title="Refresh memory files"
+            title={t("settings.refreshFiles")}
           >
             <RotateCw className={cn("w-3.5 h-3.5", isLoadingFiles && "animate-spin")} />
           </button>
@@ -500,10 +502,10 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               setIsCreatingNew(true);
             }}
             className="px-2.5 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#262626] dark:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer outline-none shrink-0"
-            title="Create new memory file"
+            title={t("settings.newMemoryFile")}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">New</span>
+            <span className="hidden sm:inline">{t("settings.newBtn")}</span>
           </button>
         </div>
       </div>
@@ -513,13 +515,13 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       {/* ------------------------------------------------------------- */}
       <div className="flex flex-col gap-2.5">
         <span className="text-[12px] font-medium text-[#737373] dark:text-[#969696]">
-          Files
+          {t("settings.filesHeader")}
         </span>
 
         {isLoadingFiles ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2 text-xs text-[#737373]">
             <RotateCw className="w-5 h-5 animate-spin" />
-            <span>Loading memory files...</span>
+            <span>{t("settings.loadingMemoryFiles")}</span>
           </div>
         ) : filteredFiles.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-[#fafafa] dark:bg-[#222222] p-8 flex flex-col items-center justify-center text-center gap-2.5">
@@ -528,12 +530,12 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-medium text-[#262626] dark:text-white">
-                {searchQuery ? "No matching memory files" : "No memory files yet"}
+                {searchQuery ? t("settings.noMatchingFiles") : t("settings.noMemoryFiles")}
               </span>
               <span className="text-[11px] text-[#737373] dark:text-[#969696] max-w-sm mt-0.5">
                 {searchQuery
-                  ? "Try searching with different keywords."
-                  : "Important facts and conventions will appear here when the agent calls retain, or you can create one."}
+                  ? t("settings.tryDifferentKeywords")
+                  : t("settings.memoriesAppearHere")}
               </span>
             </div>
             {!searchQuery && (
@@ -596,7 +598,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                         setActiveMenuFileId(isMenuOpen ? null : file.path);
                       }}
                       className="px-2 py-1 rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white flex items-center gap-1.5 text-xs transition-colors cursor-pointer outline-none"
-                      title="File actions"
+                      title={t("settings.fileActions")}
                     >
                       <Folder className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
                       <ChevronDown className="w-3 h-3 text-[#737373] dark:text-[#969696]" />
@@ -615,7 +617,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                           className="w-full px-2.5 py-1.5 rounded-lg text-left flex items-center gap-2 text-xs text-[#555555] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5 text-[#737373]" />
-                          <span>View / Preview</span>
+                          <span>{t("settings.viewPreview")}</span>
                         </button>
 
                         <button
@@ -624,7 +626,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                           className="w-full px-2.5 py-1.5 rounded-lg text-left flex items-center gap-2 text-xs text-[#555555] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         >
                           <FileCode className="w-3.5 h-3.5 text-[#737373]" />
-                          <span>Edit Markdown</span>
+                          <span>{t("settings.editMarkdown")}</span>
                         </button>
 
                         <button
@@ -633,7 +635,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                           className="w-full px-2.5 py-1.5 rounded-lg text-left flex items-center gap-2 text-xs text-[#555555] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         >
                           <FolderOpen className="w-3.5 h-3.5 text-[#737373]" />
-                          <span>Show in Explorer</span>
+                          <span>{t("settings.showInExplorer")}</span>
                         </button>
 
                         <div className="h-px bg-[#dedee2] dark:bg-[#383838] my-0.5" />
@@ -648,7 +650,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                           className="w-full px-2.5 py-1.5 rounded-lg text-left flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                          <span>Delete file</span>
+                          <span>{t("settings.deleteMemoryFile")}</span>
                         </button>
                       </div>
                     )}
@@ -701,7 +703,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                     )}
                   >
                     <Eye className="w-3 h-3" />
-                    <span>Preview</span>
+                    <span>{t("common.preview")}</span>
                   </button>
                   <button
                     type="button"
@@ -714,7 +716,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                     )}
                   >
                     <FileCode className="w-3 h-3" />
-                    <span>Edit</span>
+                    <span>{t("common.edit")}</span>
                   </button>
                 </div>
 
@@ -777,7 +779,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   ) : (
                     <Save className="w-3.5 h-3.5" />
                   )}
-                  <span>Save changes</span>
+                  <span>{t("common.save")}</span>
                 </button>
               </div>
             </div>
@@ -803,7 +805,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               </div>
               <div className="flex flex-col gap-1 min-w-0">
                 <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                  Delete Memory File?
+                  {t("settings.deleteMemoryFile")}?
                 </span>
                 <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
                   Are you sure you want to delete <strong className="text-black dark:text-white font-medium">{deletingFile.name}</strong>? This action cannot be undone.
@@ -851,7 +853,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                Create Memory File
+                {t("settings.newMemoryFile")}
               </span>
               <button
                 type="button"
@@ -909,7 +911,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 ) : (
                   <Plus className="w-3.5 h-3.5" />
                 )}
-                <span>Create file</span>
+                <span>{t("settings.newMemoryFile")}</span>
               </button>
             </div>
           </div>

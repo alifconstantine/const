@@ -639,7 +639,7 @@ export function ModelSettings({
             )}
           >
             <Box className="w-3.5 h-3.5" />
-            <span>LLM</span>
+            <span>{t("settings.llm")}</span>
           </button>
 
           <button
@@ -654,7 +654,7 @@ export function ModelSettings({
             )}
           >
             <Volume2 className="w-3.5 h-3.5" />
-            <span>Speech</span>
+            <span>{t("settings.speech")}</span>
           </button>
 
           <button
@@ -669,7 +669,7 @@ export function ModelSettings({
             )}
           >
             <ImageIcon className="w-3.5 h-3.5" />
-            <span>Image</span>
+            <span>{t("settings.image")}</span>
           </button>
 
           <button
@@ -684,7 +684,7 @@ export function ModelSettings({
             )}
           >
             <VideoIcon className="w-3.5 h-3.5" />
-            <span>Video</span>
+            <span>{t("settings.video")}</span>
           </button>
         </div>
 
@@ -696,7 +696,7 @@ export function ModelSettings({
               className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Provider</span>
+              <span>{t("settings.addProvider")}</span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
@@ -709,14 +709,14 @@ export function ModelSettings({
               className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>Choose Adapter Provider</span>
+              <span>{t("settings.chooseAdapterProvider")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={handleAddCustomProvider}
               className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>Add Custom Provider</span>
+              <span>{t("settings.addCustomProvider")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -744,21 +744,21 @@ export function ModelSettings({
             {/* Title & Description */}
             <h3 className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
               {activeCategory === "speech"
-                ? "No speech providers configured"
+                ? t("settings.noSpeechProviders")
                 : activeCategory === "image"
-                ? "No image providers configured"
+                ? t("settings.noImageProviders")
                 : activeCategory === "video"
-                ? "No video providers configured"
-                : "No language model providers configured"}
+                ? t("settings.noVideoProviders")
+                : t("settings.noLlmProviders")}
             </h3>
             <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1 leading-relaxed">
               {activeCategory === "speech"
-                ? "Connect a speech synthesis adapter or custom audio endpoint to get started."
+                ? t("settings.connectSpeechDesc")
                 : activeCategory === "image"
-                ? "Connect an image generation adapter or custom endpoint to get started."
+                ? t("settings.connectImageDesc")
                 : activeCategory === "video"
-                ? "Connect a video generation adapter or custom endpoint to get started."
-                : "Connect an LLM provider adapter or custom endpoint to get started."}
+                ? t("settings.connectVideoDesc")
+                : t("settings.connectLlmDesc")}
             </p>
 
             {/* Action Buttons */}
@@ -769,14 +769,14 @@ export function ModelSettings({
                 className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Choose Adapter</span>
+                <span>{t("settings.chooseAdapter")}</span>
               </button>
               <button
                 type="button"
                 onClick={handleAddCustomProvider}
                 className="h-8 px-3.5 rounded-xl bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Custom Endpoint</span>
+                <span>{t("settings.customEndpoint")}</span>
               </button>
             </div>
           </div>
@@ -805,12 +805,12 @@ export function ModelSettings({
                   </span>
                   {provider.isCustom && (
                     <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
-                      Custom
+                      {t("settings.customBadge")}
                     </span>
                   )}
                   {provider.isDefault && (
                     <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
-                      Default
+                      {t("settings.defaultBadge")}
                     </span>
                   )}
                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -830,7 +830,7 @@ export function ModelSettings({
                         : "border-border hover:bg-secondary text-foreground"
                     )}
                   >
-                    {isExpanded ? "Close" : "Edit"}
+                    {isExpanded ? t("common.close") : t("common.edit")}
                   </button>
                   {!provider.isDefault && (
                     <button
@@ -838,7 +838,7 @@ export function ModelSettings({
                       onClick={(e) => handleDeleteProvider(provider.id, e)}
                       className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-xs font-medium transition-all cursor-pointer"
                     >
-                      Delete
+                      {t("common.delete")}
                     </button>
                   )}
                 </div>
@@ -849,14 +849,14 @@ export function ModelSettings({
                 <div className="px-5 pb-5 pt-2 space-y-5 border-t border-border/40 animate-in fade-in-50 duration-200">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">
-                      {editingProvider.name || "Configure Provider"}
+                      {editingProvider.name || t("settings.configureProvider")}
                     </h3>
                   </div>
 
                   {/* 1. Display name */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground block">
-                      Display name
+                      {t("settings.providerName")}
                     </label>
                     <input
                       type="text"
@@ -872,7 +872,7 @@ export function ModelSettings({
                   {/* 2. Base URL */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground block">
-                      Base URL
+                      {t("settings.baseUrl")}
                     </label>
                     <input
                       type="text"
@@ -888,7 +888,7 @@ export function ModelSettings({
                   {/* 3. API Protocol */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground block">
-                      API protocol
+                      {t("settings.apiProtocol")}
                     </label>
                     {activeCategory === "llm" ? (
                       <Select
@@ -990,7 +990,7 @@ export function ModelSettings({
                   {/* 4. API Key with Visibility Toggle */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground block">
-                      API key
+                      {t("settings.apiKey")}
                     </label>
                     <div className="relative">
                       <input
@@ -1027,7 +1027,7 @@ export function ModelSettings({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <label className="text-xs font-medium text-foreground block">
-                            Voice Character
+                            {t("settings.voice")}
                           </label>
                           <Select
                             value={editingProvider.voice || "alloy"}
@@ -1054,7 +1054,7 @@ export function ModelSettings({
 
                         <div className="space-y-1.5">
                           <label className="text-xs font-medium text-foreground block">
-                            Speech Rate: {editingProvider.speed || 1.0}x
+                            {t("settings.speed")}: {editingProvider.speed || 1.0}x
                           </label>
                           <div className="flex items-center gap-2 pt-2">
                             <input
@@ -1083,7 +1083,7 @@ export function ModelSettings({
                         <div className="flex items-center gap-2 min-w-0">
                           <Volume2 className="w-4 h-4 text-muted-foreground shrink-0" />
                           <span className="text-xs text-foreground truncate">
-                            Preview voice sample ({editingProvider.voice || "alloy"})
+                            {t("settings.playSampleAudio")} ({editingProvider.voice || "alloy"})
                           </span>
                         </div>
                         <button
@@ -1098,7 +1098,7 @@ export function ModelSettings({
                           className="px-3 py-1.5 rounded-lg border border-border hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           <Play className="w-3.5 h-3.5" />
-                          <span>{isPlayingSpeech ? "Playing..." : "Test Audio"}</span>
+                          <span>{isPlayingSpeech ? t("settings.playing") : t("settings.playSampleAudio")}</span>
                         </button>
                       </div>
                     </div>
@@ -1187,7 +1187,7 @@ export function ModelSettings({
                     <div className="flex items-center justify-between pb-1">
                       <div>
                         <label className="text-xs font-medium text-foreground block">
-                          Models
+                          {t("settings.models")}
                         </label>
                         <span className="text-[11px] text-muted-foreground">
                           Customized model catalog
@@ -1200,7 +1200,7 @@ export function ModelSettings({
                           onClick={handleRestoreDefaults}
                           className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                         >
-                          Restore defaults
+                          {t("settings.restoreDefaults")}
                         </button>
                         <button
                           type="button"
@@ -1211,7 +1211,7 @@ export function ModelSettings({
                           <RefreshCw
                             className={cn("w-3 h-3", isFetchingModels && "animate-spin")}
                           />
-                          <span>Fetch available models</span>
+                          <span>{t("settings.fetchModels")}</span>
                         </button>
                       </div>
                     </div>
@@ -1220,7 +1220,7 @@ export function ModelSettings({
                     <div className="space-y-2">
                       {(!editingProvider.models || editingProvider.models.length === 0) ? (
                         <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
-                          No models registered. Enter model ID below or fetch from provider.
+                          {t("settings.noModelsRegistered")}
                         </div>
                       ) : (
                         editingProvider.models.map((model: any) => {
@@ -1256,7 +1256,7 @@ export function ModelSettings({
                                 {isDefault ? (
                                   <span className="text-[11px] font-medium text-foreground/90 px-2.5 py-0.5 rounded-full bg-secondary/80 border border-border/80 flex items-center gap-1">
                                     <Check className="w-3 h-3 text-emerald-500" />
-                                    <span>Default</span>
+                                    <span>{t("settings.defaultBadge")}</span>
                                   </span>
                                 ) : (
                                   <button
@@ -1264,7 +1264,7 @@ export function ModelSettings({
                                     onClick={() => handleSetDefaultModel(model.id, editingProvider.id)}
                                     className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                   >
-                                    Set Default
+                                    {t("settings.setDefault")}
                                   </button>
                                 )}
 
@@ -1272,7 +1272,7 @@ export function ModelSettings({
                                   type="button"
                                   onClick={() => handleRemoveModelFromForm(model.id)}
                                   className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-1"
-                                  title="Remove model"
+                                  title={t("common.remove")}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1288,7 +1288,7 @@ export function ModelSettings({
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div>
                               <label className="text-[11px] text-muted-foreground block mb-1">
-                                Model ID
+                                {t("settings.modelId")}
                               </label>
                               <input
                                 type="text"
@@ -1300,7 +1300,7 @@ export function ModelSettings({
                             </div>
                             <div>
                               <label className="text-[11px] text-muted-foreground block mb-1">
-                                Specs / Context Window
+                                {t("settings.contextWindow")}
                               </label>
                               <input
                                 type="text"
@@ -1335,7 +1335,7 @@ export function ModelSettings({
                           className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs text-foreground font-medium transition-colors cursor-pointer flex items-center gap-1.5 mt-2"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>Add model</span>
+                          <span>{t("settings.addCustomModel")}</span>
                         </button>
                       )}
                     </div>
@@ -1356,7 +1356,7 @@ export function ModelSettings({
                           ) : (
                             <Unplug className="w-3.5 h-3.5" />
                           )}
-                          <span>{isTestingPing ? "Testing..." : "Test Connection"}</span>
+                          <span>{isTestingPing ? t("settings.testingPing") : t("settings.testPing")}</span>
                         </button>
                       )}
                     </div>
@@ -1392,7 +1392,7 @@ export function ModelSettings({
           <div className="bg-[#f9f9fb] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl w-full max-w-md p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[#262626] dark:text-white">
-                Add {activeCategory.toUpperCase()} Provider Adapter
+                {t("settings.addProviderAdapter")} ({activeCategory.toUpperCase()})
               </h3>
               <button
                 type="button"
@@ -1403,7 +1403,7 @@ export function ModelSettings({
               </button>
             </div>
             <p className="text-xs text-[#737373] dark:text-[#969696]">
-              Select an adapter template to prefill endpoint defaults. You can fetch or add models once connected:
+              {t("settings.selectAdapterTemplate")}
             </p>
 
             <ScrollArea className="max-h-72 pr-1">
