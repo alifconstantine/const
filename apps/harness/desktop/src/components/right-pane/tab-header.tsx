@@ -14,12 +14,6 @@ import {
   VolumeX,
   Bot,
   FolderTree,
-  Minus,
-  Square,
-  Copy,
-  PanelRight,
-  Maximize2,
-  Minimize2,
   Waypoints,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
@@ -119,30 +113,6 @@ export function TabHeader({
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
-
-  const [isMaximized, setIsMaximized] = useState(false);
-
-  useEffect(() => {
-    window.electron?.isMaximized?.().then((max) => setIsMaximized(Boolean(max)));
-    const cleanup = window.electron?.onMaximizedChange?.((max) => {
-      setIsMaximized(max);
-    });
-    return () => {
-      cleanup?.();
-    };
-  }, []);
-
-  const handleMinimize = () => {
-    window.electron?.minimize?.();
-  };
-
-  const handleMaximize = () => {
-    window.electron?.maximize?.();
-  };
-
-  const handleClose = () => {
-    window.electron?.close?.();
-  };
 
   // Drag and drop state
   const isDraggingRef = useRef(false);
@@ -363,7 +333,7 @@ export function TabHeader({
             handleDragEnd();
           }
         }}
-        className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 px-1.5"
+        className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 pl-1.5 pr-[175px]"
       >
         {tabs.map((tab, index) => {
           const Icon = getTabIcon(tab.type);
@@ -487,94 +457,6 @@ export function TabHeader({
           aria-label={t("rightPane.openNewTab")}
         >
           <Plus className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* 3. Window Controls on the far right (Expand full, Toggle SidePanel, Minimize, Maximize/Restore, Close) */}
-      <div
-        className="flex items-center gap-0.5 ml-auto pl-1 pr-1.5 shrink-0 select-none z-30"
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-      >
-        {onToggleExpand && (
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              onToggleExpand();
-            }}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer mr-0.5 select-none"
-            title={isExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
-            aria-label={isExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
-          >
-            {isExpanded ? (
-              <Minimize2 className="w-3.5 h-3.5" />
-            ) : (
-              <Maximize2 className="w-3.5 h-3.5" />
-            )}
-          </button>
-        )}
-
-        {onCollapse && (
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              onCollapse();
-            }}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer mr-0.5 select-none"
-            title={t("rightPane.hidePanel")}
-            aria-label={t("rightPane.hidePanel")}
-          >
-            <PanelRight className="w-3.5 h-3.5" />
-          </button>
-        )}
-
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.currentTarget.blur();
-            handleMinimize();
-          }}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
-          title={t("common.minimize")}
-          aria-label={t("common.minimize")}
-        >
-          <Minus className="w-3.5 h-3.5" />
-        </button>
-
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.currentTarget.blur();
-            handleMaximize();
-          }}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
-          title={isMaximized ? t("common.restore") : t("common.maximize")}
-          aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
-        >
-          {isMaximized ? (
-            <Copy className="w-3 h-3 rotate-180" />
-          ) : (
-            <Square className="w-3 h-3" />
-          )}
-        </button>
-
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.currentTarget.blur();
-            handleClose();
-          }}
-          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#666666] dark:text-[#999999] hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-[#e81123] transition-colors cursor-pointer select-none"
-          title={t("common.close")}
-          aria-label={t("common.close")}
-        >
-          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

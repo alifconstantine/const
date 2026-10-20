@@ -16,6 +16,9 @@ import {
   Minus,
   Square,
   X,
+  PanelRight,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -698,14 +701,29 @@ function AuthenticatedContent({
     return () => ro.disconnect();
   }, []);
 
-  const handleToggleRightSidebar = () => {
+  const handleCloseRightSidebar = useCallback(() => {
+    setIsRightSidebarOpen(false);
+    if (isRightSidebarExpandedRef.current) {
+      setTimeout(() => {
+        setIsRightSidebarExpanded(false);
+      }, 320);
+    }
+  }, []);
+
+  const handleToggleRightSidebar = useCallback(() => {
     setIsRightSidebarOpen((prev) => {
       if (prev) {
-        setIsRightSidebarExpanded(false);
+        if (isRightSidebarExpandedRef.current) {
+          setTimeout(() => {
+            setIsRightSidebarExpanded(false);
+          }, 320);
+        }
+        return false;
+      } else {
+        return true;
       }
-      return !prev;
     });
-  };
+  }, []);
 
   const handleToggleBottomPanel = useCallback(async () => {
     if (!isBottomPanelOpenRef.current && bottomPanelTabsRef.current.length === 0) {
@@ -3663,10 +3681,10 @@ function AuthenticatedContent({
       if (activeRightPaneTabIdRef.current) {
         handleCloseTab(activeRightPaneTabIdRef.current);
       } else {
-        setIsRightSidebarOpen(false);
+        handleCloseRightSidebar();
       }
     }
-  }, [isSettingsOpen, isSearchOpen, isScheduledTasksOpen, isSkillsOpen, isTaskFindOpen, handleCloseTab]);
+  }, [isSettingsOpen, isSearchOpen, isScheduledTasksOpen, isSkillsOpen, isTaskFindOpen, handleCloseTab, handleCloseRightSidebar]);
 
   // Global Keyboard Shortcuts matching ZCode Reference
   useEffect(() => {
@@ -4381,7 +4399,7 @@ function AuthenticatedContent({
                   : "opacity-0 pointer-events-none"
               )}
               style={{
-                right: `${rightSidebarWidth}px`,
+                right: !isRightSidebarOpen ? 0 : `${rightSidebarWidth}px`,
                 width: "10px",
               }}
               title={t("rightPane.dragToResize")}
@@ -4393,22 +4411,26 @@ function AuthenticatedContent({
             <div
               className={cn(
                 "absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30",
-                !isDraggingRightSidebar && "transition-[width,opacity] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-                isRightSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                isRightSidebarOpen ? "pointer-events-auto" : "pointer-events-none"
               )}
               style={{
                 width: !isRightSidebarOpen
                   ? 0
                   : isRightSidebarExpanded
-                  ? "100%"
+                  ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                   : `${rightSidebarWidth}px`,
               }}
             >
               <div
                 className="h-full overflow-hidden shrink-0"
                 style={{
-                  width: isRightSidebarExpanded ? "100%" : `${rightSidebarWidth}px`,
-                  minWidth: isRightSidebarExpanded ? "100%" : `${rightSidebarWidth}px`,
+                  width: isRightSidebarExpanded
+                    ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
+                    : `${rightSidebarWidth}px`,
+                  minWidth: isRightSidebarExpanded
+                    ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
+                    : `${rightSidebarWidth}px`,
                   transition: !isDraggingRightSidebar
                     ? "width 300ms cubic-bezier(0.16,1,0.3,1), min-width 300ms cubic-bezier(0.16,1,0.3,1)"
                     : "none",
@@ -4455,13 +4477,116 @@ function AuthenticatedContent({
                   onInsertToMainPrompt={(text) => {
                     setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
                   }}
-                  onCollapse={() => {
-                    setIsRightSidebarExpanded(false);
-                    setIsRightSidebarOpen(false);
-                  }}
+                  onCollapse={handleCloseRightSidebar}
                   isExpanded={isRightSidebarExpanded}
                   onToggleExpand={() => setIsRightSidebarExpanded((prev) => !prev)}
                 />
+              </div>
+            </div>
+
+            {/* Unified Stationary Top-Right Window Controls & Sidebar Actions */}
+            <div
+              className="absolute top-0 right-0 h-11 flex items-center pr-3 z-40 select-none pointer-events-none"
+              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-0.5 pointer-events-auto">
+                {/* Expand / Restore SidePanel (Smoothly expands/collapses when sidebar is open) */}
+                <div
+                  className={cn(
+                    "overflow-hidden flex items-center transition-[width,opacity] duration-200",
+                    isRightSidebarOpen ? "w-7 opacity-100 mr-0.5" : "w-0 opacity-0 pointer-events-none mr-0"
+                  )}
+                >
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      setIsRightSidebarExpanded((prev) => !prev);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
+                    title={isRightSidebarExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
+                    aria-label={isRightSidebarExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
+                  >
+                    {isRightSidebarExpanded ? (
+                      <Minimize2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Toggle SidePanel (PanelRight) - Stays stationary in place at all times */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    handleToggleRightSidebar();
+                  }}
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
+                    isRightSidebarOpen
+                      ? "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+                      : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
+                  )}
+                  title={isRightSidebarOpen ? t("rightPane.hidePanel") : t("topToolbar.openRightSidebar")}
+                  aria-label={t("topToolbar.toggleRightPane")}
+                >
+                  <PanelRight className="w-4 h-4" />
+                </button>
+
+                {/* Hairline Divider */}
+                <div className="w-[1px] h-3.5 bg-[#dedee2] dark:bg-[#383838]/70 mx-1" />
+
+                {/* Minimize Window */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    window.electron?.minimize?.();
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
+                  title={t("common.minimize")}
+                  aria-label={t("common.minimize")}
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Maximize / Restore Window */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    window.electron?.maximize?.();
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
+                  title={isWindowMaximized ? t("common.restore") : t("common.maximize")}
+                  aria-label={isWindowMaximized ? t("common.restore") : t("common.maximize")}
+                >
+                  {isWindowMaximized ? (
+                    <Copy className="w-3 h-3 rotate-180" />
+                  ) : (
+                    <Square className="w-3 h-3" />
+                  )}
+                </button>
+
+                {/* Close Window */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    window.electron?.close?.();
+                  }}
+                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#666666] dark:text-[#999999] hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-[#e81123] transition-colors cursor-pointer select-none"
+                  title={t("common.close")}
+                  aria-label={t("common.close")}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </>
