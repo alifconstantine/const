@@ -343,7 +343,7 @@ async function dispatchSingleModel({
   const isConstBuiltin = isBuiltinModel(targetModel) && !providerDocId;
 
   if (isConstBuiltin) {
-    telemetryMeta.provider = "Google AI";
+    telemetryMeta.provider = "Const Gateway";
 
     // Enforce 7M Weekly Free Token Quota for Const-managed engine
     if (convexUrl && (providedKey || ssoToken)) {

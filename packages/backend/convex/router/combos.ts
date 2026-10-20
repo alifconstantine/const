@@ -158,12 +158,22 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
       providerName: "Const Gateway",
     },
     {
-      modelId: "gemini-3.7-flash",
+      modelId: "gpt-6-luna",
       providerId: "const",
       providerName: "Const Gateway",
     },
     {
-      modelId: "qwen-3.8-27b",
+      modelId: "glm-5.3-flash",
+      providerId: "const",
+      providerName: "Const Gateway",
+    },
+    {
+      modelId: "deepseek-v4.1-flash",
+      providerId: "const",
+      providerName: "Const Gateway",
+    },
+    {
+      modelId: "qwen-3.8-omni-flash",
       providerId: "const",
       providerName: "Const Gateway",
     },

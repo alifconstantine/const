@@ -167,7 +167,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean.includes("glm-5.3") ||
     clean.includes("glm 5.3")
   ) {
-    return "oc-nara/glm-5.3-flash";
+    return "GLM 5.3 Flash";
   }
 
   // 2. Gemini 3.8 Flash
@@ -188,7 +188,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean.includes("deepseek v4.1") ||
     clean.includes("deepseek-v4")
   ) {
-    return "oc-nara/deepseek-v4.1-flash";
+    return "Deepseek v4.1 Flash";
   }
 
   // 4. Qwen 3.8 Omni Flash
@@ -197,7 +197,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean === "qwen 3.8 omni flash" ||
     clean.includes("qwen")
   ) {
-    return "atmo/ali/qwen3.8-omni-flash";
+    return "Qwen 3.8 Omni Flash";
   }
 
   // 5. GPT 6 Luna
@@ -241,6 +241,7 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   const clean = modelId.toLowerCase().trim();
   if (clean.startsWith("antigravity/")) return true;
   if (clean === "const-search" || clean === "const search") return true;
+  if (clean.startsWith("auto/")) return true;
   if (
     clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" || clean.startsWith("gemini-3.8") ||
     clean === "glm-5.3-flash" || clean === "glm 5.3 flash" || clean.includes("glm-5.3") ||
