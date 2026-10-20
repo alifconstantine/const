@@ -27,6 +27,7 @@ export interface LlmModel {
   supportsThinking?: boolean;
   thinkingLevels?: string[];
   isDefault?: boolean;
+  inputTypes?: string[];
 }
 
 export type LlmProtocol =
@@ -58,6 +59,7 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     isDefault: true,
+    inputTypes: ["text", "image", "audio", "video"],
     description: "Advanced frontier reasoning model with 1M context and multimodal tool calling. Included in free weekly quota.",
   },
   {
@@ -68,6 +70,7 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     description: "Ultra-fast response model optimized for real-time coding, tool execution, and natural dialogue.",
+    inputTypes: ["text", "image", "video"],
   },
   {
     id: "deepseek-v4.1-flash",
@@ -77,6 +80,7 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     description: "High-performance MoE reasoning model specializing in algorithmic coding, math, and code refactoring.",
+    inputTypes: ["text", "image"],
   },
   {
     id: "qwen-3.8-omni-flash",
@@ -86,6 +90,7 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     description: "Native omni-modal foundation model strong across multilingual tasks, code, vision, and audio.",
+    inputTypes: ["text", "image", "audio", "video"],
   },
   {
     id: "gpt-6-luna",
@@ -95,6 +100,7 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     description: "Frontier reasoning powerhouse with 272K context, nuanced writing, and high-fidelity problem solving.",
+    inputTypes: ["text", "image"],
   },
   {
     id: "combo/coding",

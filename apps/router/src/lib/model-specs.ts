@@ -44,7 +44,7 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     isDefault: true,
-    inputTypes: ["text", "image", "video"],
+    inputTypes: ["text", "image", "audio", "video"],
     outputTypes: ["text"],
   },
   {
@@ -60,7 +60,7 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    inputTypes: ["text"],
+    inputTypes: ["text", "image", "video"],
     outputTypes: ["text"],
   },
   {
@@ -76,7 +76,7 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    inputTypes: ["text"],
+    inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
   {
@@ -108,7 +108,7 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    inputTypes: ["text"],
+    inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
   {

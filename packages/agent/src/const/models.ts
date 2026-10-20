@@ -12,6 +12,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1000000,
+    inputTypes: ["text", "image", "audio", "video"],
   },
   {
     id: "glm-5.3-flash",
@@ -24,6 +25,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1000000,
+    inputTypes: ["text", "image", "video"],
   },
   {
     id: "deepseek-v4.1-flash",
@@ -36,6 +38,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1000000,
+    inputTypes: ["text", "image"],
   },
   {
     id: "qwen-3.8-omni-flash",
@@ -48,6 +51,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1000000,
+    inputTypes: ["text", "image", "audio", "video"],
   },
   {
     id: "gpt-6-luna",
@@ -60,6 +64,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 272000,
+    inputTypes: ["text", "image"],
   },
   {
     id: "combo/auto",

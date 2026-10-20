@@ -89,6 +89,7 @@ import {
   type ConversationItem,
 } from "./lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "./lib/mention-search";
+import { CONST_ROUTER_LLM_MODELS } from "./lib/models-config";
 import type {
   FileMutationRecord,
   TraceStep,
@@ -142,7 +143,8 @@ interface ChatMessage {
 
 function formatChatMessageForLlm(
   m: ChatMessage,
-  allConvos: ConversationItem[]
+  allConvos: ConversationItem[],
+  targetModelId?: string
 ): { role: string; content: string | any[] } {
   if (m.role !== "user") {
     return {
@@ -161,6 +163,13 @@ function formatChatMessageForLlm(
     };
   }
 
+  const targetModel = targetModelId
+    ? CONST_ROUTER_LLM_MODELS.find(
+        (mod) => mod.id === targetModelId || mod.name.toLowerCase() === targetModelId.toLowerCase()
+      )
+    : undefined;
+  const supportsImage = !targetModel || !targetModel.inputTypes || targetModel.inputTypes.includes("image");
+
   const hasExistingAttachmentSection = textContent.includes("[Attached media / Lampiran media:");
   const attLines = m.attachments.map((att: any) => {
     const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
@@ -174,21 +183,25 @@ function formatChatMessageForLlm(
     fullText = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
   }
 
-  // Append media notices for video, audio, or binary attachments so AI knows disk location & tools
+  // Append media notices for video, audio, image (if model is text-only), or binary attachments so AI knows disk location & tools
   const mediaNotices: string[] = [];
   for (const att of m.attachments) {
     if (!att.textContent) {
       if (att.type === "video") {
         mediaNotices.push(
-          `[VIDEO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Video file is stored on disk at the indicated path. You may use workspace tools (such as ffmpeg, ffprobe, python) to inspect or process it if needed.]`
+          `[VIDEO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Berkas video tersimpan di disk pada path tersebut. Anda (AI) tidak dapat memutar atau menonton video secara langsung di chat. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat menonton video secara langsung, lalu lanjutkan membantu pertanyaan pengguna berdasarkan konteks teks atau gunakan tools workspace (seperti ffmpeg, ffprobe, python) jika relevan.]`
         );
       } else if (att.type === "audio") {
         mediaNotices.push(
-          `[AUDIO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Audio file is stored on disk at the indicated path. You may use workspace tools to inspect or transcribe it if needed.]`
+          `[AUDIO ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Berkas audio tersimpan di disk pada path tersebut. Anda (AI) tidak dapat memutar audio secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat mendengarkan audio secara langsung, lalu lanjutkan membantu pertanyaan pengguna atau gunakan tools workspace jika relevan.]`
+        );
+      } else if (att.type === "image" && !supportsImage) {
+        mediaNotices.push(
+          `[IMAGE ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Model "${targetModel?.name || targetModelId}" saat ini tidak mendukung input gambar/visi secara langsung. Beritahukan kepada pengguna secara ramah bahwa Anda tidak dapat melihat gambar ini secara langsung, lalu lanjutkan membantu dan merespons pertanyaan pengguna berdasarkan instruksi teks atau konteks yang ada.]`
         );
       } else if (att.type === "other") {
         mediaNotices.push(
-          `[FILE ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Binary file is stored on disk at the indicated path.]`
+          `[FILE ATTACHMENT: "${att.name}" (${formatFileSize(att.size)})${att.path ? ` | Path: ${att.path}` : ""} - Berkas biner tersimpan di disk pada path tersebut. Anda dapat menggunakan tools workspace untuk membaca atau memprosesnya jika diperlukan.]`
         );
       }
     }
@@ -217,19 +230,21 @@ function formatChatMessageForLlm(
   }
 
   if (docTextBlocks.length > 0) {
-    fullText = `${fullText}\n\n${docTextBlocks.join("\n\n")}`;
+    fullText = `${fullText}\n\n${docTextBlocks.join("\n")}`;
   }
 
-  // Collect multimodal image parts (base64 data URLs)
+  // Collect multimodal image parts (base64 data URLs) only if model supports images
   const imageParts: Array<{ type: "image_url"; image_url: { url: string } }> = [];
-  for (const att of m.attachments) {
-    if (att.type === "image" && att.base64) {
-      imageParts.push({
-        type: "image_url",
-        image_url: {
-          url: att.base64,
-        },
-      });
+  if (supportsImage) {
+    for (const att of m.attachments) {
+      if (att.type === "image" && att.base64) {
+        imageParts.push({
+          type: "image_url",
+          image_url: {
+            url: att.base64,
+          },
+        });
+      }
     }
   }
 
@@ -1832,7 +1847,7 @@ function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = newStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos));
+        const payloadMessages = newStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos, activeModelItem?.id || activeModelItem?.name));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
@@ -3033,7 +3048,7 @@ function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = currentStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos));
+        const payloadMessages = currentStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos, model));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,

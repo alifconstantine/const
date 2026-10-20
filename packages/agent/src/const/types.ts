@@ -33,6 +33,7 @@ export interface ModelConfig {
   defaultThinkingLevel?: string;
   maxOutputTokens?: number;
   contextWindow?: number;
+  inputTypes?: string[];
 }
 
 import type { FileMutationRecord } from "./mutation-ledger.js";

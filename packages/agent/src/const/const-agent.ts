@@ -995,6 +995,33 @@ export class ConstAgent {
               `Const Engine server gateway error (${response.status}). Upstream connection timed out or is temporarily unreachable.`;
           }
 
+          const msgWithImages = [...conversationHistory].reverse().find(
+            (m) => Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
+          );
+          if (
+            msgWithImages &&
+            Array.isArray(msgWithImages.content) &&
+            (response.status === 502 || cleanMessage.includes("Playground") || cleanMessage.includes("502") || cleanMessage.includes("gateway"))
+          ) {
+            const textParts = msgWithImages.content
+              .filter((p: any) => p.type === "text")
+              .map((p: any) => p.text)
+              .join("\n");
+            const imgCount = msgWithImages.content.filter((p: any) => p.type === "image_url").length;
+
+            msgWithImages.content = `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
+
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: "Input visual langsung tidak didukung provider. Mengalihkan ke mode referensi berkas dan melanjutkan respon...",
+            });
+
+            currentTurn--;
+            consecutiveEmptyRetries = 0;
+            continue;
+          }
+
           throw new Error(`Const error (${response.status}): ${cleanMessage}`);
         }
 
@@ -1082,6 +1109,10 @@ export class ConstAgent {
 
               try {
                 const json = JSON.parse(dataStr);
+                if (json.error) {
+                  const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
+                  throw new Error(`Const stream error: ${errorMsg}`);
+                }
                 if (json.usage) {
                   const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
                   const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
@@ -1152,6 +1183,40 @@ export class ConstAgent {
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
           }
+
+          const errMsg = streamErr?.message || "";
+          const isVisionError =
+            errMsg.includes("Playground") ||
+            errMsg.includes("browser session") ||
+            errMsg.includes("502") ||
+            errMsg.includes("bad_gateway") ||
+            errMsg.includes("image_url") ||
+            errMsg.includes("modality");
+
+          const msgWithImages = [...conversationHistory].reverse().find(
+            (m) => Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
+          );
+
+          if (isVisionError && msgWithImages && Array.isArray(msgWithImages.content)) {
+            const textParts = msgWithImages.content
+              .filter((p: any) => p.type === "text")
+              .map((p: any) => p.text)
+              .join("\n");
+            const imgCount = msgWithImages.content.filter((p: any) => p.type === "image_url").length;
+
+            msgWithImages.content = `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
+
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: "Input visual langsung tidak didukung provider. Mengalihkan ke mode referensi berkas dan melanjutkan respon...",
+            });
+
+            currentTurn--;
+            consecutiveEmptyRetries = 0;
+            continue;
+          }
+
           if (consecutiveEmptyRetries < MAX_EMPTY_RETRIES) {
             consecutiveEmptyRetries++;
             currentTurn--;
@@ -1176,6 +1241,10 @@ export class ConstAgent {
           if (dataStr && dataStr !== "[DONE]") {
             try {
               const json = JSON.parse(dataStr);
+              if (json.error) {
+                const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
+                throw new Error(`Const stream error: ${errorMsg}`);
+              }
               if (json.usage) {
                 const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
                 const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
