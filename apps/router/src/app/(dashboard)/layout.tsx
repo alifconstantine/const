@@ -30,7 +30,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/keys": "API Keys",
   "/endpoints": "Endpoints",
   "/combos": "Combos",
-  "/models": "Models",
+  "/models": "Models & Pricing",
   "/generation": "Playground",
   "/integrations": "Integrations",
   "/settings": "Settings",

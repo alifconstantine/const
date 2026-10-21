@@ -52,7 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
   { id: "authentication", title: "Authentication & keys" },
   { id: "endpoints", title: "Endpoint support" },
   { id: "streaming", title: "Streaming" },
-  { id: "models", title: "Models" },
+  { id: "models", title: "Models & Pricing" },
   { id: "reasoning", title: "Reasoning (Thinking)" },
   { id: "image-generation", title: "Image generation" },
   { id: "image-edits", title: "Image edits" },
@@ -499,32 +499,91 @@ data: [DONE]`}</pre>
             {/* 5. Models */}
             <section id="models" className="space-y-4 scroll-mt-24">
               <h2 className="text-2xl font-serif font-normal text-white">
-                Models
+                Models &amp; Pricing
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Const provides native high-speed models out-of-the-box with unified Pay-As-You-Go pricing and zero configuration:
+                Const provides native high-speed models out-of-the-box with unified Pay-As-You-Go pricing and zero multi-vendor configuration. Pricing is per 1M tokens unless specified:
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono font-semibold text-white">gemini-3.8-flash</code>
-                    <Badge className="bg-[#1b1b1b] text-white text-[10px] font-mono border border-[#2e2e2e]">Default</Badge>
-                  </div>
-                  <p className="text-xs text-[#969696] font-light">
-                    Google&apos;s flagship multimodal reasoning engine. Supports up to 1,000,000 token context windows with instant TTFT.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono font-semibold text-white">gpt-image-2</code>
-                    <Badge className="bg-[#1b1b1b] text-[#969696] text-[10px] font-mono border border-[#2e2e2e]">Vision &amp; Image</Badge>
-                  </div>
-                  <p className="text-xs text-[#969696] font-light">
-                    High-fidelity image generation and editing directly on Const Gateway via /v1/images/generations and /v1/images/edits.
-                  </p>
-                </div>
+              <div className="overflow-x-auto rounded-xl border border-[#383838]/60 bg-[#222222]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#1b1b1b] border-b border-[#383838]/60 text-[#969696] font-medium font-sans">
+                    <tr>
+                      <th className="py-2.5 px-4 font-normal">Model</th>
+                      <th className="py-2.5 px-3 font-normal">Context</th>
+                      <th className="py-2.5 px-3 font-normal">Max Out</th>
+                      <th className="py-2.5 px-3 font-normal">Input (/1M)</th>
+                      <th className="py-2.5 px-3 font-normal">Cache (/1M)</th>
+                      <th className="py-2.5 px-3 font-normal">Output (/1M)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#383838]/40 font-mono text-[#d4d4d4]">
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT 6 Luna</td>
+                      <td className="py-2.5 px-3">272K</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.0125</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
+                      <td className="py-2.5 px-3 text-white">$0.065</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GLM 5.3 Flash</td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.018</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.018</td>
+                      <td className="py-2.5 px-3 text-white">$0.065</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Qwen 3.8 Omni Flash</td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.0125</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
+                      <td className="py-2.5 px-3 text-white">$0.06</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Deepseek v4.1 Flash</td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.0125</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
+                      <td className="py-2.5 px-3 text-white">$0.075</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Gemini 3.8 Flash</td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.02</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.02</td>
+                      <td className="py-2.5 px-3 text-white">$0.08</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT Image 2</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                      <td className="py-2.5 px-3 text-white">$0.02 <span className="text-[10px] text-[#969696]">/image</span></td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Whisper Large V3 Turbo</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3 text-white">$0.006 <span className="text-[10px] text-[#969696]">/min</span></td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Const Search</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3">-</td>
+                      <td className="py-2.5 px-3 text-white">$0.005 <span className="text-[10px] text-[#969696]">/search</span></td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                      <td className="py-2.5 px-3 text-[#969696]">-</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
 

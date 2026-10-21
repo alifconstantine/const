@@ -45,6 +45,12 @@ interface ModelResponseItem {
   default_thinking_level?: string;
   input_modalities?: string[];
   output_modalities?: string[];
+  pricing?: {
+    prompt?: string;
+    completion?: string;
+    cache?: string;
+    unit?: string;
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -84,6 +90,12 @@ export async function GET(req: NextRequest) {
       default_thinking_level: "medium",
       input_modalities: ["text", "image", "video"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.02",
+        cache: "$0.02",
+        completion: "$0.08",
+        unit: "/ 1M tokens",
+      },
     },
     {
       id: "glm-5.3-flash",
@@ -116,6 +128,12 @@ export async function GET(req: NextRequest) {
       default_thinking_level: "medium",
       input_modalities: ["text", "image", "video"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.018",
+        cache: "$0.018",
+        completion: "$0.065",
+        unit: "/ 1M tokens",
+      },
     },
     {
       id: "deepseek-v4.1-flash",
@@ -148,6 +166,12 @@ export async function GET(req: NextRequest) {
       default_thinking_level: "medium",
       input_modalities: ["text", "image"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.0125",
+        cache: "$0.0125",
+        completion: "$0.075",
+        unit: "/ 1M tokens",
+      },
     },
     {
       id: "qwen-3.8-omni-flash",
@@ -180,6 +204,12 @@ export async function GET(req: NextRequest) {
       default_thinking_level: "medium",
       input_modalities: ["text", "image", "audio", "video"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.0125",
+        cache: "$0.0125",
+        completion: "$0.06",
+        unit: "/ 1M tokens",
+      },
     },
     {
       id: "gpt-6-luna",
@@ -212,6 +242,12 @@ export async function GET(req: NextRequest) {
       default_thinking_level: "medium",
       input_modalities: ["text", "image"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.0125",
+        cache: "$0.0125",
+        completion: "$0.065",
+        unit: "/ 1M tokens",
+      },
     },
     {
       id: "whisper-large-v3-turbo",
@@ -238,6 +274,10 @@ export async function GET(req: NextRequest) {
       },
       input_modalities: ["audio"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.006",
+        unit: "/ minute",
+      },
     },
     {
       id: "const-search",
@@ -267,6 +307,10 @@ export async function GET(req: NextRequest) {
       modes: ["research", "deep-research"],
       input_modalities: ["text", "search"],
       output_modalities: ["text"],
+      pricing: {
+        prompt: "$0.005",
+        unit: "/ search",
+      },
     },
     {
       id: "gpt-image-2",
@@ -289,11 +333,14 @@ export async function GET(req: NextRequest) {
       supportsReasoningEffort: false,
       capabilities: {
         image_generation: true,
-        image_edit: true,
-        vision: true,
+        image_editing: true,
       },
       input_modalities: ["text", "image"],
       output_modalities: ["image"],
+      pricing: {
+        completion: "$0.02",
+        unit: "/ image",
+      },
     },
   ];
 

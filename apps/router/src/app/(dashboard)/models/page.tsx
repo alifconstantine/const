@@ -40,7 +40,7 @@ import {
   MessageSquare,
   ImageIcon,
 } from "lucide-react";
-import { formatTokenDisplay } from "@/lib/model-specs";
+import { formatTokenDisplay, BUILTIN_MODELS, type ModelPricing } from "@/lib/model-specs";
 import { calculateQuotaMetrics } from "@/lib/quota";
 
 interface ModelItem {
@@ -50,9 +50,9 @@ interface ModelItem {
   provider: string;
   contextWindow: string;
   maxOutputTokens?: string;
+  pricing?: ModelPricing;
   inputTypes?: string[];
   outputTypes?: string[];
-  isDefault?: boolean;
   supportsThinking?: boolean;
   category?: "llm" | "stt" | "search" | "image";
   endpoint?: string;
@@ -71,113 +71,20 @@ const PROVIDERS_DATA: ProviderGroup[] = [
     id: "const",
     name: "Const Gateway",
     type: "builtin",
-    models: [
-      {
-        id: "gemini-3.8-flash",
-        name: "Gemini 3.8 Flash",
-        modelId: "gemini-3.8-flash",
-        provider: "const",
-        category: "llm",
-        endpoint: "/v1/chat/completions",
-        contextWindow: "1000000",
-        maxOutputTokens: "128000",
-        inputTypes: ["text", "image", "audio", "video"],
-        outputTypes: ["text"],
-        isDefault: true,
-        supportsThinking: true,
-      },
-      {
-        id: "glm-5.3-flash",
-        name: "GLM 5.3 Flash",
-        modelId: "glm-5.3-flash",
-        provider: "const",
-        category: "llm",
-        endpoint: "/v1/chat/completions",
-        contextWindow: "1000000",
-        maxOutputTokens: "128000",
-        inputTypes: ["text", "image", "video"],
-        outputTypes: ["text"],
-        supportsThinking: true,
-      },
-      {
-        id: "deepseek-v4.1-flash",
-        name: "Deepseek v4.1 Flash",
-        modelId: "deepseek-v4.1-flash",
-        provider: "const",
-        category: "llm",
-        endpoint: "/v1/chat/completions",
-        contextWindow: "1000000",
-        maxOutputTokens: "128000",
-        inputTypes: ["text", "image"],
-        outputTypes: ["text"],
-        supportsThinking: true,
-      },
-      {
-        id: "qwen-3.8-omni-flash",
-        name: "Qwen 3.8 Omni Flash",
-        modelId: "qwen-3.8-omni-flash",
-        provider: "const",
-        category: "llm",
-        endpoint: "/v1/chat/completions",
-        contextWindow: "1000000",
-        maxOutputTokens: "128000",
-        inputTypes: ["text", "image", "audio", "video"],
-        outputTypes: ["text"],
-        supportsThinking: true,
-      },
-      {
-        id: "gpt-6-luna",
-        name: "GPT 6 Luna",
-        modelId: "gpt-6-luna",
-        provider: "const",
-        category: "llm",
-        endpoint: "/v1/chat/completions",
-        contextWindow: "272000",
-        maxOutputTokens: "128000",
-        inputTypes: ["text", "image"],
-        outputTypes: ["text"],
-        supportsThinking: true,
-      },
-      {
-        id: "gpt-image-2",
-        name: "GPT Image 2",
-        modelId: "gpt-image-2",
-        provider: "const",
-        category: "image",
-        endpoint: "/v1/images/generations",
-        contextWindow: "-",
-        maxOutputTokens: "-",
-        inputTypes: ["text", "image"],
-        outputTypes: ["image"],
-        supportsThinking: false,
-      },
-      {
-        id: "whisper-large-v3-turbo",
-        name: "Whisper Large V3 Turbo",
-        modelId: "whisper-large-v3-turbo",
-        provider: "const",
-        category: "stt",
-        endpoint: "/v1/audio/transcriptions",
-        contextWindow: "-",
-        maxOutputTokens: "-",
-        inputTypes: ["audio"],
-        outputTypes: ["text"],
-        supportsThinking: false,
-      },
-      {
-        id: "const-search",
-        name: "Const Search (Exa AI)",
-        modelId: "const-search",
-        provider: "const",
-        category: "search",
-        endpoint: "/v1/search",
-        contextWindow: "-",
-        maxOutputTokens: "-",
-        inputTypes: ["text", "search"],
-        outputTypes: ["text"],
-        supportsThinking: false,
-      },
-    ],
+    models: BUILTIN_MODELS.map((m) => ({
+      id: m.id,
+      name: m.name,
+      modelId: m.modelId,
+      provider: m.provider,
+      category: m.category,
+      endpoint: m.endpoint,
+      contextWindow: m.contextWindow || "1M",
+      maxOutputTokens: m.maxOutputTokens || "128K",
+      pricing: m.pricing,
+      inputTypes: m.inputTypes,
+      outputTypes: m.outputTypes,
+      supportsThinking: m.supportsThinking,
+    })),
   },
 ];
 
@@ -294,7 +201,7 @@ export default function ModelsPage() {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-7 pb-12">
-        {/* 1. Breadcrumb: Dashboard > Models */}
+        {/* 1. Breadcrumb: Dashboard > Models & Pricing */}
         <Breadcrumb>
           <BreadcrumbList className="text-xs font-sans">
             <BreadcrumbItem>
@@ -308,7 +215,7 @@ export default function ModelsPage() {
             <BreadcrumbSeparator className="text-muted-foreground/40" />
             <BreadcrumbItem>
               <BreadcrumbPage className="font-medium text-foreground">
-                Models
+                Models &amp; Pricing
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -317,11 +224,10 @@ export default function ModelsPage() {
         {/* 2. Heading (Lora serif, declarative sentence with period per DESIGN.md) */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
-            Models Catalog.
+            Models &amp; Pricing.
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground font-light">
-            Unified Const models directory, context boundaries, token limits, and gateway
-            connectivity testing.
+            Unified Const models directory, context limits, and transparent Pay-As-You-Go pricing.
           </p>
         </div>
 
@@ -487,19 +393,28 @@ export default function ModelsPage() {
                   <Table>
                     <TableHeader className="bg-secondary/20">
                       <TableRow className="border-none hover:bg-transparent">
-                        <TableHead className="w-[35%] min-w-[200px] pl-6 pr-4 text-xs font-sans font-medium text-muted-foreground">
+                        <TableHead className="w-[26%] min-w-[190px] pl-6 pr-3 text-xs font-sans font-medium text-muted-foreground">
                           Model
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
-                          Context Window
+                        <TableHead className="w-[10%] min-w-[75px] px-3 text-xs font-sans font-medium text-muted-foreground">
+                          Context
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
+                        <TableHead className="w-[10%] min-w-[85px] px-3 text-xs font-sans font-medium text-muted-foreground">
                           Max Output
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-sans font-medium text-muted-foreground">
+                        <TableHead className="w-[11%] min-w-[85px] px-3 text-xs font-sans font-medium text-muted-foreground">
+                          Input (/1M)
+                        </TableHead>
+                        <TableHead className="w-[11%] min-w-[85px] px-3 text-xs font-sans font-medium text-muted-foreground">
+                          Cache (/1M)
+                        </TableHead>
+                        <TableHead className="w-[11%] min-w-[85px] px-3 text-xs font-sans font-medium text-muted-foreground">
+                          Output (/1M)
+                        </TableHead>
+                        <TableHead className="w-[11%] min-w-[95px] px-3 text-xs font-sans font-medium text-muted-foreground">
                           Modality
                         </TableHead>
-                        <TableHead className="w-[20%] min-w-[140px] pl-4 pr-6 text-right text-xs font-sans font-medium text-muted-foreground">
+                        <TableHead className="w-[10%] min-w-[110px] pl-3 pr-6 text-right text-xs font-sans font-medium text-muted-foreground">
                           Action
                         </TableHead>
                       </TableRow>
@@ -511,7 +426,7 @@ export default function ModelsPage() {
                           className="border-none hover:bg-secondary/20 transition-colors"
                         >
                           {/* 1. Model Name with Copy Button and Endpoint next to it */}
-                          <TableCell className="py-4 pl-6 pr-4">
+                          <TableCell className="py-4 pl-6 pr-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-sm text-foreground font-sans">
                                 {model.name}
@@ -540,12 +455,6 @@ export default function ModelsPage() {
                                 </TooltipContent>
                               </Tooltip>
 
-                              {model.isDefault && (
-                                <Badge className="rounded-full text-[10px] font-sans py-0 px-2 bg-primary text-primary-foreground border-transparent">
-                                  Default
-                                </Badge>
-                              )}
-
                               {/* Endpoint badge */}
                               {model.endpoint && (
                                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary/80 text-muted-foreground border border-border/40">
@@ -556,21 +465,56 @@ export default function ModelsPage() {
                           </TableCell>
 
                           {/* 2. Context Window */}
-                          <TableCell className="py-4 px-4">
+                          <TableCell className="py-4 px-3">
                             <span className="text-xs font-sans text-foreground font-normal tabular-nums">
-                              {formatTokenDisplay(model.contextWindow, "1M")}
+                              {model.contextWindow}
                             </span>
                           </TableCell>
 
                           {/* 3. Max Output */}
-                          <TableCell className="py-4 px-4">
+                          <TableCell className="py-4 px-3">
                             <span className="text-xs font-sans text-foreground font-normal tabular-nums">
-                              {formatTokenDisplay(model.maxOutputTokens, "128K")}
+                              {model.maxOutputTokens}
                             </span>
                           </TableCell>
 
-                          {/* 4. Modality badges */}
-                          <TableCell className="py-4 px-4">
+                          {/* 4. Input Price */}
+                          <TableCell className="py-4 px-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-mono font-medium text-foreground">
+                                {model.pricing?.input ?? "-"}
+                              </span>
+                              {model.pricing?.unit && model.pricing.unit !== "/ 1M tokens" && model.pricing.input !== "-" && (
+                                <span className="text-[10px] font-sans text-muted-foreground/80">
+                                  {model.pricing.unit}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* 5. Cached Price */}
+                          <TableCell className="py-4 px-3">
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {model.pricing?.cache ?? "-"}
+                            </span>
+                          </TableCell>
+
+                          {/* 6. Output Price */}
+                          <TableCell className="py-4 px-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-mono font-medium text-foreground">
+                                {model.pricing?.output ?? "-"}
+                              </span>
+                              {model.pricing?.unit && model.pricing.unit !== "/ 1M tokens" && model.pricing.output !== "-" && (
+                                <span className="text-[10px] font-sans text-muted-foreground/80">
+                                  {model.pricing.unit}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* 7. Modality badges */}
+                          <TableCell className="py-4 px-3">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {model.inputTypes?.includes("text") && (
                                 <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
@@ -615,8 +559,8 @@ export default function ModelsPage() {
                             </div>
                           </TableCell>
 
-                          {/* 5. Action: Edit (if BYOK) + Test Model */}
-                          <TableCell className="py-4 pl-4 pr-6 text-right">
+                          {/* 8. Action: Test Model */}
+                          <TableCell className="py-4 pl-3 pr-6 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
@@ -632,7 +576,7 @@ export default function ModelsPage() {
                                 ) : (
                                   <>
                                     <Zap className="h-3 w-3 fill-current" />
-                                    <span>Test Model</span>
+                                    <span>Test</span>
                                   </>
                                 )}
                               </Button>

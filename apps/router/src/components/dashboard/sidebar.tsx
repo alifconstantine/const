@@ -71,7 +71,7 @@ const navSections: NavSection[] = [
         icon: GitFork,
       },
       {
-        title: "Models",
+        title: "Models & Pricing",
         href: "/models",
         icon: Box,
       },

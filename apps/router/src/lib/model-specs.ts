@@ -5,6 +5,13 @@ export const DEFAULT_OUTPUT_TYPES = ["text"];
 
 export type ThinkingLevel = "low" | "medium" | "high" | "xhigh" | "max";
 
+export interface ModelPricing {
+  input: string;
+  cache?: string;
+  output: string;
+  unit?: string;
+}
+
 export interface ModelSpec {
   id: string;
   name: string;
@@ -14,7 +21,7 @@ export interface ModelSpec {
   providerDocId?: string;
   supportsThinking: boolean;
   thinkingDefault?: ThinkingLevel;
-  isDefault?: boolean;
+  pricing?: ModelPricing;
   isCombo?: boolean;
   comboSlug?: string;
   modelsCount?: number;
@@ -28,23 +35,28 @@ export interface ModelSpec {
   outputTypes?: string[];
 }
 
-// Built-in models matching exactly what is managed by Const Gateway / OmniRoute
+// Built-in models matching exactly what is managed by Const Gateway
 export const BUILTIN_MODELS: ModelSpec[] = [
   {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    modelId: "gemini-3.8-flash",
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    modelId: "gpt-6-luna",
     provider: "const",
     providerName: "Const",
     category: "llm",
     endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
+    contextLength: 272000,
+    contextWindow: "272K",
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    isDefault: true,
-    inputTypes: ["text", "image", "audio", "video"],
+    pricing: {
+      input: "$0.0125",
+      cache: "$0.0125",
+      output: "$0.065",
+      unit: "/ 1M tokens",
+    },
+    inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
   {
@@ -60,23 +72,13 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
+    pricing: {
+      input: "$0.018",
+      cache: "$0.018",
+      output: "$0.065",
+      unit: "/ 1M tokens",
+    },
     inputTypes: ["text", "image", "video"],
-    outputTypes: ["text"],
-  },
-  {
-    id: "deepseek-v4.1-flash",
-    name: "Deepseek v4.1 Flash",
-    modelId: "deepseek-v4.1-flash",
-    provider: "const",
-    providerName: "Const",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
   {
@@ -92,24 +94,78 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
+    pricing: {
+      input: "$0.0125",
+      cache: "$0.0125",
+      output: "$0.06",
+      unit: "/ 1M tokens",
+    },
     inputTypes: ["text", "image", "audio", "video"],
     outputTypes: ["text"],
   },
   {
-    id: "gpt-6-luna",
-    name: "GPT 6 Luna",
-    modelId: "gpt-6-luna",
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek v4.1 Flash",
+    modelId: "deepseek-v4.1-flash",
     provider: "const",
     providerName: "Const",
     category: "llm",
     endpoint: "/v1/chat/completions",
-    contextLength: 272000,
-    contextWindow: "272K",
+    contextLength: 1000000,
+    contextWindow: "1M",
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
+    pricing: {
+      input: "$0.0125",
+      cache: "$0.0125",
+      output: "$0.075",
+      unit: "/ 1M tokens",
+    },
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    modelId: "gemini-3.8-flash",
+    provider: "const",
+    providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    pricing: {
+      input: "$0.02",
+      cache: "$0.02",
+      output: "$0.08",
+      unit: "/ 1M tokens",
+    },
+    inputTypes: ["text", "image", "audio", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gpt-image-2",
+    name: "GPT Image 2",
+    modelId: "gpt-image-2",
+    provider: "const",
+    providerName: "Const",
+    category: "image",
+    endpoint: "/v1/images/generations",
+    supportsThinking: false,
+    contextWindow: "-",
+    maxOutputTokens: "-",
+    pricing: {
+      input: "-",
+      cache: "-",
+      output: "$0.02",
+      unit: "/ image",
+    },
+    inputTypes: ["text", "image"],
+    outputTypes: ["image"],
   },
   {
     id: "whisper-large-v3-turbo",
@@ -122,6 +178,12 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     supportsThinking: false,
     contextWindow: "-",
     maxOutputTokens: "-",
+    pricing: {
+      input: "$0.006",
+      cache: "-",
+      output: "-",
+      unit: "/ minute",
+    },
     inputTypes: ["audio"],
     outputTypes: ["text"],
   },
@@ -136,22 +198,14 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     supportsThinking: false,
     contextWindow: "-",
     maxOutputTokens: "-",
+    pricing: {
+      input: "$0.005",
+      cache: "-",
+      output: "-",
+      unit: "/ search",
+    },
     inputTypes: ["text", "search"],
     outputTypes: ["text"],
-  },
-  {
-    id: "gpt-image-2",
-    name: "GPT Image 2",
-    modelId: "gpt-image-2",
-    provider: "const",
-    providerName: "Const",
-    category: "image",
-    endpoint: "/v1/images/generations",
-    supportsThinking: false,
-    contextWindow: "-",
-    maxOutputTokens: "-",
-    inputTypes: ["text", "image"],
-    outputTypes: ["image"],
   },
 ];
 
