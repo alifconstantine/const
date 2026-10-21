@@ -926,14 +926,6 @@ export function ChatCard({
 
   useEffect(() => {
     if (isThinkingSupported && supportedThinkingLevels.length > 0) {
-      if (currentModelItem?.id === "combo/coding" && supportedThinkingLevels.includes("high")) {
-        // High reasoning effort by default for coding combo
-        if (thinkingLevel !== "high" && !localStorage.getItem("const_harness_user_thinking_override")) {
-          setThinkingLevel("high");
-          localStorage.setItem("const_harness_thinking_level", "high");
-          return;
-        }
-      }
       if (!supportedThinkingLevels.includes(thinkingLevel)) {
         let fallback = currentModelItem?.defaultThinkingLevel;
         if (!fallback || !supportedThinkingLevels.includes(fallback)) {
@@ -2053,12 +2045,19 @@ export function ChatCard({
                                             setSelectedModel(m.name);
                                             localStorage.setItem("const_harness_active_model", m.name);
                                             window.electron?.saveConfig?.({ activeModel: m.id });
-                                            if (m.id === "combo/coding" || m.name === "combo/coding") {
-                                              setThinkingLevel("high");
-                                              localStorage.setItem("const_harness_thinking_level", "high");
-                                            } else if (m.defaultThinkingLevel) {
-                                              setThinkingLevel(m.defaultThinkingLevel);
-                                              localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
+                                            // Retain user's current thinking level if supported by the newly selected model
+                                            const targetLevels = m.thinkingLevels && m.thinkingLevels.length > 0
+                                              ? m.thinkingLevels
+                                              : ["low", "medium", "high", "xhigh", "max"];
+
+                                            if (m.supportsThinking !== false && m.id !== "combo/fast") {
+                                              if (!targetLevels.includes(thinkingLevel)) {
+                                                const fallback = (m.defaultThinkingLevel && targetLevels.includes(m.defaultThinkingLevel))
+                                                  ? m.defaultThinkingLevel
+                                                  : (targetLevels.includes("medium") ? "medium" : targetLevels[targetLevels.length - 1]!);
+                                                setThinkingLevel(fallback);
+                                                localStorage.setItem("const_harness_thinking_level", fallback);
+                                              }
                                             }
                                             setIsModelOpen(false);
                                           }}
