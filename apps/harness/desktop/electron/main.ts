@@ -33,6 +33,7 @@ import {
   type ScheduledTaskSchedule,
 } from "./scheduled-tasks";
 import { browserController, type ControlState } from "./browser-controller";
+import { marketplaceService } from "./marketplace-service";
 
 registerGlobalBrowserToolHandler((toolName, args) =>
   browserController.executeTool(toolName, args)
@@ -736,6 +737,50 @@ app.whenReady().then(() => {
       return {
         workspaceMemoryEnabled: updated.workspaceMemoryEnabled ?? true,
       };
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // Marketplace & Skills Management IPC Handlers
+  // ---------------------------------------------------------------------------
+  ipcMain.handle("marketplace:list-installed", async (_event, workspacePath?: string) => {
+    return marketplaceService.listInstalledSkills(workspacePath);
+  });
+
+  ipcMain.handle(
+    "marketplace:install-skill",
+    async (
+      _event,
+      payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }
+    ) => {
+      return marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath);
+    }
+  );
+
+  ipcMain.handle(
+    "marketplace:uninstall-skill",
+    async (
+      _event,
+      payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }
+    ) => {
+      return marketplaceService.uninstallSkill(payload.slug, payload.scope, payload.workspacePath);
+    }
+  );
+
+  ipcMain.handle(
+    "marketplace:open-skills-folder",
+    async (
+      _event,
+      payload?: { workspacePath?: string; scope?: "user" | "workspace" }
+    ) => {
+      return marketplaceService.openSkillsFolder(payload?.workspacePath, payload?.scope);
+    }
+  );
+
+  ipcMain.handle(
+    "marketplace:get-skill-content",
+    async (_event, slug: string, workspacePath?: string) => {
+      return marketplaceService.getSkillContent(slug, workspacePath);
     }
   );
 

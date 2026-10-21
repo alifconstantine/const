@@ -2,27 +2,45 @@ const fs = require('fs');
 const path = require('path');
 
 const skillsDir = path.resolve(__dirname, '../skills');
-const outputFile = path.resolve(__dirname, '../src/lib/skills/default-skills.ts');
+const catalogFile = path.resolve(__dirname, '../src/lib/skills/skills-catalog.ts');
+const defaultSkillsFile = path.resolve(__dirname, '../src/lib/skills/default-skills.ts');
 
 if (!fs.existsSync(skillsDir)) {
   console.error('Skills directory not found:', skillsDir);
   process.exit(1);
 }
 
-const dirs = fs.readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
-
 function parseFrontmatter(content) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
   const rawMeta = match[1];
   const body = match[2];
+
   const meta = {};
-  rawMeta.split(/\r?\n/).forEach((line) => {
-    const m = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
-    if (m) {
-      meta[m[1].toLowerCase()] = m[2].trim().replace(/^['"]|['"]$/g, '');
+  const lines = rawMeta.split(/\r?\n/);
+  let currentKey = null;
+  let multilineVal = [];
+
+  for (const line of lines) {
+    const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
+    if (keyMatch) {
+      if (currentKey) {
+        meta[currentKey] = multilineVal.join(' ').trim();
+      }
+      currentKey = keyMatch[1].toLowerCase();
+      const val = keyMatch[2].trim();
+      if (val === '>' || val === '|' || val === '>-' || val === '|-') {
+        multilineVal = [];
+      } else {
+        multilineVal = [val.replace(/^['"]|['"]$/g, '')];
+      }
+    } else if (currentKey && (line.startsWith('  ') || line.startsWith('\t'))) {
+      multilineVal.push(line.trim().replace(/^['"]|['"]$/g, ''));
     }
-  });
+  }
+  if (currentKey) {
+    meta[currentKey] = multilineVal.join(' ').trim();
+  }
   return { meta, body };
 }
 
@@ -42,8 +60,7 @@ function getAuthorForSkill(slug, metaAuthor) {
     s === 'grill-with-docs' ||
     s === 'grilling' ||
     s === 'tdd' ||
-    s.startsWith('mattpocock') ||
-    ['grilling', 'loop-me'].includes(s)
+    s.startsWith('mattpocock')
   ) {
     return 'Matt Pocock';
   }
@@ -59,14 +76,12 @@ function getAuthorForSkill(slug, metaAuthor) {
   if (
     s.includes('hyperframes') ||
     [
-      'motion-graphics',
-      'general-video',
       'slideshow',
-      'media-use',
-      'figma',
-      'talking-head-recut',
+      'general-video',
       'pr-to-video',
       'product-launch-video',
+      'motion-graphics',
+      'talking-head-recut',
       'music-to-video',
       'embedded-captions',
       'faceless-explainer',
@@ -135,100 +150,163 @@ function getAuthorForSkill(slug, metaAuthor) {
   return 'skills.sh';
 }
 
-const skills = [];
-const seenSlugs = new Set();
+function getCategory(slug) {
+  const s = slug.toLowerCase();
+  if (['agent-browser', 'browser-use', 'remote-browser'].includes(s)) return 'browser_automation';
+  if (['frontend-design', 'brand-guidelines', 'ui-taste', 'ios-design', 'generative-ui', 'figma'].includes(s)) return 'design';
+  if (['docx', 'pdf', 'pptx', 'xlsx', 'canvas-design'].includes(s)) return 'document';
+  if (
+    [
+      'company-valuation',
+      'yfinance-data',
+      'stock-correlation',
+      'stock-liquidity',
+      'options-payoff',
+      'sepa-strategy',
+      'startup-analysis',
+      'saas-valuation-compression',
+      'earnings-preview',
+      'earnings-recap',
+      'estimate-analysis',
+      'etf-premium',
+      'fintel-data',
+      'finance-sentiment',
+      'hormuz-strait',
+      'hyperliquid-reader',
+      'tradingview-mcp',
+      'tradingview-reader',
+    ].includes(s)
+  ) return 'finance';
+  if (
+    s.includes('hyperframes') ||
+    [
+      'slideshow',
+      'general-video',
+      'pr-to-video',
+      'product-launch-video',
+      'motion-graphics',
+      'talking-head-recut',
+      'music-to-video',
+      'embedded-captions',
+      'faceless-explainer',
+      'remotion-to-hyperframes',
+    ].includes(s) ||
+    s.includes('manim')
+  ) return 'motion_video';
+  if (['tiktok-scraper', 'instagram-scraper', 'x-scraper', 'discord-reader', 'linkedin-reader', 'twitter-reader', 'telegram-reader', 'yc-reader', 'opencli-reader', 'literature-search-arxiv'].includes(s)) return 'scraping_research';
+  if (['tdd', 'grill-me', 'grill-with-docs', 'grilling', 'skill-creator', 'no-ai-slop'].includes(s)) return 'coding_dev';
+  return 'agent_workflow';
+}
 
+const dirs = fs.readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
 dirs.sort((a, b) => a.name.localeCompare(b.name));
 
-dirs.forEach((dir) => {
-  // Exclude convex skills completely
-  if (dir.name.toLowerCase().startsWith('convex')) {
-    return;
-  }
+// 1. Build catalog
+const catalog = [];
+for (const dir of dirs) {
+  const slug = dir.name;
+  const p = path.join(skillsDir, slug, 'SKILL.md');
+  if (!fs.existsSync(p)) continue;
+  const content = fs.readFileSync(p, 'utf8');
+  const { meta } = parseFrontmatter(content);
 
-  // Deduplicate
-  const cleanSlug = dir.name.toLowerCase().trim();
-  if (seenSlugs.has(cleanSlug)) {
-    return;
-  }
+  const cleanDescription = (meta.description || '').replace(/\s+/g, ' ').trim();
+  const author = getAuthorForSkill(slug, meta.author);
+  const category = getCategory(slug);
 
-  const dirPath = path.join(skillsDir, dir.name);
-  const skillMdPath = path.join(dirPath, 'SKILL.md');
-  if (!fs.existsSync(skillMdPath)) return;
+  catalog.push({
+    id: `skill_${slug}`,
+    slug: slug,
+    name: meta.name || slug,
+    description: cleanDescription,
+    category: category,
+    author: author,
+    version: meta.version || '1.0.0',
+    icon: 'Sparkles',
+  });
+}
+
+const catalogCode = `import type { SkillCategory } from "./types";
+
+export interface MarketplaceSkill {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category: SkillCategory;
+  author: string;
+  version: string;
+  icon?: string;
+  overview?: string;
+}
+
+export const MARKETPLACE_CATALOG: MarketplaceSkill[] = ${JSON.stringify(catalog, null, 2)};
+`;
+
+fs.writeFileSync(catalogFile, catalogCode, 'utf8');
+console.log(`Generated skills-catalog.ts with ${catalog.length} skills.`);
+
+// 2. Build default-skills.ts with pre-installed docx, pdf, pptx
+const defaultSlugs = ['docx', 'pdf', 'pptx'];
+const defaultSkills = [];
+
+for (const slug of defaultSlugs) {
+  const dir = path.join(skillsDir, slug);
+  const skillMdPath = path.join(dir, 'SKILL.md');
+  if (!fs.existsSync(skillMdPath)) continue;
   const content = fs.readFileSync(skillMdPath, 'utf8');
   const { meta } = parseFrontmatter(content);
 
-  seenSlugs.add(cleanSlug);
-
-  const slug = dir.name;
-  const name = meta.name || dir.name;
-  const description = (meta.description || 'Agent skill from skills.sh').replace(/\s+/g, ' ').trim();
-  const author = getAuthorForSkill(slug, meta.author);
-
-  // Read all text files in directory
   const files = {};
-  function readDirRecursive(currentDir, prefix = '') {
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      const relPath = prefix ? prefix + '/' + entry.name : entry.name;
+  function readDir(cur, prefix = '') {
+    for (const entry of fs.readdirSync(cur, { withFileTypes: true })) {
+      const full = path.join(cur, entry.name);
+      const rel = prefix ? prefix + '/' + entry.name : entry.name;
       if (entry.isDirectory()) {
-        if (entry.name !== 'node_modules' && entry.name !== '.git') {
-          readDirRecursive(fullPath, relPath);
+        if (entry.name !== 'schemas' && entry.name !== 'node_modules') {
+          readDir(full, rel);
         }
       } else if (entry.isFile()) {
-        try {
-          const ext = path.extname(entry.name).toLowerCase();
-          if (['.md', '.txt', '.json', '.yaml', '.yml', '.ts', '.js', '.py'].includes(ext)) {
-            const stat = fs.statSync(fullPath);
-            if (stat.size < 150000) {
-              files[relPath] = fs.readFileSync(fullPath, 'utf8');
-            }
-          }
-        } catch (e) {}
+        const ext = path.extname(entry.name).toLowerCase();
+        if (['.md', '.txt', '.json', '.py', '.js'].includes(ext) && fs.statSync(full).size < 30000) {
+          files[rel] = fs.readFileSync(full, 'utf8');
+        }
       }
     }
   }
+  readDir(dir);
+  files['SKILL.md'] = content;
 
-  try {
-    readDirRecursive(dirPath);
-  } catch (e) {}
-
-  if (!files['SKILL.md']) {
-    files['SKILL.md'] = content;
-  }
-
-  skills.push({
-    id: 'skill_' + dir.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
-    slug: dir.name,
-    name: name,
-    description: "",
+  defaultSkills.push({
+    id: `skill_${slug}`,
+    slug: slug,
+    name: meta.name || slug,
+    description: (meta.description || '').replace(/\s+/g, ' ').trim(),
     content: content,
-    icon: 'PencilSparkles',
-    category: 'custom',
-    isBuiltIn: true,
+    icon: 'FileText',
+    category: 'document',
+    isBuiltIn: false,
     isEnabled: true,
     scope: 'user',
-    author: author,
+    author: 'Anthropic',
     version: meta.version || '1.0.0',
     files: files,
-    createdAt: 1727222400000,
-    updatedAt: 1727222400000,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   });
-});
+}
 
-console.log(`Found and parsed ${skills.length} real skills from skills.sh (Convex excluded, zero duplicates).`);
+const defaultSkillsCode = `import type { LocalSkill, LocalSkillBundle } from "./types";
 
-const tsContent = `// Auto-generated real skills from skills.sh (Open Standard, zero duplicates, Convex removed)
-import type { LocalSkill, LocalSkillBundle } from "./types";
+/**
+ * Pre-installed default skills (docx, pdf, pptx) with their complete, genuine markdown instructions
+ * and scripts from skills.sh.
+ */
+export const DEFAULT_INSTALLED_SKILLS: LocalSkill[] = ${JSON.stringify(defaultSkills, null, 2)};
 
-export const DEFAULT_BUILTIN_BUNDLES: LocalSkillBundle[] = [];
-
-export const DEFAULT_BUILTIN_SKILLS: LocalSkill[] = ${JSON.stringify(skills, null, 2)};
-
-export const DEFAULT_SKILLS = DEFAULT_BUILTIN_SKILLS;
-export const DEFAULT_SKILL_BUNDLES = DEFAULT_BUILTIN_BUNDLES;
+export const DEFAULT_SKILLS: LocalSkill[] = DEFAULT_INSTALLED_SKILLS;
+export const DEFAULT_SKILL_BUNDLES: LocalSkillBundle[] = [];
 `;
 
-fs.writeFileSync(outputFile, tsContent, 'utf8');
-console.log(`Successfully written ${skills.length} skills to ${outputFile}`);
+fs.writeFileSync(defaultSkillsFile, defaultSkillsCode, 'utf8');
+console.log(`Generated default-skills.ts with ${defaultSkills.length} pre-installed skills.`);

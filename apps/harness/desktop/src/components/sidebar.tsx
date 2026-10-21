@@ -62,6 +62,7 @@ import {
   BarChart2,
   Check,
   PencilSparkles,
+  Store,
 } from "lucide-react";
 import { AutoScrollTitle } from "./auto-scroll-title";
 import {
@@ -800,12 +801,12 @@ export function Sidebar({
                 : "text-[#666666] dark:text-[#999999]"
             }`}
           >
-            <PencilSparkles className={`w-4 h-4 transition-colors ${
+            <Store className={`w-4 h-4 transition-colors ${
               isSkillsActive
                 ? "text-primary"
                 : "text-[#777777] dark:text-[#888888] group-hover:text-primary"
             }`} />
-            <span>{t("settings.skills") || "Agent Skills"}</span>
+            <span>{t("settings.marketplace") || "Marketplace"}</span>
           </button>
         </div>
 

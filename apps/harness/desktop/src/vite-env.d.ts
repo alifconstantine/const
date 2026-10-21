@@ -480,6 +480,43 @@ declare global {
           callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void
         ) => () => void;
       };
+      marketplace?: {
+        listInstalled: (workspacePath?: string) => Promise<Array<{
+          slug: string;
+          name: string;
+          description: string;
+          content: string;
+          path: string;
+          scope: "user" | "workspace";
+          author?: string;
+          version?: string;
+          files?: Record<string, string>;
+        }>>;
+        installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) => Promise<{
+          slug: string;
+          name: string;
+          description: string;
+          content: string;
+          path: string;
+          scope: "user" | "workspace";
+          author?: string;
+          version?: string;
+          files?: Record<string, string>;
+        } | null>;
+        uninstallSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) => Promise<boolean>;
+        openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) => Promise<string>;
+        getSkillContent: (slug: string, workspacePath?: string) => Promise<{
+          slug: string;
+          name: string;
+          description: string;
+          content: string;
+          author?: string;
+          version?: string;
+          files: Record<string, string>;
+          isInstalled: boolean;
+          scope?: "user" | "workspace";
+        } | null>;
+      };
     };
   }
 }

@@ -1,6 +1,205 @@
 import { db } from "../db";
 import type { LocalSkill, LocalSkillBundle, SkillFrontmatter, SkillCategory } from "./types";
 import { DEFAULT_SKILLS, DEFAULT_SKILL_BUNDLES } from "./default-skills";
+import { MARKETPLACE_CATALOG, type MarketplaceSkill } from "./skills-catalog";
+
+export { MARKETPLACE_CATALOG, type MarketplaceSkill };
+
+/**
+ * Synchronize skills installed on filesystem into local Dexie database
+ */
+export async function syncInstalledSkillsFromDisk(workspacePath?: string): Promise<void> {
+  if (window.electron?.marketplace) {
+    try {
+      const installed = await window.electron.marketplace.listInstalled(workspacePath);
+      const existing = await db.skills.toArray();
+      const existingMap = new Map(existing.map((s) => [s.slug, s]));
+
+      // 1. Insert or update skills found on disk
+      for (const item of installed) {
+        const match = existingMap.get(item.slug);
+        const catalogMatch = MARKETPLACE_CATALOG.find((c) => c.slug === item.slug);
+        const category: SkillCategory = catalogMatch?.category || "custom";
+
+        if (!match) {
+          await db.skills.put({
+            id: `skill_${item.slug}`,
+            slug: item.slug,
+            name: item.name,
+            description: item.description,
+            content: item.content,
+            icon: catalogMatch?.icon || "PencilSparkles",
+            category,
+            isBuiltIn: false,
+            isEnabled: true,
+            scope: item.scope,
+            author: item.author || catalogMatch?.author || "User",
+            version: item.version || "1.0.0",
+            overview: generateSkillOverview(item.name, item.slug, item.content, item.description),
+            files: item.files,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+        } else {
+          if (match.content !== item.content || !match.files || match.description !== item.description) {
+            await db.skills.update(match.id, {
+              name: item.name,
+              content: item.content,
+              files: item.files,
+              description: item.description,
+              author: item.author || match.author,
+              version: item.version || match.version,
+              overview: generateSkillOverview(item.name, item.slug, item.content, item.description),
+              updatedAt: Date.now(),
+            });
+          }
+        }
+      }
+
+      // If no skills exist yet in Dexie, seed pre-installed default skills (docx, pdf, pptx)
+      const totalCount = await db.skills.count();
+      if (totalCount === 0 && DEFAULT_SKILLS.length > 0) {
+        await db.skills.bulkPut(DEFAULT_SKILLS);
+      }
+    } catch (err) {
+      console.warn("[SkillsService] Failed to sync installed skills from disk:", err);
+    }
+  } else {
+    // Web fallback
+    const count = await db.skills.count();
+    if (count === 0 && DEFAULT_SKILLS.length > 0) {
+      await db.skills.bulkPut(DEFAULT_SKILLS);
+    }
+  }
+}
+
+/**
+ * Fetch full skill content and files for any skill (installed or from catalog)
+ */
+export async function fetchSkillContent(
+  slug: string,
+  workspacePath?: string
+): Promise<{
+  content: string;
+  files: Record<string, string>;
+  name?: string;
+  description?: string;
+  author?: string;
+  version?: string;
+} | null> {
+  const cleanSlug = slug.toLowerCase().trim();
+
+  // 1. Check local Dexie first
+  const local = await db.skills.where("slug").equals(cleanSlug).first();
+  if (local && local.files && Object.keys(local.files).length > 0) {
+    return {
+      content: local.content,
+      files: local.files,
+      name: local.name,
+      description: local.description,
+      author: local.author,
+      version: local.version,
+    };
+  }
+
+  // 2. Check Electron marketplace IPC
+  if (window.electron?.marketplace?.getSkillContent) {
+    try {
+      const res = await window.electron.marketplace.getSkillContent(cleanSlug, workspacePath);
+      if (res) {
+        return {
+          content: res.content,
+          files: res.files,
+          name: res.name,
+          description: res.description,
+          author: res.author,
+          version: res.version,
+        };
+      }
+    } catch (err) {
+      console.warn(`[SkillsService] Error fetching skill content for ${cleanSlug}:`, err);
+    }
+  }
+
+  // 3. Check pre-bundled default skills
+  const def = DEFAULT_SKILLS.find((s) => s.slug === cleanSlug);
+  if (def) {
+    return {
+      content: def.content,
+      files: def.files || { "SKILL.md": def.content },
+      name: def.name,
+      description: def.description,
+      author: def.author,
+      version: def.version,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Install a skill from the marketplace catalog to filesystem and Dexie DB
+ */
+export async function installSkillFromMarketplace(
+  slug: string,
+  scope: "user" | "workspace" = "user",
+  workspacePath?: string
+): Promise<LocalSkill> {
+  if (!window.electron?.marketplace) {
+    throw new Error("Marketplace electron bridge is unavailable");
+  }
+
+  const installed = await window.electron.marketplace.installSkill({ slug, scope, workspacePath });
+  if (!installed) {
+    throw new Error(`Failed to install skill '${slug}'`);
+  }
+
+  const catalogMatch = MARKETPLACE_CATALOG.find((c) => c.slug === slug);
+  const category: SkillCategory = catalogMatch?.category || "custom";
+
+  const localSkill: LocalSkill = {
+    id: `skill_${installed.slug}`,
+    slug: installed.slug,
+    name: installed.name,
+    description: installed.description,
+    content: installed.content,
+    icon: catalogMatch?.icon || "PencilSparkles",
+    category,
+    isBuiltIn: false,
+    isEnabled: true,
+    scope: installed.scope,
+    author: installed.author || catalogMatch?.author || "User",
+    version: installed.version || catalogMatch?.version || "1.0.0",
+    overview: generateSkillOverview(installed.name, installed.slug, installed.content, installed.description),
+    files: installed.files,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await db.skills.put(localSkill);
+  return localSkill;
+}
+
+/**
+ * Uninstall a skill from filesystem and delete from Dexie DB
+ */
+export async function uninstallSkillFromMarketplace(
+  id: string,
+  slug: string,
+  scope: "user" | "workspace" = "user",
+  workspacePath?: string
+): Promise<boolean> {
+  try {
+    if (window.electron?.marketplace) {
+      await window.electron.marketplace.uninstallSkill({ slug, scope, workspacePath });
+    }
+    await db.skills.delete(id);
+    return true;
+  } catch (err) {
+    console.error("[SkillsService] Failed to uninstall skill:", err);
+    return false;
+  }
+}
 
 /**
  * Initialize and seed built-in skills and bundles in local Dexie database
@@ -11,126 +210,7 @@ export async function ensureDefaultSkillsSeeded(forceReset = false): Promise<voi
       await db.skillBundles.clear();
       await db.skills.clear();
     }
-    // 1. Seed bundles
-    const existingBundles = await db.skillBundles.toArray();
-    const existingBundleIds = new Set(existingBundles.map((b) => b.id || b.slug));
-
-    for (const bundle of DEFAULT_SKILL_BUNDLES) {
-      const bundleId = bundle.id || `bundle_${bundle.slug}`;
-      const existing = existingBundles.find((b) => b.id === bundleId || b.slug === bundle.slug);
-
-      if (!existing) {
-        await db.skillBundles.put({
-          id: bundleId,
-          slug: bundle.slug,
-          name: bundle.name,
-          description: bundle.description,
-          author: bundle.author,
-          version: bundle.version,
-          category: bundle.category,
-          isBuiltIn: true,
-          isEnabled: true,
-          scope: bundle.scope || "user",
-          overview: bundle.overview,
-          files: bundle.files || { "README.md": `# ${bundle.name}\n\n${bundle.description}\n\n${bundle.overview || ""}` },
-          skillIds: bundle.skillIds,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      } else if (existing.isBuiltIn) {
-        // Sync skill IDs and files if updated
-        if (
-          !existing.skillIds ||
-          existing.skillIds.length !== bundle.skillIds.length ||
-          !existing.files ||
-          Object.keys(existing.files).length === 0
-        ) {
-          await db.skillBundles.update(existing.id, {
-            skillIds: bundle.skillIds,
-            description: bundle.description,
-            overview: bundle.overview,
-            files: bundle.files || { "README.md": `# ${bundle.name}\n\n${bundle.description}\n\n${bundle.overview || ""}` },
-            updatedAt: Date.now(),
-          });
-        }
-      }
-    }
-
-    // Clean up stale built-in bundles (e.g. convex-suite)
-    const validBundleSlugs = new Set(DEFAULT_SKILL_BUNDLES.map((b) => b.slug));
-    for (const existing of existingBundles) {
-      if (existing.isBuiltIn && (!validBundleSlugs.has(existing.slug) || existing.slug.startsWith("convex"))) {
-        await db.skillBundles.delete(existing.id);
-      }
-    }
-
-    // 2. Seed skills
-    const existingSkills = await db.skills.toArray();
-    const validBuiltInSlugs = new Set(DEFAULT_SKILLS.map((s) => s.slug));
-
-    // Clean up stale built-in skills (e.g. old convex-* or Const Platform stubs)
-    for (const existing of existingSkills) {
-      if (
-        existing.isBuiltIn &&
-        (!validBuiltInSlugs.has(existing.slug) ||
-          existing.slug.startsWith("convex") ||
-          existing.author === "Const Platform")
-      ) {
-        await db.skills.delete(existing.id);
-      }
-    }
-
-    for (const skill of DEFAULT_SKILLS) {
-      const skillId = skill.id || `skill_${skill.slug}`;
-      const existing = existingSkills.find((s) => s.id === skillId || s.slug === skill.slug);
-
-      const files =
-        skill.files && Object.keys(skill.files).length > 0
-          ? skill.files
-          : { "SKILL.md": skill.content || `# ${skill.name}\n\n${skill.description}` };
-
-      if (!existing) {
-        await db.skills.put({
-          id: skillId,
-          slug: skill.slug,
-          name: skill.name,
-          description: skill.description,
-          content: skill.content,
-          icon: skill.icon,
-          category: skill.category,
-          isBuiltIn: true,
-          isEnabled: true,
-          scope: skill.scope || "user",
-          author: skill.author || "skills.sh",
-          version: skill.version || "1.0.0",
-          bundleId: skill.bundleId,
-          bundleName: skill.bundleName,
-          overview: skill.overview || generateSkillOverview(skill.name, skill.slug, skill.content, skill.description),
-          files,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      } else if (existing.isBuiltIn) {
-        if (
-          existing.content !== skill.content ||
-          existing.description !== skill.description ||
-          existing.author !== skill.author ||
-          !existing.files ||
-          Object.keys(existing.files).length !== Object.keys(files).length
-        ) {
-          await db.skills.update(existing.id, {
-            name: skill.name,
-            description: skill.description,
-            content: skill.content,
-            category: skill.category,
-            author: skill.author || "skills.sh",
-            overview: generateSkillOverview(skill.name, skill.slug, skill.content, skill.description),
-            files,
-            updatedAt: Date.now(),
-          });
-        }
-      }
-    }
+    await syncInstalledSkillsFromDisk();
   } catch (err) {
     console.warn("[SkillsService] Failed to seed default skills:", err);
   }

@@ -12,6 +12,7 @@ import {
   Settings2,
   Cable,
   PencilSparkles,
+  Store,
   UserRound,
   UserRoundPen,
   Keyboard,
@@ -803,9 +804,8 @@ export function SettingsView({
       items: [
         { id: "memory", label: t("settings.memory"), icon: Brain },
         { id: "subagents", label: t("settings.subagents"), icon: Bot },
-        { id: "plugins", label: t("settings.plugins"), icon: Blocks },
         { id: "mcp-servers", label: t("settings.mcpServers"), icon: Cable },
-        { id: "skills", label: t("settings.skills"), icon: PencilSparkles },
+        { id: "marketplace", label: t("settings.marketplace"), icon: Store },
       ],
     },
     {
@@ -865,10 +865,11 @@ export function SettingsView({
           title: t("settings.mcpServers"),
           desc: "Manage Model Context Protocol servers and tool integrations.",
         };
+      case "marketplace":
       case "skills":
         return {
-          title: t("settings.skills"),
-          desc: "Manage agent skills, workflow procedures, and custom tool suites.",
+          title: t("marketplace.title"),
+          desc: t("marketplace.subtitle"),
         };
       case "subagents":
         return {
@@ -2287,12 +2288,12 @@ export function SettingsView({
               /* Memory Settings View                                      */
               /* --------------------------------------------------------- */
               <MemorySettings currentProject={currentProject} />
-            ) : activeTab === "skills" ? (
+            ) : activeTab === "marketplace" || activeTab === "skills" || activeTab === "plugins" ? (
               /* --------------------------------------------------------- */
-              /* Agent Skills Settings View                                */
+              /* Marketplace Settings View (Skills & Plugins)              */
               /* --------------------------------------------------------- */
               <div className="pb-10">
-                <SkillsSettings isModal={true} />
+                <SkillsSettings isModal={true} initialTab={activeTab === "plugins" ? "plugins" : "skills"} />
               </div>
             ) : (
               /* --------------------------------------------------------- */

@@ -37,6 +37,14 @@ import {
   ShieldAlert,
   File,
   Terminal,
+  Blocks,
+  Store,
+  Folder,
+  Loader2,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Download,
 } from "lucide-react";
 import { marked } from "marked";
 import JSZip from "jszip";
@@ -49,15 +57,16 @@ import {
 } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import {
-  ensureDefaultSkillsSeeded,
+  syncInstalledSkillsFromDisk,
+  installSkillFromMarketplace,
+  uninstallSkillFromMarketplace,
+  fetchSkillContent,
   parseSkillMarkdown,
   generateSkillOverview,
   runSecurityScan,
+  MARKETPLACE_CATALOG,
+  type MarketplaceSkill,
 } from "../../lib/skills/skills-service";
-import {
-  DEFAULT_BUILTIN_SKILLS,
-  DEFAULT_BUILTIN_BUNDLES,
-} from "../../lib/skills/default-skills";
 import { FileIcon } from "../workbench/file-icon";
 import { MarkdownContent } from "../workbench/markdown-content";
 
@@ -99,7 +108,7 @@ function highlightJsTsLine(line: string): string {
       if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
       if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
       if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-      if (builtin) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(builtin)}</span>`;
+      if (builtin) return `<span class="text-sky-600 dark:text-sky-400">${escapeHtml(builtin)}</span>`;
       if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
       if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
       if (spaces) return spaces;
@@ -108,237 +117,31 @@ function highlightJsTsLine(line: string): string {
   );
 }
 
-function highlightBashLine(line: string): string {
-  const regex =
-    /(#.*$)|(["'](?:\\.|[^"'\\])*["'])|(\$[a-zA-Z0-9_]+|\$\{[^}]+\})|(\b(?:echo|cd|mkdir|rm|cp|mv|cat|grep|sed|awk|curl|wget|chmod|chown|git|npm|npx|pnpm|yarn|python|python3|pip|uv|if|then|else|elif|fi|for|in|do|done|while|case|esac|function)\b)|(\b\d+\b)|([^\s\w$]+)|(\s+)/g;
+export function highlightCodeLines(code: string, filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  const lines = code.split("\n");
 
-  return line.replace(regex, (match, comment, str, variable, kw, num, _symbol, spaces) => {
-    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-    if (variable) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(variable)}</span>`;
-    if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-    if (spaces) return spaces;
-    return escapeHtml(match);
-  });
-}
-
-function highlightJsonLine(line: string): string {
-  const regex =
-    /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b)|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|([^\s\w"]+)|(\s+)/g;
-
-  return line.replace(regex, (match, key, str, bool, num, _symbol, spaces) => {
-    if (key) return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(key)}</span>`;
-    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-    if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
-    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-    if (spaces) return spaces;
-    return escapeHtml(match);
-  });
-}
-
-function highlightYamlLine(line: string): string {
-  const regex =
-    /(#.*$)|(^[ \t]*[a-zA-Z0-9_-]+(?=\s*:))|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:true|false|null|yes|no)\b)|(\b\d+(?:\.\d+)?\b)|([^\s\w"']+)|(\s+)/g;
-
-  return line.replace(regex, (match, comment, key, str, bool, num, _symbol, spaces) => {
-    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-    if (key) return `<span class="text-sky-600 dark:text-sky-400 font-semibold">${escapeHtml(key)}</span>`;
-    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-    if (bool) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(bool)}</span>`;
-    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-    if (spaces) return spaces;
-    return escapeHtml(match);
-  });
-}
-
-function highlightMarkdownLine(line: string): string {
-  if (/^#{1,6}\s+/.test(line)) {
-    return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(line)}</span>`;
-  }
-  if (/^>\s+/.test(line)) {
-    return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(line)}</span>`;
-  }
-  if (/^(\s*[-*+]|\s*\d+\.)\s/.test(line)) {
-    return `<span class="text-sky-600 dark:text-sky-400 font-medium">${escapeHtml(line)}</span>`;
-  }
-  return escapeHtml(line);
-}
-
-function highlightSqlLine(line: string): string {
-  const regex =
-    /(--.*$)|('(?:''|[^'])*')|(\b(?:SELECT|FROM|WHERE|INSERT|INTO|UPDATE|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|CREATE|TABLE|DROP|ALTER|ADD|INDEX|VIEW|UNION|ALL|AS|ON|AND|OR|NOT|IN|IS|NULL|LIKE|BETWEEN|CASE|WHEN|THEN|ELSE|END)\b)|(\b\d+\b)|([^\s\w']+)|\s+/gi;
-
-  return line.replace(regex, (match, comment, str, kw, num) => {
-    if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-    if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-    if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-    if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-    return escapeHtml(match);
-  });
-}
-
-export function highlightCodeLines(code: string, language: string): string[] {
-  const lang = (language || "").toLowerCase().trim();
-  const rawLines = code.split(/\r?\n/);
-
-  let inPyDocstring: '"""' | "'''" | null = null;
-
-  return rawLines.map((line) => {
-    if (lang === "python" || lang === "py") {
-      if (inPyDocstring) {
-        const closeIdx = line.indexOf(inPyDocstring);
-        if (closeIdx !== -1) {
-          const beforeClose = line.slice(0, closeIdx + 3);
-          const afterClose = line.slice(closeIdx + 3);
-          inPyDocstring = null;
-          return (
-            `<span class="text-emerald-600 dark:text-emerald-400 italic">${escapeHtml(beforeClose)}</span>` +
-            (afterClose ? highlightPythonLine(afterClose) : "")
-          );
-        }
-        return `<span class="text-emerald-600 dark:text-emerald-400 italic">${escapeHtml(line)}</span>`;
+  return lines
+    .map((line, idx) => {
+      let highlighted = escapeHtml(line);
+      if (ext === "py") {
+        highlighted = highlightPythonLine(line);
+      } else if (ext === "ts" || ext === "js" || ext === "tsx" || ext === "jsx" || ext === "json") {
+        highlighted = highlightJsTsLine(line);
       }
-
-      const tripleDoubleIdx = line.indexOf('"""');
-      const tripleSingleIdx = line.indexOf("'''");
-      if (tripleDoubleIdx !== -1 && (tripleSingleIdx === -1 || tripleDoubleIdx < tripleSingleIdx)) {
-        const secondIdx = line.indexOf('"""', tripleDoubleIdx + 3);
-        if (secondIdx === -1) inPyDocstring = '"""';
-      } else if (tripleSingleIdx !== -1) {
-        const secondIdx = line.indexOf("'''", tripleSingleIdx + 3);
-        if (secondIdx === -1) inPyDocstring = "'''";
-      }
-      return highlightPythonLine(line);
-    }
-
-    if (
-      lang === "typescript" ||
-      lang === "ts" ||
-      lang === "tsx" ||
-      lang === "javascript" ||
-      lang === "js" ||
-      lang === "jsx"
-    ) {
-      return highlightJsTsLine(line);
-    }
-
-    if (lang === "bash" || lang === "sh" || lang === "shell" || lang === "zsh") {
-      return highlightBashLine(line);
-    }
-
-    if (lang === "json") {
-      return highlightJsonLine(line);
-    }
-
-    if (lang === "yaml" || lang === "yml") {
-      return highlightYamlLine(line);
-    }
-
-    if (lang === "markdown" || lang === "md") {
-      return highlightMarkdownLine(line);
-    }
-
-    if (lang === "sql") {
-      return highlightSqlLine(line);
-    }
-
-    return escapeHtml(line);
-  });
+      return `<div class="table-row hover:bg-[#252528] transition-colors leading-5"><span class="table-cell select-none pr-4 text-right text-[11px] text-[#5d5d5d] font-mono w-10">${idx + 1}</span><span class="table-cell select-text text-xs font-mono text-[#d4d4d4] whitespace-pre">${highlighted || "&nbsp;"}</span></div>`;
+    })
+    .join("");
 }
 
-function SkillCodeViewer({
-  code,
-  filename,
-  onCopy,
-}: {
-  code: string;
-  filename: string;
-  onCopy?: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const ext = filename.split(".").pop()?.toLowerCase() || "text";
-  const lang =
-    ext === "py"
-      ? "python"
-      : ext === "sh" || ext === "bash"
-      ? "bash"
-      : ext === "json"
-      ? "json"
-      : ext === "yaml" || ext === "yml"
-      ? "yaml"
-      : ext === "ts" || ext === "tsx"
-      ? "typescript"
-      : ext === "js" || ext === "jsx"
-      ? "javascript"
-      : ext === "md" || ext === "markdown"
-      ? "markdown"
-      : ext;
-
-  const lines = useMemo(() => code.split(/\r?\n/), [code]);
-  const highlightedLines = useMemo(() => highlightCodeLines(code, lang), [code, lang]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    onCopy?.();
-  };
+function SkillCodeViewer({ code, filename }: { code: string; filename: string }) {
+  const highlightedHtml = useMemo(() => {
+    return highlightCodeLines(code, filename);
+  }, [code, filename]);
 
   return (
-    <div className="w-full flex flex-col rounded-xl border border-border bg-secondary/15 overflow-hidden text-xs">
-      <div className="flex items-center justify-between px-3.5 py-2 bg-secondary/40 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary">
-            <FileIcon filename={filename} className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px] font-mono font-semibold uppercase">
-              {lang}
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-muted-foreground">
-            {lines.length} {lines.length === 1 ? "line" : "lines"}
-          </span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleCopy}
-          className="h-6 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3 h-3 text-emerald-500" />
-              <span>Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3 h-3" />
-              <span>Copy</span>
-            </>
-          )}
-        </Button>
-      </div>
-
-      <div className="flex overflow-x-auto select-text py-3">
-        {/* Line numbers */}
-        <div className="select-none text-right pr-3.5 pl-3 text-muted-foreground/40 border-r border-border shrink-0 leading-relaxed font-mono text-[11.5px]">
-          {lines.map((_, i) => (
-            <div key={i}>{i + 1}</div>
-          ))}
-        </div>
-        {/* Highlighted code lines */}
-        <div className="flex-1 pl-3.5 pr-4 overflow-x-auto leading-relaxed font-mono text-[11.5px] text-foreground">
-          {highlightedLines.map((htmlLine, i) => (
-            <div
-              key={i}
-              className="whitespace-pre"
-              dangerouslySetInnerHTML={{
-                __html: htmlLine || "&nbsp;",
-              }}
-            />
-          ))}
-        </div>
-      </div>
+    <div className="w-full h-full overflow-auto bg-[#161616] rounded-xl p-3 border border-[#2e2e2e]">
+      <div className="table w-full border-collapse font-mono" dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
     </div>
   );
 }
@@ -348,6 +151,7 @@ export interface SkillsSettingsProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   isModal?: boolean;
+  initialTab?: "skills" | "plugins";
 }
 
 export function SkillsSettings({
@@ -355,23 +159,24 @@ export function SkillsSettings({
   isSidebarOpen,
   onToggleSidebar,
   isModal = false,
+  initialTab = "skills",
 }: SkillsSettingsProps = {}) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadDropzoneInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Live Query from Dexie
+  // Live Query of installed skills from Dexie DB
   const skills = useLiveQuery(() => db.skills.toArray(), [], [] as LocalSkill[]);
-  const bundles = useLiveQuery(() => db.skillBundles.toArray(), [], [] as LocalSkillBundle[]);
+
+  // Marketplace tab: Skills vs Plugins
+  const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(initialTab);
 
   // Navigation state
-  const [viewMode, setViewMode] = useState<"list" | "bundle-detail" | "skill-detail" | "upload">("list");
-  const [selectedBundle, setSelectedBundle] = useState<LocalSkillBundle | null>(null);
-  const [selectedSkill, setSelectedSkill] = useState<LocalSkill | null>(null);
-  const [originBundle, setOriginBundle] = useState<LocalSkillBundle | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "skill-detail" | "upload">("list");
+  const [selectedSkill, setSelectedSkill] = useState<LocalSkill | MarketplaceSkill | null>(null);
+  const [installingSlug, setInstallingSlug] = useState<string | null>(null);
 
   // Detail view state
-  const [bundleActiveTab, setBundleActiveTab] = useState<"overview" | "content" | "skills">("overview");
   const [skillActiveTab, setSkillActiveTab] = useState<"overview" | "content">("overview");
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [contentViewMode, setContentViewMode] = useState<"preview" | "code">("preview");
@@ -383,40 +188,184 @@ export function SkillsSettings({
   const [deleteConfirmSkill, setDeleteConfirmSkill] = useState<LocalSkill | null>(null);
   const [isManualCreateOpen, setIsManualCreateOpen] = useState(false);
 
-  // Scope sliding tab indicator
-  const allScopeRef = useRef<HTMLButtonElement>(null);
-  const userScopeRef = useRef<HTMLButtonElement>(null);
-  const workspaceScopeRef = useRef<HTMLButtonElement>(null);
-  const [scopeIndicatorStyle, setScopeIndicatorStyle] = useState<{ left: number; width: number }>({
-    left: 0,
-    width: 0,
-  });
+  // Async loaded detail for real SKILL.md and scripts/files
+  const [loadedSkillDetail, setLoadedSkillDetail] = useState<{
+    content: string;
+    files: Record<string, string>;
+    overview?: string;
+    author?: string;
+    version?: string;
+    description?: string;
+  } | null>(null);
 
   useEffect(() => {
-    const updateIndicator = () => {
-      let activeEl: HTMLButtonElement | null = null;
-      if (selectedScope === "all") activeEl = allScopeRef.current;
-      else if (selectedScope === "user") activeEl = userScopeRef.current;
-      else if (selectedScope === "workspace") activeEl = workspaceScopeRef.current;
-
-      if (activeEl) {
-        setScopeIndicatorStyle({
-          left: activeEl.offsetLeft,
-          width: activeEl.offsetWidth,
-        });
-      }
-    };
-
-    updateIndicator();
-    const timer = setTimeout(updateIndicator, 50);
-    window.addEventListener("resize", updateIndicator);
+    let cancelled = false;
+    if (selectedSkill) {
+      fetchSkillContent(selectedSkill.slug).then((res) => {
+        if (!cancelled && res) {
+          const overview = generateSkillOverview(
+            res.name || selectedSkill.name,
+            selectedSkill.slug,
+            res.content,
+            res.description || selectedSkill.description
+          );
+          setLoadedSkillDetail({
+            content: res.content,
+            files: res.files,
+            overview,
+            author: res.author,
+            version: res.version,
+            description: res.description,
+          });
+        }
+      });
+    } else {
+      setLoadedSkillDetail(null);
+    }
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", updateIndicator);
+      cancelled = true;
     };
-  }, [selectedScope, viewMode]);
+  }, [selectedSkill?.slug]);
 
-  // Upload view state (Image 4)
+  // Sync installed skills from disk on mount
+  useEffect(() => {
+    syncInstalledSkillsFromDisk().catch((err) =>
+      console.warn("[Marketplace] Disk sync on mount:", err)
+    );
+  }, []);
+
+  // Update selected skill when db updates
+  useEffect(() => {
+    if (selectedSkill && "createdAt" in selectedSkill) {
+      const refreshed = skills.find((s) => s.id === (selectedSkill as LocalSkill).id);
+      if (refreshed) setSelectedSkill(refreshed);
+    }
+  }, [skills]);
+
+  // Set of installed skill slugs (lowercase)
+  const installedSlugs = useMemo(() => {
+    return new Set((skills || []).map((s) => s.slug.toLowerCase().trim()));
+  }, [skills]);
+
+  // Filtered installed skills
+  const filteredInstalledSkills = useMemo(() => {
+    return (skills || []).filter((skill) => {
+      if (selectedScope === "user" && skill.scope === "workspace") return false;
+      if (selectedScope === "workspace" && skill.scope !== "workspace") return false;
+      if (selectedCategory !== "all" && skill.category !== selectedCategory) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = skill.name.toLowerCase().includes(q);
+        const matchesSlug = skill.slug.toLowerCase().includes(q);
+        const matchesDesc = (skill.description || "").toLowerCase().includes(q);
+        const matchesAuthor = (skill.author || "").toLowerCase().includes(q);
+        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
+      }
+      return true;
+    });
+  }, [skills, selectedScope, selectedCategory, searchQuery]);
+
+  // Available marketplace skills (uninstalled)
+  const availableMarketplaceSkills = useMemo(() => {
+    return MARKETPLACE_CATALOG.filter((item) => {
+      if (installedSlugs.has(item.slug.toLowerCase().trim())) return false;
+      if (selectedCategory !== "all" && item.category !== selectedCategory) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = item.name.toLowerCase().includes(q);
+        const matchesSlug = item.slug.toLowerCase().includes(q);
+        const matchesDesc = item.description.toLowerCase().includes(q);
+        const matchesAuthor = item.author.toLowerCase().includes(q);
+        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
+      }
+      return true;
+    });
+  }, [installedSlugs, selectedCategory, searchQuery]);
+
+  // Compute file map for skill content tab
+  const skillFilesMap = useMemo(() => {
+    if (!selectedSkill) return {};
+    if (loadedSkillDetail?.files && Object.keys(loadedSkillDetail.files).length > 0) {
+      return loadedSkillDetail.files;
+    }
+    if ("files" in selectedSkill && selectedSkill.files && Object.keys(selectedSkill.files).length > 0) {
+      return selectedSkill.files;
+    }
+    const content = loadedSkillDetail?.content || ("content" in selectedSkill ? selectedSkill.content : "");
+    if (content) {
+      return {
+        "SKILL.md": content,
+      };
+    }
+    return {
+      "SKILL.md": `# ${selectedSkill.name}\n\n${selectedSkill.description}`,
+    };
+  }, [selectedSkill, loadedSkillDetail]);
+
+  useEffect(() => {
+    if (viewMode === "skill-detail" && selectedSkill) {
+      const keys = Object.keys(skillFilesMap);
+      if (keys.length > 0 && (!selectedFileName || !skillFilesMap[selectedFileName])) {
+        setSelectedFileName(keys[0]!);
+      }
+    }
+  }, [viewMode, selectedSkill, skillFilesMap]);
+
+  // Handlers
+  const handleToggleSkill = async (id: string, isEnabled: boolean) => {
+    try {
+      await localDb.toggleSkill(id, isEnabled);
+      toast.success(isEnabled ? t("skillEnabled") : t("skillDisabled"));
+    } catch {
+      toast.error(t("marketplace.failedToUpdateStatus"));
+    }
+  };
+
+  const handleInstallSkill = async (skill: MarketplaceSkill) => {
+    setInstallingSlug(skill.slug);
+    try {
+      const installed = await installSkillFromMarketplace(
+        skill.slug,
+        selectedScope === "workspace" ? "workspace" : "user"
+      );
+      toast.success(t("marketplace.installedSuccess").replace("{name}", skill.name));
+      if (selectedSkill && selectedSkill.slug === skill.slug) {
+        setSelectedSkill(installed);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || t("marketplace.failedToInstall"));
+    } finally {
+      setInstallingSlug(null);
+    }
+  };
+
+  const handleUninstallSkill = async (skill: LocalSkill) => {
+    try {
+      await uninstallSkillFromMarketplace(skill.id, skill.slug, skill.scope);
+      toast.success(t("marketplace.uninstalledSuccess").replace("{name}", skill.name));
+      setDeleteConfirmSkill(null);
+      if (selectedSkill && (selectedSkill as LocalSkill).id === skill.id) {
+        setViewMode("list");
+        setSelectedSkill(null);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || t("marketplace.failedToUninstall"));
+    }
+  };
+
+  const handleOpenSkillsFolder = () => {
+    if (window.electron?.marketplace) {
+      window.electron.marketplace.openSkillsFolder({
+        scope: selectedScope === "workspace" ? "workspace" : "user",
+      });
+    } else if (window.electron?.openConstFolder) {
+      window.electron.openConstFolder();
+    }
+  };
+
+  // Upload view state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSkillName, setUploadSkillName] = useState("");
   const [uploadSkillSlug, setUploadSkillSlug] = useState("");
@@ -425,7 +374,6 @@ export function SkillsSettings({
   const [uploadSkillOverview, setUploadSkillOverview] = useState("");
   const [uploadCategory, setUploadCategory] = useState<SkillCategory>("custom");
   const [uploadFilesMap, setUploadFilesMap] = useState<Record<string, string>>({});
-  const [uploadIsBundle, setUploadIsBundle] = useState(false);
   const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "passed" | "failed">("idle");
   const [scanMessage, setScanMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -437,1015 +385,189 @@ export function SkillsSettings({
   const [manualContent, setManualContent] = useState("");
   const [manualCategory, setManualCategory] = useState<SkillCategory>("custom");
 
-  // Ensure default skills are present on mount
-  useEffect(() => {
-    ensureDefaultSkillsSeeded();
-  }, []);
-
-  // Update selected bundle / skill when db updates
-  useEffect(() => {
-    if (selectedBundle) {
-      const refreshed = bundles.find((b) => b.id === selectedBundle.id);
-      if (refreshed) setSelectedBundle(refreshed);
-    }
-  }, [bundles]);
-
-  useEffect(() => {
-    if (selectedSkill) {
-      const refreshed = skills.find((s) => s.id === selectedSkill.id);
-      if (refreshed) setSelectedSkill(refreshed);
-    }
-  }, [skills]);
-
-  // Compute sub-skills for selected bundle
-  const bundleSubSkills = useMemo(() => {
-    if (!selectedBundle) return [];
-    const skillIdSet = new Set(selectedBundle.skillIds || []);
-    return skills.filter((s) => skillIdSet.has(s.id) || s.bundleId === selectedBundle.id);
-  }, [selectedBundle, skills]);
-
-  // Compute file map for bundle content tab
-  const bundleFilesMap = useMemo(() => {
-    if (!selectedBundle) return {};
-    const files: Record<string, string> = { ...(selectedBundle.files || {}) };
-    // Also include sub-skills files
-    bundleSubSkills.forEach((subSkill) => {
-      const prefix = `skills/${subSkill.name || subSkill.slug}`;
-      if (subSkill.files) {
-        Object.entries(subSkill.files).forEach(([fName, fContent]) => {
-          files[`${prefix}/${fName}`] = fContent;
-        });
-      } else if (subSkill.content) {
-        files[`${prefix}/SKILL.md`] = subSkill.content;
-      }
-    });
-    return files;
-  }, [selectedBundle, bundleSubSkills]);
-
-  // Compute file map for skill content tab
-  const skillFilesMap = useMemo(() => {
-    if (!selectedSkill) return {};
-    if (selectedSkill.files && Object.keys(selectedSkill.files).length > 0) {
-      return selectedSkill.files;
-    }
-    return {
-      "SKILL.md": selectedSkill.content || `# ${selectedSkill.name}\n\n${selectedSkill.description}`,
-    };
-  }, [selectedSkill]);
-
-  // Set default selected file when switching to bundle or skill
-  useEffect(() => {
-    if (viewMode === "bundle-detail" && selectedBundle) {
-      const keys = Object.keys(bundleFilesMap);
-      if (keys.length > 0 && (!selectedFileName || !bundleFilesMap[selectedFileName])) {
-        setSelectedFileName(keys[0]!);
-      }
-    } else if (viewMode === "skill-detail" && selectedSkill) {
-      const keys = Object.keys(skillFilesMap);
-      if (keys.length > 0 && (!selectedFileName || !skillFilesMap[selectedFileName])) {
-        setSelectedFileName(keys[0]!);
-      }
-    }
-  }, [viewMode, selectedBundle, selectedSkill, bundleFilesMap, skillFilesMap]);
-
-  // Filter skills and bundles for the list view
-  const filteredBundles = useMemo(() => {
-    return bundles.filter((bundle) => {
-      if (selectedScope === "user" && bundle.scope === "workspace") return false;
-      if (selectedScope === "workspace" && bundle.scope !== "workspace") return false;
-      if (selectedCategory !== "all" && bundle.category !== selectedCategory) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = bundle.name.toLowerCase().includes(q);
-        const matchesSlug = bundle.slug.toLowerCase().includes(q);
-        const matchesDesc = bundle.description.toLowerCase().includes(q);
-        const matchesAuthor = bundle.author?.toLowerCase().includes(q);
-        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
-      }
-      return true;
-    });
-  }, [bundles, selectedScope, selectedCategory, searchQuery]);
-
-  const filteredSkills = useMemo(() => {
-    return skills.filter((skill) => {
-      if (selectedScope === "user" && skill.scope === "workspace") return false;
-      if (selectedScope === "workspace" && skill.scope !== "workspace") return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = skill.name.toLowerCase().includes(q);
-        const matchesSlug = skill.slug.toLowerCase().includes(q);
-        const matchesDesc = skill.description.toLowerCase().includes(q);
-        const matchesAuthor = skill.author?.toLowerCase().includes(q);
-        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
-      }
-      return true;
-    });
-  }, [skills, selectedScope, searchQuery]);
-
-  // Handlers for toggles
-  const handleToggleSkill = async (id: string, isEnabled: boolean) => {
-    try {
-      await localDb.toggleSkill(id, isEnabled);
-      toast.success(isEnabled ? t("skillEnabled") : t("skillDisabled"));
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to toggle skill");
-    }
-  };
-
-  const handleToggleBundle = async (id: string, isEnabled: boolean) => {
-    try {
-      await localDb.toggleSkillBundle(id, isEnabled);
-      toast.success(isEnabled ? t("skillEnabled") : t("skillDisabled"));
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to toggle bundle");
-    }
-  };
-
-  const handleResetToDefault = async () => {
-    try {
-      await ensureDefaultSkillsSeeded(true);
-      toast.success(t("skillsResetSuccess"));
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to reset skills");
-    }
-  };
-
-  // Upload & File handling for Image 4
-  const processUploadedFile = async (file: File) => {
+  const handleFileProcess = async (file: File) => {
     setUploadFile(file);
     setScanStatus("scanning");
     setScanMessage(t("scanScanning"));
 
     try {
-      const fileName = file.name.toLowerCase();
-
-      if (fileName.endsWith(".zip")) {
-        // Handle ZIP file using JSZip
-        const zip = await JSZip.loadAsync(file);
+      if (file.name.endsWith(".zip")) {
+        const zip = new JSZip();
+        const zipData = await zip.loadAsync(file);
         const filesMap: Record<string, string> = {};
-        let combinedContent = "";
-        let mainSkillMd = "";
 
-        const zipEntries = Object.keys(zip.files);
-        for (const relativePath of zipEntries) {
-          const entry = zip.files[relativePath];
-          if (!entry || entry.dir) continue;
-          const text = await entry.async("text");
-          filesMap[relativePath] = text;
-          combinedContent += text + "\n";
-          if (relativePath.endsWith("SKILL.md") || relativePath.toLowerCase().includes("skill.md")) {
-            mainSkillMd = text;
+        for (const [relativePath, zipEntry] of Object.entries(zipData.files)) {
+          if (!zipEntry.dir) {
+            const ext = relativePath.split(".").pop()?.toLowerCase();
+            if (ext && ["md", "txt", "json", "yaml", "yml", "ts", "js", "py"].includes(ext)) {
+              filesMap[relativePath] = await zipEntry.async("text");
+            }
           }
         }
 
-        const scanResult = runSecurityScan(combinedContent, file.name);
-        if (!scanResult.passed) {
+        const skillMdKey = Object.keys(filesMap).find(
+          (k) => k.endsWith("SKILL.md") || k === "SKILL.md"
+        );
+        const mainContent = skillMdKey ? filesMap[skillMdKey] || "" : "";
+        const parsed = parseSkillMarkdown(mainContent);
+
+        const scan = runSecurityScan(mainContent);
+        if (!scan.passed) {
           setScanStatus("failed");
-          setScanMessage(scanResult.message);
-          toast.error(scanResult.message);
+          setScanMessage(scan.message);
           return;
         }
 
-        const parsed = parseSkillMarkdown(mainSkillMd || combinedContent.slice(0, 2000));
-        const baseName = file.name.replace(/\.zip$/i, "");
-        const name = parsed.name !== "Untitled Skill" ? parsed.name : baseName;
-        const slug = parsed.slug || baseName.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-        const desc = parsed.description || "Uploaded agent skills bundle.";
-        const overview = generateSkillOverview(name, slug, combinedContent, desc);
-
-        setUploadSkillName(name);
-        setUploadSkillSlug(slug);
-        setUploadSkillDescription(desc);
-        setUploadSkillContent(mainSkillMd || combinedContent);
-        setUploadSkillOverview(overview);
         setUploadFilesMap(filesMap);
-        setUploadIsBundle(true);
+        setUploadSkillContent(mainContent);
+        setUploadSkillName(parsed.name || file.name.replace(".zip", ""));
+        setUploadSkillSlug(parsed.slug || file.name.replace(".zip", "").toLowerCase());
+        setUploadSkillDescription(parsed.description || "");
+        setUploadSkillOverview(generateSkillOverview(parsed.name, parsed.slug, mainContent, parsed.description));
+        setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
         setScanStatus("passed");
-        setScanMessage(scanResult.message);
+        setScanMessage(t("securityScanClean"));
       } else {
-        // Handle .md / text file
         const text = await file.text();
-        const scanResult = runSecurityScan(text, file.name);
-        if (!scanResult.passed) {
+        const parsed = parseSkillMarkdown(text);
+        const scan = runSecurityScan(text);
+        if (!scan.passed) {
           setScanStatus("failed");
-          setScanMessage(scanResult.message);
-          toast.error(scanResult.message);
+          setScanMessage(scan.message);
           return;
         }
 
-        const parsed = parseSkillMarkdown(text);
-        const overview = generateSkillOverview(parsed.name, parsed.slug, parsed.content, parsed.description);
-
-        setUploadSkillName(parsed.name);
-        setUploadSkillSlug(parsed.slug);
-        setUploadSkillDescription(parsed.description);
-        setUploadSkillContent(parsed.content);
-        setUploadSkillOverview(overview);
-        setUploadFilesMap({ "SKILL.md": parsed.content });
-        setUploadIsBundle(false);
+        setUploadSkillContent(text);
+        setUploadSkillName(parsed.name || file.name.replace(/\.[^/.]+$/, ""));
+        setUploadSkillSlug(parsed.slug || file.name.replace(/\.[^/.]+$/, "").toLowerCase());
+        setUploadSkillDescription(parsed.description || "");
+        setUploadSkillOverview(generateSkillOverview(parsed.name, parsed.slug, text, parsed.description));
+        setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
+        setUploadFilesMap({ "SKILL.md": text });
         setScanStatus("passed");
-        setScanMessage(scanResult.message);
+        setScanMessage(t("securityScanClean"));
       }
     } catch (err: any) {
       setScanStatus("failed");
-      setScanMessage(err?.message || "Failed to parse uploaded file");
-      toast.error("Failed to parse file: " + (err?.message || ""));
+      setScanMessage(err?.message || "Failed to process file");
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      processUploadedFile(file);
-    }
-  };
-
-  const handleUploadSubmit = async () => {
-    if (!uploadSkillName.trim() || !uploadSkillSlug.trim()) {
-      toast.error("Skill name and slug required");
+    if (!uploadSkillName.trim()) {
+      toast.error(t("marketplace.nameRequired"));
       return;
     }
-    if (scanStatus !== "passed") {
-      toast.error("File must pass security scan before uploading");
-      return;
-    }
-
     try {
-      const cleanSlug = uploadSkillSlug
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
+      const id = "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      const now = Date.now();
+      await db.skills.add({
+        id,
+        slug: uploadSkillSlug.trim().toLowerCase(),
+        name: uploadSkillName.trim(),
+        description: uploadSkillDescription.trim(),
+        content: uploadSkillContent,
+        icon: "PencilSparkles",
+        category: uploadCategory,
+        isBuiltIn: false,
+        isEnabled: true,
+        scope: selectedScope === "workspace" ? "workspace" : "user",
+        author: "Uploaded",
+        version: "1.0.0",
+        overview: uploadSkillOverview,
+        files: uploadFilesMap,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-      if (uploadIsBundle) {
-        // Create bundle
-        await localDb.createSkillBundle({
-          slug: cleanSlug,
-          name: uploadSkillName.trim(),
-          description: uploadSkillDescription.trim(),
-          overview: uploadSkillOverview,
-          author: "User",
-          version: "1.0.0",
-          category: uploadCategory,
-          isBuiltIn: false,
-          isEnabled: true,
-          scope: "user",
-          files: uploadFilesMap,
-          skillIds: [],
-        });
-
-        toast.success(t("skillAddedSuccess", { name: uploadSkillName }));
-      } else {
-        // Save single skill
-        await localDb.createSkill({
-          name: uploadSkillName.trim(),
-          slug: cleanSlug,
-          description: uploadSkillDescription.trim() || "Custom agent skill.",
-          content: uploadSkillContent.trim(),
-          overview: uploadSkillOverview,
-          author: "User",
-          version: "1.0.0",
-          files: uploadFilesMap,
-          category: uploadCategory,
-          icon: "PencilSparkles",
-          isBuiltIn: false,
-          isEnabled: true,
-          scope: "user",
-        });
-
-        toast.success(t("skillAddedSuccess", { name: uploadSkillName }));
-      }
-
-      // Reset & go back to list
-      setUploadFile(null);
-      setScanStatus("idle");
+      toast.success(t("skillAddedSuccess").replace("{name}", uploadSkillName));
       setViewMode("list");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to save skill");
+      setUploadFile(null);
+    } catch {
+      toast.error(t("marketplace.failedToSaveSkill"));
     }
   };
 
   const handleManualSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualName.trim() || !manualSlug.trim()) {
-      toast.error("Name and slug required");
+      toast.error(t("marketplace.nameAndSlugRequired"));
       return;
     }
-
     try {
-      const cleanSlug = manualSlug
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]/g, "-")
-        .replace(/-+/g, "-");
-      const overview = generateSkillOverview(manualName, cleanSlug, manualContent, manualDescription);
-
-      await localDb.createSkill({
+      const id = "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      const now = Date.now();
+      await db.skills.add({
+        id,
+        slug: manualSlug.trim().toLowerCase(),
         name: manualName.trim(),
-        slug: cleanSlug,
-        description: manualDescription.trim() || "Custom agent skill.",
-        content: manualContent.trim() || `# ${manualName}\n\n${manualDescription}`,
-        overview,
-        author: "User",
-        version: "1.0.0",
-        category: manualCategory,
+        description: manualDescription.trim(),
+        content: manualContent,
         icon: "PencilSparkles",
+        category: manualCategory,
         isBuiltIn: false,
         isEnabled: true,
-        scope: "user",
+        scope: selectedScope === "workspace" ? "workspace" : "user",
+        author: "User",
+        version: "1.0.0",
+        overview: generateSkillOverview(manualName, manualSlug, manualContent, manualDescription),
         files: { "SKILL.md": manualContent },
+        createdAt: now,
+        updatedAt: now,
       });
 
-      toast.success(t("skillAddedSuccess", { name: manualName }));
+      toast.success(t("skillAddedSuccess").replace("{name}", manualName));
       setIsManualCreateOpen(false);
       setManualName("");
       setManualSlug("");
       setManualDescription("");
       setManualContent("");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to create skill");
+    } catch {
+      toast.error(t("marketplace.failedToCreateSkill"));
     }
   };
 
   const handleCopyContent = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(t("contentCopied"));
+    toast.success(t("marketplace.copiedToClipboard"));
   };
 
-  // ---------------------------------------------------------------------------
-  // RENDER: VIEW 4 — UPLOAD A SKILL (Image 4)
-  // ---------------------------------------------------------------------------
-  if (viewMode === "upload") {
-    return (
-      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
-        {/* Top Back Navigation Bar */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{t("backToSkills")}</span>
-          </Button>
-
-          {onClose && !isModal && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-
-        {/* Upload Container Body */}
-        <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
-          {/* Header Titles */}
-          <div>
-            <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
-              {t("uploadSkillTitle")}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              {t("uploadSkillSubtitle")}
-            </p>
-          </div>
-
-          {/* Hidden File Input */}
-          <input
-            type="file"
-            ref={uploadDropzoneInputRef}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) processUploadedFile(file);
-              e.target.value = "";
-            }}
-            accept=".md,.markdown,.zip,text/markdown"
-            className="hidden"
-          />
-
-          {/* Terminal CLI Command Box (skills.sh open standard) */}
-          <div className="p-4 rounded-2xl bg-card border border-border flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-primary" />
-                <span className="text-xs font-semibold text-foreground">
-                  Install via Terminal (skills.sh open standard)
-                </span>
-              </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                npx skills add
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Install skills directly into your workspace using the official skills CLI. Skills are managed as real directory trees containing <code className="text-primary font-mono text-[11px]">SKILL.md</code>.
-            </p>
-            <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-secondary/80 border border-border font-mono text-xs text-foreground select-text">
-              <span className="truncate">npx skills add https://github.com/anthropics/skills --skill frontend-design</span>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText("npx skills add https://github.com/anthropics/skills --skill frontend-design");
-                  toast.success("Command copied to clipboard!");
-                }}
-                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
-                title="Copy command"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-              <span className="font-medium">Popular:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText("npx skills add adithya-s-k/manim_skill");
-                  toast.success("Copied: npx skills add adithya-s-k/manim_skill");
-                }}
-                className="px-2 py-0.5 rounded-md bg-secondary hover:bg-secondary/70 border border-border cursor-pointer transition-colors"
-              >
-                manim_skill
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText("npx skills add hyperframes");
-                  toast.success("Copied: npx skills add hyperframes");
-                }}
-                className="px-2 py-0.5 rounded-md bg-secondary hover:bg-secondary/70 border border-border cursor-pointer transition-colors"
-              >
-                hyperframes
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText("npx skills add anthropics/skills --skill frontend-design");
-                  toast.success("Copied: npx skills add anthropics/skills --skill frontend-design");
-                }}
-                className="px-2 py-0.5 rounded-md bg-secondary hover:bg-secondary/70 border border-border cursor-pointer transition-colors"
-              >
-                frontend-design
-              </button>
-            </div>
-          </div>
-
-          {/* Large Dashed Dropzone */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragOver(true);
-            }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => uploadDropzoneInputRef.current?.click()}
-            className={cn(
-              "border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3",
-              isDragOver
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/60 bg-card"
-            )}
-          >
-            <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground mb-1">
-              <Upload className="w-6 h-6 stroke-[1.8]" />
-            </div>
-
-            <div>
-              <span className="text-sm font-semibold text-foreground block">
-                {t("dragAndDropFiles")}
-              </span>
-              <span className="text-xs text-muted-foreground block mt-1">
-                {uploadFile ? (
-                  <span className="font-medium text-primary">
-                    Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                  </span>
-                ) : (
-                  "Supports single markdown or bundled archive"
-                )}
-              </span>
-            </div>
-
-            {/* Supported formats bullet points */}
-            <div className="flex flex-col items-start text-left text-xs text-muted-foreground gap-1.5 mt-2 bg-secondary/50 p-3 rounded-xl border border-border w-full max-w-md">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                <span>{t("uploadMdSupport")}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                <span>{t("uploadZipSupport")}</span>
-              </div>
-            </div>
-          </div>
-
-            {/* Security Scan Card (Image 4) */}
-            <div className="p-4 rounded-2xl bg-card border border-border flex items-start gap-3.5">
-              <div className="mt-0.5 shrink-0">
-                {scanStatus === "passed" ? (
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                ) : scanStatus === "failed" ? (
-                  <div className="w-8 h-8 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center">
-                    <ShieldAlert className="w-4 h-4" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-xl bg-secondary border border-border text-muted-foreground flex items-center justify-center">
-                    <Shield className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-foreground">
-                    {t("securityScanTitle")}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[11px] font-medium px-2 py-0.5 rounded-md",
-                      scanStatus === "passed"
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                        : scanStatus === "failed"
-                        ? "bg-destructive/10 text-destructive border border-destructive/20"
-                        : scanStatus === "scanning"
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse"
-                        : "bg-secondary text-muted-foreground border border-border"
-                    )}
-                  >
-                    {scanStatus === "passed"
-                      ? t("securityScanPassed")
-                      : scanStatus === "scanning"
-                      ? t("scanScanning")
-                      : scanStatus === "failed"
-                      ? t("scanFailed")
-                      : t("securityScanRunsOnUpload")}
-                  </span>
-                </div>
-
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  {scanStatus === "passed" ? scanMessage : t("securityScanDesc")}
-                </p>
-              </div>
-            </div>
-
-            {/* AI Generated Overview Box */}
-            {uploadFile && scanStatus === "passed" && (
-              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-card border border-border">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PencilSparkles className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-xs font-semibold text-foreground">
-                      AI Overview & Configuration
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Auto-generated from content
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-muted-foreground">
-                      {t("skillName")}
-                    </label>
-                    <Input
-                      type="text"
-                      value={uploadSkillName}
-                      onChange={(e) => setUploadSkillName(e.target.value)}
-                      className="h-8 px-2.5 text-xs bg-background border-border text-foreground rounded-xl"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-muted-foreground">
-                      {t("skillSlug")}
-                    </label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-2.5 text-xs text-muted-foreground font-mono">
-                        /
-                      </span>
-                      <Input
-                        type="text"
-                        value={uploadSkillSlug}
-                        onChange={(e) => setUploadSkillSlug(e.target.value)}
-                        className="h-8 pl-6 pr-2.5 text-xs font-mono bg-background border-border text-foreground rounded-xl"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">
-                    {t("skillDescription")}
-                  </label>
-                  <Input
-                    type="text"
-                    value={uploadSkillDescription}
-                    onChange={(e) => setUploadSkillDescription(e.target.value)}
-                    className="h-8 px-2.5 text-xs bg-background border-border text-foreground rounded-xl"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-muted-foreground">
-                    Overview (Written by AI)
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={uploadSkillOverview}
-                    onChange={(e) => setUploadSkillOverview(e.target.value)}
-                    className="w-full p-2.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 resize-y leading-relaxed font-sans"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Action Buttons */}
-            <div className="pt-2 flex items-center justify-end gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="rounded-xl border-border text-muted-foreground hover:text-foreground"
-              >
-                {t("cancel")}
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleUploadSubmit}
-                disabled={!uploadFile || scanStatus !== "passed"}
-                className="px-5 rounded-xl text-xs font-semibold shadow-xs"
-              >
-                {t("uploadBtn")}
-              </Button>
-            </div>
-          </div>
-        </div>
-    );
-  }
+  const CATEGORY_FILTERS: Array<{ id: string; label: string }> = [
+    { id: "all", label: t("marketplace.filterAll") },
+    { id: "coding_dev", label: t("marketplace.filterCoding") },
+    { id: "motion_video", label: t("marketplace.filterCreative") },
+    { id: "finance", label: t("marketplace.filterFinance") },
+    { id: "scraping_research", label: t("marketplace.filterResearch") },
+    { id: "design", label: t("marketplace.filterDesign") },
+    { id: "agent_workflow", label: t("marketplace.filterWorkflow") },
+    { id: "document", label: t("marketplace.filterDocument") },
+  ];
 
   // ---------------------------------------------------------------------------
-  // RENDER: VIEW 1 & 3 — BUNDLE DETAIL (Image 1 & Image 3)
-  // ---------------------------------------------------------------------------
-  if (viewMode === "bundle-detail" && selectedBundle) {
-    const activeFileContent = bundleFilesMap[selectedFileName] || "";
-
-    return (
-      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
-        {/* Top Back Navigation Bar */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{t("backToSkills")}</span>
-          </Button>
-
-          {onClose && !isModal && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-
-        {/* Bundle Header Strip */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col min-w-0">
-            <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground truncate">
-              {selectedBundle.name}
-            </h2>
-            {/* Meta row: Author · Version · Skills Count · Updated */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-              {selectedBundle.author && <span>{selectedBundle.author}</span>}
-              {selectedBundle.version && (
-                <>
-                  <span>·</span>
-                  <span>{selectedBundle.version}</span>
-                </>
-              )}
-              <span>·</span>
-              <span>{bundleSubSkills.length} skills</span>
-              {selectedBundle.updatedAtText && (
-                <>
-                  <span>·</span>
-                  <span>Updated {selectedBundle.updatedAtText}</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Action button: Add / Enabled */}
-          <div className="shrink-0 flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={selectedBundle.isEnabled ? "secondary" : "default"}
-              onClick={() => handleToggleBundle(selectedBundle.id, !selectedBundle.isEnabled)}
-              className="rounded-xl text-xs font-semibold gap-1.5 shadow-none"
-            >
-              {selectedBundle.isEnabled ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Enabled</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add</span>
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* 3 Tabs Row (Overview, Content, Skills · N) */}
-        <div className="border-b border-border flex items-center gap-6 text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setBundleActiveTab("overview")}
-            className={cn(
-              "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
-              bundleActiveTab === "overview"
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("tabOverview")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setBundleActiveTab("content")}
-            className={cn(
-              "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
-              bundleActiveTab === "content"
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("tabContent")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setBundleActiveTab("skills")}
-            className={cn(
-              "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
-              bundleActiveTab === "skills"
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("tabSkills")} · {bundleSubSkills.length}
-          </button>
-        </div>
-
-        {/* Tab 1: OVERVIEW */}
-        {bundleActiveTab === "overview" && (
-          <div className="max-w-3xl flex flex-col gap-6 pt-2">
-            <div className="select-text">
-              <MarkdownContent
-                content={selectedBundle.overview || selectedBundle.description || ""}
-              />
-            </div>
-
-            {/* Skills included list */}
-            <div className="flex flex-col gap-2 pt-2">
-              <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                Included Skills ({bundleSubSkills.length})
-              </span>
-              <div className="flex flex-col divide-y divide-border/60 border border-border rounded-2xl bg-card overflow-hidden shadow-2xs">
-                {bundleSubSkills.map((sub) => (
-                  <div
-                    key={sub.id}
-                    onClick={() => {
-                      setSelectedSkill(sub);
-                      setOriginBundle(selectedBundle);
-                      setViewMode("skill-detail");
-                    }}
-                    className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3 group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
-                      <FileIcon filename="SKILL.md" className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-foreground">
-                          {sub.name}
-                        </span>
-                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-secondary border border-border/60 text-muted-foreground">
-                          /{sub.slug}
-                        </span>
-                      </div>
-                      {sub.description && sub.description.trim() && sub.description !== ">" && sub.description !== "|" && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
-                          {sub.description}
-                        </p>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: CONTENT (Split Pane) */}
-        {bundleActiveTab === "content" && (
-          <div className={cn("w-full rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs", isModal ? "h-[360px]" : "h-[520px]")}>
-            {/* Left File Tree Sidebar */}
-            <div className="w-56 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
-              <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Files ({Object.keys(bundleFilesMap).length})
-              </div>
-              <ScrollArea className="flex-1 p-2">
-                <div className="flex flex-col gap-0.5">
-                  {Object.keys(bundleFilesMap).map((fileName) => {
-                    const isSelected = selectedFileName === fileName;
-                    return (
-                      <button
-                        key={fileName}
-                        type="button"
-                        onClick={() => setSelectedFileName(fileName)}
-                        className={cn(
-                          "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer truncate",
-                          isSelected
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                        )}
-                      >
-                        <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{fileName}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Right Content Viewer */}
-            <div className="flex-1 min-w-0 flex flex-col bg-card">
-              {/* File header bar */}
-              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
-                <span className="text-xs font-mono font-medium text-foreground truncate">
-                  /{selectedFileName}
-                </span>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
-                    <div className="flex items-center rounded-lg bg-muted/70 border border-border p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setContentViewMode("preview")}
-                        className={cn(
-                          "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
-                          contentViewMode === "preview"
-                            ? "bg-background text-foreground shadow-2xs font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Preview"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t("previewMode")}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setContentViewMode("code")}
-                        className={cn(
-                          "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
-                          contentViewMode === "code"
-                            ? "bg-background text-foreground shadow-2xs font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Raw Code"
-                      >
-                        <Code className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t("rawCodeMode")}</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary border border-border text-foreground">
-                      <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-[11px] font-mono font-semibold uppercase">
-                        {selectedFileName.split(".").pop() || "code"}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Copy button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCopyContent(activeFileContent)}
-                    className="h-7 w-7 p-0 rounded-lg border-border text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
-                    title={t("copyCode")}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Viewer body */}
-              <ScrollArea className="flex-1 p-5">
-                {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
-                  contentViewMode === "preview" ? (
-                    <div className="p-2 select-text">
-                      <MarkdownContent content={activeFileContent} />
-                    </div>
-                  ) : (
-                    <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
-                  )
-                ) : (
-                  <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
-                )}
-              </ScrollArea>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: SKILLS */}
-        {bundleActiveTab === "skills" && (
-          <div className="max-w-3xl flex flex-col gap-3 pt-2">
-            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-              Skills in this bundle ({bundleSubSkills.length})
-            </span>
-            <div className="flex flex-col divide-y divide-border/60 border border-border rounded-2xl bg-card overflow-hidden shadow-2xs">
-              {bundleSubSkills.map((sub) => (
-                <div
-                  key={sub.id}
-                  onClick={() => {
-                    setSelectedSkill(sub);
-                    setOriginBundle(selectedBundle);
-                    setViewMode("skill-detail");
-                  }}
-                  className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3.5 group"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
-                    <FileIcon filename="SKILL.md" className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold text-foreground">
-                        {sub.name}
-                      </span>
-                      <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-secondary border border-border/60 text-muted-foreground">
-                        /{sub.slug}
-                      </span>
-                    </div>
-                    {sub.description && sub.description.trim() && sub.description !== ">" && sub.description !== "|" && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
-                        {sub.description}
-                      </p>
-                    )}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // RENDER: VIEW 2 — SINGLE SKILL DETAIL (Image 2)
+  // RENDER: VIEW 1 — SKILL DETAIL VIEW
   // ---------------------------------------------------------------------------
   if (viewMode === "skill-detail" && selectedSkill) {
-    const activeFileContent = skillFilesMap[selectedFileName] || selectedSkill.content || "";
+    const isInstalled = "createdAt" in selectedSkill || installedSlugs.has(selectedSkill.slug.toLowerCase().trim());
+    const activeFileContent =
+      skillFilesMap[selectedFileName] ||
+      loadedSkillDetail?.content ||
+      ("content" in selectedSkill ? selectedSkill.content : "") ||
+      "";
     const filesList = Object.keys(skillFilesMap);
 
     return (
-      <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
+      <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-4 pb-8" : "space-y-6")}>
         {/* Top Back Navigation Bar */}
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              if (originBundle) {
-                setSelectedBundle(originBundle);
-                setViewMode("bundle-detail");
-              } else {
-                setViewMode("list");
-              }
-            }}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
+            onClick={() => setViewMode("list")}
+            className="gap-1.5 text-xs text-[#969696] hover:text-white cursor-pointer -ml-2 h-8"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{originBundle ? originBundle.name : t("backToSkills")}</span>
+            <span>{t("marketplace.title")}</span>
           </Button>
 
           {onClose && !isModal && (
@@ -1453,7 +575,7 @@ export function SkillsSettings({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 p-0 rounded-lg text-[#969696] hover:text-white"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -1461,55 +583,98 @@ export function SkillsSettings({
         </div>
 
         {/* Skill Header Strip */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground truncate">
-                {selectedSkill.name}
-              </h2>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-secondary border border-border/60 text-muted-foreground">
-                /{selectedSkill.slug}
-              </span>
+        <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-[#222222] border border-[#383838]">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-12 h-12 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
+              <PencilSparkles className="w-6 h-6 text-white" />
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
-              {selectedSkill.author && <span>{selectedSkill.author}</span>}
-              {selectedSkill.version && (
-                <>
-                  <span>·</span>
-                  <span>{selectedSkill.version}</span>
-                </>
-              )}
-              {selectedSkill.updatedAtText && (
-                <>
-                  <span>·</span>
-                  <span>Updated {selectedSkill.updatedAtText}</span>
-                </>
-              )}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-medium text-white truncate">
+                  {selectedSkill.name}
+                </h2>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696]">
+                  /{selectedSkill.slug}
+                </span>
+                {isInstalled && (
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {t("marketplace.installedSection")}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-[#969696] mt-1 flex-wrap">
+                {(loadedSkillDetail?.author || selectedSkill.author) && (
+                  <span>
+                    {t("marketplace.byAuthor").replace(
+                      "{author}",
+                      loadedSkillDetail?.author || selectedSkill.author || ""
+                    )}
+                  </span>
+                )}
+                {(loadedSkillDetail?.version || selectedSkill.version) && (
+                  <>
+                    <span>·</span>
+                    <span>v{loadedSkillDetail?.version || selectedSkill.version}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Action button: Enabled Switch */}
+          {/* Action button */}
           <div className="shrink-0 flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">
-              {selectedSkill.isEnabled ? "Enabled" : "Disabled"}
-            </span>
-            <Switch
-              checked={selectedSkill.isEnabled}
-              onCheckedChange={(checked) => handleToggleSkill(selectedSkill.id, checked)}
-            />
+            {isInstalled ? (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[#969696]">
+                  {(selectedSkill as LocalSkill).isEnabled ? t("marketplace.active") : t("marketplace.disabled")}
+                </span>
+                <Switch
+                  checked={(selectedSkill as LocalSkill).isEnabled}
+                  onCheckedChange={(checked) => handleToggleSkill((selectedSkill as LocalSkill).id, checked)}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setDeleteConfirmSkill(selectedSkill as LocalSkill)}
+                  className="h-8 px-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                  title={t("marketplace.uninstall")}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => handleInstallSkill(selectedSkill as MarketplaceSkill)}
+                disabled={installingSlug === selectedSkill.slug}
+                className="h-8 px-4 rounded-xl text-xs font-medium gap-1.5 bg-white text-black hover:bg-zinc-200 transition-colors shadow-none cursor-pointer"
+              >
+                {installingSlug === selectedSkill.slug ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{t("marketplace.installing")}</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5 stroke-[2.2]" />
+                    <span>{t("marketplace.install")}</span>
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
         {/* 2 Tabs Row (Overview, Content · N) */}
-        <div className="border-b border-border flex items-center gap-6 text-xs font-medium">
+        <div className="flex items-center gap-6 text-xs font-medium border-b border-[#2e2e2e]">
           <button
             type="button"
             onClick={() => setSkillActiveTab("overview")}
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "overview"
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-white text-white font-semibold"
+                : "border-transparent text-[#969696] hover:text-white"
             )}
           >
             {t("tabOverview")}
@@ -1520,8 +685,8 @@ export function SkillsSettings({
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "content"
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-white text-white font-semibold"
+                : "border-transparent text-[#969696] hover:text-white"
             )}
           >
             {t("tabContent")} · {filesList.length}
@@ -1530,121 +695,116 @@ export function SkillsSettings({
 
         {/* Tab 1: OVERVIEW */}
         {skillActiveTab === "overview" && (
-          <div className={cn("max-w-3xl flex flex-col pt-2", isModal ? "gap-4 pb-8" : "gap-6 pb-6")}>
-            {selectedSkill.overview && (
-              <div>
-                <span className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">
-                  {t("tabOverview")}
-                </span>
-                <div className="select-text">
-                  <MarkdownContent content={selectedSkill.overview} />
-                </div>
+          <div className="max-w-3xl flex flex-col gap-4 pt-2">
+            {(loadedSkillDetail?.overview || selectedSkill.overview) ? (
+              <div className="p-5 rounded-2xl bg-[#222222] border border-[#383838] select-text">
+                <MarkdownContent content={loadedSkillDetail?.overview || selectedSkill.overview || ""} />
+              </div>
+            ) : (
+              <div className="p-5 rounded-2xl bg-[#222222] border border-[#383838] select-text">
+                <p className="text-sm text-[#d4d4d4] leading-relaxed">
+                  {loadedSkillDetail?.description || selectedSkill.description}
+                </p>
               </div>
             )}
 
             {/* Slash Command Usage card */}
-            <div className="p-4 rounded-2xl bg-card border border-border flex flex-col gap-2 shadow-2xs">
-              <span className="text-xs font-semibold text-foreground">
+            <div className="p-4 rounded-2xl bg-[#222222] border border-[#383838] flex flex-col gap-2">
+              <span className="text-xs font-semibold text-white">
                 {t("slashCommandSkills")}
               </span>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Trigger this skill manually by starting your message with{" "}
-                <code className="font-mono text-foreground px-1.5 py-0.5 rounded-md bg-secondary border border-border/60">
+              <p className="text-xs text-[#969696] leading-relaxed">
+                {t("skillSlashCommandHint")}:
+              </p>
+              <div className="px-3 py-2 rounded-xl bg-[#161616] border border-[#2e2e2e] flex items-center justify-between">
+                <code className="text-xs font-mono text-white">
                   /{selectedSkill.slug}
                 </code>
-                , or let Const AI autonomously choose and apply it when relevant to your study request.
-              </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleCopyContent(`/${selectedSkill.slug}`)}
+                  className="h-6 px-2 text-[11px] text-[#969696] hover:text-white cursor-pointer"
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  <span>Copy</span>
+                </Button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Tab 2: CONTENT (Split Pane) */}
+        {/* Tab 2: CONTENT & FILES */}
         {skillActiveTab === "content" && (
-          <div className={cn("w-full rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs", isModal ? "h-[360px]" : "h-[520px]")}>
-            {/* Left File Tree Sidebar */}
-            <div className="w-52 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
-              <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Files ({filesList.length})
+          <div className="flex flex-col md:flex-row gap-4 h-[560px] max-h-[65vh] pt-2">
+            {/* File explorer sidebar */}
+            <div className="w-full md:w-60 shrink-0 flex flex-col rounded-2xl bg-[#222222] border border-[#383838] overflow-hidden">
+              <div className="px-3.5 py-3 border-b border-[#2e2e2e] flex items-center justify-between text-xs font-medium text-[#d4d4d4]">
+                <span>{t("marketplace.filesList").replace("{count}", String(filesList.length))}</span>
               </div>
               <ScrollArea className="flex-1 p-2">
-                <div className="flex flex-col gap-0.5">
-                  {filesList.map((fileName) => {
-                    const isSelected = selectedFileName === fileName;
-                    return (
-                      <button
-                        key={fileName}
-                        type="button"
-                        onClick={() => setSelectedFileName(fileName)}
-                        className={cn(
-                          "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer truncate",
-                          isSelected
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                        )}
-                      >
-                        <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{fileName}</span>
-                      </button>
-                    );
-                  })}
+                <div className="flex flex-col gap-1">
+                  {filesList.map((fName) => (
+                    <button
+                      key={fName}
+                      type="button"
+                      onClick={() => setSelectedFileName(fName)}
+                      className={cn(
+                        "w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer truncate",
+                        selectedFileName === fName
+                          ? "bg-[#2b2b2b] text-white font-medium border border-[#383838]"
+                          : "text-[#969696] hover:bg-[#2b2b2b]/60 hover:text-white"
+                      )}
+                    >
+                      <FileIcon filename={fName} className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{fName}</span>
+                    </button>
+                  ))}
                 </div>
               </ScrollArea>
             </div>
 
-            {/* Right Content Viewer */}
-            <div className="flex-1 min-w-0 flex flex-col bg-card">
-              {/* Header bar */}
-              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
-                <span className="text-xs font-mono font-medium text-foreground truncate">
-                  /{selectedFileName || "SKILL.md"}
-                </span>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
-                    <div className="flex items-center rounded-lg bg-muted/70 border border-border p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setContentViewMode("preview")}
-                        className={cn(
-                          "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
-                          contentViewMode === "preview"
-                            ? "bg-background text-foreground shadow-2xs font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Preview"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t("previewMode")}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setContentViewMode("code")}
-                        className={cn(
-                          "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
-                          contentViewMode === "code"
-                            ? "bg-background text-foreground shadow-2xs font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Raw Code"
-                      >
-                        <Code className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">{t("rawCodeMode")}</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary border border-border text-foreground">
-                      <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-[11px] font-mono font-semibold uppercase">
-                        {selectedFileName.split(".").pop() || "code"}
-                      </span>
-                    </div>
-                  )}
-
+            {/* File viewer */}
+            <div className="flex-1 min-w-0 flex flex-col rounded-2xl bg-[#222222] border border-[#383838] overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-[#2e2e2e] flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-xs font-medium text-white truncate">
+                    {selectedFileName}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center p-0.5 rounded-lg bg-[#161616] border border-[#2e2e2e]">
+                    <button
+                      type="button"
+                      onClick={() => setContentViewMode("preview")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer",
+                        contentViewMode === "preview"
+                          ? "bg-[#2b2b2b] text-white"
+                          : "text-[#969696] hover:text-white"
+                      )}
+                    >
+                      {t("previewMode")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContentViewMode("code")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer",
+                        contentViewMode === "code"
+                          ? "bg-[#2b2b2b] text-white"
+                          : "text-[#969696] hover:text-white"
+                      )}
+                    >
+                      {t("rawCodeMode")}
+                    </button>
+                  </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => handleCopyContent(activeFileContent)}
-                    className="h-7 w-7 p-0 rounded-lg border-border text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
+                    className="h-7 w-7 p-0 rounded-lg text-[#969696] hover:text-white cursor-pointer"
                     title={t("copyCode")}
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -1652,9 +812,8 @@ export function SkillsSettings({
                 </div>
               </div>
 
-              {/* Viewer body */}
               <ScrollArea className="flex-1 p-5">
-                {selectedFileName.endsWith(".md") || selectedFileName.endsWith(".markdown") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
+                {selectedFileName.endsWith(".md") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
                   contentViewMode === "preview" ? (
                     <div className="p-2 select-text">
                       <MarkdownContent content={activeFileContent} />
@@ -1674,583 +833,689 @@ export function SkillsSettings({
   }
 
   // ---------------------------------------------------------------------------
-  // RENDER: VIEW 0 — MAIN SKILLS & BUNDLES LIST
+  // RENDER: VIEW 2 — UPLOAD SKILL VIEW
   // ---------------------------------------------------------------------------
-  return (
-    <div className={cn("w-full flex flex-col font-sans select-none", isModal ? "space-y-4 pb-8" : "space-y-6")}>
-      {/* 1. Header & Controls Section */}
-      {isModal ? (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          {/* Left: Scope Switcher + Total Skills Badge */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center h-8 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
-              <div
-                className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
-                style={{
-                  transform: `translateX(${scopeIndicatorStyle.left}px)`,
-                  width: `${scopeIndicatorStyle.width}px`,
-                  opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
-                  transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-                }}
-              />
-
-              <button
-                ref={allScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("all")}
-                className={cn(
-                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "all"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("allScope") || "All"}
-              </button>
-              <button
-                ref={userScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("user")}
-                className={cn(
-                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "user"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("userScope") || "Personal"}
-              </button>
-              <button
-                ref={workspaceScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("workspace")}
-                className={cn(
-                  "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "workspace"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("workspaceScope") || "Workspace"}
-              </button>
-            </div>
-
-            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
-              {skills.length}
-            </span>
-          </div>
-
-          {/* Right: Search Bar & Primary Actions */}
-          <div className="flex items-center gap-2 ml-auto">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("searchSkills")}
-                className="h-8 w-36 sm:w-44 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <Button
-              size="sm"
-              onClick={() => setViewMode("upload")}
-              className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
-            >
-              <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>{t("uploadBtn")}</span>
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
-                  title={t("moreOptions")}
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
-              >
-                <DropdownMenuItem
-                  onClick={() => setIsManualCreateOpen(true)}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>Create from Scratch</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => ensureDefaultSkillsSeeded()}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                >
-                  <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{t("update")}</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-border" />
-                <DropdownMenuItem
-                  onClick={handleResetToDefault}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                  <span>{t("resetSkills")}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+  if (viewMode === "upload") {
+    return (
+      <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-4 pb-8" : "space-y-6")}>
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1.5 text-xs text-[#969696] hover:text-white cursor-pointer -ml-2 h-8"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{t("marketplace.title")}</span>
+          </Button>
         </div>
-      ) : (
-        <>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2.5">
-                {!isSidebarOpen && onToggleSidebar && (
-                  <button
-                    type="button"
-                    onClick={onToggleSidebar}
-                    className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
-                    title="Open sidebar"
-                    aria-label="Open sidebar"
-                  >
-                    <PanelLeft className="w-4 h-4" />
-                  </button>
-                )}
-                <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
-                  {t("skillsTitle")}
-                </h1>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
-                  {skills.length}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t("skillsSubtitle")}
-              </p>
-            </div>
 
-            {/* Search Bar & Primary Actions */}
-            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-              {/* Search Input */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("searchSkills")}
-                  className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Upload Skill Button (Primary) */}
-              <Button
-                size="sm"
-                onClick={() => setViewMode("upload")}
-                className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
-              >
-                <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
-                <span>{t("uploadBtn")}</span>
-              </Button>
-
-              {/* More Options Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
-                    title={t("moreOptions")}
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
-                >
-                  <DropdownMenuItem
-                    onClick={() => setIsManualCreateOpen(true)}
-                    className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span>Create from Scratch</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => ensureDefaultSkillsSeeded()}
-                    className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span>{t("update")}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem
-                    onClick={handleResetToDefault}
-                    className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    <span>{t("resetSkills")}</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {onClose && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-                  title="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 2. Scope Switcher Sliding Pill */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
-              <div
-                className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
-                style={{
-                  transform: `translateX(${scopeIndicatorStyle.left}px)`,
-                  width: `${scopeIndicatorStyle.width}px`,
-                  opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
-                  transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-                }}
-              />
-
-              <button
-                ref={allScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("all")}
-                className={cn(
-                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "all"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("allScope") || "All"}
-              </button>
-              <button
-                ref={userScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("user")}
-                className={cn(
-                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "user"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("userScope") || "Personal"}
-              </button>
-              <button
-                ref={workspaceScopeRef}
-                type="button"
-                onClick={() => setSelectedScope("workspace")}
-                className={cn(
-                  "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
-                  selectedScope === "workspace"
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {t("workspaceScope") || "Workspace"}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* 3. Main List Content (Natural scroll flowing with parent page) */}
-      {filteredSkills.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40 text-center space-y-4">
-          <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
-            <PencilSparkles className="w-5 h-5 stroke-[1.5]" />
-          </div>
-          <div className="space-y-1 max-w-sm mx-auto">
-            <h3 className="font-serif text-lg text-foreground font-medium">
-              {t("noSkillsFound")}
-            </h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {t("noSkillsFoundDesc")}
+        <div className="max-w-2xl mx-auto w-full space-y-6">
+          <div>
+            <h2 className="text-xl font-medium text-white">
+              {t("uploadSkillTitle")}
+            </h2>
+            <p className="text-xs text-[#969696] mt-1">
+              {t("uploadSkillSubtitle")}
             </p>
           </div>
+
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              const file = e.dataTransfer.files[0];
+              if (file) handleFileProcess(file);
+            }}
+            onClick={() => uploadDropzoneInputRef.current?.click()}
+            className={cn(
+              "rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors",
+              isDragOver
+                ? "border-white bg-[#2b2b2b]"
+                : "border-[#383838] bg-[#222222] hover:bg-[#2b2b2b]/60"
+            )}
+          >
+            <input
+              ref={uploadDropzoneInputRef}
+              type="file"
+              accept=".md,.zip"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileProcess(file);
+              }}
+            />
+            <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white mb-3">
+              <Upload className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-medium text-white">
+              {uploadFile ? uploadFile.name : t("dragAndDropFiles")}
+            </p>
+            <p className="text-xs text-[#969696] mt-1">
+              .md (SKILL.md) or .zip bundle
+            </p>
+          </div>
+
+          {scanStatus !== "idle" && (
+            <div
+              className={cn(
+                "p-4 rounded-xl border flex items-center gap-3 text-xs",
+                scanStatus === "scanning" && "bg-blue-500/10 border-blue-500/20 text-blue-300",
+                scanStatus === "passed" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-300",
+                scanStatus === "failed" && "bg-red-500/10 border-red-500/20 text-red-300"
+              )}
+            >
+              {scanStatus === "scanning" && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
+              {scanStatus === "passed" && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+              {scanStatus === "failed" && <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />}
+              <span>{scanMessage}</span>
+            </div>
+          )}
+
+          {scanStatus === "passed" && (
+            <form onSubmit={handleUploadSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                  {t("skillName")}
+                </label>
+                <Input
+                  value={uploadSkillName}
+                  onChange={(e) => setUploadSkillName(e.target.value)}
+                  className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                  {t("skillSlug")}
+                </label>
+                <Input
+                  value={uploadSkillSlug}
+                  onChange={(e) => setUploadSkillSlug(e.target.value)}
+                  className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl font-mono"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                  {t("skillDescription")}
+                </label>
+                <Input
+                  value={uploadSkillDescription}
+                  onChange={(e) => setUploadSkillDescription(e.target.value)}
+                  className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setViewMode("list")}
+                  className="h-9 px-4 text-xs text-[#969696] hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="h-9 px-4 text-xs bg-white text-black hover:bg-zinc-200 rounded-xl font-medium"
+                >
+                  {t("saveSkill")}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RENDER: MAIN MARKETPLACE VIEW
+  // ---------------------------------------------------------------------------
+  return (
+    <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-5" : "space-y-6")}>
+      {/* 1. Header with Title & Main Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            {!isSidebarOpen && onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="p-1.5 -ml-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
+                title={t("chat.toggleSidebar")}
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-white">
+              {t("marketplace.title")}
+            </h1>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-sans tabular-nums">
+              {skills.length + availableMarketplaceSkills.length}
+            </span>
+          </div>
+          <p className="text-xs text-[#969696] mt-0.5">
+            {t("marketplace.subtitle")}
+          </p>
+        </div>
+
+        {/* Search Bar & Actions */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-[#5d5d5d] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("marketplace.searchPlaceholder")}
+              className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-[#2b2b2b] border-[#383838] text-white placeholder-[#5d5d5d] focus-visible:ring-0 shadow-none outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#969696] hover:text-white cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <Button
+            size="sm"
+            onClick={handleOpenSkillsFolder}
+            className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-[#222222] border border-[#383838] text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] transition-all cursor-pointer shadow-none"
+            title={t("marketplace.openFolder")}
+          >
+            <Folder className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{t("marketplace.openFolder")}</span>
+          </Button>
+
           <Button
             size="sm"
             onClick={() => setViewMode("upload")}
-            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
+            className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-white text-black hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>{t("uploadSkillTitle")}</span>
+            <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
+            <span>{t("uploadBtn")}</span>
           </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-            <span>{filteredSkills.length} skills</span>
-          </div>
-          <div className="flex flex-col divide-y divide-border border border-border rounded-2xl bg-card overflow-hidden shadow-none">
-            {filteredSkills.map((skill) => {
-              return (
-                <div
-                  key={skill.id}
-                  className="flex items-center justify-between gap-4 p-3 hover:bg-secondary/60 transition-colors group cursor-pointer"
-                  onClick={() => {
-                    setSelectedSkill(skill);
-                    setOriginBundle(null);
-                    setSkillActiveTab("overview");
-                    setViewMode("skill-detail");
-                  }}
-                >
-                  {/* Skill Item Info */}
-                  <div className="flex items-center gap-2.5 flex-wrap min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-foreground tracking-tight">
-                      {skill.name}
-                    </span>
-                    <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-muted-foreground">
-                      /{skill.slug}
-                    </span>
-                    {skill.author && (
-                      <span className="text-[10px] text-muted-foreground">
-                        by @{skill.author}
-                      </span>
-                    )}
-                    {!skill.isBuiltIn && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
-                        {t("customBadge")}
-                      </span>
-                    )}
-                  </div>
 
-                  {/* Right: Switch & Actions */}
-                  <div
-                    className="flex items-center gap-3 shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Switch
-                      checked={skill.isEnabled}
-                      onCheckedChange={(checked) => handleToggleSkill(skill.id, checked)}
-                    />
-                    <ChevronRight
-                      onClick={() => {
-                        setSelectedSkill(skill);
-                        setOriginBundle(null);
-                        setSkillActiveTab("overview");
-                        setViewMode("skill-detail");
-                      }}
-                      className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all cursor-pointer"
-                    />
-                  </div>
-                </div>
-              );
-            })}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-[#969696] hover:text-white hover:bg-[#2b2b2b] transition-colors cursor-pointer"
+              title={t("common.close")}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Top Segmented Switcher: [ Skills ] [ Plugins ] */}
+      <div className="flex items-center gap-3 border-b border-[#2e2e2e] pb-1">
+        <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e]">
+          <button
+            type="button"
+            onClick={() => setMarketplaceTab("skills")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-2",
+              marketplaceTab === "skills"
+                ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
+                : "text-[#969696] hover:text-white"
+            )}
+          >
+            <PencilSparkles className="w-3.5 h-3.5 text-white" />
+            <span>{t("marketplace.tabSkills")}</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#161616] text-[#969696]">
+              {skills.length + availableMarketplaceSkills.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMarketplaceTab("plugins")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-2",
+              marketplaceTab === "plugins"
+                ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
+                : "text-[#969696] hover:text-white"
+            )}
+          >
+            <Blocks className="w-3.5 h-3.5 text-[#969696]" />
+            <span>{t("marketplace.tabPlugins")}</span>
+          </button>
+        </div>
+
+        {marketplaceTab === "skills" && (
+          <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] ml-auto">
+            <button
+              type="button"
+              onClick={() => setSelectedScope("all")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                selectedScope === "all" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
+              )}
+            >
+              {t("allScope") || "All"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedScope("user")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                selectedScope === "user" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
+              )}
+            >
+              {t("userScope") || "Personal"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedScope("workspace")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                selectedScope === "workspace" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
+              )}
+            >
+              {t("workspaceScope") || "Workspace"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 3. TAB CONTENT: PLUGINS (EMPTY STATE) */}
+      {marketplaceTab === "plugins" && (
+        <div className="rounded-2xl bg-[#222222] border border-[#383838] p-12 flex flex-col items-center justify-center text-center gap-3">
+          <div className="w-16 h-16 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696] mb-1">
+            <Blocks className="w-8 h-8 text-[#969696]" />
+          </div>
+          <h3 className="text-base font-medium text-white">
+            {t("marketplace.pluginsComingSoonTitle")}
+          </h3>
+          <p className="text-xs text-[#969696] max-w-md leading-relaxed">
+            {t("marketplace.pluginsComingSoonDesc")}
+          </p>
+          <div className="mt-2">
+            <span className="px-3 py-1 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] text-xs font-sans">
+              {t("marketplace.inDevelopment")}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Manual Create Dialog (Scratch Fallback) */}
+      {/* 4. TAB CONTENT: SKILLS */}
+      {marketplaceTab === "skills" && (
+        <div className="space-y-6">
+          {/* Category Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+            {CATEGORY_FILTERS.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
+                  selectedCategory === cat.id
+                    ? "bg-white text-black font-semibold"
+                    : "bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] hover:text-white hover:bg-[#252528]"
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ================================================================= */}
+          {/* SECTION A: INSTALLED SKILLS (ON TOP)                              */}
+          {/* ================================================================= */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
+                  {t("marketplace.installedSection")}
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-mono">
+                  {filteredInstalledSkills.length}
+                </span>
+              </div>
+            </div>
+
+            {filteredInstalledSkills.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#383838] bg-[#1b1b1b]/50 p-6 flex flex-col items-center justify-center text-center gap-1.5">
+                <p className="text-xs font-medium text-[#d4d4d4]">
+                  {t("marketplace.noInstalledTitle")}
+                </p>
+                <p className="text-[11px] text-[#969696] max-w-sm leading-relaxed">
+                  {t("marketplace.noInstalledDesc")}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredInstalledSkills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    onClick={() => {
+                      setSelectedSkill(skill);
+                      setSkillActiveTab("overview");
+                      setViewMode("skill-detail");
+                    }}
+                    className="rounded-xl bg-[#222222] border border-[#2e2e2e] hover:border-[#383838] p-4 flex flex-col justify-between transition-all group cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0 group-hover:border-primary/40 transition-colors">
+                            <PencilSparkles className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-semibold text-white group-hover:text-primary transition-colors truncate">
+                                {skill.name}
+                              </span>
+                              <span className="text-[11px] font-mono text-[#969696]">
+                                /{skill.slug}
+                              </span>
+                            </div>
+                            {skill.author && (
+                              <p className="text-[10px] text-[#969696] mt-0.5">
+                                by @{skill.author}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Switch & Uninstall */}
+                        <div
+                          className="flex items-center gap-2.5 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Switch
+                            checked={skill.isEnabled}
+                            onCheckedChange={(checked) => handleToggleSkill(skill.id, checked)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmSkill(skill)}
+                            className="p-1 rounded-lg text-[#969696] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title={t("marketplace.uninstall")}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {skill.description && (
+                        <p className="text-xs text-[#969696] line-clamp-2 mt-2 leading-relaxed">
+                          {skill.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#2e2e2e]/50 text-[10px]">
+                      <span className="px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] capitalize">
+                        {skill.category.replace(/_/g, " ")}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696]">
+                        {skill.scope === "workspace" ? t("marketplace.workspaceScope") : t("marketplace.globalScope")}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1.5 text-[#969696]">
+                        <span className={cn("w-1.5 h-1.5 rounded-full", skill.isEnabled ? "bg-emerald-400" : "bg-[#5d5d5d]")} />
+                        <span>{skill.isEnabled ? t("marketplace.active") : t("marketplace.disabled")}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ================================================================= */}
+          {/* SECTION B: AVAILABLE IN MARKETPLACE (BELOW)                       */}
+          {/* ================================================================= */}
+          <div className="space-y-3 pt-4 border-t border-[#2e2e2e]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
+                  {t("marketplace.availableSection")}
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-mono">
+                  {availableMarketplaceSkills.length}
+                </span>
+              </div>
+            </div>
+
+            {availableMarketplaceSkills.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#383838] bg-[#1b1b1b]/50 p-6 flex flex-col items-center justify-center text-center gap-1.5">
+                <p className="text-xs font-medium text-[#d4d4d4]">
+                  {t("marketplace.noAvailableTitle")}
+                </p>
+                <p className="text-[11px] text-[#969696] max-w-sm leading-relaxed">
+                  {t("marketplace.noAvailableDesc")}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {availableMarketplaceSkills.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedSkill(item);
+                      setSkillActiveTab("overview");
+                      setViewMode("skill-detail");
+                    }}
+                    className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] hover:border-[#383838] p-4 flex flex-col justify-between transition-all group cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-[#222222] border border-[#2e2e2e] flex items-center justify-center text-[#d4d4d4] shrink-0 group-hover:border-primary/40 transition-colors">
+                            <PencilSparkles className="w-4 h-4 text-[#d4d4d4]" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-semibold text-white group-hover:text-primary transition-colors truncate">
+                                {item.name}
+                              </span>
+                              <span className="text-[11px] font-mono text-[#969696]">
+                                /{item.slug}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-[#969696] mt-0.5">
+                              by @{item.author}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Install Button */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            onClick={() => handleInstallSkill(item)}
+                            disabled={installingSlug === item.slug}
+                            className="h-7 px-3.5 rounded-lg text-xs font-medium bg-white text-black hover:bg-zinc-200 transition-colors shadow-none cursor-pointer"
+                          >
+                            {installingSlug === item.slug ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <span>{t("marketplace.install")}</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-[#969696] line-clamp-2 mt-2 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#2e2e2e]/40 text-[10px]">
+                      <span className="px-2 py-0.5 rounded-md bg-[#222222] border border-[#2e2e2e] text-[#969696] capitalize">
+                        {item.category.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-[#5d5d5d] ml-auto">
+                        v{item.version}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete / Uninstall Confirmation Dialog */}
+      {deleteConfirmSkill && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setDeleteConfirmSkill(null)}
+        >
+          <div
+            className="w-[420px] max-w-[95vw] bg-[#222222] border border-[#383838] rounded-2xl p-5 flex flex-col gap-4 text-white shadow-2xl animate-in zoom-in-[0.985] duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  {t("marketplace.uninstallConfirmTitle")}
+                </h3>
+                <p className="text-xs text-[#969696] mt-1 leading-relaxed">
+                  {t("marketplace.uninstallConfirmDesc").replace("{name}", deleteConfirmSkill.name)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2e2e2e]">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteConfirmSkill(null)}
+                className="h-8 px-3 rounded-lg text-xs text-[#969696] hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleUninstallSkill(deleteConfirmSkill)}
+                className="h-8 px-3.5 rounded-lg text-xs bg-red-600 hover:bg-red-500 text-white font-medium shadow-none cursor-pointer"
+              >
+                {t("marketplace.uninstall")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Create Dialog */}
       {isManualCreateOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
           onClick={() => setIsManualCreateOpen(false)}
         >
           <div
-            className="w-[560px] max-w-[95vw] max-h-[85vh] bg-card border border-border rounded-2xl flex flex-col overflow-hidden text-foreground shadow-2xl animate-in zoom-in-[0.985] duration-150"
+            className="w-[560px] max-w-[95vw] max-h-[85vh] bg-[#222222] border border-[#383838] rounded-2xl flex flex-col overflow-hidden text-white shadow-2xl animate-in zoom-in-[0.985] duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-[#2e2e2e] flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm font-semibold text-white">
                   Create Skill from Scratch
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-[#969696] mt-0.5">
                   Write customized instructions and prompt triggers for your agent.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsManualCreateOpen(false)}
-                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 rounded-lg text-[#969696] hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleManualSave} className="flex-1 min-h-0 flex flex-col">
-              <ScrollArea className="flex-1 p-5">
-                <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-foreground">
-                        {t("skillName")} *
-                      </label>
-                      <Input
-                        type="text"
-                        required
-                        value={manualName}
-                        onChange={(e) => {
-                          setManualName(e.target.value);
-                          if (!manualSlug) {
-                            setManualSlug(
-                              e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-")
-                            );
-                          }
-                        }}
-                        placeholder="e.g. Code Reviewer"
-                        className="h-8 px-2.5 text-xs bg-secondary/30 border-border text-foreground rounded-xl"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-medium text-foreground">
-                        {t("skillSlug")} *
-                      </label>
-                      <div className="relative flex items-center">
-                        <span className="absolute left-2.5 text-xs text-muted-foreground font-mono">
-                          /
-                        </span>
-                        <Input
-                          type="text"
-                          required
-                          value={manualSlug}
-                          onChange={(e) => setManualSlug(e.target.value)}
-                          placeholder="code-review"
-                          className="h-8 pl-6 pr-2.5 text-xs font-mono bg-secondary/30 border-border text-foreground rounded-xl"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-foreground">
-                      {t("skillDescription")}
-                    </label>
-                    <Input
-                      type="text"
-                      value={manualDescription}
-                      onChange={(e) => setManualDescription(e.target.value)}
-                      placeholder="Summary of when AI should trigger this skill..."
-                      className="h-8 px-2.5 text-xs bg-secondary/30 border-border text-foreground rounded-xl"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-foreground">
-                      {t("skillContent")}
-                    </label>
-                    <textarea
-                      rows={8}
-                      value={manualContent}
-                      onChange={(e) => setManualContent(e.target.value)}
-                      placeholder="# Skill Instructions&#10;&#10;Explain step-by-step rules and prompt instructions here..."
-                      className="w-full p-3 text-xs font-mono bg-secondary/30 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-y"
-                    />
-                  </div>
+              <ScrollArea className="flex-1 p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                    {t("skillName")}
+                  </label>
+                  <Input
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder={t("marketplace.skillNamePlaceholder")}
+                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                    {t("skillSlug")}
+                  </label>
+                  <Input
+                    value={manualSlug}
+                    onChange={(e) => setManualSlug(e.target.value)}
+                    placeholder={t("marketplace.skillSlugPlaceholder")}
+                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                    {t("skillDescription")}
+                  </label>
+                  <Input
+                    value={manualDescription}
+                    onChange={(e) => setManualDescription(e.target.value)}
+                    placeholder={t("marketplace.skillDescPlaceholder")}
+                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
+                    {t("skillContent")}
+                  </label>
+                  <textarea
+                    value={manualContent}
+                    onChange={(e) => setManualContent(e.target.value)}
+                    rows={8}
+                    placeholder={t("marketplace.skillContentPlaceholder")}
+                    className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl p-3 text-xs text-white font-mono placeholder-[#5d5d5d] focus:outline-none focus:border-[#383838] resize-none"
+                    required
+                  />
                 </div>
               </ScrollArea>
 
-              <div className="p-4 border-t border-border flex items-center justify-end gap-2 bg-secondary/20">
+              <div className="p-4 border-t border-[#2e2e2e] flex justify-end gap-2 bg-[#222222]">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
                   onClick={() => setIsManualCreateOpen(false)}
-                  className="rounded-xl border-border text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="h-8 px-3 text-xs text-[#969696] hover:text-white"
                 >
-                  {t("cancel")}
+                  Cancel
                 </Button>
                 <Button
                   type="submit"
-                  size="sm"
-                  className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-none"
+                  className="h-8 px-4 text-xs bg-white text-black hover:bg-zinc-200 rounded-xl font-medium"
                 >
-                  {t("saveSkill")}
+                  Create Skill
                 </Button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Delete Confirmation Dialog */}
-      {deleteConfirmSkill && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => setDeleteConfirmSkill(null)}
-        >
-          <div
-            className="w-96 max-w-[90vw] bg-card border border-border rounded-2xl p-5 flex flex-col gap-4 text-foreground shadow-2xl animate-in zoom-in-[0.985] duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  {t("deleteSkillConfirm")}
-                </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t("deleteSkillConfirmDesc", { name: deleteConfirmSkill.name })}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeleteConfirmSkill(null)}
-                className="rounded-xl border-border text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                {t("cancel")}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await localDb.deleteSkill(deleteConfirmSkill.id);
-                    toast.success(t("skillDeletedSuccess"));
-                    setDeleteConfirmSkill(null);
-                  } catch (err: any) {
-                    toast.error(err?.message || "Failed to delete skill");
-                  }
-                }}
-                className="rounded-xl cursor-pointer"
-              >
-                {t("delete")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-export { SkillsSettings as SkillsView };
-

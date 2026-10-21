@@ -253,4 +253,17 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("browser:open-tab-request", handler);
     },
   },
+  marketplace: {
+    listInstalled: (workspacePath?: string) =>
+      ipcRenderer.invoke("marketplace:list-installed", workspacePath),
+    installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) =>
+      ipcRenderer.invoke("marketplace:install-skill", payload),
+    uninstallSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) =>
+      ipcRenderer.invoke("marketplace:uninstall-skill", payload),
+    openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) =>
+      ipcRenderer.invoke("marketplace:open-skills-folder", payload),
+    getSkillContent: (slug: string, workspacePath?: string) =>
+      ipcRenderer.invoke("marketplace:get-skill-content", slug, workspacePath),
+  },
 });
+
