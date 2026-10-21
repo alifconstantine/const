@@ -27,6 +27,23 @@ export interface SkillContentResult {
   scope?: "user" | "workspace";
 }
 
+interface SkillManifestEntry {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category?: string;
+  author?: string;
+  version?: string;
+  icon?: string;
+  files?: string[];
+}
+
+interface SkillManifest {
+  version: string;
+  skills: SkillManifestEntry[];
+}
+
 export class MarketplaceService {
   private globalSkillsDir: string;
 
@@ -40,7 +57,7 @@ export class MarketplaceService {
       }
     }
     // Automatically ensure default essential skills (docx, pdf, pptx) are pre-installed
-    this.ensureDefaultSkillsInstalled();
+    void this.ensureDefaultSkillsInstalled();
   }
 
   public getGlobalSkillsDir(): string {
@@ -49,15 +66,14 @@ export class MarketplaceService {
 
   public getBundledSkillsDir(): string {
     const candidates = [
+      path.join(process.resourcesPath, "skills"),
       path.join(app.getAppPath(), "skills"),
       path.join(app.getAppPath(), "..", "skills"),
-      path.join(process.cwd(), "apps", "harness", "desktop", "skills"),
-      path.join(process.cwd(), "skills"),
       path.join(__dirname, "..", "skills"),
       path.join(__dirname, "..", "..", "skills"),
-      path.join(process.resourcesPath, "skills"),
-      path.join(os.homedir(), "Code", "const", "apps", "harness", "desktop", "skills"),
-      path.join(os.homedir(), "Code", "const", ".agents", "skills"),
+      path.join(process.cwd(), "apps", "harness", "desktop", "skills"),
+      path.join(process.cwd(), "skills"),
+      path.join(process.cwd(), ".agents", "skills"),
       path.join(os.homedir(), ".agents", "skills"),
     ];
     for (const candidate of candidates) {
@@ -68,14 +84,80 @@ export class MarketplaceService {
     return candidates[0]!;
   }
 
-  public ensureDefaultSkillsInstalled(): void {
+  private getManifest(): SkillManifest | null {
+    const candidates = [
+      path.join(this.getBundledSkillsDir(), "index.json"),
+      path.join(this.getBundledSkillsDir(), "skills-manifest.json"),
+      path.join(app.getAppPath(), "skills", "index.json"),
+      path.join(process.resourcesPath, "skills", "index.json"),
+      path.join(__dirname, "..", "src", "lib", "skills", "skills-manifest.json"),
+      path.join(process.cwd(), "apps", "harness", "desktop", "src", "lib", "skills", "skills-manifest.json"),
+    ];
+    for (const cand of candidates) {
+      if (fs.existsSync(cand)) {
+        try {
+          return JSON.parse(fs.readFileSync(cand, "utf8")) as SkillManifest;
+        } catch {}
+      }
+    }
+    return null;
+  }
+
+  private getRemoteRegistryBaseUrl(): string {
+    return (
+      process.env.CONST_SKILLS_REGISTRY_BASE_URL ||
+      "https://raw.githubusercontent.com/alifconstantine/const/main/.agents/skills"
+    );
+  }
+
+  private async downloadSkillFromRemote(slug: string, destDir: string): Promise<boolean> {
+    const cleanSlug = slug.toLowerCase().trim();
+    const manifest = this.getManifest();
+    const matched = manifest?.skills?.find((s) => s.slug === cleanSlug);
+    const filesToDownload = matched?.files && matched.files.length > 0 ? matched.files : ["SKILL.md"];
+    const baseUrl = this.getRemoteRegistryBaseUrl();
+
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    for (const relFile of filesToDownload) {
+      const fileUrl = `${baseUrl}/${cleanSlug}/${relFile}`;
+      const targetFilePath = path.join(destDir, relFile);
+      try {
+        const resp = await fetch(fileUrl, { signal: AbortSignal.timeout(15000) });
+        if (resp.ok) {
+          const text = await resp.text();
+          fs.mkdirSync(path.dirname(targetFilePath), { recursive: true });
+          fs.writeFileSync(targetFilePath, text, "utf8");
+        } else {
+          console.warn(`[MarketplaceService] Remote fetch returned ${resp.status} for ${fileUrl}`);
+        }
+      } catch (err) {
+        console.warn(`[MarketplaceService] Failed to download ${fileUrl}:`, err);
+      }
+    }
+
+    const skillMdPath = path.join(destDir, "SKILL.md");
+    if (fs.existsSync(skillMdPath)) {
+      return true;
+    }
+
+    // Cleanup if SKILL.md could not be downloaded
+    try {
+      fs.rmSync(destDir, { recursive: true, force: true });
+    } catch {}
+    return false;
+  }
+
+  public async ensureDefaultSkillsInstalled(): Promise<void> {
     const defaultSlugs = ["docx", "pdf", "pptx"];
     for (const slug of defaultSlugs) {
       const destDir = path.join(this.globalSkillsDir, slug);
       const skillMd = path.join(destDir, "SKILL.md");
       if (!fs.existsSync(destDir) || !fs.existsSync(skillMd)) {
         try {
-          this.installSkill(slug, "user");
+          await this.installSkill(slug, "user");
           console.log(`[MarketplaceService] Pre-installed default skill: ${slug}`);
         } catch (err) {
           console.warn(`[MarketplaceService] Failed to pre-install default skill ${slug}:`, err);
@@ -127,10 +209,10 @@ export class MarketplaceService {
     return results;
   }
 
-  public getSkillContent(
+  public async getSkillContent(
     slug: string,
     workspacePath?: string
-  ): SkillContentResult | null {
+  ): Promise<SkillContentResult | null> {
     const cleanSlug = slug.toLowerCase().trim();
 
     // 1. Workspace installed
@@ -159,11 +241,26 @@ export class MarketplaceService {
       return this.loadSkillDetailsFromDir(bundledDir, cleanSlug, false);
     }
 
-    // 5. Fallback check in .agents/skills in project root
-    const rootAgentDir = path.join(os.homedir(), "Code", "const", ".agents", "skills", cleanSlug);
-    if (fs.existsSync(path.join(rootAgentDir, "SKILL.md"))) {
-      return this.loadSkillDetailsFromDir(rootAgentDir, cleanSlug, false);
-    }
+    // 5. Remote fetch fallback
+    try {
+      const baseUrl = this.getRemoteRegistryBaseUrl();
+      const skillMdUrl = `${baseUrl}/${cleanSlug}/SKILL.md`;
+      const resp = await fetch(skillMdUrl, { signal: AbortSignal.timeout(10000) });
+      if (resp.ok) {
+        const content = await resp.text();
+        const parsed = this.parseFrontmatter(content);
+        return {
+          slug: cleanSlug,
+          name: parsed.name || cleanSlug,
+          description: parsed.description || "Agent skill.",
+          content,
+          author: parsed.author,
+          version: parsed.version || "1.0.0",
+          files: { "SKILL.md": content },
+          isInstalled: false,
+        };
+      }
+    } catch {}
 
     return null;
   }
@@ -235,18 +332,17 @@ export class MarketplaceService {
     }
   }
 
-  public installSkill(
+  public async installSkill(
     slug: string,
     targetScope: "user" | "workspace" = "user",
     workspacePath?: string
-  ): InstalledSkillRecord | null {
+  ): Promise<InstalledSkillRecord | null> {
     const cleanSlug = slug.toLowerCase().trim();
 
-    // Check candidate sources for real skill files
+    // Check candidate sources for real skill files locally
     const candidates = [
       path.join(this.getBundledSkillsDir(), cleanSlug),
-      path.join(os.homedir(), "Code", "const", "apps", "harness", "desktop", "skills", cleanSlug),
-      path.join(os.homedir(), "Code", "const", ".agents", "skills", cleanSlug),
+      path.join(process.cwd(), ".agents", "skills", cleanSlug),
       path.join(os.homedir(), ".agents", "skills", cleanSlug),
     ];
     let sourceDir: string | null = null;
@@ -272,8 +368,14 @@ export class MarketplaceService {
       // Copy directory recursively with all real files
       this.copyDirRecursive(sourceDir, destDir);
     } else {
-      console.error(`[MarketplaceService] Cannot install '${cleanSlug}': source directory not found`);
-      return null;
+      console.log(`[MarketplaceService] Local source not found for '${cleanSlug}', downloading from registry...`);
+      const downloaded = await this.downloadSkillFromRemote(cleanSlug, destDir);
+      if (!downloaded) {
+        console.error(
+          `[MarketplaceService] Cannot install '${cleanSlug}': source directory not found locally and remote download failed`
+        );
+        return null;
+      }
     }
 
     const skillMdPath = path.join(destDir, "SKILL.md");

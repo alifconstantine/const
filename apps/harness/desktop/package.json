@@ -64,6 +64,13 @@
       "dist-electron/**/*",
       "build/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "skills",
+        "to": "skills",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "icon": "build/icon.ico",
       "artifactName": "${productName} Setup ${version}-${arch}.${ext}"

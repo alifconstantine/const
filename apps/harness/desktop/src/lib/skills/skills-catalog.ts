@@ -10,6 +10,7 @@ export interface MarketplaceSkill {
   version: string;
   icon?: string;
   overview?: string;
+  files?: string[];
 }
 
 export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
@@ -21,7 +22,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "browser_automation",
     "author": "Vercel Labs",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_brand-guidelines",
@@ -31,7 +35,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_browser-use",
@@ -41,7 +49,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "browser_automation",
     "author": "Browser Use",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_company-valuation",
@@ -51,7 +62,15 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/dcf.md",
+      "references/relative_valuation.md",
+      "references/sotp.md",
+      "references/wacc_erp_rates.md"
+    ]
   },
   {
     "id": "skill_composio",
@@ -61,7 +80,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "agent_workflow",
     "author": "Composio",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/errors.md",
+      "references/for-you.md",
+      "references/platform.md"
+    ]
   },
   {
     "id": "skill_discord-reader",
@@ -71,7 +96,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md"
+    ]
   },
   {
     "id": "skill_docx",
@@ -81,7 +111,70 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "document",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md",
+      "scripts/__init__.py",
+      "scripts/accept_changes.py",
+      "scripts/comment.py",
+      "scripts/merge_runs.py",
+      "scripts/office/helpers/__init__.py",
+      "scripts/office/helpers/pptx_chart.py",
+      "scripts/office/helpers/pptx_slide.py",
+      "scripts/office/helpers/pptx_theme.py",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+      "scripts/office/schemas/mce/mc.xsd",
+      "scripts/office/schemas/microsoft/wml-2010.xsd",
+      "scripts/office/schemas/microsoft/wml-2012.xsd",
+      "scripts/office/schemas/microsoft/wml-2018.xsd",
+      "scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+      "scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+      "scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+      "scripts/office/schemas/microsoft/wml-symex-2015.xsd",
+      "scripts/office/soffice.py",
+      "scripts/office/validate.py",
+      "scripts/office/validators/__init__.py",
+      "scripts/office/validators/base.py",
+      "scripts/office/validators/docx.py",
+      "scripts/office/validators/pptx.py",
+      "scripts/office/validators/redlining.py",
+      "scripts/templates/comments.xml",
+      "scripts/templates/commentsExtended.xml",
+      "scripts/templates/commentsExtensible.xml",
+      "scripts/templates/commentsIds.xml",
+      "scripts/templates/people.xml"
+    ]
   },
   {
     "id": "skill_earnings-preview",
@@ -91,7 +184,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   },
   {
     "id": "skill_earnings-recap",
@@ -101,7 +199,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   },
   {
     "id": "skill_embedded-captions",
@@ -111,7 +214,153 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      ".gitignore",
+      "CATALOG.md",
+      "SKILL.md",
+      "assets/fonts/char-widths.json",
+      "assets/strokefonts/HersheyScript1.svg",
+      "assets/strokefonts/HersheyScriptMed.svg",
+      "dna/README.md",
+      "dna/chrome.json",
+      "dna/cream.json",
+      "dna/documentary.json",
+      "dna/editorial.json",
+      "dna/glitch.json",
+      "dna/ink.json",
+      "dna/keynote.json",
+      "dna/loud.json",
+      "dna/neon.json",
+      "dna/velocity.json",
+      "modes/cinematic/README.md",
+      "modes/cinematic/_archive/champion/spec.md",
+      "modes/cinematic/_archive/champion/template.html",
+      "modes/cinematic/_archive/memory-wall/spec.md",
+      "modes/cinematic/_archive/memory-wall/template.html",
+      "modes/cinematic/_archive/portrait-header/spec.md",
+      "modes/cinematic/_archive/portrait-header/template.html",
+      "modes/cinematic/cinematic-cream/spec.md",
+      "modes/cinematic/cinematic-cream/template.html",
+      "modes/cinematic/engine.html",
+      "modes/standard/_anatomy.md",
+      "modes/standard/_motion.md",
+      "modes/standard/fonts/build-fonts-css.cjs",
+      "modes/standard/fonts/files/anton-latin-400-normal.woff2",
+      "modes/standard/fonts/files/audiowide-latin-400-normal.woff2",
+      "modes/standard/fonts/files/baloo-2-latin-400-normal.woff2",
+      "modes/standard/fonts/files/baloo-2-latin-700-normal.woff2",
+      "modes/standard/fonts/files/bangers-latin-400-normal.woff2",
+      "modes/standard/fonts/files/bodoni-moda-latin-400-normal.woff2",
+      "modes/standard/fonts/files/bodoni-moda-latin-700-normal.woff2",
+      "modes/standard/fonts/files/caveat-latin-400-normal.woff2",
+      "modes/standard/fonts/files/caveat-latin-700-normal.woff2",
+      "modes/standard/fonts/files/chakra-petch-latin-500-normal.woff2",
+      "modes/standard/fonts/files/chakra-petch-latin-700-normal.woff2",
+      "modes/standard/fonts/files/cinzel-latin-400-normal.woff2",
+      "modes/standard/fonts/files/cinzel-latin-700-normal.woff2",
+      "modes/standard/fonts/files/cormorant-garamond-latin-400-normal.woff2",
+      "modes/standard/fonts/files/cormorant-garamond-latin-700-normal.woff2",
+      "modes/standard/fonts/files/creepster-latin-400-normal.woff2",
+      "modes/standard/fonts/files/fredoka-latin-400-normal.woff2",
+      "modes/standard/fonts/files/fredoka-latin-700-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-400-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-500-italic.woff2",
+      "modes/standard/fonts/files/inter-latin-500-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-600-italic.woff2",
+      "modes/standard/fonts/files/inter-latin-600-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-700-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-800-normal.woff2",
+      "modes/standard/fonts/files/inter-latin-900-normal.woff2",
+      "modes/standard/fonts/files/monoton-latin-400-normal.woff2",
+      "modes/standard/fonts/files/orbitron-latin-400-normal.woff2",
+      "modes/standard/fonts/files/orbitron-latin-700-normal.woff2",
+      "modes/standard/fonts/files/permanent-marker-latin-400-normal.woff2",
+      "modes/standard/fonts/files/press-start-2p-latin-400-normal.woff2",
+      "modes/standard/fonts/files/rajdhani-latin-500-normal.woff2",
+      "modes/standard/fonts/files/rajdhani-latin-700-normal.woff2",
+      "modes/standard/fonts/files/saira-stencil-one-latin-400-normal.woff2",
+      "modes/standard/fonts/files/shippori-mincho-latin-400-normal.woff2",
+      "modes/standard/fonts/files/shippori-mincho-latin-700-normal.woff2",
+      "modes/standard/fonts/files/sora-latin-400-normal.woff2",
+      "modes/standard/fonts/files/sora-latin-700-normal.woff2",
+      "modes/standard/fonts/files/space-grotesk-latin-400-normal.woff2",
+      "modes/standard/fonts/files/space-grotesk-latin-700-normal.woff2",
+      "modes/standard/fonts/files/special-elite-latin-400-normal.woff2",
+      "modes/standard/fonts/files/teko-latin-400-normal.woff2",
+      "modes/standard/fonts/files/teko-latin-700-normal.woff2",
+      "modes/standard/fonts/files/vt323-latin-400-normal.woff2",
+      "modes/standard/fonts/fonts.css",
+      "references/aesthetic-principles.md",
+      "references/anti-patterns.md",
+      "references/bespoke-vs-presets.md",
+      "references/caption-grouping.md",
+      "references/composition-craft.md",
+      "references/direction-catalog.md",
+      "references/example-renders/champion.html",
+      "references/example-renders/memory-wall.html",
+      "references/failure-modes.md",
+      "references/layout-heuristics.md",
+      "references/motion-vocabulary.md",
+      "references/rail.md",
+      "references/reference-bar.md",
+      "references/scene-types.md",
+      "references/typographic-moves.md",
+      "references/typography-presets.md",
+      "scripts/audio-envelope.cjs",
+      "scripts/check-occlusion.cjs",
+      "scripts/check-overflow.cjs",
+      "scripts/check-rail-climax.cjs",
+      "scripts/check-timing.cjs",
+      "scripts/fill-timings.cjs",
+      "scripts/fit-fonts.cjs",
+      "scripts/fixtures/heroless/theme.json",
+      "scripts/gen-stroke-path.py",
+      "scripts/hf-cli.cjs",
+      "scripts/inject-fonts.cjs",
+      "scripts/lib-dna.cjs",
+      "scripts/make-cinematic.cjs",
+      "scripts/make-composition.cjs",
+      "scripts/make-theme.cjs",
+      "scripts/make-theme.test.mjs",
+      "scripts/matte.cjs",
+      "scripts/measure-layout.cjs",
+      "scripts/prepare.sh",
+      "scripts/preview-frames.cjs",
+      "scripts/preview-frames.test.mjs",
+      "scripts/render-and-composite.sh",
+      "scripts/render-and-composite.test.mjs",
+      "scripts/render-theme.sh",
+      "scripts/safe-zones.cjs",
+      "scripts/transcribe.cjs",
+      "scripts/transcribe.test.mjs",
+      "themes/README.md",
+      "themes/anchor.json",
+      "themes/arcade.json",
+      "themes/aurora.json",
+      "themes/biolume.json",
+      "themes/brush.json",
+      "themes/chalkboard.json",
+      "themes/dossier.json",
+      "themes/graffiti.json",
+      "themes/hologram.json",
+      "themes/inkwater.json",
+      "themes/laser.json",
+      "themes/lastpage.json",
+      "themes/neonsign.json",
+      "themes/ordnance.json",
+      "themes/papercut.json",
+      "themes/popup.json",
+      "themes/ransom.json",
+      "themes/scoreboard.json",
+      "themes/spectrum.json",
+      "themes/stardust.json",
+      "themes/stomp.json",
+      "themes/terminal.json",
+      "themes/thunder.json",
+      "themes/transit.json",
+      "themes/vhs.json"
+    ]
   },
   {
     "id": "skill_estimate-analysis",
@@ -121,7 +370,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   },
   {
     "id": "skill_etf-premium",
@@ -131,7 +385,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/etf_premium_reference.md",
+      "references/gamma_squeeze_reference.md"
+    ]
   },
   {
     "id": "skill_faceless-explainer",
@@ -141,7 +401,38 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/cut-catalog.md",
+      "references/motion-language.md",
+      "references/story-design.md",
+      "references/visual-design.md",
+      "scripts/assemble-index.mjs",
+      "scripts/assemble-index.test.mjs",
+      "scripts/audio.mjs",
+      "scripts/audio.test.mjs",
+      "scripts/build-frame.mjs",
+      "scripts/captions.mjs",
+      "scripts/captions.test.mjs",
+      "scripts/frame-packets.mjs",
+      "scripts/frame-packets.test.mjs",
+      "scripts/lib/assets.mjs",
+      "scripts/lib/bgm-volume.mjs",
+      "scripts/lib/captured-fonts.mjs",
+      "scripts/lib/dimensions.mjs",
+      "scripts/lib/frame-packets-core.mjs",
+      "scripts/lib/host-audio.mjs",
+      "scripts/lib/main-module.mjs",
+      "scripts/lib/pad-frame-duration.mjs",
+      "scripts/lib/storyboard.mjs",
+      "scripts/lib/tokens.mjs",
+      "scripts/lib/transition-registry.mjs",
+      "scripts/lib/transitions.json",
+      "scripts/transitions.mjs",
+      "scripts/transitions.test.mjs",
+      "sub-agents/frame-worker.md"
+    ]
   },
   {
     "id": "skill_figma",
@@ -151,7 +442,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "skills.sh",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "scripts/verify-motion.mjs"
+    ]
   },
   {
     "id": "skill_finance-sentiment",
@@ -161,7 +456,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   },
   {
     "id": "skill_fintel-data",
@@ -171,7 +471,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api-reference.md"
+    ]
   },
   {
     "id": "skill_frontend-design",
@@ -181,7 +486,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_gemini-infographic",
@@ -191,7 +500,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "agent_workflow",
     "author": "Google",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_general-video",
@@ -201,7 +513,15 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "scripts/frame-packets.mjs",
+      "scripts/frame-packets.test.mjs",
+      "scripts/lib/frame-packets-core.mjs",
+      "scripts/lib/main-module.mjs",
+      "sub-agents/frame-worker.md"
+    ]
   },
   {
     "id": "skill_generative-ui",
@@ -211,7 +531,14 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "Vercel",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/chart_js.md",
+      "references/design_system.md",
+      "references/svg_and_diagrams.md"
+    ]
   },
   {
     "id": "skill_grill-me",
@@ -221,7 +548,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Matt Pocock",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml"
+    ]
   },
   {
     "id": "skill_grill-with-docs",
@@ -231,7 +562,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Matt Pocock",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml"
+    ]
   },
   {
     "id": "skill_grilling",
@@ -241,7 +576,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Matt Pocock",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml"
+    ]
   },
   {
     "id": "skill_hormuz-strait",
@@ -251,7 +590,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_schema.md"
+    ]
   },
   {
     "id": "skill_hyperframes",
@@ -261,7 +605,40 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/brief-contract.md",
+      "references/brief-format.md",
+      "references/capability-menu.md",
+      "references/frame-worker-core.md",
+      "references/intent-interview.md",
+      "references/pitch-round.md",
+      "references/plugin-installation.md",
+      "references/production-loop.md",
+      "references/review-loop.md",
+      "references/route-briefs.md",
+      "references/routes/embedded-captions.md",
+      "references/routes/faceless-explainer.md",
+      "references/routes/general-video.md",
+      "references/routes/motion-graphics.md",
+      "references/routes/music-to-video.md",
+      "references/routes/pr-to-video.md",
+      "references/routes/product-launch-video.md",
+      "references/routes/remotion-to-hyperframes.md",
+      "references/routes/slideshow.md",
+      "references/routes/talking-head-recut.md",
+      "references/script-format.md",
+      "references/skill-lifecycle.md",
+      "references/storyboard-format.md",
+      "references/subagent-dispatch.md",
+      "references/workflow-catalog.md",
+      "scripts/lib/frame-packets-core.mjs",
+      "scripts/lib/main-module.mjs",
+      "scripts/lib/main-module.test.mjs",
+      "scripts/plugin-cli.mjs",
+      "scripts/plugin-cli.test.mjs"
+    ]
   },
   {
     "id": "skill_hyperframes-animation",
@@ -271,7 +648,131 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "adapters/animate-text.md",
+      "adapters/animejs.md",
+      "adapters/css-animations.md",
+      "adapters/gsap-easing-and-stagger.md",
+      "adapters/gsap-timeline-and-labels.md",
+      "adapters/gsap-transforms-and-perf.md",
+      "adapters/gsap.md",
+      "adapters/html-in-canvas-patterns.md",
+      "adapters/lottie.md",
+      "adapters/three.md",
+      "adapters/typegpu.md",
+      "adapters/waapi.md",
+      "blueprints/agent-progress-theater.md",
+      "blueprints/camera-journey.md",
+      "blueprints/comparison-split.md",
+      "blueprints/constellation-hub.md",
+      "blueprints/cta-morph-press.md",
+      "blueprints/cursor-ui-demo.md",
+      "blueprints/dataviz-countup.md",
+      "blueprints/device-surface-showcase.md",
+      "blueprints/fixed-anchor-cycle.md",
+      "blueprints/grid-card-assemble.md",
+      "blueprints/kinetic-type-beats.md",
+      "blueprints/logo-assemble-lockup.md",
+      "blueprints/overwhelm-surround.md",
+      "blueprints/panel-edit-live-sync.md",
+      "blueprints/prompt-type-submit-generate.md",
+      "blueprints/spatial-pan-stations.md",
+      "blueprints/ticker-takeover.md",
+      "blueprints/titlecard-reveal.md",
+      "blueprints/transcript-scroll-artifact-reveal.md",
+      "blueprints/typewriter-reveal.md",
+      "blueprints/video-text-pivot.md",
+      "blueprints/zoom-out-workspace-reveal.md",
+      "blueprints-index.md",
+      "examples/brand-reveal-assemble-zoom.html",
+      "examples/comparison-split-cards.html",
+      "examples/concept-demo-decode-pan.html",
+      "examples/cta-morph-press.html",
+      "examples/cta-orbit-collapse.html",
+      "examples/demo-page-scroll-spotlight.html",
+      "examples/hook-counter-burst.html",
+      "examples/messaging-multi-phrase.html",
+      "examples/metric-video-text-pivot.html",
+      "examples/problem-mockup-overwhelm.html",
+      "examples/proof-logo-chain.html",
+      "examples/takeover-ticker-displace.html",
+      "examples/workflow-approve-press.html",
+      "references/motion-blur.md",
+      "rules/3d-camera-flight.md",
+      "rules/3d-page-scroll.md",
+      "rules/3d-text-depth-layers.md",
+      "rules/ai-tracking-box.md",
+      "rules/ambient-glow-bloom.md",
+      "rules/anchored-layout-expand.md",
+      "rules/asr-keyword-glow.md",
+      "rules/avatar-cloud-network.md",
+      "rules/camera-cursor-tracking.md",
+      "rules/card-morph-anchor.md",
+      "rules/center-outward-expansion.md",
+      "rules/chart-scrub-readout.md",
+      "rules/chromatic-glitch.md",
+      "rules/context-sensitive-cursor.md",
+      "rules/control-target-sync.md",
+      "rules/coordinate-target-zoom.md",
+      "rules/counting-dynamic-scale.md",
+      "rules/css-marker-patterns.md",
+      "rules/cursor-click-ripple.md",
+      "rules/cursor-drag.md",
+      "rules/depth-of-field-blur.md",
+      "rules/depth-scatter-assemble.md",
+      "rules/discrete-text-sequence.md",
+      "rules/dynamic-content-sequencing.md",
+      "rules/gradient-text-sweep.md",
+      "rules/gsap-effects.md",
+      "rules/hacker-flip-3d.md",
+      "rules/kinetic-beat-slam.md",
+      "rules/motion-blur-streak.md",
+      "rules/multi-cursor-choreography.md",
+      "rules/multi-phase-camera.md",
+      "rules/nudge-curve.md",
+      "rules/orbit-3d-entry.md",
+      "rules/particle-burst.md",
+      "rules/physics-press-reaction.md",
+      "rules/press-release-spring.md",
+      "rules/reactive-displacement.md",
+      "rules/scale-swap-transition.md",
+      "rules/sine-wave-loop.md",
+      "rules/split-tilt-cards.md",
+      "rules/spring-pop-entrance.md",
+      "rules/stat-bars-and-fills.md",
+      "rules/svg-icon-enrichment.md",
+      "rules/svg-path-draw.md",
+      "rules/theme-crossfade-morph.md",
+      "rules/vertical-spring-ticker.md",
+      "rules/viewport-change.md",
+      "rules/waterfall-entry.md",
+      "rules-index.md",
+      "scripts/animation-map-sampling.mjs",
+      "scripts/animation-map-sampling.test.mjs",
+      "scripts/animation-map.mjs",
+      "scripts/animation-map.test.mjs",
+      "scripts/package-loader.mjs",
+      "scripts/package-loader.test.mjs",
+      "techniques.md",
+      "transitions/TRANSITION-REGISTRY.md",
+      "transitions/catalog.md",
+      "transitions/css-3d.md",
+      "transitions/css-blur.md",
+      "transitions/css-cover.md",
+      "transitions/css-destruction.md",
+      "transitions/css-dissolve.md",
+      "transitions/css-distortion.md",
+      "transitions/css-grid.md",
+      "transitions/css-light.md",
+      "transitions/css-mechanical.md",
+      "transitions/css-other.md",
+      "transitions/css-push.md",
+      "transitions/css-radial.md",
+      "transitions/css-scale.md",
+      "transitions/overview.md"
+    ]
   },
   {
     "id": "skill_hyperframes-audio",
@@ -281,7 +782,17 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/attributes.md",
+      "references/diagnosis.md",
+      "references/fx-registry.md",
+      "references/presets.md",
+      "scripts/carve.mjs",
+      "scripts/carve.test.mjs",
+      "scripts/lib/main-module.mjs"
+    ]
   },
   {
     "id": "skill_hyperframes-cli",
@@ -291,7 +802,20 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/beats.md",
+      "references/cloud.md",
+      "references/cloudrun.md",
+      "references/compare-and-batch.md",
+      "references/doctor-browser.md",
+      "references/init-and-scaffold.md",
+      "references/lambda.md",
+      "references/lint-validate-inspect.md",
+      "references/preview-render.md",
+      "references/upgrade-info-misc.md"
+    ]
   },
   {
     "id": "skill_hyperframes-core",
@@ -301,7 +825,20 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/composition-patterns.md",
+      "references/creator-editing-recipes.md",
+      "references/data-attributes.md",
+      "references/determinism-rules.md",
+      "references/full-screen-motion.md",
+      "references/minimal-composition.md",
+      "references/sub-compositions.md",
+      "references/tailwind.md",
+      "references/tracks-and-clips.md",
+      "references/variables-and-media.md"
+    ]
   },
   {
     "id": "skill_hyperframes-creative",
@@ -311,7 +848,88 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "frame-presets/biennale-yellow/FRAME.md",
+      "frame-presets/biennale-yellow/caption-skin.html",
+      "frame-presets/biennale-yellow/frame-showcase.html",
+      "frame-presets/blockframe/FRAME.md",
+      "frame-presets/blockframe/caption-skin.html",
+      "frame-presets/blockframe/frame-showcase.html",
+      "frame-presets/blue-professional/FRAME.md",
+      "frame-presets/blue-professional/caption-skin.html",
+      "frame-presets/blue-professional/frame-showcase.html",
+      "frame-presets/bold-poster/FRAME.md",
+      "frame-presets/bold-poster/caption-skin.html",
+      "frame-presets/bold-poster/frame-showcase.html",
+      "frame-presets/broadside/FRAME.md",
+      "frame-presets/broadside/caption-skin.html",
+      "frame-presets/broadside/frame-showcase.html",
+      "frame-presets/capsule/FRAME.md",
+      "frame-presets/capsule/caption-skin.html",
+      "frame-presets/capsule/frame-showcase.html",
+      "frame-presets/cartesian/FRAME.md",
+      "frame-presets/cartesian/caption-skin.html",
+      "frame-presets/cartesian/frame-showcase.html",
+      "frame-presets/cobalt-grid/FRAME.md",
+      "frame-presets/cobalt-grid/caption-skin.html",
+      "frame-presets/cobalt-grid/frame-showcase.html",
+      "frame-presets/code-editorial/FRAME.md",
+      "frame-presets/code-editorial/caption-skin.html",
+      "frame-presets/code-editorial/fonts/EBGaramond-400.woff2",
+      "frame-presets/code-editorial/fonts/EBGaramond-700.woff2",
+      "frame-presets/code-editorial/fonts/Inter-400.woff2",
+      "frame-presets/code-editorial/fonts/Inter-700.woff2",
+      "frame-presets/code-editorial/fonts/JetBrainsMono-400.woff2",
+      "frame-presets/code-editorial/fonts/JetBrainsMono-700.woff2",
+      "frame-presets/code-editorial/fonts/OFL-eb-garamond.txt",
+      "frame-presets/code-editorial/fonts/OFL-inter.txt",
+      "frame-presets/code-editorial/fonts/OFL-jetbrains-mono.txt",
+      "frame-presets/code-editorial/frame-showcase.html",
+      "frame-presets/coral/FRAME.md",
+      "frame-presets/coral/caption-skin.html",
+      "frame-presets/coral/frame-showcase.html",
+      "frame-presets/creative-mode/FRAME.md",
+      "frame-presets/creative-mode/caption-skin.html",
+      "frame-presets/creative-mode/frame-showcase.html",
+      "frame-presets/daisy-days/FRAME.md",
+      "frame-presets/daisy-days/caption-skin.html",
+      "frame-presets/daisy-days/frame-showcase.html",
+      "frame-presets/editorial-forest/FRAME.md",
+      "frame-presets/editorial-forest/caption-skin.html",
+      "frame-presets/editorial-forest/frame-showcase.html",
+      "palettes/bold-energetic.md",
+      "palettes/clean-corporate.md",
+      "palettes/dark-premium.md",
+      "palettes/jewel-rich.md",
+      "palettes/monochrome.md",
+      "palettes/nature-earth.md",
+      "palettes/neon-electric.md",
+      "palettes/pastel-soft.md",
+      "palettes/warm-editorial.md",
+      "references/audio-reactive.md",
+      "references/beat-direction.md",
+      "references/composition-patterns.md",
+      "references/data-in-motion.md",
+      "references/design-adherence.md",
+      "references/design-picker.md",
+      "references/design-spec.md",
+      "references/house-style.md",
+      "references/motion-principles.md",
+      "references/narration.md",
+      "references/prompt-expansion.md",
+      "references/story-spine.md",
+      "references/storyboard-recipe.md",
+      "references/typography.md",
+      "references/video-composition.md",
+      "references/visual-styles.md",
+      "scripts/contrast-report.mjs",
+      "scripts/extract-audio-data.py",
+      "scripts/package-loader.mjs",
+      "scripts/package-loader.test.mjs",
+      "templates/design-picker.html"
+    ]
   },
   {
     "id": "skill_hyperframes-keyframes",
@@ -321,7 +939,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml",
+      "references/keyframe-patterns.md"
+    ]
   },
   {
     "id": "skill_hyperframes-registry",
@@ -331,7 +954,21 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "examples/add-block.md",
+      "examples/add-component.md",
+      "references/component-quality-bar.md",
+      "references/contributing.md",
+      "references/demo-html-pattern.md",
+      "references/discovery.md",
+      "references/install-locations.md",
+      "references/placeholder-material.md",
+      "references/templates.md",
+      "references/wiring-blocks.md",
+      "references/wiring-components.md"
+    ]
   },
   {
     "id": "skill_hyperframes-studio",
@@ -341,7 +978,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_hyperliquid-reader",
@@ -351,7 +991,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md"
+    ]
   },
   {
     "id": "skill_instagram-scraper",
@@ -361,7 +1006,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "ApiDojo",
     "version": "0.1.1",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_ios-design",
@@ -371,7 +1019,21 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "Uizze",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "CHECKSUMS.sha256",
+      "LICENSE",
+      "MANIFEST.json",
+      "MODIFICATIONS.md",
+      "NOTICE",
+      "SKILL.md",
+      "agents/openai.yaml",
+      "reference/audit.native.md",
+      "reference/craft.md",
+      "reference/overdrive.md",
+      "references/uizze-image-to-ui.md",
+      "references/uizze-reference-policy.md"
+    ]
   },
   {
     "id": "skill_linkedin-reader",
@@ -381,7 +1043,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md"
+    ]
   },
   {
     "id": "skill_literature-search-arxiv",
@@ -391,7 +1058,15 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "Google DeepMind",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/citation.bib",
+      "references/query_syntax.md",
+      "scripts/download_paper.py",
+      "scripts/download_paper_source.py",
+      "scripts/search_arxiv.py"
+    ]
   },
   {
     "id": "skill_manim-composer",
@@ -401,7 +1076,14 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "Adithya S K",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/narrative-patterns.md",
+      "references/scene-examples.md",
+      "references/visual-techniques.md",
+      "templates/scenes-template.md"
+    ]
   },
   {
     "id": "skill_manimce-best-practices",
@@ -411,7 +1093,46 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "Adithya S K",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md",
+      "examples/3d_visualization.py",
+      "examples/attention/__init__.py",
+      "examples/attention/helpers.py",
+      "examples/attention/scenes.py",
+      "examples/basic_animations.py",
+      "examples/graph_plotting.py",
+      "examples/lorenz_attractor.py",
+      "examples/math_visualization.py",
+      "examples/updater_patterns.py",
+      "rules/3d.md",
+      "rules/animation-groups.md",
+      "rules/animations.md",
+      "rules/axes.md",
+      "rules/camera.md",
+      "rules/cli.md",
+      "rules/colors.md",
+      "rules/config.md",
+      "rules/creation-animations.md",
+      "rules/graphing.md",
+      "rules/grouping.md",
+      "rules/latex.md",
+      "rules/lines.md",
+      "rules/mobjects.md",
+      "rules/positioning.md",
+      "rules/scenes.md",
+      "rules/shapes.md",
+      "rules/styling.md",
+      "rules/text-animations.md",
+      "rules/text.md",
+      "rules/timing.md",
+      "rules/transform-animations.md",
+      "rules/updaters.md",
+      "templates/basic_scene.py",
+      "templates/camera_scene.py",
+      "templates/threed_scene.py"
+    ]
   },
   {
     "id": "skill_manimgl-best-practices",
@@ -421,7 +1142,116 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "Adithya S K",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md",
+      "examples/attention_arcs_animation.py",
+      "examples/attention_pattern_dots.py",
+      "examples/attention_scenes.py",
+      "examples/attention_softmax_masking.py",
+      "examples/autoregressive_flow.py",
+      "examples/basic_multihead.py",
+      "examples/bloch_sphere_3d.py",
+      "examples/block_collision_basic.py",
+      "examples/blocks_3d.py",
+      "examples/collision_phase_space.py",
+      "examples/complex_s_plane.py",
+      "examples/cost_function.py",
+      "examples/cube_projection_3d.py",
+      "examples/damped_solutions_splane.py",
+      "examples/dot_product_visualization.py",
+      "examples/double_slit_interference.py",
+      "examples/eigenvalue_equations.py",
+      "examples/eigenvector_flow_field.py",
+      "examples/eigenvector_matrix_transformation.py",
+      "examples/elastic_collision_vectors.py",
+      "examples/embedding_matrix.py",
+      "examples/equation_transforms.py",
+      "examples/exponential_derivative.py",
+      "examples/fibonacci_eigenvalues.py",
+      "examples/gradient_descent_basic.py",
+      "examples/hexagon_cube_correspondence.py",
+      "examples/integration_visualization.py",
+      "examples/laplace_integral.py",
+      "examples/light_polarization.py",
+      "examples/linear_regression.py",
+      "examples/llm_prediction_pipeline.py",
+      "examples/lorenz_attractor.py",
+      "examples/lozenge_tiling.py",
+      "examples/max_random_process.py",
+      "examples/mlp_forward_pass.py",
+      "examples/mlp_network_icon.py",
+      "examples/mlp_neuron_activation.py",
+      "examples/mlp_neurons_flow.py",
+      "examples/mlp_relu_visualization.py",
+      "examples/mlp_vector_space.py",
+      "examples/mlp_weight_matrix.py",
+      "examples/multi_head_attention.py",
+      "examples/network_block_flow.py",
+      "examples/neural_network_basic.py",
+      "examples/parallax_starfield.py",
+      "examples/probability_distribution.py",
+      "examples/probability_output.py",
+      "examples/quantum_gates.py",
+      "examples/qubit_state_vector.py",
+      "examples/query_key_dot_products.py",
+      "examples/query_key_space_mapping.py",
+      "examples/radial_wave_visualization.py",
+      "examples/rotating_exponentials.py",
+      "examples/semantic_similarity.py",
+      "examples/simple_test.py",
+      "examples/softmax_visualization.py",
+      "examples/solve_damped_ode.py",
+      "examples/spring_mass_system.py",
+      "examples/sqrt_random_process.py",
+      "examples/superposition_effect.py",
+      "examples/three_d_surfaces.py",
+      "examples/three_d_vector_space.py",
+      "examples/token_embeddings_flow.py",
+      "examples/token_probability_distribution.py",
+      "examples/token_sampling.py",
+      "examples/token_to_embedding.py",
+      "examples/tokenization_demo.py",
+      "examples/transit_animation.py",
+      "examples/value_matrix_transform.py",
+      "examples/vector_fields.py",
+      "examples/wave_amplitude_visualization.py",
+      "examples/weight_matrix_product.py",
+      "examples/weights_vs_data.py",
+      "examples/word_vector_analogy.py",
+      "examples/zone_plate_hologram.py",
+      "references/equation_transforms.md",
+      "references/integration_visualization.md",
+      "references/parallax_starfield.md",
+      "references/rotating_exponentials.md",
+      "references/spring_mass_system.md",
+      "references/three_d_surfaces.md",
+      "references/transit_animation.md",
+      "references/vector_fields.md",
+      "rules/3d.md",
+      "rules/animation-groups.md",
+      "rules/animations.md",
+      "rules/camera.md",
+      "rules/cli.md",
+      "rules/colors.md",
+      "rules/config.md",
+      "rules/creation-animations.md",
+      "rules/embedding.md",
+      "rules/frame.md",
+      "rules/interactive.md",
+      "rules/mobjects.md",
+      "rules/scenes.md",
+      "rules/styling.md",
+      "rules/t2c.md",
+      "rules/tex.md",
+      "rules/text.md",
+      "rules/transform-animations.md",
+      "templates/3d_scene.py",
+      "templates/basic_scene.py",
+      "templates/interactive_scene.py",
+      "templates/math_scene.py"
+    ]
   },
   {
     "id": "skill_media-use",
@@ -431,7 +1261,121 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "agent_workflow",
     "author": "skills.sh",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      ".gitignore",
+      "SKILL.md",
+      "audio/assets/sfx/CREDITS.md",
+      "audio/assets/sfx/chime.mp3",
+      "audio/assets/sfx/click-soft.mp3",
+      "audio/assets/sfx/click.mp3",
+      "audio/assets/sfx/error.mp3",
+      "audio/assets/sfx/glitch-1.mp3",
+      "audio/assets/sfx/glitch-2.mp3",
+      "audio/assets/sfx/glitch-3.mp3",
+      "audio/assets/sfx/impact-bass-1.mp3",
+      "audio/assets/sfx/impact-bass-2.mp3",
+      "audio/assets/sfx/key-press.mp3",
+      "audio/assets/sfx/manifest.json",
+      "audio/assets/sfx/notification.mp3",
+      "audio/assets/sfx/ping.mp3",
+      "audio/assets/sfx/pop.mp3",
+      "audio/assets/sfx/riser.mp3",
+      "audio/assets/sfx/sparkle.mp3",
+      "audio/assets/sfx/typing.mp3",
+      "audio/assets/sfx/whoosh-cinematic.mp3",
+      "audio/assets/sfx/whoosh-short.mp3",
+      "audio/assets/sfx/whoosh.mp3",
+      "audio/references/bgm.md",
+      "audio/references/captions/authoring.md",
+      "audio/references/captions/motion.md",
+      "audio/references/captions/transcript-handling.md",
+      "audio/references/remove-background.md",
+      "audio/references/requirements.md",
+      "audio/references/sfx.md",
+      "audio/references/transcribe.md",
+      "audio/references/tts-to-captions.md",
+      "audio/references/tts.md",
+      "audio/scripts/audio.mjs",
+      "audio/scripts/audio.test.mjs",
+      "audio/scripts/gemini-pipeline.test.mjs",
+      "audio/scripts/heygen-tts.mjs",
+      "audio/scripts/heygen-tts.test.mjs",
+      "audio/scripts/heygen-voice.mjs",
+      "audio/scripts/heygen-voice.test.mjs",
+      "audio/scripts/lib/audio-meta.mjs",
+      "audio/scripts/lib/audio-meta.test.mjs",
+      "audio/scripts/lib/bgm-volume.mjs",
+      "audio/scripts/lib/bgm.mjs",
+      "audio/scripts/lib/bgm.test.mjs",
+      "audio/scripts/lib/concurrency.mjs",
+      "audio/scripts/lib/concurrency.test.mjs",
+      "audio/scripts/lib/gemini-auth.mjs",
+      "audio/scripts/lib/gemini-auth.py",
+      "audio/scripts/lib/gemini-auth.test.mjs",
+      "audio/scripts/lib/gemini-auth_test.py",
+      "audio/scripts/lib/gemini-tts.mjs",
+      "audio/scripts/lib/gemini-tts.test.mjs",
+      "audio/scripts/lib/heygen.mjs",
+      "audio/scripts/lib/heygen.test.mjs",
+      "audio/scripts/lib/host-audio.mjs",
+      "audio/scripts/lib/host-audio.test.mjs",
+      "audio/scripts/lib/main-module.mjs",
+      "audio/scripts/lib/media-record.mjs",
+      "audio/scripts/lib/media-record.test.mjs",
+      "audio/scripts/lib/python.mjs",
+      "audio/scripts/lib/python.test.mjs",
+      "audio/scripts/lib/sfx.mjs",
+      "audio/scripts/lib/sfx.test.mjs",
+      "audio/scripts/lib/tts.cleanup.test.mjs",
+      "audio/scripts/lib/tts.mjs",
+      "audio/scripts/lib/tts.spawn.test.mjs",
+      "audio/scripts/lib/tts.test.mjs",
+      "audio/scripts/lyria-recipe.py",
+      "audio/scripts/wait-bgm.mjs",
+      "audio/scripts/wait-bgm.test.mjs",
+      "luts/README.md",
+      "luts/index.json",
+      "references/audio.md",
+      "references/grading.md",
+      "references/media-treatment-recipes.md",
+      "references/media-treatments.md",
+      "references/memory.md",
+      "references/meta.md",
+      "references/operations.md",
+      "references/resolve.md",
+      "references/setup-providers.md",
+      "references/telemetry-dashboard.md",
+      "scripts/audio-duck.mjs",
+      "scripts/compatibility.test.mjs",
+      "scripts/dither.mjs",
+      "scripts/dither.test.mjs",
+      "scripts/eval.mjs",
+      "scripts/lib/config-lock.mjs",
+      "scripts/lib/cutlist.mjs",
+      "scripts/lib/duck.mjs",
+      "scripts/lib/error-diffusion.mjs",
+      "scripts/lib/index-gen.mjs",
+      "scripts/lib/manifest.mjs",
+      "scripts/lib/media-fetch.mjs",
+      "scripts/lib/media-home.mjs",
+      "scripts/lib/npx-sync.mjs",
+      "scripts/lib/parakeet-words.mjs",
+      "scripts/lib/prefs-store.mjs",
+      "scripts/lib/recipe-store.mjs",
+      "scripts/lib/telemetry.mjs",
+      "scripts/lib/telemetry.test.mjs",
+      "scripts/lib/transcriptCutFade.mjs",
+      "scripts/lib/words.mjs",
+      "scripts/prefs.mjs",
+      "scripts/recipe.mjs",
+      "scripts/resolve-plugin.test.mjs",
+      "scripts/resolve.mjs",
+      "scripts/transcribe.mjs",
+      "scripts/transcribe.test.mjs",
+      "scripts/transcript-cut.mjs",
+      "scripts/transcript-cut.test.mjs"
+    ]
   },
   {
     "id": "skill_motion-graphics",
@@ -441,7 +1385,32 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/builder.md",
+      "agents/director.md",
+      "agents/finalize.md",
+      "catalog-map.md",
+      "categories/asset-fusion/module.md",
+      "categories/charts/module.md",
+      "categories/kinetic-type/module.md",
+      "categories/logo-reveal/module.md",
+      "categories/lower-thirds/module.md",
+      "categories/maps/bake-basemap.mjs",
+      "categories/maps/module.md",
+      "categories/news/module.md",
+      "categories/stat/module.md",
+      "categories/tweet/module.md",
+      "categories/webpage/module.md",
+      "grounding/PROTOCOL.md",
+      "grounding/locate.mjs",
+      "phases/source/guide.md",
+      "references/builder-contract.md",
+      "references/motion-vocabulary.md",
+      "references/shot-plan-ir.md",
+      "samples/asset-fusion/_ref-circle-highlight.html"
+    ]
   },
   {
     "id": "skill_music-to-video",
@@ -451,7 +1420,178 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/frame-skeleton.md",
+      "references/montage.md",
+      "references/motion-primitive-catalog.md",
+      "references/motion-primitives/3d-card-flip/index.html",
+      "references/motion-primitives/3d-card-flip/scene.html",
+      "references/motion-primitives/assets/gsap.min.js",
+      "references/motion-primitives/bg-flow-field/index.html",
+      "references/motion-primitives/bg-flow-field/scene.html",
+      "references/motion-primitives/binary-decrypt/index.html",
+      "references/motion-primitives/binary-decrypt/scene.html",
+      "references/motion-primitives/blur-resolve/index.html",
+      "references/motion-primitives/blur-resolve/scene.html",
+      "references/motion-primitives/braam-punch/index.html",
+      "references/motion-primitives/braam-punch/scene.html",
+      "references/motion-primitives/chromatic-split/index.html",
+      "references/motion-primitives/chromatic-split/scene.html",
+      "references/motion-primitives/chrome-sweep/index.html",
+      "references/motion-primitives/chrome-sweep/scene.html",
+      "references/motion-primitives/counting-punch/index.html",
+      "references/motion-primitives/counting-punch/scene.html",
+      "references/motion-primitives/crash-zoom-in/index.html",
+      "references/motion-primitives/crash-zoom-in/scene.html",
+      "references/motion-primitives/datamosh-smear/index.html",
+      "references/motion-primitives/datamosh-smear/scene.html",
+      "references/motion-primitives/directional-fill/index.html",
+      "references/motion-primitives/directional-fill/scene.html",
+      "references/motion-primitives/dolly-zoom/index.html",
+      "references/motion-primitives/dolly-zoom/scene.html",
+      "references/motion-primitives/electric-arc/index.html",
+      "references/motion-primitives/electric-arc/scene.html",
+      "references/motion-primitives/flash-cut/index.html",
+      "references/motion-primitives/flash-cut/scene.html",
+      "references/motion-primitives/gooey-metaball/index.html",
+      "references/motion-primitives/gooey-metaball/scene.html",
+      "references/motion-primitives/hard-cut/index.html",
+      "references/motion-primitives/hard-cut/scene.html",
+      "references/motion-primitives/hypercut-whip/index.html",
+      "references/motion-primitives/hypercut-whip/scene.html",
+      "references/motion-primitives/iris-open/index.html",
+      "references/motion-primitives/iris-open/scene.html",
+      "references/motion-primitives/kinetic-letter-in/index.html",
+      "references/motion-primitives/kinetic-letter-in/scene.html",
+      "references/motion-primitives/liquid-morph/index.html",
+      "references/motion-primitives/liquid-morph/scene.html",
+      "references/motion-primitives/mask-reveal/index.html",
+      "references/motion-primitives/mask-reveal/scene.html",
+      "references/motion-primitives/mosaic-pack/index.html",
+      "references/motion-primitives/mosaic-pack/scene.html",
+      "references/motion-primitives/neon-flicker/index.html",
+      "references/motion-primitives/neon-flicker/scene.html",
+      "references/motion-primitives/outline-to-fill/index.html",
+      "references/motion-primitives/outline-to-fill/scene.html",
+      "references/motion-primitives/palette-flip/index.html",
+      "references/motion-primitives/palette-flip/scene.html",
+      "references/motion-primitives/particle-burst/index.html",
+      "references/motion-primitives/particle-burst/scene.html",
+      "references/motion-primitives/pixel-dissolve/index.html",
+      "references/motion-primitives/pixel-dissolve/scene.html",
+      "references/motion-primitives/radial-burst-lines/index.html",
+      "references/motion-primitives/radial-burst-lines/scene.html",
+      "references/motion-primitives/screen-shake/index.html",
+      "references/motion-primitives/screen-shake/scene.html",
+      "references/motion-primitives/slot-machine-reveal/index.html",
+      "references/motion-primitives/slot-machine-reveal/scene.html",
+      "references/motion-primitives/spotlight-sweep/index.html",
+      "references/motion-primitives/spotlight-sweep/scene.html",
+      "references/motion-primitives/staggered-exit/index.html",
+      "references/motion-primitives/staggered-exit/scene.html",
+      "references/motion-primitives/text-spectral-rays/USAGE.md",
+      "references/motion-primitives/text-spectral-rays/index.html",
+      "references/motion-primitives/text-spectral-rays/scene.html",
+      "references/motion-primitives/text-wave-distort/index.html",
+      "references/motion-primitives/text-wave-distort/scene.html",
+      "references/motion-primitives/tile-mosaic/index.html",
+      "references/motion-primitives/tile-mosaic/scene.html",
+      "references/motion-primitives/typewriter-reveal/index.html",
+      "references/motion-primitives/typewriter-reveal/scene.html",
+      "references/motion-primitives/word-grid-burst/index.html",
+      "references/motion-primitives/word-grid-burst/scene.html",
+      "references/planning.md",
+      "references/storyboard-format.md",
+      "references/template-catalog.md",
+      "references/templates/card-flyby/index.html",
+      "references/templates/card-flyby/program.json",
+      "references/templates/held-message-living-field/index.html",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/asphalt-031.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/bark-014.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/brick.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/bricks-075-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/bricks-101.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/bricks-102.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/bricks-104.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/carpet.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/concrete-034.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/concrete-042-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/concrete-046.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/concrete-047-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/concrete.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/diamond-plate-009.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/fabric-080.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/fabric-083.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/grass-001.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/grass-004.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/grass-005.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-037.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-054.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-068.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-080.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-103.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/ground-104.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/lava.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/leather-037.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/marble-012.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/marble-016.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-032.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-038.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-041-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-046-b.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-048-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-049-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-055-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal-061-b.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/metal.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/onyx.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/painted-plaster-017.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/paving-stones-138.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/paving-stones-150.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/plaster-001.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-007.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-008-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-009-c.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-012-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-012-b.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/road-013-a.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/rock-058.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/rock-063.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/rock.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/snow-015.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/snow.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/tiles-138.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/travertine-009.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-049.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-051.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-058.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-066.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-092.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-094.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-floor-051.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-floor-064.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood-floor-070.png",
+      "references/templates/held-text-strobe-burst/assets/texture-mask-text/masks/wood.png",
+      "references/templates/held-text-strobe-burst/index.html",
+      "references/templates/intro-kinetic-cascade/index.html",
+      "references/templates/intro-kinetic-cascade/program.json",
+      "references/templates/logo-split-lockup-pulse/assets/fredoka-700.woff2",
+      "references/templates/logo-split-lockup-pulse/index.html",
+      "references/templates/poster-tile-mosaic/index.html",
+      "references/templates/poster-tile-mosaic/program.json",
+      "references/templates/roll-flipbook-word-cycle/index.html",
+      "references/templates/split-anchor-word-slot/index.html",
+      "references/templates/split-anchor-word-slot/program.json",
+      "references/templates/typewriter-phrase-keyword-shuffle/index.html",
+      "scripts/analyze-beatgrid.py",
+      "scripts/assemble-index.mjs",
+      "scripts/lib/storyboard.mjs",
+      "scripts/stage-assets.mjs",
+      "scripts/validate-plan.mjs",
+      "sub-agents/frame-worker.md"
+    ]
   },
   {
     "id": "skill_no-ai-slop",
@@ -461,7 +1601,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Peter Yang",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml",
+      "eval.md"
+    ]
   },
   {
     "id": "skill_opencli-reader",
@@ -471,7 +1616,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/discovery.md",
+      "references/finance-sources.md"
+    ]
   },
   {
     "id": "skill_options-payoff",
@@ -481,7 +1632,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/bs_code.md",
+      "references/strategies.md"
+    ]
   },
   {
     "id": "skill_pdf",
@@ -491,7 +1648,21 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "document",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md",
+      "forms.md",
+      "reference.md",
+      "scripts/check_bounding_boxes.py",
+      "scripts/check_fillable_fields.py",
+      "scripts/convert_pdf_to_images.py",
+      "scripts/create_validation_image.py",
+      "scripts/extract_form_field_info.py",
+      "scripts/extract_form_structure.py",
+      "scripts/fill_fillable_fields.py",
+      "scripts/fill_pdf_form_with_annotations.py"
+    ]
   },
   {
     "id": "skill_pptx",
@@ -501,7 +1672,65 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "document",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "LICENSE.txt",
+      "SKILL.md",
+      "scripts/__init__.py",
+      "scripts/add_slide.py",
+      "scripts/clean.py",
+      "scripts/office/helpers/__init__.py",
+      "scripts/office/helpers/pptx_chart.py",
+      "scripts/office/helpers/pptx_slide.py",
+      "scripts/office/helpers/pptx_theme.py",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chart.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-chartDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-diagram.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-lockedCanvas.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-main.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-picture.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-spreadsheetDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/dml-wordprocessingDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/pml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-additionalCharacteristics.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-bibliography.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-commonSimpleTypes.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlDataProperties.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-customXmlSchemaProperties.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesCustom.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesExtended.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-documentPropertiesVariantTypes.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-math.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/shared-relationshipReference.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/sml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-main.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-officeDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-presentationDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-spreadsheetDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/vml-wordprocessingDrawing.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/wml.xsd",
+      "scripts/office/schemas/ISO-IEC29500-4_2016/xml.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-contentTypes.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-coreProperties.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-digSig.xsd",
+      "scripts/office/schemas/ecma/fouth-edition/opc-relationships.xsd",
+      "scripts/office/schemas/mce/mc.xsd",
+      "scripts/office/schemas/microsoft/wml-2010.xsd",
+      "scripts/office/schemas/microsoft/wml-2012.xsd",
+      "scripts/office/schemas/microsoft/wml-2018.xsd",
+      "scripts/office/schemas/microsoft/wml-cex-2018.xsd",
+      "scripts/office/schemas/microsoft/wml-cid-2016.xsd",
+      "scripts/office/schemas/microsoft/wml-sdtdatahash-2020.xsd",
+      "scripts/office/schemas/microsoft/wml-symex-2015.xsd",
+      "scripts/office/soffice.py",
+      "scripts/office/validate.py",
+      "scripts/office/validators/__init__.py",
+      "scripts/office/validators/base.py",
+      "scripts/office/validators/docx.py",
+      "scripts/office/validators/pptx.py",
+      "scripts/office/validators/redlining.py",
+      "scripts/thumbnail.py"
+    ]
   },
   {
     "id": "skill_pr-to-video",
@@ -511,7 +1740,44 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/code-vocabulary.md",
+      "references/cut-catalog.md",
+      "references/motion-language.md",
+      "references/story-design.md",
+      "references/visual-design.md",
+      "scripts/assemble-index.mjs",
+      "scripts/assemble-index.test.mjs",
+      "scripts/audio.mjs",
+      "scripts/build-frame.mjs",
+      "scripts/captions.mjs",
+      "scripts/captions.test.mjs",
+      "scripts/fetch-people-avatars.mjs",
+      "scripts/fetch-pr.mjs",
+      "scripts/frame-contract.test.mjs",
+      "scripts/frame-packets.mjs",
+      "scripts/ingest.mjs",
+      "scripts/lib/assets.mjs",
+      "scripts/lib/bgm-volume.mjs",
+      "scripts/lib/captured-fonts.mjs",
+      "scripts/lib/dimensions.mjs",
+      "scripts/lib/frame-contract.mjs",
+      "scripts/lib/frame-packets-core.mjs",
+      "scripts/lib/host-audio.mjs",
+      "scripts/lib/main-module.mjs",
+      "scripts/lib/pad-frame-duration.mjs",
+      "scripts/lib/storyboard.mjs",
+      "scripts/lib/tokens.mjs",
+      "scripts/lib/transition-registry.mjs",
+      "scripts/lib/transitions.json",
+      "scripts/preflight.mjs",
+      "scripts/project-dir.mjs",
+      "scripts/transitions.mjs",
+      "scripts/workflow-guardrails.test.mjs",
+      "sub-agents/frame-worker.md"
+    ]
   },
   {
     "id": "skill_product-launch-video",
@@ -521,7 +1787,46 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/cut-catalog.md",
+      "references/motion-language.md",
+      "references/story-design.md",
+      "references/visual-design.md",
+      "scripts/assemble-index.mjs",
+      "scripts/assemble-index.test.mjs",
+      "scripts/audio.mjs",
+      "scripts/audio.test.mjs",
+      "scripts/build-frame-colors.test.mjs",
+      "scripts/build-frame-subsets.test.mjs",
+      "scripts/build-frame.mjs",
+      "scripts/captions.mjs",
+      "scripts/captions.test.mjs",
+      "scripts/capture-skill-guardrails.test.mjs",
+      "scripts/frame-packets.mjs",
+      "scripts/frame-packets.test.mjs",
+      "scripts/lib/assets.mjs",
+      "scripts/lib/bgm-volume.mjs",
+      "scripts/lib/captured-fonts.mjs",
+      "scripts/lib/dimensions.mjs",
+      "scripts/lib/frame-packets-core.mjs",
+      "scripts/lib/host-audio.mjs",
+      "scripts/lib/main-module.mjs",
+      "scripts/lib/pad-frame-duration.mjs",
+      "scripts/lib/pad-frame-duration.test.mjs",
+      "scripts/lib/storyboard.mjs",
+      "scripts/lib/tokens.mjs",
+      "scripts/lib/tokens.test.mjs",
+      "scripts/lib/transition-registry.mjs",
+      "scripts/lib/transitions.json",
+      "scripts/media-contract.test.mjs",
+      "scripts/stage-assets.mjs",
+      "scripts/stage-assets.test.mjs",
+      "scripts/transitions.mjs",
+      "scripts/transitions.test.mjs",
+      "sub-agents/frame-worker.md"
+    ]
   },
   {
     "id": "skill_remote-browser",
@@ -531,7 +1836,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "browser_automation",
     "author": "Browser Use",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_remotion-to-hyperframes",
@@ -541,7 +1849,86 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "assets/.gitkeep",
+      "assets/test-corpus/.gitignore",
+      "assets/test-corpus/run.sh",
+      "assets/test-corpus/tier-1-title-card/.gitignore",
+      "assets/test-corpus/tier-1-title-card/README.md",
+      "assets/test-corpus/tier-1-title-card/expected.json",
+      "assets/test-corpus/tier-1-title-card/hf-src/compositions/title.html",
+      "assets/test-corpus/tier-1-title-card/hf-src/index.html",
+      "assets/test-corpus/tier-1-title-card/remotion-src/package.json",
+      "assets/test-corpus/tier-1-title-card/remotion-src/remotion.config.ts",
+      "assets/test-corpus/tier-1-title-card/remotion-src/src/Root.tsx",
+      "assets/test-corpus/tier-1-title-card/remotion-src/src/TitleCard.tsx",
+      "assets/test-corpus/tier-1-title-card/remotion-src/src/index.ts",
+      "assets/test-corpus/tier-1-title-card/remotion-src/tsconfig.json",
+      "assets/test-corpus/tier-2-multi-scene/.gitignore",
+      "assets/test-corpus/tier-2-multi-scene/README.md",
+      "assets/test-corpus/tier-2-multi-scene/expected.json",
+      "assets/test-corpus/tier-2-multi-scene/hf-src/compositions/scene-1.html",
+      "assets/test-corpus/tier-2-multi-scene/hf-src/compositions/scene-2.html",
+      "assets/test-corpus/tier-2-multi-scene/hf-src/compositions/scene-3.html",
+      "assets/test-corpus/tier-2-multi-scene/hf-src/index.html",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/package.json",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/remotion.config.ts",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/src/MultiScene.tsx",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/src/Root.tsx",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/src/index.ts",
+      "assets/test-corpus/tier-2-multi-scene/remotion-src/tsconfig.json",
+      "assets/test-corpus/tier-2-multi-scene/setup.sh",
+      "assets/test-corpus/tier-3-data-driven/.gitignore",
+      "assets/test-corpus/tier-3-data-driven/README.md",
+      "assets/test-corpus/tier-3-data-driven/expected.json",
+      "assets/test-corpus/tier-3-data-driven/hf-src/compositions/scene-1.html",
+      "assets/test-corpus/tier-3-data-driven/hf-src/compositions/scene-2.html",
+      "assets/test-corpus/tier-3-data-driven/hf-src/compositions/scene-3.html",
+      "assets/test-corpus/tier-3-data-driven/hf-src/index.html",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/package.json",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/remotion.config.ts",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/Root.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/Stargazed.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/components/AnimatedNumber.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/components/StatCard.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/components/UnderlinedText.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/index.ts",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/scenes/OutroScene.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/scenes/StatsScene.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/src/scenes/TitleScene.tsx",
+      "assets/test-corpus/tier-3-data-driven/remotion-src/tsconfig.json",
+      "assets/test-corpus/tier-4-escape-hatch/README.md",
+      "assets/test-corpus/tier-4-escape-hatch/cases/01-use-state.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/02-use-effect-deps.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/03-async-metadata.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/04-third-party-react.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/05-lambda-config.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/06-warnings-only.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/07-custom-hook.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/cases/08-mixed.tsx",
+      "assets/test-corpus/tier-4-escape-hatch/expected.json",
+      "assets/test-corpus/tier-4-escape-hatch/validate.sh",
+      "references/api-map.md",
+      "references/escape-hatch.md",
+      "references/eval.md",
+      "references/fonts.md",
+      "references/limitations.md",
+      "references/lottie.md",
+      "references/media.md",
+      "references/parameters.md",
+      "references/sequencing.md",
+      "references/timing.md",
+      "references/transitions.md",
+      "scripts/.gitkeep",
+      "scripts/frame_strip.sh",
+      "scripts/lint_source.py",
+      "scripts/render_diff.sh",
+      "scripts/tests/fixtures/blocker.tsx",
+      "scripts/tests/fixtures/clean.tsx",
+      "scripts/tests/smoke.sh"
+    ]
   },
   {
     "id": "skill_saas-valuation-compression",
@@ -551,7 +1938,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/benchmarks.md"
+    ]
   },
   {
     "id": "skill_sepa-strategy",
@@ -561,7 +1953,18 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/entry-rules.md",
+      "references/fundamentals.md",
+      "references/market-environment.md",
+      "references/patterns.md",
+      "references/position-sizing.md",
+      "references/stage-analysis.md",
+      "references/trend-template.md"
+    ]
   },
   {
     "id": "skill_skill-creator",
@@ -571,7 +1974,17 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Anthropic",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/architecture-patterns.md",
+      "references/dynamic-calling.md",
+      "references/frontmatter-guide.md",
+      "references/quality-rubric.md",
+      "references/skill-examples.md",
+      "references/writing-guide.md"
+    ]
   },
   {
     "id": "skill_slideshow",
@@ -581,7 +1994,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "references/standalone-harness.md"
+    ]
   },
   {
     "id": "skill_startup-analysis",
@@ -591,7 +2008,14 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/ceo-framework.md",
+      "references/job-applicant-framework.md",
+      "references/vc-framework.md"
+    ]
   },
   {
     "id": "skill_stock-correlation",
@@ -601,7 +2025,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/sector_universes.md"
+    ]
   },
   {
     "id": "skill_stock-liquidity",
@@ -611,7 +2040,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/liquidity_reference.md"
+    ]
   },
   {
     "id": "skill_talking-head-recut",
@@ -621,7 +2055,37 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "motion_video",
     "author": "HyperFrames",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "NOTICE.md",
+      "SKILL.md",
+      "assets/fonts/Caveat-400-latin.woff2",
+      "assets/fonts/Caveat-700-latin.woff2",
+      "assets/fonts/Inter-400-latin.woff2",
+      "assets/fonts/Inter-700-latin.woff2",
+      "assets/fonts/LXGWWenKaiTC-400-latin.woff2",
+      "assets/fonts/Virgil.woff2",
+      "assets/vendor/gsap.min.js",
+      "media-contract.test.mjs",
+      "references/DESIGN_INDEX.md",
+      "references/frames/clean.html",
+      "references/frames/hairline.html",
+      "references/frames/polaroid.html",
+      "references/layouts/overlay.html",
+      "references/layouts/pip.html",
+      "references/layouts/split.html",
+      "references/layouts/stack.html",
+      "references/styles/academic.html",
+      "references/styles/audit.html",
+      "references/styles/editorial.html",
+      "references/styles/geom.html",
+      "references/styles/minimal.html",
+      "references/styles/spotlight.html",
+      "references/styles/swiss.html",
+      "references/styles/terminal.html",
+      "references/styles/whiteboard.html",
+      "references/styles/xhs.html"
+    ]
   },
   {
     "id": "skill_tdd",
@@ -631,7 +2095,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "coding_dev",
     "author": "Matt Pocock",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md",
+      "agents/openai.yaml",
+      "mocking.md",
+      "tests.md"
+    ]
   },
   {
     "id": "skill_telegram-reader",
@@ -641,7 +2111,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md"
+    ]
   },
   {
     "id": "skill_tiktok-scraper",
@@ -651,7 +2126,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "ApiDojo",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_tradingview-mcp",
@@ -661,7 +2139,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_tradingview-reader",
@@ -671,7 +2153,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md"
+    ]
   },
   {
     "id": "skill_twitter-reader",
@@ -681,7 +2168,13 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/commands.md",
+      "references/schema.md"
+    ]
   },
   {
     "id": "skill_ui-taste",
@@ -691,7 +2184,27 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "design",
     "author": "Uizze",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "CHECKSUMS.sha256",
+      "LICENSE",
+      "MANIFEST.json",
+      "MODIFICATIONS.md",
+      "NOTICE",
+      "SKILL.md",
+      "agents/openai.yaml",
+      "reference/audit.md",
+      "reference/audit.native.md",
+      "reference/craft.md",
+      "reference/distill.md",
+      "reference/ios.md",
+      "reference/new-work.md",
+      "reference/operate.md",
+      "reference/overdrive.md",
+      "reference/polish.md",
+      "references/uizze-image-to-ui.md",
+      "references/uizze-reference-policy.md"
+    ]
   },
   {
     "id": "skill_x-scraper",
@@ -701,7 +2214,10 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "ApiDojo",
     "version": "0.1.1",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "SKILL.md"
+    ]
   },
   {
     "id": "skill_yc-reader",
@@ -711,7 +2227,12 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "scraping_research",
     "author": "OpenCLI",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   },
   {
     "id": "skill_yfinance-data",
@@ -721,6 +2242,11 @@ export const MARKETPLACE_CATALOG: MarketplaceSkill[] = [
     "category": "finance",
     "author": "Himself65",
     "version": "1.0.0",
-    "icon": "Sparkles"
+    "icon": "Sparkles",
+    "files": [
+      "README.md",
+      "SKILL.md",
+      "references/api_reference.md"
+    ]
   }
 ];

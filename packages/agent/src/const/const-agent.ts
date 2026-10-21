@@ -1,6 +1,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import type {
   AgentConfig,
   AgentEvent,
@@ -366,9 +367,142 @@ export function estimateToolSchemasTokens(tools: any[] = CONST_DEFAULT_TOOLS): n
   }
 }
 
-export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
-  if (customPrompt) return customPrompt;
+export interface Skill {
+  name: string;
+  description: string;
+  content: string;
+  filePath: string;
+  disableModelInvocation?: boolean;
+}
 
+export function formatSkillsForSystemPrompt(skills: Skill[]): string {
+  const visibleSkills = skills.filter((skill) => !skill.disableModelInvocation);
+  if (visibleSkills.length === 0) return "";
+
+  const lines = [
+    "The following skills provide specialized instructions for specific tasks.",
+    "Read the full skill file with the 'read' tool when the user task matches its description.",
+    "When a skill file references a relative path, resolve it against the skill directory (parent folder of SKILL.md) and use that absolute path in tool commands.",
+    "",
+    "<available_skills>",
+  ];
+
+  for (const skill of visibleSkills) {
+    lines.push("  <skill>");
+    lines.push(`    <name>${escapeSkillXml(skill.name)}</name>`);
+    lines.push(`    <description>${escapeSkillXml(skill.description)}</description>`);
+    lines.push(`    <location>${escapeSkillXml(skill.filePath)}</location>`);
+    lines.push("  </skill>");
+  }
+
+  lines.push("</available_skills>");
+  return lines.join("\n");
+}
+
+function escapeSkillXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function parseSkillFrontmatter(content: string): {
+  name?: string;
+  description?: string;
+  disableModelInvocation?: boolean;
+} {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match || !match[1]) return {};
+  const metaBlock = match[1];
+  const meta: Record<string, string> = {};
+  const lines = metaBlock.split(/\r?\n/);
+  let currentKey: string | null = null;
+  let multilineVal: string[] = [];
+
+  for (const line of lines) {
+    const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
+    if (keyMatch && keyMatch[1] && keyMatch[2] !== undefined) {
+      if (currentKey) {
+        meta[currentKey] = multilineVal.join(" ").trim();
+      }
+      currentKey = keyMatch[1].toLowerCase();
+      const val = keyMatch[2].trim();
+      if (val === ">" || val === "|" || val === ">-" || val === "|-") {
+        multilineVal = [];
+      } else {
+        multilineVal = [val.replace(/^['"]|['"]$/g, "")];
+      }
+    } else if (currentKey && (line.startsWith("  ") || line.startsWith("\t"))) {
+      multilineVal.push(line.trim().replace(/^['"]|['"]$/g, ""));
+    }
+  }
+  if (currentKey) {
+    meta[currentKey] = multilineVal.join(" ").trim();
+  }
+
+  const disableModel =
+    meta["disable-model-invocation"] === "true" ||
+    meta["disable_model_invocation"] === "true";
+
+  return {
+    name: meta.name,
+    description: meta.description,
+    disableModelInvocation: disableModel,
+  };
+}
+
+export function scanInstalledSkills(workspacePath?: string): Skill[] {
+  const results: Skill[] = [];
+  const seen = new Set<string>();
+
+  const scanDir = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const slug = entry.name.toLowerCase().trim();
+        if (seen.has(slug)) continue;
+
+        const skillMd = path.join(dir, entry.name, "SKILL.md");
+        if (!fs.existsSync(skillMd)) continue;
+
+        try {
+          const content = fs.readFileSync(skillMd, "utf-8");
+          const parsed = parseSkillFrontmatter(content);
+          seen.add(slug);
+          results.push({
+            name: parsed.name || entry.name,
+            description: parsed.description || "",
+            content,
+            filePath: skillMd,
+            disableModelInvocation: parsed.disableModelInvocation,
+          });
+        } catch {
+          // ignore read error
+        }
+      }
+    } catch {
+      // ignore readdir error
+    }
+  };
+
+  // 1. Workspace skills (highest priority)
+  if (workspacePath && workspacePath !== "Outside Project") {
+    scanDir(path.join(workspacePath, ".agents", "skills"));
+    scanDir(path.join(workspacePath, ".const", "skills"));
+  }
+
+  // 2. Global user skills
+  scanDir(path.join(os.homedir(), ".const", "harness", "skills"));
+  scanDir(path.join(os.homedir(), ".agents", "skills"));
+
+  return results;
+}
+
+export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
   const normalizedCwd = workspacePath.replace(/\\/g, "/");
 
   // Check for project context files
@@ -407,7 +541,18 @@ export function buildConstSystemPrompt(workspacePath: string, customPrompt?: str
     // ignore memory read error
   }
 
-  return `You are Const Agent, an expert autonomous coding and software engineering assistant operating inside Const Harness. You help users by reading files, executing commands, editing code, creating folders, and developing complete software applications.
+  // Check for installed skills (workspace and global)
+  let skillsPrompt = "";
+  try {
+    const installedSkills = scanInstalledSkills(workspacePath);
+    if (installedSkills.length > 0) {
+      skillsPrompt = `\n\n${formatSkillsForSystemPrompt(installedSkills)}`;
+    }
+  } catch {
+    // ignore skills scan error
+  }
+
+  const basePrompt = `You are Const Agent, an expert autonomous coding and software engineering assistant operating inside Const Harness. You help users by reading files, executing commands, editing code, creating folders, and developing complete software applications.
 
 Current working directory: ${normalizedCwd}
 
@@ -487,7 +632,13 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
   2. If 'edit' fails because 'old_content' was not found, call 'read' immediately to inspect the latest file content and exact lines before attempting another edit.
   3. If 'bash' fails with exit code != 0, examine stderr/stdout carefully to understand why it failed before trying an alternative fix.
   4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.
-  5. NEVER execute terminal 'sleep' commands (e.g. 'sleep 5', 'sleep 10') in bash or powershell to wait or poll for background tasks or subagents. Subagents run in the foreground by default and return their complete findings directly.${workspaceMemory ? `\n\n${workspaceMemory}` : ""}${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
+  5. NEVER execute terminal 'sleep' commands (e.g. 'sleep 5', 'sleep 10') in bash or powershell to wait or poll for background tasks or subagents. Subagents run in the foreground by default and return their complete findings directly.${workspaceMemory ? `\n\n${workspaceMemory}` : ""}${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}${skillsPrompt}`;
+
+  if (customPrompt) {
+    return `${customPrompt}\n\n---\n# WORKSPACE TOOLS & EXECUTION ENVIRONMENT\n${basePrompt}`;
+  }
+
+  return basePrompt;
 }
 
 export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {
@@ -514,6 +665,17 @@ export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: str
     } catch {
       // ignore read error
     }
+  }
+
+  // Check for installed skills (workspace and global)
+  let skillsPrompt = "";
+  try {
+    const installedSkills = scanInstalledSkills(workspacePath);
+    if (installedSkills.length > 0) {
+      skillsPrompt = `\n\n${formatSkillsForSystemPrompt(installedSkills)}`;
+    }
+  } catch {
+    // ignore skills scan error
   }
 
   const basePrompt = `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
@@ -567,7 +729,7 @@ PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
    - Use 'browser_click', 'browser_type', or 'browser_evaluate' (for multi-step sequences) referencing element refs ('e1') or semantic selectors ('text/...', 'placeholder/...').
    - If a human check (CAPTCHA, login, 2FA, or secret password) appears, call 'browser_request_help' so the student can complete it and resume.
 5. Error Recovery:
-   - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}`;
+   - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}${skillsPrompt}`;
 
   if (customPrompt) {
     return `${customPrompt}\n\n---\n# WORKSPACE TOOLS & EXECUTION ENVIRONMENT\n${basePrompt}`;

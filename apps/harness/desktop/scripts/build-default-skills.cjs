@@ -201,7 +201,25 @@ function getCategory(slug) {
 const dirs = fs.readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory());
 dirs.sort((a, b) => a.name.localeCompare(b.name));
 
-// 1. Build catalog
+function listRelativeFiles(dir, prefix = '') {
+  const result = [];
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== '.git') {
+          result.push(...listRelativeFiles(full, rel));
+        }
+      } else if (entry.isFile()) {
+        result.push(rel);
+      }
+    }
+  } catch {}
+  return result;
+}
+
+// 1. Build catalog and manifest
 const catalog = [];
 for (const dir of dirs) {
   const slug = dir.name;
@@ -213,6 +231,7 @@ for (const dir of dirs) {
   const cleanDescription = (meta.description || '').replace(/\s+/g, ' ').trim();
   const author = getAuthorForSkill(slug, meta.author);
   const category = getCategory(slug);
+  const relativeFiles = listRelativeFiles(path.join(skillsDir, slug));
 
   catalog.push({
     id: `skill_${slug}`,
@@ -223,8 +242,22 @@ for (const dir of dirs) {
     author: author,
     version: meta.version || '1.0.0',
     icon: 'Sparkles',
+    files: relativeFiles.length > 0 ? relativeFiles : ['SKILL.md'],
   });
 }
+
+const manifestData = {
+  version: '1.0.0',
+  generatedAt: new Date().toISOString(),
+  count: catalog.length,
+  skills: catalog,
+};
+
+const manifestPath1 = path.resolve(__dirname, '../skills/index.json');
+const manifestPath2 = path.resolve(__dirname, '../src/lib/skills/skills-manifest.json');
+fs.writeFileSync(manifestPath1, JSON.stringify(manifestData, null, 2), 'utf8');
+fs.writeFileSync(manifestPath2, JSON.stringify(manifestData, null, 2), 'utf8');
+console.log(`Generated skills/index.json and skills-manifest.json with ${catalog.length} skills.`);
 
 const catalogCode = `import type { SkillCategory } from "./types";
 
@@ -238,6 +271,7 @@ export interface MarketplaceSkill {
   version: string;
   icon?: string;
   overview?: string;
+  files?: string[];
 }
 
 export const MARKETPLACE_CATALOG: MarketplaceSkill[] = ${JSON.stringify(catalog, null, 2)};

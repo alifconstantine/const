@@ -285,13 +285,18 @@ export function SkillsSettings({
   }, [installedSlugs, selectedCategory, searchQuery]);
 
   // Compute file map for skill content tab
-  const skillFilesMap = useMemo(() => {
+  const skillFilesMap: Record<string, string> = useMemo(() => {
     if (!selectedSkill) return {};
     if (loadedSkillDetail?.files && Object.keys(loadedSkillDetail.files).length > 0) {
       return loadedSkillDetail.files;
     }
-    if ("files" in selectedSkill && selectedSkill.files && Object.keys(selectedSkill.files).length > 0) {
-      return selectedSkill.files;
+    if (
+      "files" in selectedSkill &&
+      selectedSkill.files &&
+      !Array.isArray(selectedSkill.files) &&
+      Object.keys(selectedSkill.files).length > 0
+    ) {
+      return selectedSkill.files as Record<string, string>;
     }
     const content = loadedSkillDetail?.content || ("content" in selectedSkill ? selectedSkill.content : "");
     if (content) {
