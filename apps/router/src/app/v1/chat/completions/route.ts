@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: {
-            message: `Model '${model}' is an image model powered by NaraRouter. Please use POST /v1/images/generations or POST /v1/images/edits instead.`,
+            message: `Model '${model}' is an image model. Please use POST /v1/images/generations or POST /v1/images/edits instead.`,
             type: "invalid_request_error",
             code: "invalid_endpoint_for_model",
           },
@@ -373,7 +373,7 @@ async function dispatchSingleModel({
           return NextResponse.json(
             {
               error: {
-                message: `Const weekly free token quota exceeded (7,000,000 tokens/week). Resets in ${quotaCheck.resetsInText || "this week"}. Configure your own provider key (BYOK) in Providers for unlimited access.`,
+                message: `Const token quota exceeded (${quotaCheck.weeklyLimitTokens?.toLocaleString() || "7,000,000"} tokens). Resets in ${quotaCheck.resetsInText || "this week"}. Manage your Pay-As-You-Go usage and allowance in your Const Dashboard.`,
                 type: "quota_exceeded",
                 code: "weekly_quota_exceeded",
               },

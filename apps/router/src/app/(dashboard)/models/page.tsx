@@ -15,13 +15,6 @@ import {
   Card,
   Button,
   Badge,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
   Table,
   TableHeader,
   TableBody,
@@ -41,25 +34,20 @@ import {
   Check,
   Zap,
   Box,
-  Plus,
   Loader2,
-  Pencil,
   Brain,
   Mic,
   MessageSquare,
   ImageIcon,
 } from "lucide-react";
-import { ModelConfigDialog } from "@/components/models/model-config-dialog";
-import { formatTokenDisplay, isReasoningModel } from "@/lib/model-specs";
-import { calculateQuotaMetrics, formatTokenAmount } from "@/lib/quota";
+import { formatTokenDisplay } from "@/lib/model-specs";
+import { calculateQuotaMetrics } from "@/lib/quota";
 
 interface ModelItem {
   id: string;
   name: string;
   modelId: string;
   provider: string;
-  providerDocId?: string;
-  providerId?: string;
   contextWindow: string;
   maxOutputTokens?: string;
   inputTypes?: string[];
@@ -73,15 +61,15 @@ interface ModelItem {
 interface ProviderGroup {
   id: string;
   name: string;
-  type: "builtin" | "byok" | "oauth";
+  type: "builtin";
   models: ModelItem[];
 }
 
-// Provider Catalog: Const Managed Models (OmniRoute Combos)
+// Unified Const Provider Catalog: All models run directly on Const Gateway
 const PROVIDERS_DATA: ProviderGroup[] = [
   {
     id: "const",
-    name: "Const",
+    name: "Const Gateway",
     type: "builtin",
     models: [
       {
@@ -151,6 +139,19 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         supportsThinking: true,
       },
       {
+        id: "gpt-image-2",
+        name: "GPT Image 2",
+        modelId: "gpt-image-2",
+        provider: "const",
+        category: "image",
+        endpoint: "/v1/images/generations",
+        contextWindow: "-",
+        maxOutputTokens: "-",
+        inputTypes: ["text", "image"],
+        outputTypes: ["image"],
+        supportsThinking: false,
+      },
+      {
         id: "whisper-large-v3-turbo",
         name: "Whisper Large V3 Turbo",
         modelId: "whisper-large-v3-turbo",
@@ -178,86 +179,26 @@ const PROVIDERS_DATA: ProviderGroup[] = [
       },
     ],
   },
-  {
-    id: "nara",
-    name: "NaraRouter",
-    type: "builtin",
-    models: [
-      {
-        id: "gpt-image-2",
-        name: "GPT Image 2",
-        modelId: "gpt-image-2",
-        provider: "nara",
-        category: "image",
-        endpoint: "/v1/images/generations",
-        contextWindow: "-",
-        maxOutputTokens: "-",
-        inputTypes: ["text", "image"],
-        outputTypes: ["image"],
-        supportsThinking: false,
-      },
-    ],
-  },
 ];
 
 export default function ModelsPage() {
   const { isAuthenticated } = useRouterAuth();
-  const userProviders = useQuery(
-    api.router.providers.listUserProviders,
-    isAuthenticated ? {} : "skip"
-  );
   const quota = useQuery(
     api.router.quotas.getUserQuota,
     isAuthenticated ? {} : "skip"
   );
-  const updateSingleModelMutation = useMutation(api.router.providers.updateSingleModel);
 
   const metrics = useMemo(() => {
     return calculateQuotaMetrics(quota);
   }, [quota]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "image" | "stt" | "search">("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
-  const [editingModel, setEditingModel] = useState<ModelItem | null>(null);
 
-  // Combine built-in Const provider with user's active connected providers
-  const allProviders = useMemo(() => {
-    const list: ProviderGroup[] = [...PROVIDERS_DATA];
-
-    if (userProviders) {
-      for (const up of userProviders) {
-        if (up.status !== "active") continue;
-        const enabledModels = up.importedModels.filter((m: any) => m.enabled);
-        if (enabledModels.length === 0) continue;
-
-        list.push({
-          id: up.providerId,
-          name: up.name,
-          type: "byok",
-          models: enabledModels.map((m: any) => ({
-            id: `${up.providerId}/${m.modelId}`,
-            name: m.name,
-            modelId: m.modelId,
-            provider: up.name,
-            providerDocId: up._id,
-            providerId: up.providerId,
-            category: "llm",
-            endpoint: "/v1/chat/completions",
-            contextWindow: m.contextWindow || "1000000",
-            maxOutputTokens: m.maxOutputTokens || "128000",
-            inputTypes: m.inputTypes || ["text"],
-            outputTypes: m.outputTypes || ["text"],
-            supportsThinking: isReasoningModel(m.modelId, m.capabilities, m.name),
-          })),
-        });
-      }
-    }
-
-    return list;
-  }, [userProviders]);
+  // Unified single provider: Const Gateway
+  const allProviders = PROVIDERS_DATA;
 
   // Copy model identifier to clipboard
   const handleCopyModel = (modelId: string, displayName: string) => {
@@ -281,8 +222,7 @@ export default function ModelsPage() {
         body: JSON.stringify({
           model: model.modelId,
           provider: model.provider,
-          providerId: model.providerId || (model.provider === "const" ? "const" : undefined),
-          providerDocId: model.providerDocId,
+          providerId: "const",
         }),
       });
 
@@ -308,16 +248,11 @@ export default function ModelsPage() {
     }
   };
 
-  // Filter models by provider, category, and search query
+  // Filter models by category and search query
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
     return allProviders.map((provider) => {
-      // Check provider filter
-      if (selectedProvider !== "all" && provider.id !== selectedProvider) {
-        return null;
-      }
-
       // Filter models inside provider
       const matchedModels = provider.models.filter((model) => {
         // Modality / Category filter
@@ -348,7 +283,7 @@ export default function ModelsPage() {
         models: matchedModels,
       };
     }).filter(Boolean) as ProviderGroup[];
-  }, [allProviders, searchQuery, selectedProvider, selectedCategory]);
+  }, [allProviders, searchQuery, selectedCategory]);
 
   // Total available models count across filtered
   const totalAvailableModels = allProviders.reduce(
@@ -385,7 +320,7 @@ export default function ModelsPage() {
             Models Catalog.
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground font-light">
-            Active models directory, context boundaries, token limits, and gateway
+            Unified Const models directory, context boundaries, token limits, and gateway
             connectivity testing.
           </p>
         </div>
@@ -399,10 +334,10 @@ export default function ModelsPage() {
                 Current Plan
               </span>
               <h2 className="text-xl sm:text-2xl font-sans font-semibold text-foreground tracking-tight">
-                Free
+                Pay As You Go
               </h2>
               <p className="text-xs text-muted-foreground font-light">
-                Base models are included with 7M weekly token quota.
+                All models are managed on Const Gateway with transparent metered usage.
               </p>
             </div>
 
@@ -435,7 +370,7 @@ export default function ModelsPage() {
                   Weekly Token Quota
                 </span>
                 <span className="text-[9px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none uppercase">
-                  Free
+                  Active
                 </span>
               </div>
 
@@ -458,7 +393,7 @@ export default function ModelsPage() {
             </div>
 
             <p className="text-[11px] text-muted-foreground font-light">
-              Shared 7M weekly token quota across all Const models. Resets in {metrics.resetsInText}.
+              Shared weekly token and image quota across all Const models. Resets in {metrics.resetsInText}.
             </p>
           </div>
         </Card>
@@ -496,7 +431,7 @@ export default function ModelsPage() {
 
           <div className="flex items-center gap-2 flex-1 sm:justify-end">
             {/* Search Input */}
-            <div className="relative flex-1 sm:max-w-xs">
+            <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
                 type="text"
@@ -506,42 +441,6 @@ export default function ModelsPage() {
                 className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
               />
             </div>
-
-            {/* Provider Selector */}
-            <Select
-              value={selectedProvider}
-              onValueChange={(val) => {
-                if (val === "add_provider") {
-                  window.location.href = "/providers";
-                  return;
-                }
-                setSelectedProvider(val);
-              }}
-            >
-              <SelectTrigger className="h-10 min-w-[130px] rounded-xl bg-secondary/50 border-none text-xs font-sans text-foreground">
-                <SelectValue placeholder="Select Provider" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
-                <SelectItem value="all" className="cursor-pointer">
-                  All
-                </SelectItem>
-                {allProviders.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="cursor-pointer">
-                    {p.name}
-                  </SelectItem>
-                ))}
-                <SelectSeparator />
-                <SelectItem
-                  value="add_provider"
-                  className="cursor-pointer font-medium text-foreground hover:bg-secondary flex items-center gap-1.5"
-                >
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Plus className="h-3 w-3 text-muted-foreground" />
-                    <span>Add Provider</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -561,7 +460,6 @@ export default function ModelsPage() {
                 size="sm"
                 onClick={() => {
                   setSearchQuery("");
-                  setSelectedProvider("all");
                   setSelectedCategory("all");
                 }}
                 className="mt-2 rounded-full text-xs h-8 border-none bg-secondary hover:bg-secondary/80"
@@ -720,25 +618,6 @@ export default function ModelsPage() {
                           {/* 5. Action: Edit (if BYOK) + Test Model */}
                           <TableCell className="py-4 pl-4 pr-6 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {model.providerDocId && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => setEditingModel(model)}
-                                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-                                      aria-label={`Edit ${model.name}`}
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    Edit model specs
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-
                               <Button
                                 size="sm"
                                 onClick={() => handleTestModel(model)}
@@ -768,46 +647,6 @@ export default function ModelsPage() {
             ))
           )}
         </div>
-
-        {/* Edit Model Configuration Dialog */}
-        <ModelConfigDialog
-          open={!!editingModel}
-          onOpenChange={(open) => !open && setEditingModel(null)}
-          title={`Edit model: ${editingModel?.name || editingModel?.modelId}`}
-          initialData={
-            editingModel
-              ? {
-                  modelId: editingModel.modelId,
-                  name: editingModel.name,
-                  contextWindow: editingModel.contextWindow,
-                  maxOutputTokens: editingModel.maxOutputTokens,
-                  inputTypes: editingModel.inputTypes,
-                  outputTypes: editingModel.outputTypes,
-                }
-              : null
-          }
-          onSave={async (data) => {
-            if (!editingModel?.providerDocId) return;
-            try {
-              await updateSingleModelMutation({
-                providerDocId: editingModel.providerDocId as any,
-                modelId: editingModel.modelId,
-                contextWindow: data.contextWindow,
-                maxOutputTokens: data.maxOutputTokens,
-                inputTypes: data.inputTypes,
-                outputTypes: data.outputTypes,
-              });
-              toast.success("Model updated successfully", {
-                description: `Updated configuration for ${data.modelId}`,
-              });
-              setEditingModel(null);
-            } catch (err: any) {
-              toast.error("Failed to update model", {
-                description: err?.message || "An unexpected error occurred",
-              });
-            }
-          }}
-        />
       </div>
     </TooltipProvider>
   );

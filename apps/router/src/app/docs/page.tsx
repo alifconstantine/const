@@ -502,7 +502,7 @@ data: [DONE]`}</pre>
                 Models
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Const provides native high-speed models out-of-the-box, plus full support for Bring Your Own Key (BYOK) providers:
+                Const provides native high-speed models out-of-the-box with unified Pay-As-You-Go pricing and zero configuration:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -512,17 +512,17 @@ data: [DONE]`}</pre>
                     <Badge className="bg-[#1b1b1b] text-white text-[10px] font-mono border border-[#2e2e2e]">Default</Badge>
                   </div>
                   <p className="text-xs text-[#969696] font-light">
-                    Google's flagship multimodal reasoning engine. Supports up to 1,000,000 token context windows with instant TTFT.
+                    Google&apos;s flagship multimodal reasoning engine. Supports up to 1,000,000 token context windows with instant TTFT.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono font-semibold text-white">BYOK Custom Models</code>
-                    <Badge className="bg-[#1b1b1b] text-[#969696] text-[10px] font-mono border border-[#2e2e2e]">Connected</Badge>
+                    <code className="text-sm font-mono font-semibold text-white">gpt-image-2</code>
+                    <Badge className="bg-[#1b1b1b] text-[#969696] text-[10px] font-mono border border-[#2e2e2e]">Vision &amp; Image</Badge>
                   </div>
                   <p className="text-xs text-[#969696] font-light">
-                    Connect OpenAI, Anthropic, DeepSeek, or Groq keys via the Providers dashboard to unlock thousands of external models.
+                    High-fidelity image generation and editing directly on Const Gateway via /v1/images/generations and /v1/images/edits.
                   </p>
                 </div>
               </div>
@@ -682,7 +682,7 @@ data: [DONE]`}</pre>
                 <ul className="list-disc list-inside space-y-1 pt-1 text-[#d4d4d4]">
                   <li><code className="font-mono text-white">size</code>: <code className="font-mono text-[#969696]">1024x1024</code> (1k), <code className="font-mono text-[#969696]">2048x2048</code> (2k), <code className="font-mono text-[#969696]">4096x4096</code> (4k)</li>
                   <li><code className="font-mono text-white">response_format</code>: <code className="font-mono text-[#969696]">&quot;url&quot;</code> (temporary signed storage URL) or <code className="font-mono text-[#969696]">&quot;b64_json&quot;</code> (inline Base64 payload)</li>
-                  <li><code className="font-mono text-white">models</code>: <code className="font-mono text-white font-semibold">gpt-image-2</code> (NaraRouter), <code className="font-mono text-[#969696]">imagen-3.0-generate-002</code>, <code className="font-mono text-[#969696]">dall-e-3</code>, <code className="font-mono text-[#969696]">flux-1-schnell</code></li>
+                  <li><code className="font-mono text-white">models</code>: <code className="font-mono text-white font-semibold">gpt-image-2</code> (Const Image), <code className="font-mono text-[#969696]">imagen-3.0-generate-002</code>, <code className="font-mono text-[#969696]">dall-e-3</code>, <code className="font-mono text-[#969696]">flux-1-schnell</code></li>
                 </ul>
               </div>
             </section>
@@ -693,7 +693,7 @@ data: [DONE]`}</pre>
                 Image edits
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Edit, inpaint, or modify existing images by supplying an original image and a prompt specifying the alterations via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/edits</code>. Powered by NaraRouter (<code className="text-white font-mono">gpt-image-2</code>) and OpenAI Images. Uses <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">multipart/form-data</code> or JSON payload.
+                Edit, inpaint, or modify existing images by supplying an original image and a prompt specifying the alterations via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/edits</code>. Powered by Const Images (<code className="text-white font-mono">gpt-image-2</code>). Uses <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">multipart/form-data</code> or JSON payload.
               </p>
 
               <div className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] p-4 font-mono text-xs text-[#d4d4d4] space-y-2">
@@ -984,21 +984,21 @@ data: [DONE]`}</pre>
                 Rate limits &amp; quotas
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Every developer account on Const receives a free weekly allowance of <strong>7,000,000 tokens</strong> across all standard models:
+                Const operates on a Pay-As-You-Go model with a generous weekly baseline allocation of <strong>7,000,000 tokens</strong> and <strong>20 image operations</strong>:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1 text-xs">
-                  <span className="font-semibold text-white">7-Day Rolling Reset</span>
+                  <span className="font-semibold text-white">7-Day Rolling Cycle</span>
                   <p className="text-[#969696] font-light">
-                    Your allowance automatically resets back to 7,000,000 tokens every 7 days from registration.
+                    Your baseline allocation automatically refreshes every 7 days from registration with live metering in the dashboard.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1 text-xs">
-                  <span className="font-semibold text-white">BYOK Quota Exemption</span>
+                  <span className="font-semibold text-white">Unified Pay-As-You-Go</span>
                   <p className="text-[#969696] font-light">
-                    Requests using Bring Your Own Key external providers bypass the weekly free quota completely.
+                    Pay-As-You-Go metered usage covers all models under one unified account without needing external provider keys or multi-vendor billing.
                   </p>
                 </div>
               </div>
@@ -1077,7 +1077,7 @@ data: [DONE]`}</pre>
                     <tr>
                       <td className="px-4 py-3 font-mono font-semibold text-white">429</td>
                       <td className="px-4 py-3 font-mono text-[#969696]">rate_limited</td>
-                      <td className="px-4 py-3">Rate limit reached or weekly 7,000,000 token quota exceeded. Wait for rolling reset or switch to BYOK provider.</td>
+                      <td className="px-4 py-3">Rate limit reached or weekly 7,000,000 token quota exceeded. Wait for rolling reset or top up your Pay-As-You-Go balance.</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 font-mono font-semibold text-white">500</td>
@@ -1087,7 +1087,7 @@ data: [DONE]`}</pre>
                     <tr>
                       <td className="px-4 py-3 font-mono font-semibold text-white">502</td>
                       <td className="px-4 py-3 font-mono text-[#969696]">bad_gateway</td>
-                      <td className="px-4 py-3">Upstream model provider failed or returned an invalid response. Model combos handle this automatically.</td>
+                      <td className="px-4 py-3">Upstream model execution failed or returned an invalid response. Model combos handle this automatically.</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 font-mono font-semibold text-white">503</td>
@@ -1102,25 +1102,25 @@ data: [DONE]`}</pre>
             {/* 18. Model combos */}
             <section id="model-combos" className="space-y-4 scroll-mt-24 pb-16">
               <h2 className="text-2xl font-serif font-normal text-white">
-                Model combos
+                Custom virtual combos
               </h2>
               <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Model combos are virtual model identifiers of the form <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">combo/&lt;name&gt;</code> that bundle multiple real models under one fallback strategy. When the first model fails or encounters rate limits, the combo automatically cascades to the next target within the same request.
+                Virtual combos are user-defined failover chains configured in the Combos dashboard with custom identifiers of the form <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">combo/&lt;slug&gt;</code>. Users configure their own sequence of Const models to guarantee 100% uptime with sub-second failover.
               </p>
 
               {/* What is a combo & Circuit breaker cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5 text-xs">
-                  <span className="font-semibold text-white">Seamless In-Flight Fallback</span>
+                  <span className="font-semibold text-white">In-Flight Cascading Fallback</span>
                   <p className="text-[#969696] font-light leading-relaxed">
-                    When calling <code className="font-mono text-white">combo/&lt;name&gt;</code>, the gateway attempts each model in order: <code className="font-mono text-[#d4d4d4]">Target 1 &rarr; (if 429/500/timeout) &rarr; Target 2 &rarr; Target 3</code>. The first target that succeeds returns immediately with zero downtime observed by your client.
+                    When invoking <code className="font-mono text-white">combo/&lt;slug&gt;</code>, the gateway attempts each model in your custom order: <code className="font-mono text-[#d4d4d4]">Target 1 &rarr; (if 429/500/timeout) &rarr; Target 2 &rarr; Target 3</code>. The first target that succeeds returns immediately.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5 text-xs">
                   <span className="font-semibold text-white">Automatic Circuit Breaker</span>
                   <p className="text-[#969696] font-light leading-relaxed">
-                    A built-in circuit breaker prevents repeatedly hitting failing providers. After a failure, that model enters a 10-minute cooldown window where subsequent calls skip it immediately without wasting time on timeouts.
+                    A built-in circuit breaker prevents repeatedly hitting failing targets. After an upstream error, that model enters a cooldown window where subsequent calls skip it immediately to preserve throughput.
                   </p>
                 </div>
               </div>
@@ -1128,9 +1128,9 @@ data: [DONE]`}</pre>
               {/* Combo cURL Snippet */}
               <div className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] p-4 font-mono text-xs text-[#d4d4d4] space-y-2">
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
-                  <span>CALLING A COMBO ENDPOINT</span>
+                  <span>CALLING A CUSTOM COMBO</span>
                   <button
-                    onClick={() => handleCopy(`curl ${baseUrl}/chat/completions \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "combo/coding",\n    "messages": [{"role": "user", "content": "Write a high-performance LRU cache in Rust"}]\n  }'`, "combo-curl")}
+                    onClick={() => handleCopy(`curl ${baseUrl}/chat/completions \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "combo/my-route",\n    "messages": [{"role": "user", "content": "Write a high-performance LRU cache in Rust"}]\n  }'`, "combo-curl")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "combo-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
@@ -1140,31 +1140,31 @@ data: [DONE]`}</pre>
   -H "Authorization: Bearer sk-const-live-yourkey" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "combo/coding",
+    "model": "combo/my-route",
     "messages": [{"role": "user", "content": "Write a high-performance LRU cache in Rust"}]
   }'`}</pre>
               </div>
 
-              {/* Preset Combos Grid */}
+              {/* Custom Combo Configuration Steps */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1">
-                  <code className="text-white font-mono font-semibold">combo/coding</code>
+                  <span className="text-white font-mono font-semibold">1. Identity &amp; Slug</span>
                   <p className="text-[#969696] font-light">
-                    Cascades through Claude 3.7 Sonnet, Gemini 3.8 Flash, and DeepSeek V3 for uninterrupted coding agent pipelines.
+                    Assign a human-readable name and an API route slug (e.g. <code className="text-white font-mono">combo/production-code</code>).
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1">
-                  <code className="text-white font-mono font-semibold">combo/fast</code>
+                  <span className="text-white font-mono font-semibold">2. Select Models</span>
                   <p className="text-[#969696] font-light">
-                    Lowest Time-to-First-Token (TTFT) fallback across Groq Llama 3.3 and Gemini Flash for real-time streaming interfaces.
+                    Add your desired sequence of Const models (e.g. Gemini 3.8 Flash &rarr; Deepseek v4.1 &rarr; GLM 5.3) with drag-and-drop priorities.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1">
-                  <code className="text-white font-mono font-semibold">combo/auto</code>
+                  <span className="text-white font-mono font-semibold">3. Context &amp; Persona</span>
                   <p className="text-[#969696] font-light">
-                    Intelligent dynamic routing optimizing cost, latency, and reasoning depth according to prompt complexity.
+                    Optionally constrain maximum context length or inject a default system persona across all models in the chain.
                   </p>
                 </div>
               </div>

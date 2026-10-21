@@ -31,7 +31,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/endpoints": "Endpoints",
   "/combos": "Combos",
   "/models": "Models",
-  "/providers": "Providers",
   "/generation": "Playground",
   "/integrations": "Integrations",
   "/settings": "Settings",

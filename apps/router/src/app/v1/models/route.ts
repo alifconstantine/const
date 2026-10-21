@@ -271,12 +271,12 @@ export async function GET(req: NextRequest) {
     {
       id: "gpt-image-2",
       name: "GPT Image 2",
-      display_name: "GPT Image 2 (NaraRouter)",
+      display_name: "GPT Image 2",
       object: "model",
       created: 1700000000,
-      owned_by: "nara",
-      provider: "nara",
-      provider_name: "NaraRouter",
+      owned_by: "const",
+      provider: "const",
+      provider_name: "Const",
       type: "image",
       category: "image",
       endpoint: "/v1/images/generations",
@@ -295,136 +295,17 @@ export async function GET(req: NextRequest) {
       input_modalities: ["text", "image"],
       output_modalities: ["image"],
     },
-    {
-      id: "combo/auto",
-      name: "combo/auto",
-      display_name: "combo/auto",
-      object: "model",
-      created: 1700000000,
-      owned_by: "const",
-      provider: "const",
-      provider_name: "Const",
-      type: "chat",
-      category: "llm",
-      endpoint: "/v1/chat/completions",
-      context_length: 272000,
-      max_input_tokens: 272000,
-      max_output_tokens: 128000,
-      supports_thinking: true,
-      supports_reasoning: true,
-      supportsThinking: true,
-      supportsReasoningEffort: true,
-      capabilities: {
-        reasoning: true,
-        thinking: true,
-        supportsThinking: true,
-        tool_calling: true,
-      },
-      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
-      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
-      default_thinking_level: "medium",
-    },
-    {
-      id: "combo/fast",
-      name: "combo/fast",
-      display_name: "combo/fast",
-      object: "model",
-      created: 1700000000,
-      owned_by: "const",
-      provider: "const",
-      provider_name: "Const",
-      type: "chat",
-      category: "llm",
-      endpoint: "/v1/chat/completions",
-      context_length: 272000,
-      max_input_tokens: 272000,
-      max_output_tokens: 128000,
-      supports_thinking: false,
-      supports_reasoning: false,
-      supportsThinking: false,
-      capabilities: {
-        reasoning: false,
-        thinking: false,
-        supportsThinking: false,
-        tool_calling: true,
-      },
-    },
-    {
-      id: "combo/coding",
-      name: "combo/coding",
-      display_name: "combo/coding",
-      object: "model",
-      created: 1700000000,
-      owned_by: "const",
-      provider: "const",
-      provider_name: "Const",
-      type: "chat",
-      category: "llm",
-      endpoint: "/v1/chat/completions",
-      context_length: 1000000,
-      max_input_tokens: 1000000,
-      max_output_tokens: 128000,
-      supports_thinking: true,
-      supports_reasoning: true,
-      supportsThinking: true,
-      supportsReasoningEffort: true,
-      capabilities: {
-        reasoning: true,
-        thinking: true,
-        supportsThinking: true,
-        tool_calling: true,
-      },
-      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
-      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
-      default_thinking_level: "high",
-    },
   ];
 
   const modelsList = [...defaultModels];
 
-  // If user provided a key or token, also fetch their connected BYOK models
+  // If user provided a key or token, also fetch their custom virtual combos
   if (convexUrl && bearerValue) {
     try {
       const client = new ConvexHttpClient(convexUrl);
       const isJwt = bearerValue.startsWith("eyJ") && bearerValue.includes(".");
       if (isJwt) {
         client.setAuth(bearerValue);
-      }
-      const userProviders = await client.query(api.router.providers.listUserProviders, {});
-      if (userProviders) {
-        for (const prov of userProviders) {
-          if (prov.status !== "active") continue;
-          for (const m of prov.importedModels) {
-            if (m.enabled) {
-              const supportsThinking = isReasoningModel(m.modelId, m.capabilities, m.name);
-              modelsList.push({
-                id: m.modelId,
-                name: m.name || m.modelId,
-                display_name: m.name || m.modelId,
-                object: "model",
-                created: 1700000000,
-                owned_by: prov.name,
-                provider: prov.providerId,
-                provider_name: prov.name,
-                type: "chat",
-                category: "llm",
-                endpoint: "/v1/chat/completions",
-                supports_thinking: supportsThinking,
-                supports_reasoning: supportsThinking,
-                supportsThinking: supportsThinking,
-                supportsReasoningEffort: supportsThinking,
-                capabilities: {
-                  reasoning: supportsThinking,
-                  thinking: supportsThinking,
-                  supportsThinking: supportsThinking,
-                  tool_calling: true,
-                },
-                thinking_levels: supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined,
-                reasoning_effort: supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined,
-              });
-            }
-          }
-        }
       }
 
       // Also fetch user custom combos from Convex

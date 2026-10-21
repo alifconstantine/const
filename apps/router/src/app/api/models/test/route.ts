@@ -40,35 +40,34 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     // ========================================================
-    // CASE NARA: NaraRouter Image Models (gpt-image-2)
+    // CASE CONST IMAGES: Const Image Models (gpt-image-2)
     // ========================================================
     if (
       model === "gpt-image-2" ||
       model.toLowerCase().includes("gpt-image") ||
-      providerId === "nara" ||
-      providerId === "nararouter"
+      providerId === "const-image"
     ) {
-      const naraBaseUrl = (
+      const imgBaseUrl = (
         process.env.NARA_ROUTER_BASE_URL?.trim() || "https://api-images.bynara.id"
       ).replace(/\/+$/, "");
-      const naraApiKey = apiKey?.trim() || process.env.NARA_ROUTER_API_KEY?.trim();
+      const imgApiKey = apiKey?.trim() || process.env.NARA_ROUTER_API_KEY?.trim();
 
-      if (!naraApiKey) {
+      if (!imgApiKey) {
         return NextResponse.json(
           {
             success: false,
             error:
-              "NARA_ROUTER_API_KEY environment variable is not configured and no API key was provided.",
+              "Const image gateway key (NARA_ROUTER_API_KEY) is not configured and no API key was provided.",
           },
           { status: 400 }
         );
       }
 
-      const res = await fetch(`${naraBaseUrl}/v1/images/generations`, {
+      const res = await fetch(`${imgBaseUrl}/v1/images/generations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${naraApiKey}`,
+          Authorization: `Bearer ${imgApiKey}`,
         },
         body: JSON.stringify({
           model: "gpt-image-2",
@@ -86,7 +85,7 @@ export async function POST(req: NextRequest) {
         const errorMsg =
           data?.error?.message ||
           data?.message ||
-          `NaraRouter error (HTTP ${res.status} ${res.statusText})`;
+          `Const Image Gateway error (HTTP ${res.status} ${res.statusText})`;
         return NextResponse.json(
           { success: false, error: errorMsg, status: res.status, latency },
           { status: res.status }
@@ -97,7 +96,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         latency,
-        reply: `NaraRouter gpt-image-2 connected successfully (${imgUrl})`,
+        reply: `Const gpt-image-2 connected successfully (${imgUrl})`,
         model: "gpt-image-2",
       });
     }

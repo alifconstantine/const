@@ -518,7 +518,7 @@ export const getDashboardAnalytics = query({
       .query("userProviders")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
-    const activeProvidersCount = userProviders.filter((p) => p.status === "active").length + 1; // +1 for default Google AI
+    const activeProvidersCount = userProviders.filter((p) => p.status === "active").length + 1; // +1 for default Const Gateway
 
     // 3. Compute KPI metrics
     let totalTokens = 0;

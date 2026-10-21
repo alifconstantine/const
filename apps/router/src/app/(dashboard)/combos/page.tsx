@@ -69,17 +69,12 @@ export default function CombosPage() {
     api.router.combos.listCombos,
     isAuthenticated ? {} : "skip"
   );
-  const userProviders = useQuery(
-    api.router.providers.listUserProviders,
-    isAuthenticated ? {} : "skip"
-  );
 
   const createComboMutation = useMutation(api.router.combos.createCombo);
   const updateComboMutation = useMutation(api.router.combos.updateCombo);
   const deleteComboMutation = useMutation(api.router.combos.deleteCombo);
 
   // 2. Filter & Search State
-  const [activeTab, setActiveTab] = useState<"all" | "builtin" | "custom">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
@@ -96,8 +91,7 @@ export default function CombosPage() {
   const [systemMessage, setSystemMessage] = useState("");
   const [selectedModels, setSelectedModels] = useState<ComboModelEntry[]>([]);
 
-  // Stage 2 Builder State (Provider & Model Selectors)
-  const [builderProviderId, setBuilderProviderId] = useState<string>("const");
+  // Stage 2 Builder State (Direct Model Selector)
   const [builderModelId, setBuilderModelId] = useState<string>("gemini-3.8-flash");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -116,7 +110,7 @@ export default function CombosPage() {
     setTimeout(() => setCopiedSlug(null), 2000);
   };
 
-  // Open Create Wizard (Starts strictly with 0 models!)
+  // Open Create Wizard (Starts strictly with 0 models - user defines their own!)
   const openCreateWizard = () => {
     if (!isAuthenticated) {
       signIn();
@@ -128,16 +122,14 @@ export default function CombosPage() {
     setComboDescription("");
     setContextLength(262144);
     setSystemMessage("");
-    setSelectedModels([]); // Starts with 0 models
-    setBuilderProviderId("const");
+    setSelectedModels([]); // Starts empty: user fills from scratch
     setBuilderModelId("gemini-3.8-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
 
-  // Open Edit Wizard for a Custom Combo
+  // Open Edit Wizard for a Combo
   const openEditWizard = (combo: NonNullable<typeof combos>[number]) => {
-    if (combo.isBuiltin) return;
     setEditingComboId(combo._id as Id<"routerCombos">);
     setComboName(combo.name);
     setComboSlug(combo.slug);
@@ -147,12 +139,11 @@ export default function CombosPage() {
     setSelectedModels(
       combo.models.map((m, idx) => ({
         modelId: m.modelId,
-        providerId: m.providerId,
-        providerName: m.providerName,
+        providerId: m.providerId || "const",
+        providerName: m.providerName || "Const",
         priority: idx + 1,
       }))
     );
-    setBuilderProviderId("const");
     setBuilderModelId("gemini-3.8-flash");
     setStep(1);
     setIsWizardOpen(true);
@@ -172,110 +163,34 @@ export default function CombosPage() {
     }
   };
 
-  // Available Providers for Stage 2: Const Gateway + Active User BYOK Providers
-  const availableProviders = useMemo(() => {
-    const list = [
-      {
-        providerId: "const",
-        name: "Const Gateway",
-        status: "active",
-        models: [
-          { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash (Managed)" },
-          { modelId: "glm-5.3-flash", name: "GLM 5.3 Flash (Managed)" },
-          { modelId: "deepseek-v4.1-flash", name: "Deepseek v4.1 Flash (Managed)" },
-          { modelId: "qwen-3.8-omni-flash", name: "Qwen 3.8 Omni Flash (Managed)" },
-          { modelId: "gpt-6-luna", name: "GPT 6 Luna (Managed)" },
-        ],
-      },
-    ];
-
-    if (userProviders) {
-      userProviders.forEach((p) => {
-        if (p.status !== "active") return;
-        const imported = (p.importedModels || [])
-          .filter((m) => m.enabled)
-          .map((m) => ({ modelId: m.modelId, name: m.name || m.modelId }));
-
-        // Safe defaults if importedModels was empty
-        const defaultModels =
-          imported.length > 0
-            ? imported
-            : p.providerId === "openrouter"
-              ? [
-                  { modelId: "z-ai/glm-5.3-flash", name: "GLM 5.3 Flash" },
-                  { modelId: "openai/gpt-4o-mini", name: "GPT-4o Mini" },
-                  { modelId: "deepseek/deepseek-chat", name: "DeepSeek V3" },
-                  { modelId: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
-                ]
-              : p.providerId === "deepseek"
-                ? [
-                    { modelId: "deepseek-chat", name: "DeepSeek Chat" },
-                    { modelId: "deepseek-reasoner", name: "DeepSeek Reasoner" },
-                  ]
-                : p.providerId === "google"
-                  ? [
-                      { modelId: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-                      { modelId: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-                    ]
-                  : p.providerId === "groq"
-                    ? [
-                        { modelId: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile" },
-                      ]
-                    : [];
-
-        if (defaultModels.length > 0) {
-          list.push({
-            providerId: p.providerId,
-            name: p.name || p.providerId,
-            status: p.status,
-            models: defaultModels,
-          });
-        }
-      });
-    }
-
-    return list;
-  }, [userProviders]);
-
-  const selectedBuilderProvider = useMemo(() => {
-    return (
-      availableProviders.find((p) => p.providerId === builderProviderId) ??
-      availableProviders[0]!
-    );
-  }, [availableProviders, builderProviderId]);
-
-  // When provider changes, ensure model select points to a valid model
-  const handleProviderChange = (newProviderId: string) => {
-    setBuilderProviderId(newProviderId);
-    const targetProv = availableProviders.find((p) => p.providerId === newProviderId);
-    if (targetProv && targetProv.models.length > 0) {
-      setBuilderModelId(targetProv.models[0]!.modelId);
-    } else {
-      setBuilderModelId("");
-    }
-  };
+  // Available Const Gateway Models for Stage 2
+  const CONST_AVAILABLE_MODELS = [
+    { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash", desc: "Fast frontier multimodal, 1M context" },
+    { modelId: "glm-5.3-flash", name: "GLM 5.3 Flash", desc: "High-speed reasoning, 1M context" },
+    { modelId: "deepseek-v4.1-flash", name: "Deepseek v4.1 Flash", desc: "Advanced coding & math, 1M context" },
+    { modelId: "qwen-3.8-omni-flash", name: "Qwen 3.8 Omni Flash", desc: "Multilingual & vision, 1M context" },
+    { modelId: "gpt-6-luna", name: "GPT 6 Luna", desc: "Complex synthesis, 272K context" },
+  ];
 
   // Live Candidate Step
   const builderCandidateStep = useMemo(() => {
-    if (!builderModelId || !selectedBuilderProvider) return null;
-    const modelObj = selectedBuilderProvider.models.find(
+    if (!builderModelId) return null;
+    const modelObj = CONST_AVAILABLE_MODELS.find(
       (m) => m.modelId === builderModelId
     );
     return {
       modelId: builderModelId,
       modelName: modelObj?.name || builderModelId,
-      providerId: selectedBuilderProvider.providerId,
-      providerName: selectedBuilderProvider.name,
+      providerId: "const",
+      providerName: "Const",
     };
-  }, [builderModelId, selectedBuilderProvider]);
+  }, [builderModelId]);
 
   // Duplicate Check
   const builderHasDuplicate = useMemo(() => {
     if (!builderCandidateStep) return false;
     return selectedModels.some(
-      (m) =>
-        m.modelId === builderCandidateStep.modelId &&
-        m.providerId === builderCandidateStep.providerId
+      (m) => m.modelId === builderCandidateStep.modelId
     );
   }, [builderCandidateStep, selectedModels]);
 
@@ -410,30 +325,20 @@ export default function CombosPage() {
     }
   };
 
-  // Filter combos by active tab and search query
+  // Filter combos by search query
   const filteredCombos = useMemo(() => {
     if (!combos) return [];
-    let list = combos;
+    if (!searchQuery.trim()) return combos;
 
-    if (activeTab === "builtin") {
-      list = list.filter((c) => c.isBuiltin);
-    } else if (activeTab === "custom") {
-      list = list.filter((c) => !c.isBuiltin);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.slug.toLowerCase().includes(q) ||
-          (c.description && c.description.toLowerCase().includes(q)) ||
-          c.models.some((m) => m.modelId.toLowerCase().includes(q))
-      );
-    }
-
-    return list;
-  }, [combos, activeTab, searchQuery]);
+    const q = searchQuery.toLowerCase().trim();
+    return combos.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.slug.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q)) ||
+        c.models.some((m) => m.modelId.toLowerCase().includes(q))
+    );
+  }, [combos, searchQuery]);
 
   return (
     <div className="space-y-8">
@@ -444,7 +349,7 @@ export default function CombosPage() {
             Virtual Combos.
           </h1>
           <p className="text-sm text-muted-foreground font-light">
-            Resilient multi-model chains with automatic failover, priority routing, and load balancing.
+            Resilient multi-model chains with automatic failover, priority routing, and load balancing across Const models.
           </p>
         </div>
 
@@ -459,41 +364,10 @@ export default function CombosPage() {
 
       {/* 2. Filter Bar & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-full self-start">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={cn(
-              "px-3.5 py-1 text-xs font-sans rounded-full transition-colors cursor-pointer",
-              activeTab === "all"
-                ? "bg-foreground text-background font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            All ({combos?.length || 3})
-          </button>
-          <button
-            onClick={() => setActiveTab("builtin")}
-            className={cn(
-              "px-3.5 py-1 text-xs font-sans rounded-full transition-colors cursor-pointer",
-              activeTab === "builtin"
-                ? "bg-foreground text-background font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            System Defaults (3)
-          </button>
-          <button
-            onClick={() => setActiveTab("custom")}
-            className={cn(
-              "px-3.5 py-1 text-xs font-sans rounded-full transition-colors cursor-pointer",
-              activeTab === "custom"
-                ? "bg-foreground text-background font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Custom ({(combos?.length || 3) - 3})
-          </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-medium px-3 py-1 rounded-full bg-secondary/80 text-foreground">
+            {combos ? `${combos.length} Custom Combo${combos.length === 1 ? "" : "s"}` : "Loading..."}
+          </span>
         </div>
 
         {/* Search Bar */}
@@ -564,11 +438,8 @@ export default function CombosPage() {
                   <div className="space-y-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                        {combo.isBuiltin ? "SYSTEM DEFAULT" : "CUSTOM ROUTE"}
+                        FAILOVER ROUTE
                       </span>
-                      {combo.isBuiltin && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                      )}
                     </div>
                     <h2 className="text-base font-semibold font-sans text-foreground tracking-tight truncate">
                       {combo.name}
@@ -664,26 +535,24 @@ export default function CombosPage() {
                   </Button>
                 </Link>
 
-                {!combo.isBuiltin && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditWizard(combo)}
-                      className="rounded-full h-9 px-3 text-xs font-sans cursor-pointer hover:bg-background/80"
-                    >
-                      <span>Edit</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeletingId(combo._id as Id<"routerCombos">)}
-                      className="rounded-full h-9 w-9 p-0 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEditWizard(combo)}
+                    className="rounded-full h-9 px-3 text-xs font-sans cursor-pointer hover:bg-background/80"
+                  >
+                    <span>Edit</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDeletingId(combo._id as Id<"routerCombos">)}
+                    className="rounded-full h-9 w-9 p-0 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
           );
@@ -793,7 +662,7 @@ export default function CombosPage() {
                   </div>
                 )}
 
-              {/* ──── STAGE 2: SELECTION OF PROVIDER & MODEL ──── */}
+              {/* ──── STAGE 2: SELECTION OF MODEL ──── */}
               {step === 2 && (
                 <div className="space-y-4">
                   <div className="space-y-0.5">
@@ -801,75 +670,49 @@ export default function CombosPage() {
                       Add Models
                     </h3>
                     <p className="text-xs text-muted-foreground font-light">
-                      Select provider and model to append to your execution chain.
+                      Select a model to append to your execution chain. All models run directly on Const Gateway.
                     </p>
                   </div>
 
-                  {/* Builder Card with @const/ui Select Dropdowns */}
+                  {/* Builder Card with Direct Model Select */}
                   <div className="p-4 rounded-2xl bg-secondary/30 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* 1. PROVIDER */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                          1. Provider
-                        </label>
-                        <Select
-                          value={builderProviderId}
-                          onValueChange={handleProviderChange}
-                        >
-                          <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
-                            <SelectValue placeholder="Select Provider" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-border bg-popover text-xs">
-                            {availableProviders.map((prov) => (
-                              <SelectItem
-                                key={prov.providerId}
-                                value={prov.providerId}
-                                className="cursor-pointer"
-                              >
-                                {prov.name} ({prov.models.length} model{prov.models.length === 1 ? "" : "s"})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* 2. MODEL */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                          2. Model
-                        </label>
-                        <Select
-                          value={builderModelId}
-                          onValueChange={setBuilderModelId}
-                        >
-                          <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
-                            <SelectValue placeholder="Select Model" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-border bg-popover text-xs max-h-56">
-                            {(selectedBuilderProvider?.models || []).map((m) => (
-                              <SelectItem
-                                key={m.modelId}
-                                value={m.modelId}
-                                className="cursor-pointer"
-                              >
-                                {m.name} · <span className="font-mono opacity-70">{m.modelId}</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Select Model
+                      </label>
+                      <Select
+                        value={builderModelId}
+                        onValueChange={setBuilderModelId}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
+                          <SelectValue placeholder="Select Model" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-border bg-popover text-xs max-h-56">
+                          {CONST_AVAILABLE_MODELS.map((m) => (
+                            <SelectItem
+                              key={m.modelId}
+                              value={m.modelId}
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between w-full gap-2">
+                                <span className="font-medium">{m.name}</span>
+                                <span className="font-mono opacity-70 text-[11px]">{m.modelId}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Preview Box & Add Step Button */}
                     <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background/60">
                       <div className="min-w-0 flex-1">
                         <div className="text-[10px] font-mono text-muted-foreground uppercase">
-                          Candidate
+                          Selected Model
                         </div>
                         <div className="text-xs font-medium text-foreground truncate mt-0.5">
                           {builderCandidateStep
-                            ? `${builderCandidateStep.providerName} / ${builderCandidateStep.modelId}`
+                            ? `${builderCandidateStep.modelName} (${builderCandidateStep.modelId})`
                             : "Choose a model"}
                         </div>
                       </div>
@@ -877,7 +720,7 @@ export default function CombosPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {builderHasDuplicate && (
                           <span className="text-[11px] text-amber-500">
-                            Already added
+                            Already in chain
                           </span>
                         )}
                         <Button

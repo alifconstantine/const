@@ -138,8 +138,8 @@ export default function HomePage() {
               <span className="italic text-muted-foreground font-serif">Zero downtime.</span>
             </h1>
             <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground font-sans font-light leading-relaxed pt-2">
-              Const Router abstracts multiple AI providers behind a unified OpenAI-compatible API.
-              Equipped with Tri-Rail access, zero-buffering SSE streaming, and automated failover combos.
+              Const Router delivers unified Pay-As-You-Go access to frontier AI models behind a single OpenAI-compatible API.
+              Transparent token metering, zero-buffering SSE streaming, and custom failover combos.
             </p>
           </div>
 
@@ -182,15 +182,15 @@ export default function HomePage() {
 
           {/* Architecture Cards Grid (24px Mobbin Geometry) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-16 text-left">
-            {/* Tri-Rail Card */}
+            {/* Pay-As-You-Go Card */}
             <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
               {/* 30% iOS Squircle Icon Frame */}
               <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
                 <Layers className="h-5 w-5 stroke-[1.75]" />
               </div>
-              <h2 className="text-lg font-medium text-foreground tracking-tight">Tri-Rail Access Model</h2>
+              <h2 className="text-lg font-medium text-foreground tracking-tight">Pay-As-You-Go Metering</h2>
               <p className="text-xs sm:text-sm text-muted-foreground font-light leading-relaxed">
-                Connect via Platform Managed Engine Pool, personal custom BYOK, or OAuth accounts (GitHub Copilot, Codex, Claude).
+                Metered billing with transparent token usage. One unified key across all frontier models with no external provider setup required.
               </p>
             </div>
 
@@ -199,9 +199,9 @@ export default function HomePage() {
               <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
                 <ShieldCheck className="h-5 w-5 stroke-[1.75]" />
               </div>
-              <h2 className="text-lg font-medium text-foreground tracking-tight">Smart Virtual Combos</h2>
+              <h2 className="text-lg font-medium text-foreground tracking-tight">Custom Virtual Combos</h2>
               <p className="text-xs sm:text-sm text-muted-foreground font-light leading-relaxed">
-                Dynamic cascading fallback: Priority chains, round-robin load distribution, and 3-layer anti-429 circuit breakers.
+                Build custom multi-model failover chains with automatic cascading, priority routing, and instant anti-429 circuit breakers.
               </p>
             </div>
 

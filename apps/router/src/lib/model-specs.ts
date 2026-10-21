@@ -9,7 +9,7 @@ export interface ModelSpec {
   id: string;
   name: string;
   modelId: string;
-  provider: "const" | "google" | "byok" | "combo" | "nara";
+  provider: "const" | "byok" | "combo";
   providerName: string;
   providerDocId?: string;
   supportsThinking: boolean;
@@ -143,8 +143,8 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     id: "gpt-image-2",
     name: "GPT Image 2",
     modelId: "gpt-image-2",
-    provider: "nara",
-    providerName: "NaraRouter",
+    provider: "const",
+    providerName: "Const",
     category: "image",
     endpoint: "/v1/images/generations",
     supportsThinking: false,

@@ -300,7 +300,7 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* 2. Top Telemetry Section: Usage Stats (Left) + Circular Free Quota Ring (Right) */}
+      {/* 2. Top Telemetry Section: Usage Stats (Left) + Quota & Metering Ring (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* Left: 4 KPI Usage Stats Cards in 2x2 grid */}
         <div className="lg:col-span-8 xl:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -451,11 +451,11 @@ export default function DashboardOverviewPage() {
             <Server className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>
               <div className="text-[11px] font-sans text-muted-foreground uppercase tracking-wider font-semibold">
-                Providers
+                Gateway
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
                 {analytics ? (
-                  `${analytics.infrastructure.activeProvidersCount || 1} Active`
+                  "Const Active"
                 ) : (
                   <Skeleton className="h-5 w-16 rounded mt-0.5" />
                 )}
@@ -990,25 +990,25 @@ export default function DashboardOverviewPage() {
         </div>
       </Card>
 
-      {/* 6. Lower Section: Provider Distribution Comprehensive Table (Full Width) */}
+      {/* 6. Lower Section: Model Consumption & Metering Table (Full Width) */}
       <Card className="rounded-3xl border-border/70 bg-card overflow-hidden transition-colors">
         <div className="p-6 pb-4 border-b border-border/60 flex items-center justify-between">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-foreground stroke-[1.75]" />
               <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-                Provider Distribution
+                Model Consumption &amp; Metering
               </h3>
             </div>
             <p className="text-xs text-muted-foreground font-light">
-              Routing share, throughput, latency, and token consumption across active AI providers.
+              Pay-as-you-go metered traffic, throughput, latency, and token consumption across Const models.
             </p>
           </div>
           <Link
-            href="/providers"
+            href="/models"
             className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
           >
-            <span>Manage providers</span>
+            <span>View models</span>
             <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -1018,7 +1018,7 @@ export default function DashboardOverviewPage() {
             <TableHeader className="bg-secondary/20">
               <TableRow className="border-border/60 hover:bg-transparent">
                 <TableHead className="text-xs font-medium text-muted-foreground pl-6 py-3">
-                  Provider
+                  Model / Target
                 </TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
                   Requests
@@ -1063,7 +1063,7 @@ export default function DashboardOverviewPage() {
                     colSpan={8}
                     className="py-12 text-center text-xs text-muted-foreground font-sans"
                   >
-                    No provider traffic recorded yet in this window.
+                    No model traffic recorded yet in this window.
                   </TableCell>
                 </TableRow>
               ) : (

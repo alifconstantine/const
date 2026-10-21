@@ -38,7 +38,7 @@ export function QuotaCard({ className }: { className?: string }) {
                 <Zap className="h-4 w-4 stroke-[1.75]" />
               </div>
               <span className="text-sm font-semibold text-foreground font-sans tracking-tight">
-                Free Weekly Quota
+                Pay-As-You-Go Quota &amp; Metering
               </span>
             </div>
 

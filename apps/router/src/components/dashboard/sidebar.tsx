@@ -16,7 +16,6 @@ import {
   Terminal,
   GitFork,
   Box,
-  Cpu,
   Bot,
   Layers,
   Search,
@@ -75,11 +74,6 @@ const navSections: NavSection[] = [
         title: "Models",
         href: "/models",
         icon: Box,
-      },
-      {
-        title: "Providers",
-        href: "/providers",
-        icon: Cpu,
       },
       {
         title: "Generation",
@@ -271,7 +265,7 @@ export function Sidebar({
           >
             <div className="flex items-center justify-between text-xs text-foreground mb-2">
               <span className="font-semibold uppercase tracking-wider text-foreground">
-                FREE QUOTA
+                PAY AS YOU GO
               </span>
               <span className="tabular-nums font-bold text-foreground">
                 {quota ? `${metrics.percentRemaining.toFixed(0)}%` : "..."}

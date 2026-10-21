@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   const telemetryMeta: TelemetryMetadata = {
     requestId,
     model: requestedModel,
-    provider: "NaraRouter (Images)",
+    provider: "Const (Images)",
     convexUrl,
     estimatedPromptTokens: 25,
   };
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
           return corsJson(
             {
               error: {
-                message: `Const weekly image quota exceeded (${quotaCheck.weeklyLimitImages || 20} generations/edits per week). Resets in ${quotaCheck.resetsInText || "this week"}. To bypass this limit, configure your own NaraRouter API key in Providers.`,
+                message: `Const weekly image quota exceeded (${quotaCheck.weeklyLimitImages || 20} generations/edits per week). Resets in ${quotaCheck.resetsInText || "this week"}. Top up your Pay-As-You-Go balance to continue.`,
                 type: "quota_exceeded",
                 code: "weekly_quota_exceeded",
               },
@@ -146,30 +146,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Resolve Upstream NaraRouter API Key & Base URL
+    // 4. Resolve Upstream Image API Key & Base URL
     let upstreamKey = process.env.NARA_ROUTER_API_KEY?.trim() || "";
 
-    // If caller provided a direct NaraRouter key (e.g. sk-nry-...)
+    // If caller provided a direct image key
     if (providedKey && (providedKey.startsWith("sk-nry-") || !providedKey.startsWith("sk-const-"))) {
       if (!upstreamKey || providedKey.startsWith("sk-nry-")) {
         upstreamKey = providedKey;
-      }
-    }
-
-    // Check user BYOK providers in Convex if key is still missing
-    if (!upstreamKey && convexUrl && (ssoToken || providedKey)) {
-      try {
-        const client = new ConvexHttpClient(convexUrl);
-        if (ssoToken) client.setAuth(ssoToken);
-        const creds = await client.query(api.router.providers.getProviderCredentials, {
-          modelId: requestedModel,
-          rawApiKey: providedKey || undefined,
-        });
-        if (creds?.apiKey) {
-          upstreamKey = creds.apiKey;
-        }
-      } catch (e) {
-        console.warn("Could not load BYOK provider for NaraRouter:", e);
       }
     }
 
@@ -178,9 +161,9 @@ export async function POST(req: NextRequest) {
         {
           error: {
             message:
-              "NaraRouter API key is not configured. Please set NARA_ROUTER_API_KEY in environment variables or provide a valid NaraRouter API key (sk-nry-...) in the Authorization header.",
+              "Image provider gateway key is not configured on Const Router. Please set NARA_ROUTER_API_KEY in environment variables.",
             type: "configuration_error",
-            code: "missing_nara_api_key",
+            code: "missing_image_api_key",
           },
         },
         { status: 500 }
@@ -208,7 +191,7 @@ export async function POST(req: NextRequest) {
     if (body.style !== undefined) upstreamPayload.style = body.style;
     if (body.user !== undefined) upstreamPayload.user = body.user;
 
-    // 6. Forward request to NaraRouter
+    // 6. Forward request to Const Image Gateway
     const upstreamRes = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
@@ -230,7 +213,7 @@ export async function POST(req: NextRequest) {
       } catch {
         errorObj = {
           error: {
-            message: resBodyText || `NaraRouter upstream error ${upstreamRes.status}`,
+            message: resBodyText || `Const Image upstream error ${upstreamRes.status}`,
             type: "upstream_error",
             code: `http_${upstreamRes.status}`,
           },

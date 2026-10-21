@@ -277,7 +277,7 @@ export default function LogsPage() {
 
         {/* 4. Filter Toolbar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search Input (Broad on the left, matching NaraRouter) */}
+          {/* Search Input */}
           <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input

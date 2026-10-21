@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
           return corsJson(
             {
               error: {
-                message: `Const weekly free quota exceeded. Resets in ${quotaCheck.resetsInText || "this week"}.`,
+                message: `Const Pay-As-You-Go quota limit reached. Resets in ${quotaCheck.resetsInText || "this billing cycle"}.`,
                 type: "quota_exceeded",
                 code: "weekly_quota_exceeded",
               },

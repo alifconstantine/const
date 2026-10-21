@@ -50,7 +50,6 @@ import {
   BUILTIN_MODELS,
   type ModelSpec,
   checkSupportsThinking,
-  isReasoningModel,
 } from "@/lib/model-specs";
 import { ModelSelectorPanel } from "@/components/generation/model-selector-panel";
 import { HistoryPanel, type ChatSessionMeta } from "@/components/generation/history-panel";
@@ -68,10 +67,6 @@ export default function GenerationPage() {
   );
   const userKeys = useQuery(
     api.router.keys.listKeys,
-    isAuthenticated ? {} : "skip"
-  );
-  const userProviders = useQuery(
-    api.router.providers.listUserProviders,
     isAuthenticated ? {} : "skip"
   );
   const availableCombos = useQuery(
@@ -101,27 +96,8 @@ export default function GenerationPage() {
     }));
   }, [availableCombos]);
 
-  // Map BYOK providers into custom models list
-  const customModels = useMemo<ModelSpec[]>(() => {
-    if (!userProviders) return [];
-    const list: ModelSpec[] = [];
-    for (const p of userProviders) {
-      if (p.status !== "active") continue;
-      for (const m of p.importedModels) {
-        if (!m.enabled) continue;
-        list.push({
-          id: `${p.providerId}/${m.modelId}`,
-          name: m.name,
-          modelId: m.modelId,
-          provider: "byok",
-          providerName: p.name,
-          providerDocId: p._id,
-          supportsThinking: isReasoningModel(m.modelId, m.capabilities, m.name),
-        });
-      }
-    }
-    return list;
-  }, [userProviders]);
+  // Unified Const Gateway: no external BYOK models
+  const customModels: ModelSpec[] = useMemo(() => [], []);
 
   // Active Session & Chat State
   const [activeChatId, setActiveChatId] = useState<string | null>(null);

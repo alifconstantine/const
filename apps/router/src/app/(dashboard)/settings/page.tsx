@@ -82,8 +82,8 @@ export default function SettingsPage() {
     isAuthenticated ? {} : "skip"
   );
 
-  const providers = useQuery(
-    api.router.providers.listUserProviders,
+  const combos = useQuery(
+    api.router.combos.listCombos,
     isAuthenticated ? {} : "skip"
   );
 
@@ -202,9 +202,11 @@ export default function SettingsPage() {
                 <SelectItem value="deepseek-v4.1-flash">deepseek-v4.1-flash</SelectItem>
                 <SelectItem value="qwen-3.8-omni-flash">qwen-3.8-omni-flash</SelectItem>
                 <SelectItem value="gpt-6-luna">gpt-6-luna</SelectItem>
-                <SelectItem value="combo/coding">combo/coding (Coding Chain)</SelectItem>
-                <SelectItem value="combo/fast">combo/fast (Low-Latency)</SelectItem>
-                <SelectItem value="combo/auto">combo/auto (Auto-Router)</SelectItem>
+                {combos && combos.map((c) => (
+                  <SelectItem key={c._id} value={`combo/${c.slug}`}>
+                    combo/{c.slug} ({c.name})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground font-light">
@@ -265,11 +267,11 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-foreground" />
             <h2 className="text-sm font-medium text-foreground">
-              Weekly Free Quota Status
+              Pay-As-You-Go Quota &amp; Metering Status
             </h2>
           </div>
           <p className="text-xs text-muted-foreground font-light">
-            Every user receives 7,000,000 free tokens and 20 free image generations/edits every 7-day rolling cycle.
+            Metered 7,000,000 tokens and 20 image generations/edits included per 7-day rolling cycle on Pay-As-You-Go.
           </p>
         </div>
 
@@ -338,7 +340,7 @@ export default function SettingsPage() {
               Quota Depletion Warnings
             </p>
             <p className="text-[11px] text-muted-foreground font-light">
-              Display prominent indicators in the sidebar when free quota falls below 15%.
+              Display prominent indicators in the sidebar when quota balance falls below 15%.
             </p>
           </div>
           <Switch
@@ -456,9 +458,9 @@ export default function SettingsPage() {
 
           <div className="p-3 rounded-xl bg-secondary/30 text-center">
             <p className="text-base font-serif font-bold text-foreground">
-              {providers ? providers.length : "—"}
+              {combos ? combos.length : "—"}
             </p>
-            <p className="text-[10px] text-muted-foreground font-mono">Providers</p>
+            <p className="text-[10px] text-muted-foreground font-mono">Combos</p>
           </div>
 
           <div className="p-3 rounded-xl bg-secondary/30 text-center">
