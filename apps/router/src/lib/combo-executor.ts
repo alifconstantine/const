@@ -274,6 +274,7 @@ export async function executeComboChat(
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          "x-disabled-guardrails": "vision-bridge",
         };
         if (constEngineKey) {
           headers["Authorization"] = `Bearer ${constEngineKey}`;
@@ -283,7 +284,7 @@ export async function executeComboChat(
 
         // Context clamping safeguard for models with 272K limit (GPT 6 Luna)
         let targetMessages = formattedMessages;
-        if (targetModel.includes("Luna") || target.modelId.toLowerCase().includes("luna")) {
+        if (targetModel.toLowerCase().includes("luna") || target.modelId.toLowerCase().includes("luna")) {
           let curTokens = estimateMessagesTokens(targetMessages);
           if (curTokens > 265000 && targetMessages.length > 2) {
             targetMessages = [...formattedMessages];
@@ -296,6 +297,7 @@ export async function executeComboChat(
 
         const constPayload: Record<string, unknown> = {
           model: targetModel,
+          disabledGuardrails: ["vision-bridge"],
           messages: targetMessages,
           temperature,
           stream: true,

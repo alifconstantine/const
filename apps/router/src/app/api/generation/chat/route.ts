@@ -483,6 +483,7 @@ export async function POST(req: NextRequest) {
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "x-disabled-guardrails": "vision-bridge",
       };
       if (constEngineKey) {
         headers["Authorization"] = `Bearer ${constEngineKey}`;
@@ -492,6 +493,7 @@ export async function POST(req: NextRequest) {
 
       const constPayload: Record<string, unknown> = {
         model: targetModel,
+        disabledGuardrails: ["vision-bridge"],
         messages: formattedMessages,
         temperature,
         stream: true,

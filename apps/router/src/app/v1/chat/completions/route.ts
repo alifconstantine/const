@@ -506,6 +506,7 @@ async function dispatchSingleModel({
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "x-disabled-guardrails": "vision-bridge",
     };
     if (constEngineKey) {
       headers["Authorization"] = `Bearer ${constEngineKey}`;
@@ -515,6 +516,7 @@ async function dispatchSingleModel({
 
     const constPayload: Record<string, unknown> = {
       model: resolvedModel,
+      disabledGuardrails: ["vision-bridge"],
       messages: searchAugmentedMessages,
       temperature,
       stream,
@@ -540,49 +542,12 @@ async function dispatchSingleModel({
       constPayload.tool_choice = tool_choice;
     }
 
-    let response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
+    const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify(constPayload),
       signal,
     });
-
-    // Graceful fallback for multimodal/vision errors on engine
-    if (!response.ok) {
-      const hasImageParts = searchAugmentedMessages.some(
-        (m) => Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
-      );
-      if (hasImageParts) {
-        const degradedMessages = searchAugmentedMessages.map((m) => {
-          if (!Array.isArray(m.content)) return m;
-          const textParts = m.content
-            .filter((p: any) => p.type === "text")
-            .map((p: any) => p.text)
-            .join("\n");
-          const imgCount = m.content.filter((p: any) => p.type === "image_url").length;
-          return {
-            ...m,
-            content: `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`,
-          };
-        });
-
-        const retryPayload = {
-          ...constPayload,
-          messages: degradedMessages,
-        };
-
-        const retryResponse = await fetch(`${constBaseUrl}/v1/chat/completions`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(retryPayload),
-          signal,
-        });
-
-        if (retryResponse.ok) {
-          response = retryResponse;
-        }
-      }
-    }
 
     if (!response.ok) {
       const errText = await response.text();

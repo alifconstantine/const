@@ -17,11 +17,7 @@ import {
   deleteCookie,
 } from "@/lib/auth-constants";
 
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("Missing NEXT_PUBLIC_CONVEX_URL environment variable.");
-}
-
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://placeholder.convex.cloud";
 export const convex = new ConvexReactClient(convexUrl);
 
 import { api } from "@const/backend/_generated/api";

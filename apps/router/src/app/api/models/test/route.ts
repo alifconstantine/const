@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "x-disabled-guardrails": "vision-bridge",
         Authorization: `Bearer ${constApiKey}`,
       };
 

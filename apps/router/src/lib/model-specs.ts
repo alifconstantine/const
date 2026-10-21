@@ -181,7 +181,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean.includes("glm-5.3") ||
     clean.includes("glm 5.3")
   ) {
-    return "GLM 5.3 Flash";
+    return "atmo/zai/glm-5.3-flash";
   }
 
   // 2. Gemini 3.8 Flash
@@ -195,6 +195,7 @@ export function normalizeConstModelName(modelId: string): string {
   }
 
   // 3. Deepseek v4.1 Flash
+  // Map any variation, including atmo/atmo/deepseek-v4.1-flash, to the working atmo/ali/deepseek-v4.1-flash
   if (
     clean === "deepseek-v4.1-flash" ||
     clean === "deepseek v4.1 flash" ||
@@ -202,7 +203,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean.includes("deepseek v4.1") ||
     clean.includes("deepseek-v4")
   ) {
-    return "Deepseek v4.1 Flash";
+    return "atmo/ali/deepseek-v4.1-flash";
   }
 
   // 4. Qwen 3.8 Omni Flash
@@ -211,7 +212,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean === "qwen 3.8 omni flash" ||
     clean.includes("qwen")
   ) {
-    return "Qwen 3.8 Omni Flash";
+    return "atmo/ali/qwen3.8-omni-flash";
   }
 
   // 5. GPT 6 Luna
@@ -221,7 +222,7 @@ export function normalizeConstModelName(modelId: string): string {
     clean === "gpt-luna-6" ||
     clean.includes("luna")
   ) {
-    return "GPT 6 Luna";
+    return "atmo/cx/gpt-6-luna";
   }
 
   // Audio: Whisper Large v3 Turbo
@@ -254,6 +255,7 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   if (!modelId) return false;
   const clean = modelId.toLowerCase().trim();
   if (clean.startsWith("antigravity/")) return true;
+  if (clean.startsWith("atmo/")) return true;
   if (clean === "const-search" || clean === "const search") return true;
   if (clean.startsWith("auto/")) return true;
   if (
