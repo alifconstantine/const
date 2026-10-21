@@ -1060,7 +1060,7 @@ export function SkillsSettings({
       </div>
 
       {/* 2. Top Segmented Switcher: [ Skills ] [ Plugins ] */}
-      <div className="flex items-center gap-3 border-b border-[#2e2e2e] pb-1">
+      <div className="flex items-center gap-3">
         <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e]">
           <button
             type="button"
@@ -1279,7 +1279,7 @@ export function SkillsSettings({
           {/* ================================================================= */}
           {/* SECTION B: AVAILABLE IN MARKETPLACE (BELOW)                       */}
           {/* ================================================================= */}
-          <div className="space-y-3 pt-4 border-t border-[#2e2e2e]">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-white uppercase tracking-wider">

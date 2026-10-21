@@ -12,7 +12,6 @@ import {
   Settings2,
   Cable,
   PencilSparkles,
-  Store,
   UserRound,
   UserRoundPen,
   Keyboard,
@@ -82,7 +81,6 @@ import {
 } from "../lib/theme";
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
-import { SkillsSettings } from "./settings/skills-settings";
 import { UsageStatsView } from "./settings/usage-stats-view";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
@@ -805,7 +803,6 @@ export function SettingsView({
         { id: "memory", label: t("settings.memory"), icon: Brain },
         { id: "subagents", label: t("settings.subagents"), icon: Bot },
         { id: "mcp-servers", label: t("settings.mcpServers"), icon: Cable },
-        { id: "marketplace", label: t("settings.marketplace"), icon: Store },
       ],
     },
     {
@@ -864,12 +861,6 @@ export function SettingsView({
         return {
           title: t("settings.mcpServers"),
           desc: "Manage Model Context Protocol servers and tool integrations.",
-        };
-      case "marketplace":
-      case "skills":
-        return {
-          title: t("marketplace.title"),
-          desc: t("marketplace.subtitle"),
         };
       case "subagents":
         return {
@@ -2288,13 +2279,6 @@ export function SettingsView({
               /* Memory Settings View                                      */
               /* --------------------------------------------------------- */
               <MemorySettings currentProject={currentProject} />
-            ) : activeTab === "marketplace" || activeTab === "skills" || activeTab === "plugins" ? (
-              /* --------------------------------------------------------- */
-              /* Marketplace Settings View (Skills & Plugins)              */
-              /* --------------------------------------------------------- */
-              <div className="pb-10">
-                <SkillsSettings isModal={true} initialTab={activeTab === "plugins" ? "plugins" : "skills"} />
-              </div>
             ) : (
               /* --------------------------------------------------------- */
               /* Generic Placeholder for other capabilities                */

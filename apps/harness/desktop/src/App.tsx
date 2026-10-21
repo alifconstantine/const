@@ -386,6 +386,11 @@ function AuthenticatedContent({
   const greeting = getGreeting(t);
 
   const handleOpenSettings = (tab: string = "general") => {
+    if (tab === "skills" || tab === "marketplace" || tab === "plugins") {
+      setIsSkillsOpen(true);
+      setIsScheduledTasksOpen(false);
+      return;
+    }
     const resolvedTab = tab === "model" ? "model-settings" : tab;
     setSettingsTab(resolvedTab);
     setIsSettingsOpen(true);

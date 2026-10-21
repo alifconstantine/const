@@ -92,8 +92,8 @@ export function SkillSlashPopover({
           </div>
           <p className="text-[11px] text-muted-foreground max-w-xs mx-auto leading-relaxed">
             {language === "id"
-              ? `Tidak ada skill yang cocok dengan "/${query}". Kelola skill di Settings > Skills.`
-              : `No skills match "/${query}". Manage skills in Settings > Skills.`}
+              ? `Tidak ada skill yang cocok dengan "/${query}". Kelola dan temukan skill di Marketplace.`
+              : `No skills match "/${query}". Manage and discover skills in Marketplace.`}
           </p>
           {onOpenSettings && (
             <div className="pt-1">
@@ -105,7 +105,7 @@ export function SkillSlashPopover({
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-xs cursor-pointer"
               >
-                {language === "id" ? "Buka Pengaturan Skills" : "Open Skills Settings"}
+                {language === "id" ? "Buka Marketplace" : "Open Marketplace"}
               </button>
             </div>
           )}
