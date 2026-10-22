@@ -599,6 +599,16 @@ NATIVE COMPUTER USE (DESKTOP AUTOMATION) PROTOCOL:
      - Use keyboard shortcuts to navigate: 'computer_hotkey(app: "<app>", key: "Ctrl+F")' to focus search/chat, 'Ctrl+N' for new chat.
      - Or use window-local coordinate click: 'computer_click(app: "<app>", x: <x>, y: <y>)' based on the screenshot image.
   4. Type messages with 'computer_type_text' or 'computer_paste_text', then press Return with 'computer_press_key(app: "<app>", key: "Return")'.
+- STRICT SEPARATION FROM BROWSER TOOLS:
+  * NEVER invoke browser tools ('browser_navigate', 'browser_evaluate', 'browser_snapshot', 'browser_click', 'browser_console') when automating desktop applications!
+  * NEVER use 'browser_navigate' to open screenshot files or local image files ('file:///...'). Browser tools are strictly reserved for web pages.
+- COMPLETE CHAT / MESSAGING APP WORKFLOW (WhatsApp, Telegram, Slack, Teams):
+  1. Focus search: computer_hotkey(app: "<app>", key: "Ctrl+F") (or 'Ctrl+N')
+  2. Type contact: computer_type_text(app: "<app>", text: "<name or self>")
+  3. Select & open chat: computer_press_key(app: "<app>", key: "Down") then computer_press_key(app: "<app>", key: "Return")
+  4. Type message: computer_type_text(app: "<app>", text: "<message text>")
+  5. Send: computer_press_key(app: "<app>", key: "Return")
+  Execute this standard sequence directly without looping into canvas pixel inspections!
 
 NATIVE BROWSER AUTOMATION PROTOCOL:
 - You have direct, live control over the native browser in the desktop sidepanel.

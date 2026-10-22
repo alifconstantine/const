@@ -567,10 +567,9 @@ export class ComputerController {
       );
       if (savedPath) {
         lines.push(`Screenshot File: ${savedPath}`);
-        lines.push(`Screenshot Link: [View Screenshot](file:///${savedPath.replace(/\\/g, "/")})`);
       }
       lines.push(
-        `Hint: If an element is missing in the accessibility tree below, use window-local coordinates from the screenshot: computer_click(app: "${snapshot.app.name}", x: <x>, y: <y>).`
+        `Note: The screenshot is saved to disk for user reference. Do NOT navigate to it using browser tools. Use 'computer_*' tools ('computer_click', 'computer_type_text', 'computer_press_key', 'computer_hotkey') directly to control ${snapshot.app.name}.`
       );
     }
     lines.push("");

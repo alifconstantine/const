@@ -771,6 +771,9 @@ export class BrowserController {
     this.assertBotMayAct();
 
     const cleanUrl = this.normalizeUrl(url);
+    if (cleanUrl.startsWith("file://") && /\.(png|jpe?g|webp|gif|bmp|svg|ico)$/i.test(cleanUrl)) {
+      throw new Error("Cannot open local image/screenshot files with browser_navigate. Browser tools are only for web pages (http://, https://, localhost, or HTML files). For desktop applications, continue using the 'computer_*' tools.");
+    }
     const tab = await this.ensureTargetTab({
       url: cleanUrl,
       tabId: options?.tabId,
@@ -1851,6 +1854,12 @@ export class BrowserController {
 
       if (norm === "browsernavigate") {
         const url = args.url || args.target;
+        if (typeof url === "string" && (url.startsWith("file://") && /\.(png|jpe?g|webp|gif|bmp|svg|ico)$/i.test(url) || url.includes("/screenshots/"))) {
+          return {
+            result: "Error: Cannot open local image/screenshot files with browser_navigate. Browser tools are only for web pages (http://, https://, localhost, or HTML files). For desktop applications, continue using the 'computer_*' tools directly.",
+            isError: true,
+          };
+        }
         if (url === "tabs") {
           return {
             result: JSON.stringify({ activeTabId: this.activeTabId, tabs: this.listTabs() }, null, 2),
