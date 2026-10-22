@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { AccountMenu } from "./account-menu";
-import { Button, cn } from "@const/ui";
+import { Button, cn, ConstLogoIcon } from "@const/ui";
 import { calculateQuotaMetrics } from "@/lib/quota";
 import {
   LayoutGrid,
@@ -18,10 +18,11 @@ import {
   Box,
   Bot,
   Layers,
-  Search,
+  Settings,
+  BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
-  X,
+  ExternalLink,
 } from "lucide-react";
 
 interface NavItem {
@@ -29,6 +30,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
+  isExternal?: boolean;
 }
 
 interface NavSection {
@@ -38,27 +40,37 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    title: "OVERVIEW",
+    title: "BUILD",
     items: [
       {
-        title: "Dashboard",
-        href: "/dashboard",
-        icon: LayoutGrid,
+        title: "API Keys",
+        href: "/keys",
+        icon: Key,
       },
       {
-        title: "Request logs",
+        title: "Usage logs",
         href: "/logs",
         icon: ScrollText,
+      },
+      {
+        title: "Playground",
+        href: "/generation",
+        icon: Bot,
+      },
+      {
+        title: "Combos",
+        href: "/combos",
+        icon: GitFork,
       },
     ],
   },
   {
-    title: "DEVELOPER",
+    title: "DISCOVER",
     items: [
       {
-        title: "API keys",
-        href: "/keys",
-        icon: Key,
+        title: "Models & pricing",
+        href: "/models",
+        icon: Box,
       },
       {
         title: "Endpoints",
@@ -66,24 +78,30 @@ const navSections: NavSection[] = [
         icon: Terminal,
       },
       {
-        title: "Combos",
-        href: "/combos",
-        icon: GitFork,
-      },
-      {
-        title: "Models & Pricing",
-        href: "/models",
-        icon: Box,
-      },
-      {
-        title: "Generation",
-        href: "/generation",
-        icon: Bot,
-      },
-      {
         title: "Integrations",
         href: "/integrations",
         icon: Layers,
+      },
+    ],
+  },
+  {
+    title: "ACCOUNT",
+    items: [
+      {
+        title: "Settings & data",
+        href: "/settings",
+        icon: Settings,
+      },
+    ],
+  },
+  {
+    title: "DEVELOP",
+    items: [
+      {
+        title: "Documentation",
+        href: "/docs",
+        icon: BookOpen,
+        isExternal: true,
       },
     ],
   },
@@ -103,7 +121,6 @@ export function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState("");
   const { isAuthenticated } = useRouterAuth();
   const quota = useQuery(
     api.router.quotas.getUserQuota,
@@ -114,19 +131,7 @@ export function Sidebar({
     return calculateQuotaMetrics(quota);
   }, [quota]);
 
-  const filteredSections = useMemo(() => {
-    if (!searchQuery.trim()) return navSections;
-    const query = searchQuery.toLowerCase().trim();
-
-    return navSections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) =>
-          item.title.toLowerCase().includes(query)
-        ),
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [searchQuery]);
+  const isOverviewActive = pathname === "/dashboard" || pathname === "/";
 
   return (
     <aside
@@ -136,14 +141,14 @@ export function Sidebar({
         className
       )}
     >
-      {/* Top Header Row of Sidebar: Search on left & Close icon on right */}
+      {/* 1. Top Logo in Sidebar matching AtmoRouter design */}
       {isCollapsed ? (
-        <div className="h-11 px-2 flex items-center justify-center shrink-0">
+        <div className="h-14 px-2 flex items-center justify-center border-b border-border/70 shrink-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleCollapse}
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+            className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground cursor-pointer"
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
@@ -151,29 +156,26 @@ export function Sidebar({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 shrink-0">
-          {/* Search Input positioned on the left */}
-          <div className="relative flex-1 flex items-center">
-            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search"
-              className="w-full h-8 pl-8 pr-7 rounded-lg bg-background text-xs text-foreground placeholder:text-muted-foreground outline-none border border-border focus:border-ring transition-all font-sans"
+        <div className="h-14 px-4 flex items-center justify-between border-b border-border/70 shrink-0">
+          <Link
+            href="/dashboard"
+            onClick={onNavigate}
+            className="flex items-center gap-2.5 group min-w-0"
+          >
+            <ConstLogoIcon
+              size="sm"
+              className="w-6 h-6 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
-                aria-label="Clear search"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+            <div className="flex items-center gap-2 truncate">
+              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
+                Const
+              </span>
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+                Router
+              </span>
+            </div>
+          </Link>
 
-          {/* Sidebar Close Button */}
           {onToggleCollapse && (
             <Button
               variant="ghost"
@@ -189,72 +191,98 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Navigation Menus */}
-      <nav className="flex-1 overflow-y-auto px-2 sm:px-3 pt-1 pb-3 space-y-3.5 scrollbar-thin">
-        {filteredSections.length === 0 ? (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">
-            {isCollapsed ? "—" : `No menus found for "${searchQuery}"`}
-          </div>
-        ) : (
-          filteredSections.map((section, idx) => (
-            <div key={section.title} className="space-y-0.5">
-              {isCollapsed ? (
-                idx > 0 && <div className="my-2" />
-              ) : (
-                <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-                  {section.title}
-                </h3>
-              )}
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive =
-                    item.href === "/dashboard"
-                      ? pathname === "/dashboard"
-                      : pathname === item.href || pathname?.startsWith(`${item.href}/`);
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={onNavigate}
-                      title={isCollapsed ? item.title : undefined}
-                      className={cn(
-                        "rounded-xl text-xs font-sans transition-colors group flex items-center",
-                        isCollapsed
-                          ? "justify-center p-2"
-                          : "justify-between px-2.5 py-2",
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
-                      )}
-                    >
-                      <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
-                        <Icon
-                          className={cn(
-                            "h-4 w-4 shrink-0 transition-colors",
-                            isActive
-                              ? "text-sidebar-accent-foreground stroke-[2]"
-                              : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]"
-                          )}
-                        />
-                        {!isCollapsed && <span className="truncate">{item.title}</span>}
-                      </div>
-                      {!isCollapsed && item.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+      {/* 2. Navigation Menus */}
+      <nav className="flex-1 overflow-y-auto px-2 sm:px-3 pt-3 pb-3 space-y-3.5 scrollbar-thin">
+        {/* Top-level Overview Item */}
+        <div className="space-y-0.5">
+          <Link
+            href="/dashboard"
+            onClick={onNavigate}
+            title={isCollapsed ? "Overview" : undefined}
+            className={cn(
+              "rounded-xl text-xs font-sans transition-colors group flex items-center",
+              isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2",
+              isOverviewActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
+                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
+            )}
+          >
+            <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
+              <LayoutGrid
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-colors",
+                  isOverviewActive
+                    ? "text-sidebar-accent-foreground stroke-[2]"
+                    : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]"
+                )}
+              />
+              {!isCollapsed && <span className="truncate font-medium">Overview</span>}
             </div>
-          ))
-        )}
+          </Link>
+        </div>
+
+        {/* Categorized Navigation Sections */}
+        {navSections.map((section, idx) => (
+          <div key={section.title} className="space-y-0.5">
+            {isCollapsed ? (
+              idx > 0 && <div className="my-2 border-t border-border/30" />
+            ) : (
+              <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/80 font-semibold">
+                {section.title}
+              </h3>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive =
+                  pathname === item.href || pathname?.startsWith(`${item.href}/`);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    title={isCollapsed ? item.title : undefined}
+                    className={cn(
+                      "rounded-xl text-xs font-sans transition-colors group flex items-center",
+                      isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
+                        : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
+                    )}
+                  >
+                    <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
+                      <Icon
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-colors",
+                          isActive
+                            ? "text-sidebar-accent-foreground stroke-[2]"
+                            : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]"
+                        )}
+                      />
+                      {!isCollapsed && <span className="truncate">{item.title}</span>}
+                    </div>
+                    {!isCollapsed && (
+                      <div className="flex items-center gap-1.5">
+                        {item.isExternal && (
+                          <ExternalLink className="h-3 w-3 text-muted-foreground/60 group-hover:text-foreground transition-colors" />
+                        )}
+                        {item.badge && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Mini Quota Indicator in Sidebar */}
+      {/* 3. Mini Pay As You Go Quota Indicator in Sidebar */}
       {!isCollapsed && isAuthenticated && (
         <div className="px-2 pt-2">
           <Link
@@ -273,7 +301,7 @@ export function Sidebar({
             </div>
 
             {/* Full-width Graphical Progress Bar */}
-            <div className="w-full h-2.5 rounded-full bg-secondary overflow-hidden mb-2">
+            <div className="w-full h-2 rounded-full bg-secondary overflow-hidden mb-2">
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500 ease-out",
@@ -295,8 +323,8 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Account Profile Card at the Bottom */}
-      <div className="p-2 shrink-0 bg-sidebar">
+      {/* 4. Account Profile Card at the Bottom */}
+      <div className="p-2 shrink-0 bg-sidebar border-t border-border/50">
         <AccountMenu isCollapsed={isCollapsed} />
       </div>
     </aside>

@@ -201,27 +201,7 @@ export default function ModelsPage() {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-7 pb-12">
-        {/* 1. Breadcrumb: Dashboard > Models & Pricing */}
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs font-sans">
-            <BreadcrumbItem>
-              <BreadcrumbLink
-                href="/dashboard"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="text-muted-foreground/40" />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium text-foreground">
-                Models &amp; Pricing
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* 2. Heading (Lora serif, declarative sentence with period per DESIGN.md) */}
+        {/* 1. Heading (Lora serif, declarative sentence with period per DESIGN.md) */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
             Models &amp; Pricing.

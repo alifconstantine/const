@@ -258,26 +258,6 @@ export default function EndpointsPage() {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-6 pb-12">
-        {/* Breadcrumb */}
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs font-sans">
-            <BreadcrumbItem>
-              <BreadcrumbLink
-                href="/dashboard"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="text-muted-foreground/40" />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium text-foreground">
-                Endpoints
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         {/* Page Header */}
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-serif font-light text-foreground tracking-tight">

@@ -143,27 +143,7 @@ export default function LogsPage() {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-7 pb-12">
-        {/* 1. Breadcrumb: Dashboard > Logs */}
-        <Breadcrumb>
-          <BreadcrumbList className="text-xs font-sans">
-            <BreadcrumbItem>
-              <BreadcrumbLink
-                href="/dashboard"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="text-muted-foreground/40" />
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-medium text-foreground">
-                Request Logs
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        {/* 2. Heading */}
+        {/* 1. Heading */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">

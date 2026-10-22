@@ -9,6 +9,12 @@ import { api } from "@const/backend/_generated/api";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbSeparator,
+  BreadcrumbPage,
   ConstLogoIcon,
   Button,
   Sheet,
@@ -21,19 +27,19 @@ import {
   Loader2,
   Menu,
   Bell,
-  BookOpen,
 } from "lucide-react";
 
 const ROUTE_TITLES: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/logs": "Request Logs",
+  "/dashboard": "Overview",
+  "/logs": "Usage logs",
   "/keys": "API Keys",
   "/endpoints": "Endpoints",
   "/combos": "Combos",
   "/models": "Models & Pricing",
   "/generation": "Playground",
   "/integrations": "Integrations",
-  "/settings": "Settings",
+  "/settings": "Settings & data",
+  "/docs": "Documentation",
 };
 
 export default function DashboardLayout({
@@ -42,7 +48,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading, isSigningOut, signIn, signOut, refreshSession } = useRouterAuth();
+  const { isAuthenticated, isLoading, isSigningOut, signIn, refreshSession } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
     isAuthenticated ? {} : "skip"
@@ -52,7 +58,7 @@ export default function DashboardLayout({
   const [hasAttemptedRefresh, setHasAttemptedRefresh] = useState(false);
 
   const currentTitle = useMemo(() => {
-    if (!pathname) return "Dashboard";
+    if (!pathname || pathname === "/" || pathname === "/dashboard") return "Overview";
     if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
     for (const [route, title] of Object.entries(ROUTE_TITLES)) {
       if (pathname.startsWith(`${route}/`)) return title;
@@ -121,86 +127,20 @@ export default function DashboardLayout({
       <title>{`${currentTitle} - Const Router`}</title>
       <div
         className={cn(
-          "flex flex-col bg-sidebar text-foreground antialiased selection:bg-primary selection:text-primary-foreground",
-          isGeneration ? "h-[100dvh] overflow-hidden" : "min-h-screen"
+          "flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground"
         )}
       >
-      {/* Top Header Bar matching Const Harness studio header */}
-      <header className="h-14 w-full border-b border-border bg-card sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
-        {/* Left: Const Logo & Product Badge */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
-            aria-label="Open sidebar navigation"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
-            <ConstLogoIcon
-              size="sm"
-              className="w-6 h-6 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
-            />
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
-                Const
-              </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
-                Router
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* Right: Controls & Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4 stroke-[1.75]" />
-          </Button>
-
-          <ThemeToggle />
-
-          <Link href="/docs">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 rounded-full text-xs font-medium px-4 border-border bg-secondary text-foreground hover:bg-muted cursor-pointer gap-1.5"
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              <span>Docs</span>
-            </Button>
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Layout: Left Sidebar + Content Area */}
-      <div
-        className={cn(
-          "flex-1 flex min-w-0 bg-sidebar",
-          isGeneration && "overflow-hidden h-[calc(100dvh-3.5rem)] md:h-[calc(100vh-3.5rem)]"
-        )}
-      >
-        {/* Desktop Left Sidebar (Collapsible with smooth transition) */}
+        {/* Full-height Desktop Left Sidebar */}
         <div
           className={cn(
-            "hidden md:block shrink-0 transition-all duration-300 bg-sidebar",
+            "hidden md:block shrink-0 transition-all duration-300 bg-sidebar border-r border-border/70 h-full",
             isCollapsed ? "w-16" : "w-64"
           )}
         >
-          <div className="h-[calc(100vh-3.5rem)] sticky top-14 bg-sidebar">
-            <Sidebar
-              isCollapsed={isCollapsed}
-              onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-            />
-          </div>
+          <Sidebar
+            isCollapsed={isCollapsed}
+            onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          />
         </div>
 
         {/* Mobile Slide-out Drawer */}
@@ -216,19 +156,81 @@ export default function DashboardLayout({
           </Sheet>
         </div>
 
-        {/* Page Content Viewport - Studio Canvas */}
-        <main
-          className={cn(
-            "flex-1 min-w-0 w-full bg-background text-foreground border-t border-l border-border/40",
-            isGeneration
-              ? "p-0 overflow-hidden flex flex-col h-full"
-              : "p-6 md:p-8 overflow-y-auto"
-          )}
-        >
-          {children}
-        </main>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
+          {/* Top Page Heading Bar: Breadcrumb (Left) + ThemeToggle, Notif, Create API Key (Right) */}
+          <header className="h-14 w-full border-b border-border/70 bg-card/60 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
+            {/* Left: Mobile Menu Toggle + Breadcrumbs */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileOpen(true)}
+                className="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+                aria-label="Open navigation"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+
+              <Breadcrumb>
+                <BreadcrumbList className="text-xs font-sans">
+                  <BreadcrumbItem>
+                    <BreadcrumbLink
+                      href="/dashboard"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Dashboard
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="text-muted-foreground/40" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="font-medium text-foreground">
+                      {currentTitle}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+
+            {/* Right: Controls & Actions */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <ThemeToggle />
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+                aria-label="Notifications"
+              >
+                <Bell className="h-4 w-4 stroke-[1.75]" />
+              </Button>
+
+              {/* Saldo placeholder (deferred by user) */}
+
+              <Link href="/keys">
+                <Button
+                  size="sm"
+                  className="h-8 rounded-lg text-xs font-medium px-3.5 bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-xs transition-colors"
+                >
+                  Create API key
+                </Button>
+              </Link>
+            </div>
+          </header>
+
+          {/* Page Content Viewport */}
+          <main
+            className={cn(
+              "flex-1 min-w-0 w-full overflow-y-auto",
+              isGeneration
+                ? "p-0 overflow-hidden flex flex-col h-full"
+                : "p-6 md:p-8"
+            )}
+          >
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
-  </>
-);
+    </>
+  );
 }
