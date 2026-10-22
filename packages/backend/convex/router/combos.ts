@@ -269,6 +269,28 @@ export const deleteCombo = mutation({
   },
 });
 
+// 5b. Delete All Custom Combos for the Current User
+export const clearAllCombos = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    const userCombos = await ctx.db
+      .query("routerCombos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const combo of userCombos) {
+      await ctx.db.delete(combo._id);
+    }
+
+    return { success: true, count: userCombos.length };
+  },
+});
+
 // 6. Resolve Combo for Gateway Execution
 export const resolveComboForExecution = query({
   args: {

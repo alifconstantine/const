@@ -73,6 +73,7 @@ export default function CombosPage() {
   const createComboMutation = useMutation(api.router.combos.createCombo);
   const updateComboMutation = useMutation(api.router.combos.updateCombo);
   const deleteComboMutation = useMutation(api.router.combos.deleteCombo);
+  const clearAllCombosMutation = useMutation(api.router.combos.clearAllCombos);
 
   // 2. Filter & Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,6 +98,8 @@ export default function CombosPage() {
 
   // Delete State
   const [deletingId, setDeletingId] = useState<Id<"routerCombos"> | null>(null);
+  const [isClearAllOpen, setIsClearAllOpen] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   // Drag and Drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -325,6 +328,23 @@ export default function CombosPage() {
     }
   };
 
+  // Clear All Combos Action
+  const handleClearAll = async () => {
+    setIsClearingAll(true);
+    try {
+      const res = await clearAllCombosMutation({});
+      toast.success("All virtual combos deleted", {
+        description: `Removed ${res.count} combo${res.count === 1 ? "" : "s"} from your account.`,
+      });
+      setIsClearAllOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to clear combos.";
+      toast.error("Error", { description: msg });
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
   // Filter combos by search query
   const filteredCombos = useMemo(() => {
     if (!combos) return [];
@@ -368,6 +388,17 @@ export default function CombosPage() {
           <span className="text-xs font-mono font-medium px-3 py-1 rounded-full bg-secondary/80 text-foreground">
             {combos ? `${combos.length} Custom Combo${combos.length === 1 ? "" : "s"}` : "Loading..."}
           </span>
+          {combos && combos.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsClearAllOpen(true)}
+              className="rounded-full text-xs font-sans h-7 px-3 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="h-3 w-3 mr-1.5" />
+              <span>Clear all</span>
+            </Button>
+          )}
         </div>
 
         {/* Search Bar */}
@@ -414,12 +445,14 @@ export default function CombosPage() {
             </div>
           ))
         ) : filteredCombos.length === 0 ? (
-          <div className="col-span-full text-center py-16 bg-secondary/20 rounded-3xl p-8 space-y-3">
-            <p className="text-sm font-medium text-foreground">No virtual combos found</p>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+          <div className="col-span-full text-center py-24 bg-secondary/15 rounded-3xl p-8 space-y-2 border border-border/30">
+            <p className="text-base font-medium text-foreground">
+              {searchQuery ? "No matching combos found" : "No combos yet"}
+            </p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto font-light">
               {searchQuery
                 ? `No combos match "${searchQuery}". Try a different search term.`
-                : "Create your first virtual combo to set up resilient multi-model failover chains."}
+                : "No combos yet. Create one to route across multiple models."}
             </p>
           </div>
         ) : (
@@ -1120,6 +1153,41 @@ export default function CombosPage() {
               className="rounded-full text-xs cursor-pointer font-sans"
             >
               Delete Combo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 6. Clear All Confirmation Dialog */}
+      <Dialog open={isClearAllOpen} onOpenChange={setIsClearAllOpen}>
+        <DialogContent className="max-w-md rounded-3xl border-none bg-card p-6 space-y-4">
+          <div className="space-y-1.5">
+            <h3 className="text-base font-semibold text-foreground font-sans">
+              Delete All Virtual Combos?
+            </h3>
+            <p className="text-xs text-muted-foreground font-light">
+              Are you sure you want to delete all {combos?.length || 0} custom combos? Your account will be reset to an empty state with no pre-configured virtual models.
+            </p>
+          </div>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isClearingAll}
+              onClick={() => setIsClearAllOpen(false)}
+              className="rounded-full text-xs cursor-pointer font-sans border-none bg-secondary hover:bg-secondary/80"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={isClearingAll}
+              onClick={handleClearAll}
+              className="rounded-full text-xs cursor-pointer font-sans"
+            >
+              {isClearingAll ? "Deleting..." : "Delete All Combos"}
             </Button>
           </DialogFooter>
         </DialogContent>
