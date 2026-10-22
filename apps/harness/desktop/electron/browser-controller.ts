@@ -557,9 +557,9 @@ export class BrowserController {
 
   public assertBotMayAct() {
     const current = this.getControl();
-    if (current.holder === "human") {
+    if (current.requested) {
       throw new Error(
-        "A person currently has control of the browser ('You Drive' mode). Wait for them to click 'Hand back to AI' before performing browser actions."
+        `The assistant is waiting for human permission/assistance ("${current.reason || "Verification required"}"). Please complete the action in the browser and click 'Done — Resume AI'.`
       );
     }
   }
@@ -1087,6 +1087,7 @@ export class BrowserController {
     }
 
     await new Promise((r) => setTimeout(r, 120));
+    await this.cleanUpAiOverlays(target);
 
     return {
       action: "click",
@@ -1254,6 +1255,8 @@ export class BrowserController {
       }
       await new Promise((r) => setTimeout(r, 150));
     }
+
+    await this.cleanUpAiOverlays(target);
 
     return {
       action: "type",
@@ -1751,56 +1754,65 @@ export class BrowserController {
   // Visual AI Cursor Overlay Injection
   // ---------------------------------------------------------------------------
 
+  private async cleanUpAiOverlays(target?: WebContents) {
+    const t = target || this.getTargetTab()?.contents;
+    if (!t || t.isDestroyed()) return;
+    try {
+      await t.executeJavaScript(`
+        try {
+          var p = document.getElementById('__const_ai_pointer');
+          if (p) p.remove();
+          var o = document.getElementById('__const_ai_cursor_overlay');
+          if (o) o.remove();
+        } catch(e) {}
+      `);
+    } catch {}
+  }
+
   private injectAiCursorOverlay(target: WebContents) {
     if (target.isDestroyed()) return;
 
     const overlayCode = `
       (function() {
+        // Clean up any legacy pointers or badges immediately
+        try {
+          var p = document.getElementById('__const_ai_pointer');
+          if (p) p.remove();
+          var o = document.getElementById('__const_ai_cursor_overlay');
+          if (o) o.remove();
+        } catch(e) {}
+
         if (window.__constOverlayInjected) return;
         window.__constOverlayInjected = true;
 
-        const cursorContainer = document.createElement('div');
-        cursorContainer.id = '__const_ai_cursor_overlay';
-        cursorContainer.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2147483647;';
-        
-        const pointer = document.createElement('div');
-        pointer.id = '__const_ai_pointer';
-        pointer.style.cssText = 'position:absolute;width:16px;height:16px;background:#3b82f6;border:2px solid #ffffff;border-radius:50%;box-shadow:0 0 12px rgba(59,130,246,0.9);transform:translate(-50%,-50%);transition:top 0.18s cubic-bezier(0.16,1,0.3,1), left 0.18s cubic-bezier(0.16,1,0.3,1), transform 0.15s ease;display:none;';
-        
-        const badge = document.createElement('span');
-        badge.innerText = 'AI';
-        badge.style.cssText = 'position:absolute;top:-18px;left:14px;background:#1e1b4b;color:#93c5fd;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;border:1px solid #3b82f6;font-family:sans-serif;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,0.4);';
-        pointer.appendChild(badge);
-
-        cursorContainer.appendChild(pointer);
-        document.documentElement.appendChild(cursorContainer);
-
+        // Transient click ripple that automatically removes itself from DOM after 350ms
         window.__constShowClickRipple = function(x, y) {
-          pointer.style.left = x + 'px';
-          pointer.style.top = y + 'px';
-          pointer.style.display = 'block';
+          try {
+            var oldP = document.getElementById('__const_ai_pointer');
+            if (oldP) oldP.remove();
 
-          const ripple = document.createElement('div');
-          ripple.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:10px;height:10px;border-radius:50%;border:2px solid #60a5fa;transform:translate(-50%,-50%) scale(1);animation:constRipple 0.5s ease-out forwards;pointer-events:none;';
-          cursorContainer.appendChild(ripple);
+            var ripple = document.createElement('div');
+            ripple.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;width:8px;height:8px;border-radius:50%;border:2px solid #60a5fa;transform:translate(-50%,-50%) scale(1);animation:constRipple 0.35s ease-out forwards;pointer-events:none;z-index:2147483647;';
+            document.documentElement.appendChild(ripple);
 
-          setTimeout(() => {
-            if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
-          }, 500);
+            setTimeout(function() {
+              if (ripple && ripple.parentNode) ripple.parentNode.removeChild(ripple);
+            }, 350);
+          } catch(e) {}
         };
 
         window.__constHighlightElement = function(el) {
           if (!el) return;
-          const prevOutline = el.style.outline;
-          el.style.outline = '2px solid #3b82f6';
+          var prevOutline = el.style.outline;
+          el.style.outline = '2px solid rgba(59, 130, 246, 0.6)';
           el.style.outlineOffset = '2px';
-          setTimeout(() => {
-            el.style.outline = prevOutline;
-          }, 1200);
+          setTimeout(function() {
+            try { el.style.outline = prevOutline; } catch(e) {}
+          }, 350);
         };
 
         const style = document.createElement('style');
-        style.innerText = '@keyframes constRipple { 0% { transform:translate(-50%,-50%) scale(1); opacity:1; } 100% { transform:translate(-50%,-50%) scale(4.5); opacity:0; } }';
+        style.innerText = '@keyframes constRipple { 0% { transform:translate(-50%,-50%) scale(1); opacity:1; } 100% { transform:translate(-50%,-50%) scale(3.5); opacity:0; } }';
         document.head.appendChild(style);
       })();
     `;
@@ -2020,6 +2032,8 @@ export class BrowserController {
         result: `Browser tool error (${toolName}): ${err?.message || String(err)}`,
         isError: true,
       };
+    } finally {
+      void this.cleanUpAiOverlays();
     }
   }
 }

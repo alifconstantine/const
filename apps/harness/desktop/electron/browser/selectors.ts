@@ -36,7 +36,7 @@ export function parseSelectorSpec(selector: string): SelectorSpec {
     normalized = `pierce/${normalized.slice("p-pierce/".length)}`;
   }
 
-  const ariaRef = /^(?:aria-ref=|aria-ref\/|ariaref\/|@?)(e\d+)$/i.exec(normalized);
+  const ariaRef = /^(?:aria-ref=|aria-ref\/|ariaref\/|ref[:=\/]\s*|@?|\[?)(e\d+)(?:\]|\s*\(.*?\))?$/i.exec(normalized);
   if (ariaRef) {
     return { kind: "aria-ref", value: ariaRef[1]!.toLowerCase(), raw };
   }
@@ -190,12 +190,19 @@ const findElement = spec => {
   if (!spec) return null;
   if (spec.kind === "aria-ref") {
     const wanted = spec.value;
+    if (typeof window.resolveAriaRef === "function") {
+      try {
+        const found = window.resolveAriaRef(wanted);
+        if (found && found.isConnected !== false) return found;
+      } catch {}
+    }
     if (window.__constElementMap && window.__constElementMap[wanted]) {
       const mapped = window.__constElementMap[wanted];
       if (mapped && mapped.isConnected !== false) return mapped;
     }
     for (const el of allElements()) {
       if (el._ariaRef && el._ariaRef.ref === wanted) return el;
+      if (el.getAttribute && (el.getAttribute("data-aria-ref") === wanted || el.getAttribute("ref") === wanted)) return el;
     }
     return null;
   }

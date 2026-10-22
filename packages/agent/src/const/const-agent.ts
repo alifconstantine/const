@@ -587,6 +587,16 @@ NATIVE BROWSER AUTOMATION PROTOCOL:
   3. Use 'browser_click', 'browser_type', or 'browser_evaluate' (for multi-step sequences in a single turn) referencing element refs ('e1') or semantic selectors ('text/Sign in', 'placeholder/Search').
   4. Use 'browser_console' to inspect full console logs and network requests when debugging web apps, and 'browser_screenshot' (with Set-of-Mark annotations) when visual layout inspection is needed ('read' can inspect the saved screenshot file).
   5. If a human check (CAPTCHA, 2FA, OTP, or secret password) appears, call 'browser_request_help' (setting 'secretWanted' and 'ref' for passwords) so the user can complete it and hand control back.
+- SEQUENTIAL & DEDUPLICATED ACTIONS:
+  1. Browser operations mutate live DOM state and are strictly sequential. Never call redundant clicks, multiple snapshots, or repeated help requests in the same step.
+  2. Once 'browser_request_help' is resolved by the user, immediately proceed with your task or take a 'browser_snapshot' to observe the updated page state instead of repeatedly requesting help.
+
+CONTINUATION & MULTI-TURN PROTOCOL:
+- When the user sends "continue", "lanjutkan", "next", or asks to proceed:
+  1. Carefully inspect the entire conversation history, including prior tool calls, their results, snapshots, and previous responses.
+  2. DO NOT restart from scratch or re-execute navigations, clicks, or searches that have already succeeded in prior turns.
+  3. Resume immediately from the exact state reached in the prior turn.
+  4. If all actions and data gathering are already complete, synthesize your findings into a clear, structured response for the user.
 
 SUB-AGENT DELEGATION PROTOCOL:
 - You can spawn up to 5 concurrent subagents to divide modular tasks cleanly.
@@ -720,6 +730,8 @@ PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
    - Use 'browser_navigate' + 'browser_snapshot' when the student asks to open a website, search online documentation/papers, read an article together, or inspect an interactive web simulation.
    - Use 'browser_click', 'browser_type', or 'browser_evaluate' (for multi-step sequences) referencing element refs ('e1') or semantic selectors ('text/...', 'placeholder/...').
    - If a human check (CAPTCHA, login, 2FA, or secret password) appears, call 'browser_request_help' so the student can complete it and resume.
+   - SEQUENTIAL & DEDUPLICATED ACTIONS: Browser operations mutate live DOM and are strictly sequential. Never call duplicate clicks, multiple snapshots, or repeated help requests in the same step.
+   - CONTINUATION & MULTI-TURN PROTOCOL: When the student sends "continue", "lanjutkan", or asks to proceed, inspect the entire conversation history including prior tool outputs and build upon existing findings without restarting from scratch.
 5. Error Recovery:
    - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}${skillsPrompt}`;
 
@@ -1134,6 +1146,7 @@ export class ConstAgent {
               model: this.config.model,
               messages: formattedMessages,
               tools: activeTools,
+              ...(activeTools && activeTools.length > 0 ? { parallel_tool_calls: false } : {}),
               stream: true,
               stream_options: { include_usage: true },
               max_tokens: resolvedMaxTokens,
@@ -1546,7 +1559,7 @@ export class ConstAgent {
           onEvent({ type: "token", token: flushed.content });
         }
 
-        const toolCalls: ToolCall[] = Array.from(toolCallsMap.values())
+        const rawToolCalls: ToolCall[] = Array.from(toolCallsMap.values())
           .filter((tc) => tc.name && tc.name.trim().length > 0)
           .map((tc) => {
             // Auto-repair synthetic tool calls (e.g. Google Antigravity call:google:run_shell_command)
@@ -1578,12 +1591,47 @@ export class ConstAgent {
           });
 
         // Fallback Tool Call Extraction: Recover tool calls from markdown code blocks or text
-        if (toolCalls.length === 0 && turnContent) {
+        if (rawToolCalls.length === 0 && turnContent) {
           const fallback = extractFallbackToolCalls(turnContent);
           if (fallback.length > 0) {
-            toolCalls.push(...fallback);
+            rawToolCalls.push(...fallback);
             turnContent = turnContent.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/gi, "").trim();
           }
+        }
+
+        // Sequential Deduplication of Tool Calls within the same turn
+        const toolCalls: ToolCall[] = [];
+        let seenBrowserRequestHelp = false;
+
+        for (const tc of rawToolCalls) {
+          const name = tc.function.name;
+
+          // Never execute multiple browser_request_help in the same turn
+          if (name === "browser_request_help") {
+            if (seenBrowserRequestHelp) continue;
+            seenBrowserRequestHelp = true;
+          }
+
+          const prev = toolCalls[toolCalls.length - 1];
+          if (prev) {
+            // Drop duplicate consecutive identical tool calls
+            if (prev.function.name === name) {
+              try {
+                const prevArgs = JSON.stringify(parseToolArguments(prev.function.arguments));
+                const currArgs = JSON.stringify(parseToolArguments(tc.function.arguments));
+                if (prevArgs === currArgs) {
+                  continue;
+                }
+              } catch {}
+            }
+
+            // Drop consecutive browser_snapshot calls in the same turn
+            if (name === "browser_snapshot" && prev.function.name === "browser_snapshot") {
+              continue;
+            }
+          }
+
+          toolCalls.push(tc);
         }
 
         const hasActionableOutput = toolCalls.length > 0 || turnContent.trim().length > 0;
@@ -1684,6 +1732,27 @@ export class ConstAgent {
               message: "Output reached token limit during draft. Directing model to execute tool calls...",
             });
             continue;
+          }
+
+          // If the model had previous tool calls in this session (currentTurn > 1) but output an empty text turn without tools,
+          // prompt it to synthesize its findings instead of terminating with an empty message.
+          if (turnContent.trim().length === 0 && currentTurn > 1 && currentTurn < maxTurns) {
+            conversationHistory.push({
+              role: "user",
+              content: "All previous tool actions are complete. Now provide your final, complete response to the user summarizing your actions and findings.",
+              timestamp: Date.now(),
+            });
+
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: "Tool operations completed. Synthesizing final answer...",
+            });
+            continue;
+          }
+
+          if (turnContent.trim().length === 0 && currentTurn > 1) {
+            turnContent = "Semua instruksi dan operasi tools telah selesai dijalankan.";
           }
 
           const assistantMsg: AgentMessage = {

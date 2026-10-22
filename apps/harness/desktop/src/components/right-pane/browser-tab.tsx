@@ -17,14 +17,7 @@ import {
   VolumeX,
   ZoomIn,
   ZoomOut,
-  Bot,
-  User,
   ShieldAlert,
-  KeyRound,
-  Eye,
-  EyeOff,
-  Send,
-  ArrowRightLeft,
 } from "lucide-react";
 import type { RightPaneTab, BrowserSelectedElement } from "./types";
 import { useTranslation } from "../../lib/i18n";
@@ -123,14 +116,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     since: new Date().toISOString(),
     requested: false,
   });
-  const [latestAiAction, setLatestAiAction] = useState<{
-    type: string;
-    details?: any;
-    timestamp: number;
-  } | null>(null);
-  const [secretInput, setSecretInput] = useState("");
-  const [showSecret, setShowSecret] = useState(false);
-  const [isSubmittingSecret, setIsSubmittingSecret] = useState(false);
+
 
   const webviewRef = useRef<any>(null);
 
@@ -171,42 +157,16 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       if (st) setControlState(st);
     });
 
-    const unsubAction = window.electron.browser.onAiAction((act) => {
-      setLatestAiAction({ ...act, timestamp: Date.now() });
-    });
-
     return () => {
       unsubControl();
-      unsubAction();
     };
   }, []);
 
-  // Control action handlers
-  const handleTakeControl = async () => {
-    if (window.electron?.browser) {
-      const st = await window.electron.browser.takeControl();
-      if (st) setControlState(st);
-    }
-  };
-
+  // Permission action handler
   const handleHandBack = async () => {
     if (window.electron?.browser) {
       const st = await window.electron.browser.releaseControl();
       if (st) setControlState(st);
-    }
-  };
-
-  const handleSupplySecret = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!secretInput || !window.electron?.browser) return;
-    setIsSubmittingSecret(true);
-    try {
-      await window.electron.browser.supplySecret(secretInput);
-      setSecretInput("");
-    } catch (err) {
-      console.error("Failed to supply secret:", err);
-    } finally {
-      setIsSubmittingSecret(false);
     }
   };
 
@@ -747,40 +707,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           />
         </div>
 
-        {/* AI Control Status Pill in Toolbar */}
-        {controlState.holder === "human" ? (
-          <div className="flex items-center gap-1.5 pl-2 pr-1 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-            <span className="font-medium hidden md:inline text-[11px]">You Drive</span>
-            <button
-              type="button"
-              onClick={handleHandBack}
-              className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 transition-colors cursor-pointer font-medium"
-              title={t("rightPane.browserHandControl")}
-            >
-              Hand back
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 pl-2 pr-1 h-7 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-400 text-[11px] shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
-            <span className="font-medium hidden md:inline text-[11px]">AI Pilot</span>
-            {latestAiAction && Date.now() - latestAiAction.timestamp < 5000 && (
-              <span className="text-[10px] text-blue-300 font-mono bg-blue-500/20 px-1 py-0.5 rounded max-w-[90px] truncate hidden lg:inline">
-                {latestAiAction.type}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleTakeControl}
-              className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/35 text-blue-200 transition-colors cursor-pointer"
-              title={t("rightPane.browserTakeControl")}
-            >
-              Take over
-            </button>
-          </div>
-        )}
-
         {/* Responsive Size Button */}
         <div className="relative" ref={sizeMenuRef}>
           <button
@@ -966,30 +892,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
         </div>
       </div>
 
-      {/* AI Browser Control Status Banners (OpenBot & oh-my-pi inspired) */}
-      {/* Case 1: You have control (manual takeover without active AI help prompt) */}
-      {controlState.holder === "human" && !controlState.requested && (
-        <div className="bg-[#0b1f13] border-b border-emerald-500/30 px-3.5 py-2 flex items-center justify-between text-xs text-emerald-200 shrink-0 z-10 animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="font-semibold text-emerald-100 shrink-0">You have control of the browser</span>
-            <span className="text-emerald-300/70 truncate text-[11px] hidden sm:inline">
-              The assistant is paused. You can click, type, or solve prompts directly.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleHandBack}
-            className="px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer shadow-xs ml-2"
-          >
-            <ArrowRightLeft className="w-3 h-3" />
-            <span>Hand back to AI</span>
-          </button>
-        </div>
-      )}
-
-      {/* Case 2: AI Needs Help (CAPTCHA, 2FA, OTP, Confirmation) */}
-      {controlState.requested && !controlState.secretWanted && (
+      {/* AI Permission Banner (Waiting for Human Verification / CAPTCHA / 2FA) */}
+      {controlState.requested && (
         <div className="bg-[#241508] border-b border-amber-500/40 px-3.5 py-2.5 flex items-center justify-between text-xs text-amber-200 shrink-0 z-10 animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
@@ -1005,16 +909,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
-            {controlState.holder !== "human" && (
-              <button
-                type="button"
-                onClick={handleTakeControl}
-                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Take control</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={handleHandBack}
@@ -1024,61 +918,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               <span>Done — Resume AI</span>
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Case 3: AI Requests Secret / Password Input */}
-      {controlState.requested && controlState.secretWanted && (
-        <div className="bg-[#170e28] border-b border-violet-500/40 p-3 flex flex-col gap-2.5 text-xs text-violet-200 shrink-0 z-10 animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400 shrink-0">
-                <KeyRound className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <span className="font-semibold text-white">Enter {controlState.secretWanted}</span>
-                <p className="text-[11px] text-violet-300/70 mt-0.5">
-                  Typed directly into the page. The value is securely handled and never exposed in chat.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleTakeControl}
-              className="text-[11px] text-violet-400 hover:text-violet-200 underline cursor-pointer shrink-0"
-            >
-              Take full control instead
-            </button>
-          </div>
-
-          <form onSubmit={handleSupplySecret} className="flex items-center gap-2">
-            <div className="flex-1 relative flex items-center">
-              <input
-                type={showSecret ? "text" : "password"}
-                value={secretInput}
-                onChange={(e) => setSecretInput(e.target.value)}
-                placeholder={`Type ${controlState.secretWanted}...`}
-                className="w-full h-8 px-3 pr-8 bg-[#10091d] border border-violet-500/35 focus:border-violet-400 rounded-lg text-xs text-white placeholder-violet-400/40 outline-none font-mono"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => setShowSecret((prev) => !prev)}
-                className="absolute right-2 text-violet-400/70 hover:text-violet-200 cursor-pointer"
-                title={showSecret ? "Hide password" : "Show password"}
-              >
-                {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            <button
-              type="submit"
-              disabled={!secretInput || isSubmittingSecret}
-              className="h-8 px-3.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
-            >
-              <Send className="w-3 h-3" />
-              <span>{isSubmittingSecret ? "Sending..." : "Send to page"}</span>
-            </button>
-          </form>
         </div>
       )}
 

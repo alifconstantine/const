@@ -222,6 +222,54 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 
 ---
 
+## Minimal Browser Chrome & Human-in-the-Loop Architecture
+
+### 1. Minimal Browser Chrome (Zero Mode Friction)
+- **Elimination of "AI Pilot" / "You Drive" Mode Friction**: The browser tab functions as a natural, fluid viewport. Artificial takeover buttons, "AI Pilot" pulsing pills, and "You Drive" mode states in the toolbar are strictly eliminated.
+- **Always-Interactive Viewport**: The human user and the AI assistant share the viewport seamlessly. The user may click or inspect the page at any time without having to toggle a "Take over" mode.
+- **Minimal Navigation Header**: The browser toolbar contains strictly:
+  1. Navigation buttons: Back (`ChevronLeft`), Forward (`ChevronRight`), and Reload (`RotateCw`).
+  2. Unified Address Bar: Shows current URL or accepts search queries (`#242424` fill, `#333333` hairline border, `font-sans` placeholder).
+  3. Viewport Preset Selector: Mobile, Tablet, Desktop responsive testing presets (`MonitorSmartphone`).
+  4. More Options: DevTools, copy link, zoom controls, and hard reload (`MoreHorizontal`).
+
+### 2. Human-in-the-Loop Permission Banner Pattern
+- **Single Source of Truth**: Human intervention is requested strictly via the tool `browser_request_help` (for CAPTCHAs, 2FA/OTP verification, Cloudflare checks, or sensitive authentication).
+- **Non-Intrusive Amber Permission Banner**:
+  - Activated strictly when `controlState.requested === true`.
+  - Background: `#241508` (dark amber studio fill), hairline boundary `border-amber-500/40`.
+  - Iconography: `ShieldAlert` in `amber-400` inside a rounded-lg container.
+  - Contextual Message: Displays the assistant's stated reason (`controlState.reason || "Please complete manual verification on the page, then click Done."`).
+  - Single Resolution Action: One prominent button: `"Done — Resume AI"` (`bg-amber-500 hover:bg-amber-400 text-black font-semibold`).
+  - Clicking `"Done — Resume AI"` calls `window.electron.browser.releaseControl()`, clearing the banner and immediately resolving the agent's waiting promise so execution resumes seamlessly.
+- **Prohibited UI Patterns**:
+  - Modal blockers that cover the entire browser viewport (preventing the user from solving the CAPTCHA).
+  - Floating password forms ("AI Requests Secret") that duplicate browser input fields. Users enter credentials directly into the webpage.
+  - Persistent "You have control" banners that clutter the screen when no help is requested.
+
+### 3. Zero Lingering Overlays & Elimination of Static "AI" Pointers
+- **Strict Prohibition of Static "AI" Pointers or Badges**: The browser controller must never leave persistent blue dots, crosshairs, or badges labeled "AI" on the webpage after performing an action (such as `browser_click` or `browser_type`).
+- **Complete DOM Cleanliness After Tool Calls**: Any transient visual cues (such as click ripples or element outlines) must be brief (under 350ms) and self-destructing. The controller must actively clean up and remove any overlay elements (`__const_ai_pointer`, `__const_ai_cursor_overlay`) in a `finally` block immediately upon tool completion.
+
+---
+
+## Multi-Turn Tool Continuity & Deduplication Protocol
+
+### 1. Tool Call Serialization & Continuation Integrity
+- **Full History Preservation**: When formatting chat history for the LLM during continuation turns ("continue", "lanjutkan", "next"), all previous tool calls (`tool_calls`) and their execution results (`role: "tool"`) must be serialized and preserved.
+- **No Amnesia on Continue**: Never truncate assistant tool calls to `{ role: "assistant", content: "" }`. Doing so causes amnesia, where the model loses track of elements it clicked, URLs it visited, and data it inspected.
+- **Continuation Directive**: When the user requests continuation, the agent must build upon prior results rather than restarting investigations from scratch.
+
+### 2. Sequential Browser Execution & Deduplication
+- **Sequential Calls (`parallel_tool_calls: false`)**: Web browser interactions change the live DOM synchronously. Models must execute browser actions sequentially rather than emitting multiple parallel actions in a single turn.
+- **In-Turn Deduplication**: Filter out duplicate consecutive identical tool calls within the same turn (e.g., duplicate consecutive clicks on the same element ref or duplicate consecutive snapshots).
+- **Single Help Request**: Never issue multiple `browser_request_help` calls in a single turn or loop. Once resolved, the agent immediately inspects the result and proceeds.
+
+### 3. Synthesis Guarantee for Multi-Turn Tasks
+- **Never Output Empty Assistant Cards**: If an agent completes multiple tool turns and the model outputs an empty text turn without tools, the system must prompt the model to synthesize a complete final answer rather than terminating with an empty chat card.
+
+---
+
 ## Iconography & Empty States
 
 ### 1. Lucide Vector Icons over Emojis
@@ -250,6 +298,9 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 - **Do** use `Layers` for the Artifacts tab and empty states.
 - **Do** wrap empty state icons in minimalist rounded squircles (`rounded-2xl`).
 - **Do** maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#ffffff` for primary reading text.
+- **Do** keep the browser chrome minimal and clean — toolbar contains only navigation, URL input, responsive presets, and options.
+- **Do** display the amber Permission banner only when `browser_request_help` is actively waiting for human intervention.
+- **Do** serialize both `tool_calls` and `role: "tool"` messages in full so "continue" retains complete memory of previous actions.
 
 ### Don't
 - **Don't** apply `font-mono` to UI buttons, project selectors, sources pills, or list numbers.
@@ -260,3 +311,6 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 - **Don't** use `Sparkles` for Artifacts or non-AI feature tabs.
 - **Don't** use emojis as interface icons or empty state visual representations.
 - **Don't** use heavy drop shadows (`shadow-md`, `shadow-xl`) on workspace panels.
+- **Don't** display "AI Pilot", "You Drive", or "Take over" mode pills in the browser header.
+- **Don't** truncate previous tool history into empty assistant strings when sending turns to the LLM.
+- **Don't** leave persistent blue pointer dots, "AI" badges, or click overlays on the webpage DOM after tool calls.

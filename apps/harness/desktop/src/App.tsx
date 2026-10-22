@@ -145,22 +145,69 @@ function formatChatMessageForLlm(
   m: ChatMessage,
   allConvos: ConversationItem[],
   targetModelId?: string
-): { role: string; content: string | any[] } {
+): Array<{
+  role: string;
+  content: string | any[] | null;
+  tool_calls?: any[];
+  tool_call_id?: string;
+  name?: string;
+  thinking?: string;
+}> {
   if (m.role !== "user") {
-    return {
-      role: m.role,
-      content: m.content,
-    };
+    if (m.toolCalls && m.toolCalls.length > 0) {
+      const toolMessages: any[] = [];
+      const formattedToolCalls = m.toolCalls.map((tc, idx) => ({
+        id: tc.id || `call_${m.timestamp || Date.now()}_${idx}`,
+        type: "function" as const,
+        function: {
+          name: tc.name,
+          arguments: typeof tc.args === "string" ? tc.args : JSON.stringify(tc.args ?? {}),
+        },
+      }));
+
+      toolMessages.push({
+        role: "assistant",
+        content: m.content || null,
+        thinking: m.thinking || undefined,
+        tool_calls: formattedToolCalls,
+      });
+
+      for (const tc of m.toolCalls) {
+        const resultStr =
+          typeof tc.result === "string"
+            ? tc.result
+            : tc.result !== undefined && tc.result !== null
+            ? JSON.stringify(tc.result)
+            : "";
+        toolMessages.push({
+          role: "tool",
+          tool_call_id: tc.id || `call_${m.timestamp || Date.now()}`,
+          name: tc.name,
+          content: resultStr,
+        });
+      }
+      return toolMessages;
+    }
+
+    return [
+      {
+        role: m.role,
+        content: m.content || "",
+        thinking: m.thinking || undefined,
+      },
+    ];
   }
 
   // Resolve @-mentioned sessions in user prompt
   let textContent = resolveMentionedSessionsInPrompt(m.content || "", allConvos);
 
   if (!m.attachments || m.attachments.length === 0) {
-    return {
-      role: "user",
-      content: textContent,
-    };
+    return [
+      {
+        role: "user",
+        content: textContent,
+      },
+    ];
   }
 
   const targetModel = targetModelId
@@ -249,19 +296,23 @@ function formatChatMessageForLlm(
   }
 
   if (imageParts.length > 0) {
-    return {
-      role: "user",
-      content: [
-        { type: "text", text: fullText },
-        ...imageParts,
-      ],
-    };
+    return [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: fullText },
+          ...imageParts,
+        ],
+      },
+    ];
   }
 
-  return {
-    role: "user",
-    content: fullText,
-  };
+  return [
+    {
+      role: "user",
+      content: fullText,
+    },
+  ];
 }
 
 interface ConversationRightPaneState {
@@ -1876,7 +1927,7 @@ function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = newStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos, activeModelItem?.id || activeModelItem?.name));
+        const payloadMessages = newStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, activeModelItem?.id || activeModelItem?.name));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
@@ -3159,7 +3210,7 @@ function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = currentStreamMessages.map((m) => formatChatMessageForLlm(m, allConvos, model));
+        const payloadMessages = currentStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, model));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
