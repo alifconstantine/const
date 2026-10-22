@@ -38,7 +38,6 @@ import {
   Brain,
   Mic,
   MessageSquare,
-  ImageIcon,
 } from "lucide-react";
 import { formatTokenDisplay, BUILTIN_MODELS, type ModelPricing } from "@/lib/model-specs";
 import { calculateQuotaMetrics } from "@/lib/quota";
@@ -100,7 +99,7 @@ export default function ModelsPage() {
   }, [quota]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "image" | "stt" | "search">("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "stt" | "search">("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
 
@@ -166,13 +165,11 @@ export default function ModelsPage() {
         if (selectedCategory !== "all") {
           const isAudio = model.category === "stt" || model.inputTypes?.includes("audio") || model.modelId.includes("whisper");
           const isSearch = model.category === "search" || model.inputTypes?.includes("search") || model.modelId === "const-search";
-          const isImage = model.category === "image" || model.inputTypes?.includes("image") || model.outputTypes?.includes("image") || model.modelId.includes("image");
-          const isLlm = !isAudio && !isSearch && !isImage;
+          const isLlm = !isAudio && !isSearch;
 
           if (selectedCategory === "llm" && !isLlm) return false;
           if (selectedCategory === "stt" && !isAudio) return false;
           if (selectedCategory === "search" && !isSearch) return false;
-          if (selectedCategory === "image" && !isImage) return false;
         }
 
         if (!query) return true;
@@ -279,7 +276,7 @@ export default function ModelsPage() {
             </div>
 
             <p className="text-[11px] text-muted-foreground font-light">
-              Shared weekly token and image quota across all Const models. Resets in {metrics.resetsInText}.
+              Shared weekly token quota across all Const models. Resets in {metrics.resetsInText}.
             </p>
           </div>
         </Card>
@@ -291,7 +288,6 @@ export default function ModelsPage() {
             {[
               { id: "all", label: "All Modalities", icon: null },
               { id: "llm", label: "LLM / Chat", icon: MessageSquare },
-              { id: "image", label: "Image", icon: ImageIcon },
               { id: "stt", label: "Audio / STT", icon: Mic },
               { id: "search", label: "Search", icon: Search },
             ].map((cat) => {

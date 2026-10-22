@@ -312,36 +312,6 @@ export async function GET(req: NextRequest) {
         unit: "/ search",
       },
     },
-    {
-      id: "gpt-image-2",
-      name: "GPT Image 2",
-      display_name: "GPT Image 2",
-      object: "model",
-      created: 1700000000,
-      owned_by: "const",
-      provider: "const",
-      provider_name: "Const",
-      type: "image",
-      category: "image",
-      endpoint: "/v1/images/generations",
-      context_length: null,
-      max_input_tokens: null,
-      max_output_tokens: null,
-      supports_thinking: false,
-      supports_reasoning: false,
-      supportsThinking: false,
-      supportsReasoningEffort: false,
-      capabilities: {
-        image_generation: true,
-        image_editing: true,
-      },
-      input_modalities: ["text", "image"],
-      output_modalities: ["image"],
-      pricing: {
-        completion: "$0.02",
-        unit: "/ image",
-      },
-    },
   ];
 
   const modelsList = [...defaultModels];

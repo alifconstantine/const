@@ -150,19 +150,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (model.toLowerCase().includes("gpt-image") || model.toLowerCase() === "gpt-image-2") {
-      return NextResponse.json(
-        {
-          error: {
-            message: `Model '${model}' is an image model. Please use POST /v1/images/generations or POST /v1/images/edits instead.`,
-            type: "invalid_request_error",
-            code: "invalid_endpoint_for_model",
-          },
-        },
-        { status: 400 }
-      );
-    }
-
     if (!messages || messages.length === 0) {
       return NextResponse.json(
         { error: { message: "The 'messages' array must not be empty." } },

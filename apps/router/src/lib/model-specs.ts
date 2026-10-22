@@ -148,26 +148,6 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     outputTypes: ["text"],
   },
   {
-    id: "gpt-image-2",
-    name: "GPT Image 2",
-    modelId: "gpt-image-2",
-    provider: "const",
-    providerName: "Const",
-    category: "image",
-    endpoint: "/v1/images/generations",
-    supportsThinking: false,
-    contextWindow: "-",
-    maxOutputTokens: "-",
-    pricing: {
-      input: "-",
-      cache: "-",
-      output: "$0.02",
-      unit: "/ image",
-    },
-    inputTypes: ["text", "image"],
-    outputTypes: ["image"],
-  },
-  {
     id: "whisper-large-v3-turbo",
     name: "Whisper Large V3 Turbo",
     modelId: "whisper-large-v3-turbo",
@@ -352,9 +332,7 @@ export function isNonGenerativeModel(modelId: string): boolean {
     clean.includes("flux") ||
     clean.includes("imagen") ||
     clean.includes("midjourney") ||
-    clean.includes("stable-diffusion") ||
-    clean.includes("gpt-image") ||
-    clean.includes("image-2")
+    clean.includes("stable-diffusion")
   );
 }
 
@@ -365,8 +343,6 @@ export function isImageModel(modelId: string): boolean {
   if (!modelId) return false;
   const clean = modelId.toLowerCase().trim();
   return (
-    clean === "gpt-image-2" ||
-    clean.includes("gpt-image") ||
     clean.includes("dall-e") ||
     clean.includes("imagen") ||
     clean.includes("flux") ||

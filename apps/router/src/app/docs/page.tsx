@@ -54,8 +54,6 @@ const NAV_SECTIONS: NavSection[] = [
   { id: "streaming", title: "Streaming" },
   { id: "models", title: "Models & Pricing" },
   { id: "reasoning", title: "Reasoning (Thinking)" },
-  { id: "image-generation", title: "Image generation" },
-  { id: "image-edits", title: "Image edits" },
   { id: "audio-transcription", title: "Audio transcription" },
   { id: "speech", title: "Speech (TTS)" },
   { id: "music-generation", title: "Music generation" },
@@ -459,8 +457,6 @@ console.log(data.choices[0].message.content);`}</pre>
                   { method: "GET", path: "/v1/models", protocol: "OpenAI Models List", desc: "Lists all available models (?type=llm, audio, search, all)" },
                   { method: "POST", path: "/v1/audio/transcriptions", protocol: "OpenAI Audio Whisper", desc: "Speech-to-text audio transcription (Whisper Large V3 Turbo)" },
                   { method: "POST", path: "/v1/search", protocol: "Const Search (Exa AI)", desc: "Web search and deep research grounding" },
-                  { method: "POST", path: "/v1/images/generations", protocol: "OpenAI Image Generation", desc: "Text-to-image synthesis (Imagen 3, DALL-E, Flux)" },
-                  { method: "POST", path: "/v1/images/edits", protocol: "OpenAI Image Edits", desc: "Multipart inpainting & image editing" },
                   { method: "POST", path: "/v1/audio/speech", protocol: "OpenAI Audio Speech (TTS)", desc: "Text-to-speech audio streaming" },
                   { method: "POST", path: "/v1/audio/music", protocol: "Const Generative Music", desc: "Full-length music track generation" },
                   { method: "POST", path: "/v1/embeddings", protocol: "OpenAI Embeddings", desc: "High-dimensional dense vector embeddings" },
@@ -705,84 +701,7 @@ data: [DONE]`}</pre>
               </div>
             </section>
 
-            {/* 7. Image generation */}
-            <section id="image-generation" className="space-y-4 scroll-mt-24">
-              <h2 className="text-2xl font-serif font-normal text-white">
-                Image generation
-              </h2>
-              <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Generate high-resolution visual assets directly from descriptive text prompts via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/generations</code>. Fully compatible with OpenAI Image Generation SDKs.
-              </p>
-
-              <div className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] p-4 font-mono text-xs text-[#d4d4d4] space-y-2">
-                <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
-                  <span>CURL EXAMPLE</span>
-                  <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/generations" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{\n    "model": "gpt-image-2",\n    "prompt": "Minimalist architecture of a modern glass pavilion in mist, editorial photograph",\n    "n": 1,\n    "size": "1024x1024",\n    "response_format": "url"\n  }'`, "img-gen-curl")}
-                    className="hover:text-white transition-colors cursor-pointer"
-                  >
-                    {copiedCode === "img-gen-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
-                  </button>
-                </div>
-                <pre>{`curl -X POST "${baseUrl}/images/generations" \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer sk-const-live-yourkey" \\
-  -d '{
-    "model": "gpt-image-2",
-    "prompt": "Minimalist architecture of a modern glass pavilion in mist, editorial photograph",
-    "n": 1,
-    "size": "1024x1024",
-    "response_format": "url"
-  }'`}</pre>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-2 text-xs text-[#969696] font-light">
-                <span className="font-semibold text-white">Supported Sizes &amp; Formats:</span>
-                <ul className="list-disc list-inside space-y-1 pt-1 text-[#d4d4d4]">
-                  <li><code className="font-mono text-white">size</code>: <code className="font-mono text-[#969696]">1024x1024</code> (1k), <code className="font-mono text-[#969696]">2048x2048</code> (2k), <code className="font-mono text-[#969696]">4096x4096</code> (4k)</li>
-                  <li><code className="font-mono text-white">response_format</code>: <code className="font-mono text-[#969696]">&quot;url&quot;</code> (temporary signed storage URL) or <code className="font-mono text-[#969696]">&quot;b64_json&quot;</code> (inline Base64 payload)</li>
-                  <li><code className="font-mono text-white">models</code>: <code className="font-mono text-white font-semibold">gpt-image-2</code> (Const Image), <code className="font-mono text-[#969696]">imagen-3.0-generate-002</code>, <code className="font-mono text-[#969696]">dall-e-3</code>, <code className="font-mono text-[#969696]">flux-1-schnell</code></li>
-                </ul>
-              </div>
-            </section>
-
-            {/* 8. Image edits */}
-            <section id="image-edits" className="space-y-4 scroll-mt-24">
-              <h2 className="text-2xl font-serif font-normal text-white">
-                Image edits
-              </h2>
-              <p className="text-xs sm:text-sm text-[#969696] font-light leading-relaxed">
-                Edit, inpaint, or modify existing images by supplying an original image and a prompt specifying the alterations via <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">POST /v1/images/edits</code>. Powered by Const Images (<code className="text-white font-mono">gpt-image-2</code>). Uses <code className="text-[#d4d4d4] font-mono bg-[#1b1b1b] px-1.5 py-0.5 rounded border border-[#2e2e2e]">multipart/form-data</code> or JSON payload.
-              </p>
-
-              <div className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] p-4 font-mono text-xs text-[#d4d4d4] space-y-2">
-                <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
-                  <span>MULTIPART CURL SNIPPET</span>
-                  <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/images/edits" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -F image="@original.png" \\\n  -F mask="@mask.png" \\\n  -F prompt="Add a sleek wooden coffee table in the center of the room" \\\n  -F model="gpt-image-2" \\\n  -F size="1024x1024"`, "img-edit-curl")}
-                    className="hover:text-white transition-colors cursor-pointer"
-                  >
-                    {copiedCode === "img-edit-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
-                  </button>
-                </div>
-                <pre>{`curl -X POST "${baseUrl}/images/edits" \\
-  -H "Authorization: Bearer sk-const-live-yourkey" \\
-  -F image="@original.png" \\
-  -F mask="@mask.png" \\
-  -F prompt="Add a sleek wooden coffee table in the center of the room" \\
-  -F model="gpt-image-2" \\
-  -F size="1024x1024"`}</pre>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5 text-xs text-[#969696] font-light">
-                <span className="font-semibold text-white">Mask Specification:</span>
-                <p>
-                  The <code className="font-mono text-[#d4d4d4]">mask</code> parameter is an optional PNG file where transparency indicates the exact area to replace. If omitted, the entire image is modified guided by the prompt.
-                </p>
-              </div>
-            </section>
-
-            {/* 9. Audio transcription */}
+            {/* Audio transcription */}
             <section id="audio-transcription" className="space-y-4 scroll-mt-24">
               <h2 className="text-2xl font-serif font-normal text-white">
                 Audio transcription
