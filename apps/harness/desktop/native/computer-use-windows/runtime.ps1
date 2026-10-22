@@ -101,6 +101,31 @@ public static class ConstDesktopWin32 {
     public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint lpdwProcessId);
 
     [DllImport("user32.dll")]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    public static bool ForceForegroundWindow(IntPtr hwnd) {
+        if (hwnd == IntPtr.Zero) return false;
+        ShowWindow(hwnd, 9);
+        IntPtr foreHwnd = GetForegroundWindow();
+        if (foreHwnd == hwnd) return true;
+        uint forePid = 0;
+        uint appPid = 0;
+        uint foreThread = GetWindowThreadProcessId(foreHwnd, out forePid);
+        uint appThread = GetWindowThreadProcessId(hwnd, out appPid);
+        if (foreThread != 0 && appThread != 0 && foreThread != appThread) {
+            AttachThreadInput(foreThread, appThread, true);
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            AttachThreadInput(foreThread, appThread, false);
+        } else {
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+        }
+        try { SwitchToThisWindow(hwnd, true); } catch {}
+        return true;
+    }
+
+    [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
     [DllImport("user32.dll")]
