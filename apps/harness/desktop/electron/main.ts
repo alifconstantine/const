@@ -294,7 +294,7 @@ try {
 
 // Explicitly set app name, AUMID and userData
 app.setName("Const Harness");
-if (process.platform === "win32" && app.isPackaged) {
+if (process.platform === "win32") {
   app.setAppUserModelId("id.web.const.harness.desktop");
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");

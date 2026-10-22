@@ -372,6 +372,23 @@ function AuthenticatedContent({
   onSwitchAccount: () => void;
 }) {
   const user = useQuery(api.auth.queries.currentUser, {});
+  const [cachedUser, setCachedUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("const_cached_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (user) {
+      setCachedUser(user);
+      try {
+        localStorage.setItem("const_cached_user", JSON.stringify(user));
+      } catch {}
+    }
+  }, [user]);
   const [localProfile, setLocalProfile] = useState<{ name?: string; image?: string }>(() => {
     try {
       const saved = localStorage.getItem("const_custom_user_profile");
@@ -409,16 +426,18 @@ function AuthenticatedContent({
     return () => window.removeEventListener("const:user-profile-updated", handleProfileUpdate);
   }, []);
 
+  const activeUser = user || cachedUser;
+
   const effectiveUser = useMemo(() => {
     const customName = localProfile.name?.trim();
     const customImage = localProfile.image?.trim();
-    if (!user && !customName && !customImage) return user;
+    if (!activeUser && !customName && !customImage) return activeUser;
     return {
-      ...(user || { id: "local-user-session", email: "Local Workspace" }),
-      name: customName ? customName : user?.name,
-      image: customImage ? customImage : user?.image,
+      ...(activeUser || { id: "local-user-session", email: "Local Workspace" }),
+      name: customName ? customName : activeUser?.name,
+      image: customImage ? customImage : activeUser?.image,
     };
-  }, [user, localProfile]);
+  }, [activeUser, localProfile]);
 
   const { token } = useAppAuth();
   const { t } = useTranslation();
@@ -5043,6 +5062,7 @@ export default function App() {
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
     localStorage.removeItem("const_custom_user_profile");
+    localStorage.removeItem("const_cached_user");
     setToken(null);
     setIsWaitingAuth(false);
   };
@@ -5051,6 +5071,7 @@ export default function App() {
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
     localStorage.removeItem("const_custom_user_profile");
+    localStorage.removeItem("const_cached_user");
     setToken(null);
     setIsWaitingAuth(true);
 

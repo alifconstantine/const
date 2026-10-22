@@ -299,7 +299,8 @@ function Test-ConstBrowserProcess($Process) {
 function Get-ConstRootElement($Process) {
     if ($Process.MainWindowHandle -ne 0) {
         try {
-            return [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
+            $el = [Windows.Automation.AutomationElement]::FromHandle([IntPtr]$Process.MainWindowHandle)
+            if ($null -ne $el) { return $el }
         } catch {}
     }
     try {
@@ -307,6 +308,15 @@ function Get-ConstRootElement($Process) {
         $condition = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$Process.Id)
         $elem = $root.FindFirst([Windows.Automation.TreeScope]::Children, $condition)
         if ($null -ne $elem) { return $elem }
+
+        $elem = $root.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)
+        if ($null -ne $elem) { return $elem }
+
+        if (-not [string]::IsNullOrWhiteSpace($Process.MainWindowTitle)) {
+            $nameCond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, $Process.MainWindowTitle)
+            $elem = $root.FindFirst([Windows.Automation.TreeScope]::Children, $nameCond)
+            if ($null -ne $elem) { return $elem }
+        }
     } catch {}
     throw "No top-level UI Automation window is available for $($Process.ProcessName)."
 }
@@ -385,10 +395,7 @@ function Restore-ConstWindow($Process) {
         } catch {}
     }
     if ($hwnd -eq [IntPtr]::Zero) { return }
-    [void][ConstDesktopWin32]::ShowWindow($hwnd, 9)
-    [void][ConstDesktopWin32]::BringWindowToTop($hwnd)
-    [void][ConstDesktopWin32]::SetForegroundWindow($hwnd)
-    try { [ConstDesktopWin32]::SwitchToThisWindow($hwnd, $true) } catch {}
+    [void][ConstDesktopWin32]::ForceForegroundWindow($hwnd)
 }
 
 function Test-ConstWindowFocused([IntPtr]$WindowHandle) {
@@ -415,8 +422,10 @@ function Wait-ConstWindowFocused([IntPtr]$WindowHandle, [int]$TimeoutMillisecond
 }
 
 function Assert-ConstKeyboardFocus([IntPtr]$WindowHandle, $Operation) {
+    if ($WindowHandle -eq [IntPtr]::Zero) { return }
     if (Test-ConstWindowFocused $WindowHandle) { return }
     if ([bool]$Operation.restoreWindow) {
+        [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle)
         if (Wait-ConstWindowFocused $WindowHandle 500) { return }
         throw "window_not_focused: keyboard input requires the target window to be focused; restoreWindow was requested but the target window is still not focused; bring it forward manually or check desktop permissions"
     }
@@ -1070,7 +1079,7 @@ function Get-ConstElementScreenPoint($Element) {
 }
 
 function Send-ConstMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count, [string]$Modifiers) {
-    [void][ConstDesktopWin32]::SetForegroundWindow($WindowHandle)
+    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
     [void][ConstDesktopWin32]::SetCursorPos($ScreenX, $ScreenY)
     $buttonName = if ([string]::IsNullOrWhiteSpace($Button)) { "left" } else { $Button.ToLowerInvariant() }
     switch ($buttonName) {
@@ -1101,7 +1110,7 @@ function Send-ConstMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$Screen
 }
 
 function Send-ConstDrag([IntPtr]$WindowHandle, $From, $To) {
-    [void][ConstDesktopWin32]::SetForegroundWindow($WindowHandle)
+    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
     $startX = [int]$From.x
     $startY = [int]$From.y
     $endX = [int]$To.x
@@ -1118,7 +1127,7 @@ function Send-ConstDrag([IntPtr]$WindowHandle, $From, $To) {
 }
 
 function Send-ConstText([IntPtr]$WindowHandle, [string]$Text) {
-    [void][ConstDesktopWin32]::SetForegroundWindow($WindowHandle)
+    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
     $hasNonAscii = $false
     foreach ($character in $Text.ToCharArray()) {
         if ([int][char]$character -gt 0x7F) { $hasNonAscii = $true; break }
@@ -1146,7 +1155,7 @@ function Get-ConstVirtualKey([string]$Key) {
 }
 
 function Send-ConstKey([IntPtr]$WindowHandle, [string]$Key) {
-    [void][ConstDesktopWin32]::SetForegroundWindow($WindowHandle)
+    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
     [System.Windows.Forms.SendKeys]::SendWait((ConvertTo-ConstSendKeysKey $Key))
 }
 
@@ -1180,7 +1189,7 @@ function Send-ConstHotkey([IntPtr]$WindowHandle, [string]$KeySpec) {
             $prefix += ConvertTo-ConstSendKeysModifier $modifier
         }
     }
-    [void][ConstDesktopWin32]::SetForegroundWindow($WindowHandle)
+    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
     [System.Windows.Forms.SendKeys]::SendWait($prefix + (ConvertTo-ConstSendKeysKey $key))
 }
 
@@ -1274,6 +1283,13 @@ function Invoke-ConstOperation($Operation) {
     $fromElement = Find-ConstElement $root $Operation.fromElement
     $toElement = Find-ConstElement $root $Operation.toElement
     $handle = [IntPtr]$process.MainWindowHandle
+    if ($handle -eq [IntPtr]::Zero -and $null -ne $root) {
+        try {
+            if ($root.Current.NativeWindowHandle -ne 0) {
+                $handle = [IntPtr]$root.Current.NativeWindowHandle
+            }
+        } catch {}
+    }
     if ($Operation.tool -in @("type_text", "press_key", "hotkey", "paste_text")) {
         Assert-ConstKeyboardFocus $handle $Operation
     }
