@@ -146,7 +146,7 @@ export default function IntegrationsPage() {
       steps: [
         { title: "Open Settings", desc: "Open Cursor Settings > Models > OpenAI API Key." },
         { title: "Configure Base URL", desc: `Enable 'Override OpenAI Base URL' and paste: ${baseUrl}` },
-        { title: "Add Const Models", desc: "Add model names: 'gemini-3.8-flash' or 'combo/coding'." },
+        { title: "Add Const Models", desc: "Add model names: 'gemini-3.8-flash' or custom 'combo/<slug>'." },
       ],
       defaultSnippet: (b, k) => `# In Cursor Settings > Models:
 OpenAI API Base URL: ${b}
@@ -154,8 +154,8 @@ API Key: ${k}
 
 # Recommended Model IDs to add:
 gemini-3.8-flash
-combo/coding
-combo/fast`,
+glm-5.3-flash
+deepseek-v4.1-flash`,
     },
     {
       id: "continue",
@@ -184,9 +184,9 @@ combo/fast`,
       "apiKey": "${k}"
     },
     {
-      "title": "Const - Coding Combo",
+      "title": "Const - GLM Flash",
       "provider": "openai",
-      "model": "combo/coding",
+      "model": "glm-5.3-flash",
       "apiBase": "${b}",
       "apiKey": "${k}"
     }
@@ -208,13 +208,13 @@ combo/fast`,
       steps: [
         { title: "Select API Provider", desc: "In Cline settings, choose 'OpenAI Compatible'." },
         { title: "Enter Credentials", desc: `Set Base URL to ${baseUrl} and enter your Const API key.` },
-        { title: "Specify Model ID", desc: "Set Model ID to 'combo/coding' or 'gemini-3.8-flash'." },
+        { title: "Specify Model ID", desc: "Set Model ID to 'gemini-3.8-flash' or your custom 'combo/<slug>'." },
       ],
       defaultSnippet: (b, k) => `// Cline / Roo Code Settings:
 Provider: OpenAI Compatible
 Base URL: ${b}
 API Key: ${k}
-Model ID: combo/coding`,
+Model ID: gemini-3.8-flash`,
     },
     {
       id: "windsurf",
@@ -393,7 +393,7 @@ const constAi = createOpenAI({
 });
 
 const { text } = await generateText({
-  model: constAi("combo/coding"),
+  model: constAi("gemini-3.8-flash"),
   prompt: "How does rate limiting work?",
 });
 
@@ -412,12 +412,12 @@ console.log(text);`,
       configType: "python",
       steps: [
         { title: "Import ChatOpenAI", desc: "from langchain_openai import ChatOpenAI" },
-        { title: "Configure Endpoint", desc: `Set openai_api_base="${baseUrl}" and model="combo/coding"` },
+        { title: "Configure Endpoint", desc: `Set openai_api_base="${baseUrl}" and model="gemini-3.8-flash"` },
       ],
       defaultSnippet: (b, k) => `from langchain_openai import ChatOpenAI
 
 llm = ChatOpenAI(
-    model="combo/coding",
+    model="gemini-3.8-flash",
     openai_api_base="${b}",
     openai_api_key="${k}",
     temperature=0.2,

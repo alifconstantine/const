@@ -360,7 +360,7 @@ export async function GET(req: NextRequest) {
         const userCombos = await client.query(api.router.combos.listCombos, {});
         if (userCombos && Array.isArray(userCombos)) {
           for (const c of userCombos) {
-            if (!c.isBuiltin && c.status === "active") {
+            if (c.status === "active") {
               const comboId = `combo/${c.slug}`;
               modelsList.push({
                 id: comboId,
