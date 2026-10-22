@@ -229,72 +229,87 @@ export const listLogs = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return [];
 
-    let logs = await ctx.db
-      .query("routerLogs")
-      .withIndex("by_user_created", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(args.limit || 100);
-
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-
-    // Apply Time Filter
-    if (args.timeRange === "today") {
-      logs = logs.filter((l) => l.createdAt >= oneDayAgo);
-    } else if (args.timeRange === "7d") {
-      logs = logs.filter((l) => l.createdAt >= sevenDaysAgo);
-    } else if (args.timeRange === "30d") {
-      logs = logs.filter((l) => l.createdAt >= thirtyDaysAgo);
-    }
-
-    // Apply Status Filter
-    if (args.statusFilter === "200" || args.statusFilter === "success") {
-      logs = logs.filter((l) => l.status >= 200 && l.status < 300);
-    } else if (args.statusFilter === "errors") {
-      logs = logs.filter((l) => l.status >= 400);
-    }
-
-    // Apply Type Filter
-    if (args.typeFilter && args.typeFilter !== "all") {
-      if (args.typeFilter === "image") {
-        logs = logs.filter((l) => l.requestType === "image_generation" || l.requestType === "image_edit");
-      } else if (args.typeFilter === "chat") {
-        logs = logs.filter((l) => !l.requestType || l.requestType === "chat");
+      let logs: any[] = [];
+      try {
+        logs = await ctx.db
+          .query("routerLogs")
+          .withIndex("by_user_created", (q) => q.eq("userId", userId))
+          .order("desc")
+          .take(args.limit || 100);
+      } catch {
+        // Resilient fallback if by_user_created index is building or not found on remote deployment
+        logs = await ctx.db
+          .query("routerLogs")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .order("desc")
+          .take(args.limit || 100);
       }
-    }
 
-    // Apply Model Filter
-    if (args.modelFilter && args.modelFilter !== "all") {
-      const mf = args.modelFilter.toLowerCase();
-      logs = logs.filter((l) => l.model.toLowerCase().includes(mf));
-    }
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
-    // Apply Provider Filter
-    if (args.providerFilter && args.providerFilter !== "all") {
-      const pf = args.providerFilter.toLowerCase();
-      logs = logs.filter((l) => l.provider.toLowerCase() === pf);
-    }
+      // Apply Time Filter
+      if (args.timeRange === "today") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= oneDayAgo);
+      } else if (args.timeRange === "7d") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= sevenDaysAgo);
+      } else if (args.timeRange === "30d") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= thirtyDaysAgo);
+      }
 
-    // Apply Search Query (matches requestId, model, provider, keyName, prompt, requestType)
-    if (args.searchQuery && args.searchQuery.trim()) {
-      const q = args.searchQuery.toLowerCase().trim();
-      logs = logs.filter(
-        (l) =>
-          l.requestId.toLowerCase().includes(q) ||
-          l.model.toLowerCase().includes(q) ||
-          l.provider.toLowerCase().includes(q) ||
-          (l.keyName && l.keyName.toLowerCase().includes(q)) ||
-          (l.prompt && l.prompt.toLowerCase().includes(q)) ||
-          (l.requestType && l.requestType.toLowerCase().includes(q))
-      );
-    }
+      // Apply Status Filter
+      if (args.statusFilter === "200" || args.statusFilter === "success") {
+        logs = logs.filter((l) => typeof l.status === "number" && l.status >= 200 && l.status < 300);
+      } else if (args.statusFilter === "errors") {
+        logs = logs.filter((l) => typeof l.status === "number" && l.status >= 400);
+      }
 
-    return logs;
+      // Apply Type Filter
+      if (args.typeFilter && args.typeFilter !== "all") {
+        if (args.typeFilter === "image") {
+          logs = logs.filter((l) => l.requestType === "image_generation" || l.requestType === "image_edit");
+        } else if (args.typeFilter === "chat") {
+          logs = logs.filter((l) => !l.requestType || l.requestType === "chat");
+        }
+      }
+
+      // Apply Model Filter
+      if (args.modelFilter && args.modelFilter !== "all") {
+        const mf = args.modelFilter.toLowerCase();
+        logs = logs.filter((l) => l.model && l.model.toLowerCase().includes(mf));
+      }
+
+      // Apply Provider Filter
+      if (args.providerFilter && args.providerFilter !== "all") {
+        const pf = args.providerFilter.toLowerCase();
+        logs = logs.filter((l) => l.provider && l.provider.toLowerCase() === pf);
+      }
+
+      // Apply Search Query (matches requestId, model, provider, keyName, prompt, requestType)
+      if (args.searchQuery && args.searchQuery.trim()) {
+        const q = args.searchQuery.toLowerCase().trim();
+        logs = logs.filter(
+          (l) =>
+            (l.requestId && l.requestId.toLowerCase().includes(q)) ||
+            (l.model && l.model.toLowerCase().includes(q)) ||
+            (l.provider && l.provider.toLowerCase().includes(q)) ||
+            (l.keyName && l.keyName.toLowerCase().includes(q)) ||
+            (l.prompt && l.prompt.toLowerCase().includes(q)) ||
+            (l.requestType && l.requestType.toLowerCase().includes(q))
+        );
+      }
+
+      return logs;
+    } catch (err) {
+      console.error("Error in listLogs query:", err);
+      return [];
+    }
   },
 });
 
@@ -304,8 +319,127 @@ export const getLogMetrics = query({
     timeRange: v.optional(v.string()), // "today", "7d", "30d", "all"
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) {
+        return {
+          totalRequests: 0,
+          totalTokens: 0,
+          promptTokens: 0,
+          cachedTokens: 0,
+          completionTokens: 0,
+          avgTtftMs: 0,
+          avgDurationMs: 0,
+          avgSpeed: 0,
+          successRate: 100,
+          activityBuckets: [],
+        };
+      }
+
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+      let logs: any[] = [];
+      try {
+        logs = await ctx.db
+          .query("routerLogs")
+          .withIndex("by_user_created", (q) => q.eq("userId", userId))
+          .order("desc")
+          .take(500);
+      } catch {
+        logs = await ctx.db
+          .query("routerLogs")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .order("desc")
+          .take(500);
+      }
+
+      if (args.timeRange === "today") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= oneDayAgo);
+      } else if (args.timeRange === "7d") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= sevenDaysAgo);
+      } else if (args.timeRange === "30d") {
+        logs = logs.filter((l) => (l.createdAt || 0) >= thirtyDaysAgo);
+      }
+
+      if (logs.length === 0) {
+        return {
+          totalRequests: 0,
+          totalTokens: 0,
+          promptTokens: 0,
+          cachedTokens: 0,
+          completionTokens: 0,
+          avgTtftMs: 0,
+          avgDurationMs: 0,
+          avgSpeed: 0,
+          successRate: 100,
+          activityBuckets: [],
+        };
+      }
+
+      let totalTokens = 0;
+      let promptTokens = 0;
+      let cachedTokens = 0;
+      let completionTokens = 0;
+      let ttftSum = 0;
+      let ttftCount = 0;
+      let durationSum = 0;
+      let speedSum = 0;
+      let speedCount = 0;
+      let successCount = 0;
+
+      logs.forEach((l) => {
+        totalTokens += l.totalTokens || 0;
+        promptTokens += l.promptTokens || 0;
+        cachedTokens += l.cachedTokens || 0;
+        completionTokens += l.completionTokens || 0;
+        durationSum += l.durationMs || 0;
+        if (l.ttftMs) {
+          ttftSum += l.ttftMs;
+          ttftCount++;
+        }
+        if (l.tokensPerSecond) {
+          speedSum += l.tokensPerSecond;
+          speedCount++;
+        }
+        if (typeof l.status === "number" && l.status >= 200 && l.status < 300) {
+          successCount++;
+        }
+      });
+
+      // 24 mini-buckets for activity visualization (past 24h or relative timeline)
+      const numBuckets = 24;
+      const bucketInterval = (now - (logs[logs.length - 1]?.createdAt || oneDayAgo)) / numBuckets || 3600000;
+      const bucketCounts = new Array(numBuckets).fill(0);
+
+      logs.forEach((l) => {
+        const diff = now - (l.createdAt || now);
+        const bucketIdx = Math.min(numBuckets - 1, Math.max(0, Math.floor(diff / bucketInterval)));
+        bucketCounts[numBuckets - 1 - bucketIdx]++;
+      });
+
+      const maxBucket = Math.max(1, ...bucketCounts);
+      const activityBuckets = bucketCounts.map((count) => ({
+        count,
+        heightPercent: Math.round((count / maxBucket) * 100),
+      }));
+
+      return {
+        totalRequests: logs.length,
+        totalTokens,
+        promptTokens,
+        cachedTokens,
+        completionTokens,
+        avgTtftMs: ttftCount > 0 ? Math.round(ttftSum / ttftCount) : 0,
+        avgDurationMs: Math.round(durationSum / logs.length),
+        avgSpeed: speedCount > 0 ? parseFloat((speedSum / speedCount).toFixed(1)) : 0,
+        successRate: Math.round((successCount / logs.length) * 100),
+        activityBuckets,
+      };
+    } catch (err) {
+      console.error("Error in getLogMetrics:", err);
       return {
         totalRequests: 0,
         totalTokens: 0,
@@ -319,100 +453,6 @@ export const getLogMetrics = query({
         activityBuckets: [],
       };
     }
-
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-
-    let logs = await ctx.db
-      .query("routerLogs")
-      .withIndex("by_user_created", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(500);
-
-    if (args.timeRange === "today") {
-      logs = logs.filter((l) => l.createdAt >= oneDayAgo);
-    } else if (args.timeRange === "7d") {
-      logs = logs.filter((l) => l.createdAt >= sevenDaysAgo);
-    } else if (args.timeRange === "30d") {
-      logs = logs.filter((l) => l.createdAt >= thirtyDaysAgo);
-    }
-
-    if (logs.length === 0) {
-      return {
-        totalRequests: 0,
-        totalTokens: 0,
-        promptTokens: 0,
-        cachedTokens: 0,
-        completionTokens: 0,
-        avgTtftMs: 0,
-        avgDurationMs: 0,
-        avgSpeed: 0,
-        successRate: 100,
-        activityBuckets: [],
-      };
-    }
-
-    let totalTokens = 0;
-    let promptTokens = 0;
-    let cachedTokens = 0;
-    let completionTokens = 0;
-    let ttftSum = 0;
-    let ttftCount = 0;
-    let durationSum = 0;
-    let speedSum = 0;
-    let speedCount = 0;
-    let successCount = 0;
-
-    logs.forEach((l) => {
-      totalTokens += l.totalTokens;
-      promptTokens += l.promptTokens;
-      cachedTokens += l.cachedTokens || 0;
-      completionTokens += l.completionTokens;
-      durationSum += l.durationMs;
-      if (l.ttftMs) {
-        ttftSum += l.ttftMs;
-        ttftCount++;
-      }
-      if (l.tokensPerSecond) {
-        speedSum += l.tokensPerSecond;
-        speedCount++;
-      }
-      if (l.status >= 200 && l.status < 300) {
-        successCount++;
-      }
-    });
-
-    // 24 mini-buckets for activity visualization (past 24h or relative timeline)
-    const numBuckets = 24;
-    const bucketInterval = (now - (logs[logs.length - 1]?.createdAt || oneDayAgo)) / numBuckets || 3600000;
-    const bucketCounts = new Array(numBuckets).fill(0);
-
-    logs.forEach((l) => {
-      const diff = now - l.createdAt;
-      const bucketIdx = Math.min(numBuckets - 1, Math.max(0, Math.floor(diff / bucketInterval)));
-      bucketCounts[numBuckets - 1 - bucketIdx]++;
-    });
-
-    const maxBucket = Math.max(1, ...bucketCounts);
-    const activityBuckets = bucketCounts.map((count) => ({
-      count,
-      heightPercent: Math.round((count / maxBucket) * 100),
-    }));
-
-    return {
-      totalRequests: logs.length,
-      totalTokens,
-      promptTokens,
-      cachedTokens,
-      completionTokens,
-      avgTtftMs: ttftCount > 0 ? Math.round(ttftSum / ttftCount) : 0,
-      avgDurationMs: Math.round(durationSum / logs.length),
-      avgSpeed: speedCount > 0 ? parseFloat((speedSum / speedCount).toFixed(1)) : 0,
-      successRate: Math.round((successCount / logs.length) * 100),
-      activityBuckets,
-    };
   },
 });
 

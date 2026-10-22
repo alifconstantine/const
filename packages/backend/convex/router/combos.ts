@@ -251,7 +251,7 @@ export const updateCombo = mutation({
 // 5. Delete a Custom Combo
 export const deleteCombo = mutation({
   args: {
-    id: v.id("routerCombos"),
+    id: v.union(v.id("routerCombos"), v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -259,13 +259,22 @@ export const deleteCombo = mutation({
       throw new Error("Unauthorized");
     }
 
-    const existing = await ctx.db.get(args.id);
-    if (!existing || existing.userId !== userId) {
-      throw new Error("Combo not found or unauthorized.");
+    // Safely ignore legacy or virtual builtin IDs (builtin_auto, etc.)
+    if (args.id.startsWith("builtin_") || SYSTEM_DEFAULT_SLUGS.includes(args.id as any)) {
+      return { success: true };
     }
 
-    await ctx.db.delete(args.id);
-    return { success: true };
+    try {
+      const existing = await ctx.db.get(args.id as any);
+      if (!existing || (existing as any).userId !== userId) {
+        return { success: true };
+      }
+
+      await ctx.db.delete(args.id as any);
+      return { success: true };
+    } catch {
+      return { success: true };
+    }
   },
 });
 

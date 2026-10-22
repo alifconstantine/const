@@ -102,8 +102,8 @@ export default function LogsPage() {
     api.router.logs.listLogs,
     isAuthenticated
       ? {
-          statusFilter,
-          typeFilter,
+          statusFilter: statusFilter !== "all" ? statusFilter : undefined,
+          typeFilter: typeFilter !== "all" ? typeFilter : undefined,
           timeRange,
           searchQuery: searchQuery.trim() || undefined,
         }

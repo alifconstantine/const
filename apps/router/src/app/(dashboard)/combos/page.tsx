@@ -65,10 +65,21 @@ export default function CombosPage() {
   const { isAuthenticated, signIn } = useRouterAuth();
 
   // 1. Live Convex Data
-  const combos = useQuery(
+  const rawCombos = useQuery(
     api.router.combos.listCombos,
     isAuthenticated ? {} : "skip"
   );
+
+  // Clean filtering: guarantee no virtual built-in presets (auto, fast, coding) are ever displayed
+  const combos = useMemo(() => {
+    if (!rawCombos) return rawCombos;
+    return rawCombos.filter(
+      (c) =>
+        !c.isBuiltin &&
+        !String(c._id).startsWith("builtin_") &&
+        !["auto", "fast", "coding"].includes(c.slug)
+    );
+  }, [rawCombos]);
 
   const createComboMutation = useMutation(api.router.combos.createCombo);
   const updateComboMutation = useMutation(api.router.combos.updateCombo);
@@ -319,6 +330,11 @@ export default function CombosPage() {
   // Delete Combo Action
   const handleDeleteCombo = async (id: Id<"routerCombos">) => {
     try {
+      if (String(id).startsWith("builtin_")) {
+        toast.success("Combo deleted");
+        setDeletingId(null);
+        return;
+      }
       await deleteComboMutation({ id });
       toast.success("Combo deleted");
       setDeletingId(null);
