@@ -34,19 +34,26 @@ import {
 function getInitials(name?: string | null, email?: string | null): string {
   if (name && name.trim()) {
     const parts = name.trim().split(/\s+/).filter(Boolean);
-    const first = parts[0];
-    const last = parts.length > 1 ? parts[parts.length - 1] : undefined;
+    const letterParts = parts.filter((p) => /[a-zA-Z]/.test(p));
+    const candidateParts = letterParts.length > 0 ? letterParts : parts;
+    const first = candidateParts[0];
+    const last = candidateParts.length > 1 ? candidateParts[candidateParts.length - 1] : undefined;
     if (first) {
-      if (last && last[0]) {
-        return (first[0] + last[0]).toUpperCase();
+      const firstLetter = first.match(/[a-zA-Z]/)?.[0] || first[0] || "";
+      if (last) {
+        const lastLetter = last.match(/[a-zA-Z]/)?.[0] || last[0] || "";
+        return (firstLetter + lastLetter).toUpperCase();
       }
       return first.substring(0, 2).toUpperCase();
     }
   }
   if (email && email.trim()) {
     const parts = email.trim().split("@");
-    if (parts[0] && parts[0].length > 0) {
-      return parts[0].substring(0, 2).toUpperCase();
+    const username = parts[0];
+    if (username && username.length > 0) {
+      const letters = username.replace(/[^a-zA-Z]/g, "");
+      if (letters.length >= 2) return letters.substring(0, 2).toUpperCase();
+      return username.substring(0, 2).toUpperCase();
     }
   }
   return "U";

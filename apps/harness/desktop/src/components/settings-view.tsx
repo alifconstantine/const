@@ -555,9 +555,13 @@ export function SettingsView({
     try {
       const existingRaw = localStorage.getItem("const_custom_user_profile");
       const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      const updated = { ...existing, image: "" };
-      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
+      delete existing.image;
+      if (Object.keys(existing).length > 0) {
+        localStorage.setItem("const_custom_user_profile", JSON.stringify(existing));
+      } else {
+        localStorage.removeItem("const_custom_user_profile");
+      }
+      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: existing }));
 
       try {
         await updateProfileMutation({ image: "" });

@@ -324,7 +324,17 @@ function AuthenticatedContent({
   const [localProfile, setLocalProfile] = useState<{ name?: string; image?: string }>(() => {
     try {
       const saved = localStorage.getItem("const_custom_user_profile");
-      return saved ? JSON.parse(saved) : {};
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      if (parsed.image !== undefined && (!parsed.image || !parsed.image.trim())) {
+        delete parsed.image;
+        if (Object.keys(parsed).length > 0) {
+          localStorage.setItem("const_custom_user_profile", JSON.stringify(parsed));
+        } else {
+          localStorage.removeItem("const_custom_user_profile");
+        }
+      }
+      return parsed;
     } catch {
       return {};
     }
@@ -349,11 +359,13 @@ function AuthenticatedContent({
   }, []);
 
   const effectiveUser = useMemo(() => {
-    if (!user && !localProfile.name && !localProfile.image) return user;
+    const customName = localProfile.name?.trim();
+    const customImage = localProfile.image?.trim();
+    if (!user && !customName && !customImage) return user;
     return {
       ...(user || { id: "local-user-session", email: "Local Workspace" }),
-      name: localProfile.name !== undefined ? localProfile.name : user?.name,
-      image: localProfile.image !== undefined ? localProfile.image : user?.image,
+      name: customName ? customName : user?.name,
+      image: customImage ? customImage : user?.image,
     };
   }, [user, localProfile]);
 
@@ -4869,6 +4881,7 @@ export default function App() {
   const handleSignOut = () => {
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
+    localStorage.removeItem("const_custom_user_profile");
     setToken(null);
     setIsWaitingAuth(false);
   };
@@ -4876,6 +4889,7 @@ export default function App() {
   const handleSwitchAccount = async () => {
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
+    localStorage.removeItem("const_custom_user_profile");
     setToken(null);
     setIsWaitingAuth(true);
 
