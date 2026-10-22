@@ -294,7 +294,7 @@ try {
 
 // Explicitly set app name, AUMID and userData
 app.setName("Const Harness");
-if (process.platform === "win32") {
+if (process.platform === "win32" && app.isPackaged) {
   app.setAppUserModelId("id.web.const.harness.desktop");
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
@@ -2081,7 +2081,7 @@ app.whenReady().then(() => {
 
       const initialMessage: AgentMessage = {
         role: "user",
-        content: `[Scheduled Task: ${taskName} â€” Run #${runCount}]\n\n${taskPrompt}`,
+        content: `[Scheduled Task: ${taskName} — Run #${runCount}]\n\n${taskPrompt}`,
         timestamp: Date.now(),
       };
 
