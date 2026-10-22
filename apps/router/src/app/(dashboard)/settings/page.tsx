@@ -202,11 +202,19 @@ export default function SettingsPage() {
                 <SelectItem value="deepseek-v4.1-flash">deepseek-v4.1-flash</SelectItem>
                 <SelectItem value="qwen-3.8-omni-flash">qwen-3.8-omni-flash</SelectItem>
                 <SelectItem value="gpt-6-luna">gpt-6-luna</SelectItem>
-                {combos && combos.map((c) => (
-                  <SelectItem key={c._id} value={`combo/${c.slug}`}>
-                    combo/{c.slug} ({c.name})
-                  </SelectItem>
-                ))}
+                {combos &&
+                  combos
+                    .filter(
+                      (c) =>
+                        !c.isBuiltin &&
+                        !String(c._id).startsWith("builtin_") &&
+                        !["auto", "fast", "coding"].includes(c.slug)
+                    )
+                    .map((c) => (
+                      <SelectItem key={c._id} value={`combo/${c.slug}`}>
+                        combo/{c.slug} ({c.name})
+                      </SelectItem>
+                    ))}
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground font-light">

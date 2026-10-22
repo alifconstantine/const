@@ -396,12 +396,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // CASE 0: Virtual Combo Request (combo/* or auto/fast/coding)
+    // CASE 0: Virtual Combo Request (combo/*)
     // ========================================================
     const isCombo =
       providerId === "combo" ||
-      model.startsWith("combo/") ||
-      ["auto", "fast", "coding"].includes(model);
+      model.startsWith("combo/");
 
     if (isCombo) {
       const comboSlug = model.replace(/^combo\//, "");

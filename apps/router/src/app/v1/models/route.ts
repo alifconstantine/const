@@ -355,11 +355,20 @@ export async function GET(req: NextRequest) {
         client.setAuth(bearerValue);
       }
 
-      // Also fetch user custom combos from Convex
+      // Also fetch user custom combos from Convex (excluding legacy built-in presets)
       try {
         const userCombos = await client.query(api.router.combos.listCombos, {});
         if (userCombos && Array.isArray(userCombos)) {
           for (const c of userCombos) {
+            // Strictly exclude any legacy built-in presets (auto, fast, coding)
+            if (
+              c.isBuiltin ||
+              String(c._id).startsWith("builtin_") ||
+              ["auto", "fast", "coding"].includes(c.slug)
+            ) {
+              continue;
+            }
+
             if (c.status === "active") {
               const comboId = `combo/${c.slug}`;
               modelsList.push({

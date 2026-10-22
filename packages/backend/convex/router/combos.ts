@@ -32,20 +32,27 @@ export const listCombos = query({
       .order("desc")
       .collect();
 
-    return userCombos.map((c) => ({
-      _id: c._id,
-      name: c.name,
-      slug: c.slug,
-      description: c.description,
-      systemMessage: c.systemMessage,
-      contextLength: c.contextLength,
-      strategy: c.strategy,
-      models: c.models,
-      isBuiltin: false,
-      status: c.status,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-    }));
+    return userCombos
+      .filter(
+        (c) =>
+          !(c as any).isBuiltin &&
+          !String(c._id).startsWith("builtin_") &&
+          !["auto", "fast", "coding"].includes(c.slug)
+      )
+      .map((c) => ({
+        _id: c._id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        systemMessage: c.systemMessage,
+        contextLength: c.contextLength,
+        strategy: c.strategy,
+        models: c.models,
+        isBuiltin: false,
+        status: c.status,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      }));
   },
 });
 

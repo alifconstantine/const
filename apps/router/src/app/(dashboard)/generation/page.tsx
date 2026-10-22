@@ -78,22 +78,29 @@ export default function GenerationPage() {
   const updateChatMutation = useMutation(api.router.chats.updateChat);
   const deleteChatMutation = useMutation(api.router.chats.deleteChat);
 
-  // Map Virtual Combos into ModelSpec list
+  // Map Virtual Combos into ModelSpec list (strictly user-created custom combos only)
   const comboModels = useMemo<ModelSpec[]>(() => {
     if (!availableCombos) return [];
-    return availableCombos.map((c) => ({
-      id: `combo/${c.slug}`,
-      name: c.name,
-      modelId: `combo/${c.slug}`,
-      provider: "combo" as const,
-      providerName: "Virtual Combo",
-      supportsThinking: false,
-      isCombo: true,
-      comboSlug: c.slug,
-      modelsCount: c.models?.length || 0,
-      description: c.description,
-      contextLength: c.contextLength,
-    }));
+    return availableCombos
+      .filter(
+        (c) =>
+          !c.isBuiltin &&
+          !String(c._id).startsWith("builtin_") &&
+          !["auto", "fast", "coding"].includes(c.slug)
+      )
+      .map((c) => ({
+        id: `combo/${c.slug}`,
+        name: c.name,
+        modelId: `combo/${c.slug}`,
+        provider: "combo" as const,
+        providerName: "Virtual Combo",
+        supportsThinking: false,
+        isCombo: true,
+        comboSlug: c.slug,
+        modelsCount: c.models?.length || 0,
+        description: c.description,
+        contextLength: c.contextLength,
+      }));
   }, [availableCombos]);
 
   // Unified Const Gateway: no external BYOK models
