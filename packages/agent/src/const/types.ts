@@ -159,7 +159,24 @@ export interface AgentEventMap {
   approval_request: ApprovalRequestData;
   approval_resolved: { approvalId: string; decision: ApprovalDecision };
   file_mutation: { record: FileMutationRecord };
-  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    cacheHitRate?: number;
+    durationMs?: number;
+  };
+  context_update: {
+    usedTokens: number;
+    totalTokens: number;
+    systemPromptTokens: number;
+    toolsTokens: number;
+    messagesTokens: number;
+    percent?: number;
+  };
   status: { status: "idle" | "thinking" | "calling_tool" | "waiting_approval" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string };
@@ -209,6 +226,7 @@ export interface AgentConfig {
   thinkingLevel?: ThinkingLevel | string;
   maxTokens?: number;
   maxOutputTokens?: number;
+  contextWindow?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
   browserHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
   voiceConfig?: any;

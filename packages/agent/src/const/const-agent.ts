@@ -21,6 +21,12 @@ import {
   isPathWithinWorkspace,
 } from "./tools.js";
 import { globalSubAgentManager, formatTaskResultEnvelope } from "./subagent.js";
+import {
+  parseProviderUsage,
+  calculateContextBreakdown,
+  calculateContextOccupancy,
+} from "./token-meter.js";
+import { DEFAULT_MODELS } from "./models.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -351,20 +357,6 @@ export function compactHistoryForContext(
 
     return compacted;
   });
-}
-
-export function estimateTextTokens(text: string): number {
-  if (!text) return 0;
-  return Math.max(1, Math.ceil(text.length / 3.8));
-}
-
-export function estimateToolSchemasTokens(tools: any[] = CONST_DEFAULT_TOOLS): number {
-  try {
-    const raw = JSON.stringify(tools);
-    return Math.ceil(raw.length / 3.8);
-  } catch {
-    return 950;
-  }
 }
 
 export interface Skill {
@@ -1079,6 +1071,38 @@ export class ConstAgent {
           }),
         ];
 
+        // Token meter (DeepSeek Harness adaptation): Compute accurate context breakdown across system prompt, active tools, and message history
+        const breakdown = calculateContextBreakdown({
+          systemPrompt: effectiveSystemPrompt,
+          tools: activeTools,
+          messages: historyForContext,
+        });
+
+        const activeModelInfo = DEFAULT_MODELS.find((m) => m.id === this.config.model);
+        const resolvedContextWindow =
+          this.config.contextWindow ??
+          activeModelInfo?.contextWindow ??
+          1_048_576;
+
+        const occupancy = calculateContextOccupancy(
+          {
+            projectedTokens: breakdown.totalHeuristicTokens,
+            contextWindow: resolvedContextWindow,
+          },
+          breakdown.totalHeuristicTokens,
+          resolvedContextWindow
+        );
+
+        onEvent({
+          type: "context_update",
+          systemPromptTokens: breakdown.systemTokens,
+          toolsTokens: breakdown.toolsTokens,
+          messagesTokens: breakdown.messageTokens,
+          usedTokens: occupancy.usedTokens,
+          totalTokens: occupancy.contextWindow,
+          percent: occupancy.percent,
+        });
+
         // Dynamic Max Output Tokens:
         // - Built-in Gemini / Const models have 128K max output (128,000)
         // - Custom endpoints or unspecified models default to 64K (65,536)
@@ -1097,6 +1121,7 @@ export class ConstAgent {
           throw new Error("User cancelled agent execution.");
         }
 
+        const llmRequestStartTime = Date.now();
         const response = await fetchWithRetry(
           endpoint,
           {
@@ -1286,15 +1311,26 @@ export class ConstAgent {
 
               try {
                 if (json.usage) {
-                  const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
-                  const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
-                  const totalTokens = Math.max(0, Math.round(Number(json.usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
-                  if (totalTokens > 0) {
+                  const norm = parseProviderUsage(json.usage);
+                  if (norm && norm.totalTokens > 0) {
+                    const totalPrompt = norm.inputTokens + (norm.cacheReadTokens ?? 0) + (norm.cacheWriteTokens ?? 0);
+                    const cacheHitRate =
+                      norm.cacheReadTokens && totalPrompt > 0
+                        ? Math.min(100, Math.round((norm.cacheReadTokens / totalPrompt) * 100))
+                        : 0;
+
+                    const durationMs = Math.max(1, Date.now() - llmRequestStartTime);
+
                     onEvent({
                       type: "usage",
-                      promptTokens,
-                      completionTokens,
-                      totalTokens,
+                      promptTokens: norm.inputTokens,
+                      completionTokens: norm.outputTokens,
+                      totalTokens: norm.totalTokens,
+                      cacheReadTokens: norm.cacheReadTokens,
+                      cacheWriteTokens: norm.cacheWriteTokens,
+                      reasoningTokens: norm.reasoningTokens,
+                      cacheHitRate,
+                      durationMs,
                     });
                   }
                 }
@@ -1427,15 +1463,26 @@ export class ConstAgent {
 
             try {
               if (json?.usage) {
-                const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
-                const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
-                const totalTokens = Math.max(0, Math.round(Number(json.usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
-                if (totalTokens > 0) {
+                const norm = parseProviderUsage(json.usage);
+                if (norm && norm.totalTokens > 0) {
+                  const totalPrompt = norm.inputTokens + (norm.cacheReadTokens ?? 0) + (norm.cacheWriteTokens ?? 0);
+                  const cacheHitRate =
+                    norm.cacheReadTokens && totalPrompt > 0
+                      ? Math.min(100, Math.round((norm.cacheReadTokens / totalPrompt) * 100))
+                      : 0;
+
+                  const durationMs = Math.max(1, Date.now() - llmRequestStartTime);
+
                   onEvent({
                     type: "usage",
-                    promptTokens,
-                    completionTokens,
-                    totalTokens,
+                    promptTokens: norm.inputTokens,
+                    completionTokens: norm.outputTokens,
+                    totalTokens: norm.totalTokens,
+                    cacheReadTokens: norm.cacheReadTokens,
+                    cacheWriteTokens: norm.cacheWriteTokens,
+                    reasoningTokens: norm.reasoningTokens,
+                    cacheHitRate,
+                    durationMs,
                   });
                 }
               }

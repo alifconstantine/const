@@ -543,6 +543,18 @@ function AuthenticatedContent({
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    cacheHitRate?: number;
+  } | null>(null);
+
+  const [backendContextBreakdown, setBackendContextBreakdown] = useState<{
+    systemPromptTokens: number;
+    toolsTokens: number;
+    messagesTokens: number;
+    usedTokens: number;
+    totalTokens: number;
   } | null>(null);
 
   // Right Sidebar (Side Pane) state & tab management - initialized closed on startup
@@ -1996,11 +2008,9 @@ function AuthenticatedContent({
 
   // Dynamic Context Usage computation (Image 3)
   const contextUsage = useMemo<ContextUsageData>(() => {
-    // Exact estimate based on agent system prompt + registered tools
-    // System prompt: ~850 tokens (const system prompt template)
-    // Tools schemas: ~950 tokens (11 agent tools JSON schemas)
-    const systemPromptTokens = 850;
-    const toolsTokens = 950;
+    // Dynamic breakdown from token-meter if available, fallback to baseline estimates
+    const systemPromptTokens = backendContextBreakdown?.systemPromptTokens ?? 850;
+    const toolsTokens = backendContextBreakdown?.toolsTokens ?? 950;
 
     // Estimate tokens dynamically from active conversation messages (chars / ~3.8)
     const messagesTokens = Math.round(
@@ -2028,13 +2038,15 @@ function AuthenticatedContent({
       }, 0)
     );
 
-    const modelLimit = activeModelItem?.contextWindow || 1_048_576;
+    const modelLimit = activeModelItem?.contextWindow || backendContextBreakdown?.totalTokens || 1_048_576;
     const totalTokens = modelLimit;
 
     // If we have verified ground-truth usage from the LLM provider API:
     let usedTokens: number;
     if (lastKnownLlmUsage && lastKnownLlmUsage.totalTokens > 0) {
       usedTokens = Math.max(lastKnownLlmUsage.totalTokens, systemPromptTokens + toolsTokens + messagesTokens);
+    } else if (backendContextBreakdown?.usedTokens) {
+      usedTokens = Math.max(backendContextBreakdown.usedTokens, systemPromptTokens + toolsTokens + messagesTokens);
     } else {
       usedTokens = systemPromptTokens + toolsTokens + messagesTokens;
     }
@@ -2046,7 +2058,7 @@ function AuthenticatedContent({
       toolsTokens,
       messagesTokens,
     };
-  }, [messages, activeModelItem, lastKnownLlmUsage]);
+  }, [messages, activeModelItem, lastKnownLlmUsage, backendContextBreakdown]);
 
   const contextUsageRef = React.useRef(contextUsage);
   useEffect(() => {
@@ -2067,44 +2079,72 @@ function AuthenticatedContent({
     const turns = Math.max(1, userMessages.length);
 
     let totalToolCalls = 0;
+    let actualToolDurationMs = 0;
+    let actualLlmDurationMs = 0;
+
     for (const m of assistantMessages) {
+      if (m.durationMs && m.durationMs > 0) {
+        actualLlmDurationMs += m.durationMs;
+      }
       if (m.toolCalls) totalToolCalls += m.toolCalls.length;
+      if (m.traceSteps) {
+        for (const step of m.traceSteps) {
+          if (step.type === "tool" && step.durationMs) {
+            actualToolDurationMs += step.durationMs;
+          }
+        }
+      }
     }
     const steps = Math.max(1, assistantMessages.length + totalToolCalls);
 
-    // Dynamic estimation of execution durations & tokens
-    const toolDurationMs = Math.max(1000, totalToolCalls * 1500);
-    const estimatedLlmMs = Math.max(3000, turns * 4500 + totalToolCalls * 2000);
+    // Real tracked execution durations
+    const toolDurationMs = actualToolDurationMs > 0 ? actualToolDurationMs : Math.max(0, totalToolCalls * 800);
+    const estimatedLlmMs = actualLlmDurationMs > 0 ? actualLlmDurationMs : Math.max(1000, turns * 2500);
 
-    const outputTokens = Math.max(
-      32,
-      Math.round(
-        assistantMessages.reduce(
-          (sum, m) => sum + (m.content?.length || 0) / 3.8 + (m.thinking?.length || 0) / 4,
-          0
-        )
-      )
-    );
+    const outputTokens =
+      lastKnownLlmUsage?.completionTokens && lastKnownLlmUsage.completionTokens > 0
+        ? lastKnownLlmUsage.completionTokens
+        : Math.max(
+            0,
+            Math.round(
+              assistantMessages.reduce(
+                (sum, m) => sum + (m.content?.length || 0) / 4 + (m.thinking?.length || 0) / 4,
+                0
+              )
+            )
+          );
 
-    // Multi-turn context accumulates input tokens across turns
-    const baseInputTokensPerTurn = 850 + 950;
-    const messageInputTokens = Math.round(
-      userMessages.reduce((sum, m) => sum + (m.content?.length || 0) / 3.8, 0)
-    );
-    const inputTokens = Math.max(
-      1800,
-      baseInputTokensPerTurn * turns + messageInputTokens + Math.round(outputTokens * 0.5)
-    );
+    // Prompt tokens: Ground-truth from provider response if available, or token-meter projection
+    const inputTokens =
+      lastKnownLlmUsage?.promptTokens && lastKnownLlmUsage.promptTokens > 0
+        ? lastKnownLlmUsage.promptTokens
+        : (backendContextBreakdown?.usedTokens ?? contextUsage.usedTokens);
 
-    const ttftSeconds = Math.max(1.2, +(1.2 + (turns > 3 ? 0.8 : 0.2)).toFixed(1));
+    const ttftSeconds =
+      estimatedLlmMs > 0
+        ? Math.max(0.2, +((estimatedLlmMs / 1000) * 0.15).toFixed(1))
+        : 0.8;
     const tokPerSec =
       outputTokens > 0 && estimatedLlmMs > 0
-        ? Math.max(25, Math.min(180, Math.round(outputTokens / (estimatedLlmMs / 1000))))
+        ? Math.max(1, Math.round(outputTokens / (estimatedLlmMs / 1000)))
         : 58;
-    const cacheHitRate = turns > 1 ? 76 : turns === 1 ? 64 : 0;
-    const totalTokens = inputTokens + outputTokens;
-    const cachedInputTokens = Math.round(inputTokens * (cacheHitRate / 100));
-    const uncachedInputTokens = Math.max(0, inputTokens - cachedInputTokens);
+
+    // Real cache hit rate from provider when available, otherwise 0% (no synthetic dummy formula)
+    const cacheHitRate =
+      lastKnownLlmUsage?.cacheHitRate !== undefined
+        ? lastKnownLlmUsage.cacheHitRate
+        : 0;
+
+    const totalTokens =
+      lastKnownLlmUsage?.totalTokens && lastKnownLlmUsage.totalTokens > 0
+        ? lastKnownLlmUsage.totalTokens
+        : inputTokens + outputTokens;
+
+    const cachedInputTokens = lastKnownLlmUsage?.cacheReadTokens ?? 0;
+    const uncachedInputTokens =
+      lastKnownLlmUsage?.promptTokens !== undefined
+        ? Math.max(0, lastKnownLlmUsage.promptTokens - cachedInputTokens)
+        : Math.max(0, inputTokens - cachedInputTokens);
 
     return {
       turns,
@@ -2119,8 +2159,9 @@ function AuthenticatedContent({
       totalTokens,
       cachedInputTokens,
       uncachedInputTokens,
+      reasoningTokens: lastKnownLlmUsage?.reasoningTokens,
     };
-  }, [messages]);
+  }, [messages, lastKnownLlmUsage, backendContextBreakdown]);
 
   // Smart auto-scroll: pause when user scrolls up, resume when user is near bottom
   const isAutoScrollEnabledRef = useRef<boolean>(true);
@@ -2412,6 +2453,7 @@ function AuthenticatedContent({
               toolCallId: callId,
               name: event.toolName || "tool",
               args: event.args,
+              startTime: Date.now(),
             });
             const tools = last.toolCalls ? [...last.toolCalls] : [];
             tools.push({
@@ -2433,21 +2475,6 @@ function AuthenticatedContent({
           setMessages(targetMsgs);
         }
       } else if (event.type === "tool_result") {
-        if (event.toolName) {
-          // Record tool execution directly to local desktop Dexie database
-          localDb.recordRequestLog({
-            requestId: `tool_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            model: event.toolName,
-            conversationId: targetConvoId,
-            promptTokens: 120,
-            completionTokens: 60,
-            totalTokens: 180,
-            durationMs: 650,
-            status: event.isError ? 500 : 200,
-            toolNames: [event.toolName],
-            createdAt: Date.now(),
-          }).catch(() => {});
-        }
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];
@@ -2457,11 +2484,13 @@ function AuthenticatedContent({
                 ? { ...tc, result: event.result, isError: event.isError }
                 : tc
             );
-            const steps = (last.traceSteps || []).map((st) =>
-              st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
-                ? { ...st, result: event.result, isError: event.isError }
-                : st
-            );
+            const steps = (last.traceSteps || []).map((st) => {
+              if (st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)) {
+                const durationMs = st.startTime ? Math.max(1, Date.now() - st.startTime) : (st.durationMs || 50);
+                return { ...st, result: event.result, isError: event.isError, durationMs };
+              }
+              return st;
+            });
             const updated: ChatMessage = {
               ...last,
               toolCalls: tools,
@@ -2469,6 +2498,31 @@ function AuthenticatedContent({
             };
             targetMsgs = [...targetMsgs];
             targetMsgs[lastIdx] = updated;
+
+            if (event.toolName) {
+              const matchingStep = steps.find(
+                (st) => st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
+              );
+              const durationMs = matchingStep?.durationMs ?? 50;
+              const rawArgs = JSON.stringify(event.args ?? matchingStep?.args ?? {});
+              const rawResult = typeof event.result === "string" ? event.result : JSON.stringify(event.result ?? {});
+              const promptTokens = Math.max(1, Math.ceil(rawArgs.length / 4));
+              const completionTokens = Math.max(1, Math.ceil(rawResult.length / 4));
+              const totalTokens = promptTokens + completionTokens;
+
+              localDb.recordRequestLog({
+                requestId: `tool_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                model: event.toolName,
+                conversationId: targetConvoId,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                durationMs,
+                status: event.isError ? 500 : 200,
+                toolNames: [event.toolName],
+                createdAt: Date.now(),
+              }).catch(() => {});
+            }
           }
         }
         if (event.toolName === "ask_question") {
@@ -2514,20 +2568,60 @@ function AuthenticatedContent({
         if (targetConvoId === conversationIdRef.current) {
           setMessages(targetMsgs);
         }
+      } else if (event.type === "context_update") {
+        const sys = event.systemPromptTokens ?? 850;
+        const tls = event.toolsTokens ?? 950;
+        const msg = event.messagesTokens ?? 0;
+        const used = event.usedTokens ?? sys + tls + msg;
+        const total = event.totalTokens ?? (activeModelItemRef.current?.contextWindow || 1_048_576);
+
+        setBackendContextBreakdown({
+          systemPromptTokens: sys,
+          toolsTokens: tls,
+          messagesTokens: msg,
+          usedTokens: used,
+          totalTokens: total,
+        });
+
+        const stored = loadConversations();
+        const target = stored.find((c) => c.id === targetConvoId);
+        if (target) {
+          target.contextUsage = {
+            usedTokens: used,
+            totalTokens: total,
+            systemPromptTokens: sys,
+            toolsTokens: tls,
+            messagesTokens: msg,
+          };
+          saveConversation(target);
+        }
       } else if (event.type === "usage") {
         const usage = event.usage || event;
         const promptTokens = Math.max(0, Math.round(Number(usage.promptTokens ?? usage.prompt_tokens ?? 0) || 0));
         const completionTokens = Math.max(0, Math.round(Number(usage.completionTokens ?? usage.completion_tokens ?? 0) || 0));
         const totalTokens = Math.max(0, Math.round(Number(usage.totalTokens ?? usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
+        const cacheReadTokens = usage.cacheReadTokens !== undefined ? Math.max(0, Math.round(Number(usage.cacheReadTokens) || 0)) : undefined;
+        const cacheWriteTokens = usage.cacheWriteTokens !== undefined ? Math.max(0, Math.round(Number(usage.cacheWriteTokens) || 0)) : undefined;
+        const reasoningTokens = usage.reasoningTokens !== undefined ? Math.max(0, Math.round(Number(usage.reasoningTokens) || 0)) : undefined;
+        const cacheHitRate = usage.cacheHitRate !== undefined ? Math.max(0, Math.round(Number(usage.cacheHitRate) || 0)) : undefined;
+
         if (totalTokens > 0) {
           if (targetConvoId === conversationIdRef.current) {
-            setLastKnownLlmUsage({ promptTokens, completionTokens, totalTokens });
+            setLastKnownLlmUsage({
+              promptTokens,
+              completionTokens,
+              totalTokens,
+              cacheReadTokens,
+              cacheWriteTokens,
+              reasoningTokens,
+              cacheHitRate,
+            });
           }
           const stored = loadConversations();
           const target = stored.find((c) => c.id === targetConvoId);
           if (target) {
-            const sys = target.contextUsage?.systemPromptTokens ?? 850;
-            const tls = target.contextUsage?.toolsTokens ?? 950;
+            const sys = backendContextBreakdown?.systemPromptTokens ?? target.contextUsage?.systemPromptTokens ?? 850;
+            const tls = backendContextBreakdown?.toolsTokens ?? target.contextUsage?.toolsTokens ?? 950;
             target.contextUsage = {
               usedTokens: totalTokens,
               totalTokens: target.contextUsage?.totalTokens || (activeModelItemRef.current?.contextWindow || 1_048_576),
@@ -2546,7 +2640,7 @@ function AuthenticatedContent({
             promptTokens,
             completionTokens,
             totalTokens,
-            durationMs: 1200,
+            durationMs: usage.durationMs ?? 1200,
             status: 200,
             createdAt: Date.now(),
           }).catch(() => {});
@@ -3490,8 +3584,16 @@ function AuthenticatedContent({
           completionTokens: 0,
           totalTokens: target.contextUsage.usedTokens,
         });
+        setBackendContextBreakdown({
+          systemPromptTokens: target.contextUsage.systemPromptTokens ?? 850,
+          toolsTokens: target.contextUsage.toolsTokens ?? 950,
+          messagesTokens: target.contextUsage.messagesTokens ?? 0,
+          usedTokens: target.contextUsage.usedTokens ?? 0,
+          totalTokens: target.contextUsage.totalTokens ?? 1_048_576,
+        });
       } else {
         setLastKnownLlmUsage(null);
+        setBackendContextBreakdown(null);
       }
       restoreConversationRightPaneState(id);
       return;
@@ -3522,8 +3624,16 @@ function AuthenticatedContent({
           completionTokens: 0,
           totalTokens: target.contextUsage.usedTokens,
         });
+        setBackendContextBreakdown({
+          systemPromptTokens: target.contextUsage.systemPromptTokens ?? 850,
+          toolsTokens: target.contextUsage.toolsTokens ?? 950,
+          messagesTokens: target.contextUsage.messagesTokens ?? 0,
+          usedTokens: target.contextUsage.usedTokens ?? 0,
+          totalTokens: target.contextUsage.totalTokens ?? 1_048_576,
+        });
       } else {
         setLastKnownLlmUsage(null);
+        setBackendContextBreakdown(null);
       }
       restoreConversationRightPaneState(target.id);
     }

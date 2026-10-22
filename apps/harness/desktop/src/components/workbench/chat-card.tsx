@@ -275,6 +275,7 @@ export interface ConversationMetrics {
   totalTokens?: number;
   cachedInputTokens?: number;
   uncachedInputTokens?: number;
+  reasoningTokens?: number;
 }
 
 export interface ContextUsageData {
@@ -2527,6 +2528,12 @@ export function ChatCard({
                         <span className="text-muted-foreground">Output</span>
                         <span className="tabular-nums text-foreground">{metrics.outputTokens.toLocaleString()} tok</span>
                       </div>
+                      {metrics.reasoningTokens && metrics.reasoningTokens > 0 ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Reasoning tokens</span>
+                          <span className="tabular-nums text-foreground">{metrics.reasoningTokens.toLocaleString()} tok</span>
+                        </div>
+                      ) : null}
                     </div>
                   </PopoverContent>
                 </Popover>

@@ -213,5 +213,17 @@ export {
 	type BackgroundTaskItem,
 	extractPdfText,
 	extractDocumentText,
+	parseProviderUsage,
+	estimateSystemPromptTokens,
+	estimateContentBlocks,
+	estimateMessage,
+	calculateContextBreakdown,
+	calculateContextOccupancy,
+	accumulateSessionUsage,
+	type NormalizedTokenUsage,
+	type TokenUsageProjection,
+	type ContextPressureProjection,
+	type ContextBreakdownProjection,
+	type ContextOccupancy,
 } from "./const/index.ts";
 

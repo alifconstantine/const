@@ -14,3 +14,4 @@ export * from "./eval.js";
 export * from "./ast-edit.js";
 export * from "./gh.js";
 export * from "./web.js";
+export * from "./token-meter.js";
