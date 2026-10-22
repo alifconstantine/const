@@ -253,6 +253,10 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("browser:open-tab-request", handler);
     },
   },
+  computer: {
+    getCapabilities: () => ipcRenderer.invoke("computer:get-capabilities"),
+    listApps: () => ipcRenderer.invoke("computer:list-apps"),
+  },
   marketplace: {
     listInstalled: (workspacePath?: string) =>
       ipcRenderer.invoke("marketplace:list-installed", workspacePath),

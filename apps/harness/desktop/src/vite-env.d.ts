@@ -223,6 +223,8 @@ export interface UserConfig {
     supportsTools?: boolean;
   }>;
   workspaceMemoryEnabled?: boolean;
+  enableComputerUse?: boolean;
+  enableBrowserUse?: boolean;
   defaultProjectLocation?: string;
   language?: string;
   defaultPermission?: "ask_before_changes" | "full_access" | "request_review";
@@ -479,6 +481,21 @@ declare global {
         onOpenTabRequest?: (
           callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void
         ) => () => void;
+      };
+      computer?: {
+        getCapabilities: () => Promise<{
+          platform: string;
+          supported: boolean;
+          engine?: string;
+          tools?: string[];
+          capabilities?: string[];
+        }>;
+        listApps: () => Promise<Array<{
+          name: string;
+          pid?: number;
+          bundleId?: string;
+          title?: string;
+        }>>;
       };
       marketplace?: {
         listInstalled: (workspacePath?: string) => Promise<Array<{

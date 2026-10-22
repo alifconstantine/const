@@ -151,7 +151,7 @@ export class MarketplaceService {
   }
 
   public async ensureDefaultSkillsInstalled(): Promise<void> {
-    const defaultSlugs = ["docx", "pdf", "pptx"];
+    const defaultSlugs = ["docx", "pdf", "pptx", "computer-use"];
     for (const slug of defaultSlugs) {
       const destDir = path.join(this.globalSkillsDir, slug);
       const skillMd = path.join(destDir, "SKILL.md");

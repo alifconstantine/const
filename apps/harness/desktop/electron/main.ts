@@ -10,6 +10,7 @@ import {
   globalTaskManager,
   globalSubAgentManager,
   registerGlobalBrowserToolHandler,
+  registerGlobalComputerToolHandler,
   listMemoryFiles,
   readMemoryFile,
   saveMemoryFile,
@@ -33,11 +34,30 @@ import {
   type ScheduledTaskSchedule,
 } from "./scheduled-tasks";
 import { browserController, type ControlState } from "./browser-controller";
+import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
 
-registerGlobalBrowserToolHandler((toolName, args) =>
-  browserController.executeTool(toolName, args)
-);
+registerGlobalBrowserToolHandler(async (toolName, args) => {
+  const config = loadUserConfig();
+  if (config.enableBrowserUse === false) {
+    return {
+      result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+      isError: true,
+    };
+  }
+  return browserController.executeTool(toolName, args);
+});
+
+registerGlobalComputerToolHandler(async (toolName, args) => {
+  const config = loadUserConfig();
+  if (config.enableComputerUse === false) {
+    return {
+      result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+      isError: true,
+    };
+  }
+  return computerController.executeTool(toolName, args);
+});
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -79,6 +99,8 @@ export interface UserConfig {
     supportsTools?: boolean;
   }>;
   workspaceMemoryEnabled?: boolean;
+  enableComputerUse?: boolean;
+  enableBrowserUse?: boolean;
   defaultProjectLocation?: string;
   language?: string;
   defaultPermission?: "ask_before_changes" | "full_access" | "request_review";
@@ -95,6 +117,8 @@ const defaultUserConfig: UserConfig = {
   activeModel: "gemini-3.8-flash",
   activeProvider: "const",
   workspaceMemoryEnabled: true,
+  enableComputerUse: true,
+  enableBrowserUse: true,
   defaultProjectLocation: "",
   language: "en",
   defaultPermission: "ask_before_changes",
@@ -179,7 +203,8 @@ function loadUserConfig(): UserConfig {
         merged.providers.const.baseUrl = process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1";
       }
 
-      return merged;
+      computerController.setEnabled(merged.enableComputerUse !== false);
+    return merged;
     }
   } catch (err) {
     console.error("[Electron Main] Failed to read config.json, using default:", err);
@@ -200,6 +225,9 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
       ...(config.providers || {}),
     },
   };
+  if (config.enableComputerUse !== undefined) {
+    computerController.setEnabled(config.enableComputerUse);
+  }
   if (config.launchOnStartup !== undefined) {
     try {
       app.setLoginItemSettings({
@@ -666,6 +694,24 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   // Config & Model Management IPC Handlers
   // ---------------------------------------------------------------------------
+  ipcMain.handle("computer:get-capabilities", async () => {
+    try {
+      return await computerController.getCapabilities();
+    } catch (err: any) {
+      return { error: err.message || String(err) };
+    }
+  });
+
+  ipcMain.handle("computer:list-apps", async () => {
+    try {
+      const apps = await computerController.listApps();
+      return Array.isArray(apps) ? apps : [];
+    } catch (err: any) {
+      console.warn("[Computer] Failed to list apps:", err);
+      return [];
+    }
+  });
+
   ipcMain.handle("config:get", async () => {
     return loadUserConfig();
   });
@@ -1161,7 +1207,24 @@ app.whenReady().then(() => {
           });
         },
         browserHandler: async (toolName, args) => {
+          const cfg = loadUserConfig();
+          if (cfg.enableBrowserUse === false) {
+            return {
+              result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+              isError: true,
+            };
+          }
           return await browserController.executeTool(toolName, args);
+        },
+        computerHandler: async (toolName, args) => {
+          const cfg = loadUserConfig();
+          if (cfg.enableComputerUse === false) {
+            return {
+              result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+              isError: true,
+            };
+          }
+          return await computerController.executeTool(toolName, args);
         },
       });
 
@@ -1991,7 +2054,24 @@ app.whenReady().then(() => {
         thinkingLevel: "medium",
         maxTurns: 200,
         browserHandler: async (toolName, args) => {
+          const cfg = loadUserConfig();
+          if (cfg.enableBrowserUse === false) {
+            return {
+              result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+              isError: true,
+            };
+          }
           return await browserController.executeTool(toolName, args);
+        },
+        computerHandler: async (toolName, args) => {
+          const cfg = loadUserConfig();
+          if (cfg.enableComputerUse === false) {
+            return {
+              result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+              isError: true,
+            };
+          }
+          return await computerController.executeTool(toolName, args);
         },
       });
 
@@ -2001,7 +2081,7 @@ app.whenReady().then(() => {
 
       const initialMessage: AgentMessage = {
         role: "user",
-        content: `[Scheduled Task: ${taskName} — Run #${runCount}]\n\n${taskPrompt}`,
+        content: `[Scheduled Task: ${taskName} â€” Run #${runCount}]\n\n${taskPrompt}`,
         timestamp: Date.now(),
       };
 
@@ -2358,3 +2438,4 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+

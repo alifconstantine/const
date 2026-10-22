@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -40,6 +40,35 @@ import { executeEval } from "./eval.js";
 import { executeAstEdit } from "./ast-edit.js";
 import { executeGhTool } from "./gh.js";
 
+export type BrowserToolHandler = (
+  toolName: string,
+  args: Record<string, any>
+) => Promise<{ result: any; isError: boolean }>;
+
+export type ComputerToolHandler = (
+  toolName: string,
+  args: Record<string, any>
+) => Promise<{ result: any; isError: boolean }>;
+
+let globalBrowserToolHandler: BrowserToolHandler | null = null;
+let globalComputerToolHandler: ComputerToolHandler | null = null;
+
+export function registerGlobalBrowserToolHandler(handler: BrowserToolHandler | null) {
+  globalBrowserToolHandler = handler;
+}
+
+export function getGlobalBrowserToolHandler(): BrowserToolHandler | null {
+  return globalBrowserToolHandler;
+}
+
+export function registerGlobalComputerToolHandler(handler: ComputerToolHandler | null) {
+  globalComputerToolHandler = handler;
+}
+
+export function getGlobalComputerToolHandler(): ComputerToolHandler | null {
+  return globalComputerToolHandler;
+}
+
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
   stepIndex?: number;
@@ -59,26 +88,14 @@ export interface ExecuteToolOptions {
   onSourceCreated?: (source: any) => void;
   onArtifactCreated?: (artifact: any) => void;
   browserHandler?: BrowserToolHandler;
+  computerHandler?: ComputerToolHandler;
   voiceConfig?: any;
   imageConfig?: any;
   speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
   imageHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
 }
 
-export type BrowserToolHandler = (
-  toolName: string,
-  args: Record<string, any>
-) => Promise<{ result: any; isError: boolean }>;
 
-let globalBrowserToolHandler: BrowserToolHandler | null = null;
-
-export function registerGlobalBrowserToolHandler(handler: BrowserToolHandler | null) {
-  globalBrowserToolHandler = handler;
-}
-
-export function getGlobalBrowserToolHandler(): BrowserToolHandler | null {
-  return globalBrowserToolHandler;
-}
 
 // ---------------------------------------------------------------------------
 // Shell Configuration & Discovery (aligned with Pi Windows architecture)
@@ -703,6 +720,350 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Native Computer Use Tool Definitions (Desktop GUI Automation - Orca/Const)
+// ---------------------------------------------------------------------------
+
+export const COMPUTER_LIST_APPS_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_list_apps",
+    description:
+      "Lists visible and running local desktop applications (PID, process name, window titles) available for GUI automation and observation.",
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+};
+
+export const COMPUTER_LIST_WINDOWS_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_list_windows",
+    description:
+      "Lists all visible top-level windows for a specific target desktop application (by name, executable, bundle ID, or pid:<number>).",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description:
+            "The target application name, executable name, bundle identifier, or 'pid:<number>' from computer_list_apps.",
+        },
+      },
+      required: ["app"],
+    },
+  },
+};
+
+export const COMPUTER_GET_APP_STATE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_get_app_state",
+    description:
+      "Inspects a visible desktop app window: extracts its complete Accessibility Tree with numbered element indexes and captures a visual window screenshot saved to disk. Always use this instead of writing custom PowerShell/OCR scripts.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector (name, bundleId, or pid:<number>).",
+        },
+        windowId: {
+          type: "number",
+          description: "Optional window ID from computer_list_windows.",
+        },
+        windowIndex: {
+          type: "number",
+          description: "Optional window index if windowId is not available.",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips screenshot capture to save tokens/bandwidth.",
+        },
+        restoreWindow: {
+          type: "boolean",
+          description: "If true (default), unminimizes and brings the window to the front before inspecting.",
+        },
+      },
+      required: ["app"],
+    },
+  },
+};
+
+export const COMPUTER_CLICK_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_click",
+    description:
+      "Clicks a UI element by its numeric elementIndex from computer_get_app_state, or by window-local x,y coordinates from the screenshot. Always use this instead of executing terminal mouse scripts.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        elementIndex: {
+          type: "number",
+          description: "The numeric element index from the latest accessibility tree (recommended).",
+        },
+        x: {
+          type: "number",
+          description: "Window-local X coordinate (use only when elementIndex is unavailable).",
+        },
+        y: {
+          type: "number",
+          description: "Window-local Y coordinate (use only when elementIndex is unavailable).",
+        },
+        mouseButton: {
+          type: "string",
+          enum: ["left", "right", "middle"],
+          description: "Mouse button to click (default: 'left').",
+        },
+        clickCount: {
+          type: "number",
+          description: "Number of clicks: 1 for single-click, 2 for double-click (default: 1).",
+        },
+        modifiers: {
+          type: "string",
+          description: "Optional keyboard modifier chord held during click (e.g. 'CmdOrCtrl', 'Shift', 'Alt').",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app"],
+    },
+  },
+};
+
+export const COMPUTER_SET_VALUE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_set_value",
+    description:
+      "Directly sets the text or value of an editable UI element (text box, combo box, slider) via accessibility patterns without typing delays.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        elementIndex: {
+          type: "number",
+          description: "The numeric element index of the editable field.",
+        },
+        value: {
+          type: "string",
+          description: "The exact value or text to set.",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "elementIndex", "value"],
+    },
+  },
+};
+
+export const COMPUTER_TYPE_TEXT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_type_text",
+    description:
+      "Synthesizes keyboard typing into the currently focused element of the target window. Ensure the control is focused via computer_click or computer_hotkey first. Never execute PowerShell SendKeys scripts.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        text: {
+          type: "string",
+          description: "The string of characters to type.",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "text"],
+    },
+  },
+};
+
+export const COMPUTER_PRESS_KEY_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_press_key",
+    description:
+      "Presses a single navigation or control key (e.g. 'Return', 'Enter', 'Escape', 'Tab', 'Backspace', 'Delete', 'Up', 'Down', 'Left', 'Right', 'Space').",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        key: {
+          type: "string",
+          description: "Key name to press (e.g. 'Return', 'Tab', 'Escape', 'Down').",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "key"],
+    },
+  },
+};
+
+export const COMPUTER_HOTKEY_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_hotkey",
+    description:
+      "Sends a keyboard shortcut chord combining modifier(s) and a key (e.g. 'CmdOrCtrl+F', 'Ctrl+N', 'Alt+F4', 'Ctrl+S'). Essential for focusing search or opening new chats in modern apps like WhatsApp or browsers.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        key: {
+          type: "string",
+          description: "Key combination chord string (e.g. 'CmdOrCtrl+A', 'Ctrl+Shift+P').",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "key"],
+    },
+  },
+};
+
+export const COMPUTER_PASTE_TEXT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_paste_text",
+    description:
+      "Pastes text into the focused element via system clipboard and standard paste shortcut. Preferred for long bodies of text or code blocks.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        text: {
+          type: "string",
+          description: "Text to paste.",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "text"],
+    },
+  },
+};
+
+export const COMPUTER_SCROLL_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_scroll",
+    description:
+      "Scrolls a scrollable container or window up, down, left, or right.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        direction: {
+          type: "string",
+          enum: ["up", "down", "left", "right"],
+          description: "Direction to scroll.",
+        },
+        pages: {
+          type: "number",
+          description: "Amount to scroll in page increments (default: 1).",
+        },
+        elementIndex: {
+          type: "number",
+          description: "Optional element index to scroll within.",
+        },
+        x: {
+          type: "number",
+          description: "Optional window-local X position to hover before scrolling.",
+        },
+        y: {
+          type: "number",
+          description: "Optional window-local Y position to hover before scrolling.",
+        },
+        noScreenshot: {
+          type: "boolean",
+          description: "If true, skips post-action screenshot.",
+        },
+      },
+      required: ["app", "direction"],
+    },
+  },
+};
+
+export const COMPUTER_DRAG_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_drag",
+    description:
+      "Drags mouse from a source element or coordinate to a destination element or coordinate.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: {
+          type: "string",
+          description: "Target application selector.",
+        },
+        fromElementIndex: { type: "number", description: "Source element index." },
+        toElementIndex: { type: "number", description: "Destination element index." },
+        fromX: { type: "number", description: "Source X coordinate." },
+        fromY: { type: "number", description: "Source Y coordinate." },
+        toX: { type: "number", description: "Destination X coordinate." },
+        toY: { type: "number", description: "Destination Y coordinate." },
+        noScreenshot: { type: "boolean", description: "If true, skips post-action screenshot." },
+      },
+      required: ["app"],
+    },
+  },
+};
+
+export const NATIVE_COMPUTER_TOOLS: NativeToolDefinition[] = [
+  COMPUTER_LIST_APPS_TOOL,
+  COMPUTER_LIST_WINDOWS_TOOL,
+  COMPUTER_GET_APP_STATE_TOOL,
+  COMPUTER_CLICK_TOOL,
+  COMPUTER_SET_VALUE_TOOL,
+  COMPUTER_TYPE_TEXT_TOOL,
+  COMPUTER_PRESS_KEY_TOOL,
+  COMPUTER_HOTKEY_TOOL,
+  COMPUTER_PASTE_TEXT_TOOL,
+  COMPUTER_SCROLL_TOOL,
+  COMPUTER_DRAG_TOOL,
+];
+
+
+// ---------------------------------------------------------------------------
 // Long-Term Memory Tool Definitions (retain, recall, reflect)
 // ---------------------------------------------------------------------------
 
@@ -893,6 +1254,7 @@ export const GENERATE_IMAGE_TOOL: NativeToolDefinition = {
 
 export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
   ...NATIVE_BROWSER_TOOLS,
+  ...NATIVE_COMPUTER_TOOLS,
   GENERATE_SPEECH_TOOL,
   GENERATE_IMAGE_TOOL,
   {
@@ -2352,6 +2714,7 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
   GENERATE_SPEECH_TOOL,
   GENERATE_IMAGE_TOOL,
   ...NATIVE_BROWSER_TOOLS,
+  ...NATIVE_COMPUTER_TOOLS,
 ];
 
 // ---------------------------------------------------------------------------
@@ -3184,7 +3547,7 @@ export async function executeComposioTool(
               title,
               rowsProcessed: Array.isArray(rows) ? rows.length : 0,
               message: notConnected
-                ? `Spreadsheet "${title}" disiapkan. Akun Google Sheets Anda belum terhubung — hubungkan akun di menu Connectors agar langsung tersimpan di Google Drive.`
+                ? `Spreadsheet "${title}" disiapkan. Akun Google Sheets Anda belum terhubung â€” hubungkan akun di menu Connectors agar langsung tersimpan di Google Drive.`
                 : `Spreadsheet "${title}" disiapkan: ${errMsg}`,
               spreadsheetUrl: fallbackUrl,
             },
@@ -3312,13 +3675,13 @@ export async function executeComposioTool(
             markdownText += slides
               .map((s: any) => {
                 const bullets = Array.isArray(s.bullets)
-                  ? s.bullets.map((b: string) => `• ${b}`).join("\n")
+                  ? s.bullets.map((b: string) => `â€¢ ${b}`).join("\n")
                   : s.content || "";
                 return `## ${s.title || "Slide"}\n\n${bullets}`;
               })
               .join("\n\n---\n\n");
           } else {
-            markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\n• Gambaran materi pokok\n• Tujuan pembelajaran\n\n---\n\n## Kesimpulan\n• Poin-poin evaluasi utama`;
+            markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\nâ€¢ Gambaran materi pokok\nâ€¢ Tujuan pembelajaran\n\n---\n\n## Kesimpulan\nâ€¢ Poin-poin evaluasi utama`;
           }
         }
 
@@ -5046,6 +5409,27 @@ export async function executeNativeTool(
         return {
           result:
             "The native desktop browser is not connected or open. Please open the Browser tab in the right pane to interact with web pages directly.",
+          isError: true,
+        };
+      }
+      return await handler(toolName, args);
+    }
+
+    // -----------------------------------------------------------------------
+    // Native Computer Use Tools (Desktop GUI Automation)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool.startsWith("computer") ||
+      toolName.startsWith("computer_")
+    ) {
+      const handler =
+        options.computerHandler ||
+        options.parentConfig?.computerHandler ||
+        getGlobalComputerToolHandler();
+      if (!handler) {
+        return {
+          result:
+            "No native computer use handler registered. Computer Use is only available in the native Const desktop application.",
           isError: true,
         };
       }
@@ -7400,3 +7784,4 @@ export async function executeNativeTool(
     };
   }
 }
+

@@ -1,4 +1,4 @@
-export { uuidv7 } from "@const/ai";
+﻿export { uuidv7 } from "@const/ai";
 export type {
 	AttributeValue,
 	ExactTelemetryAttributes,
@@ -225,5 +225,13 @@ export {
 	type ContextPressureProjection,
 	type ContextBreakdownProjection,
 	type ContextOccupancy,
+	registerGlobalBrowserToolHandler,
+	getGlobalBrowserToolHandler,
+	type BrowserToolHandler,
+	registerGlobalComputerToolHandler,
+	getGlobalComputerToolHandler,
+	type ComputerToolHandler,
+	NATIVE_COMPUTER_TOOLS,
 } from "./const/index.ts";
+
 

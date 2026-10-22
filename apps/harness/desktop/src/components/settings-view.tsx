@@ -81,6 +81,7 @@ import {
 } from "../lib/theme";
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
+import { ComputerUseSettings } from "./settings/computer-use-settings";
 import { UsageStatsView } from "./settings/usage-stats-view";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
@@ -804,6 +805,7 @@ export function SettingsView({
     {
       label: t("settings.agentCapabilities"),
       items: [
+        { id: "computer-use", label: t("settings.computerUse"), icon: Monitor },
         { id: "memory", label: t("settings.memory"), icon: Brain },
         { id: "subagents", label: t("settings.subagents"), icon: Bot },
         { id: "mcp-servers", label: t("settings.mcpServers"), icon: Cable },
@@ -855,6 +857,11 @@ export function SettingsView({
         return {
           title: t("settings.usageStatistic"),
           desc: "Monitor your weekly token consumption and account usage limits.",
+        };
+      case "computer-use":
+        return {
+          title: t("settings.computerUseTitle"),
+          desc: t("settings.computerUseSubtitle"),
         };
       case "memory":
         return {
@@ -2278,6 +2285,11 @@ export function SettingsView({
                 quota={quota}
                 onActiveModelChanged={(modelId) => handleSelectActiveModel(modelId)}
               />
+            ) : activeTab === "computer-use" ? (
+              /* --------------------------------------------------------- */
+              /* Computer Use & Browser Settings View                      */
+              /* --------------------------------------------------------- */
+              <ComputerUseSettings />
             ) : activeTab === "memory" ? (
               /* --------------------------------------------------------- */
               /* Memory Settings View                                      */

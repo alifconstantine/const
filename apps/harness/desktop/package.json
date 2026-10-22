@@ -69,6 +69,11 @@
         "from": "skills",
         "to": "skills",
         "filter": ["**/*"]
+      },
+      {
+        "from": "native",
+        "to": "native",
+        "filter": ["**/*"]
       }
     ],
     "win": {
@@ -82,3 +87,4 @@
     }
   }
 }
+

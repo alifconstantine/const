@@ -577,6 +577,28 @@ Available tools:
 - browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
 - browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
 - browser_request_help: Hand over control to the human user for CAPTCHAs, 2FA/OTP verification, or masked password/secret entry, pausing until the user hands control back.
+- computer_list_apps: List visible running desktop applications (e.g. WhatsApp, Spotify, Chrome, Notepad).
+- computer_list_windows: List all open windows for a given application.
+- computer_get_app_state: Capture the accessible UI elements tree and a screenshot of the target app window (saved to disk).
+- computer_click: Click a UI element by elementIndex (recommended) or window-local (x, y) coordinates.
+- computer_set_value: Directly set text or value in an editable input element without keystroke lag.
+- computer_type_text: Type text into the focused control in the active app window.
+- computer_press_key: Press single keys ('Return', 'Tab', 'Escape', etc.).
+- computer_hotkey: Send keyboard shortcuts (e.g. 'CmdOrCtrl+F', 'Ctrl+N', 'Alt+F4').
+- computer_paste_text: Paste text via system clipboard into the active app window.
+- computer_scroll: Scroll the app window up, down, left, or right.
+- computer_drag: Drag and drop between elements or coordinates.
+
+NATIVE COMPUTER USE (DESKTOP AUTOMATION) PROTOCOL:
+- You have native computer-use capabilities to control desktop applications (e.g. WhatsApp, Spotify, Chrome, Edge, Slack, IDEs, system dialogs).
+- CRITICAL NEGATIVE CONSTRAINT: NEVER write or execute PowerShell, CMD, Bash, C#, or Python scripts in the terminal to simulate mouse clicks, keyboard strokes, window activation, OCR, or capture screenshots (e.g. 'Add-Type -AssemblyName System.Windows.Forms', 'SendKeys', 'Windows.Media.Ocr', 'UIAutomationClient'). ALWAYS invoke the native 'computer_*' tools!
+- WORKFLOW FOR DESKTOP APPS:
+  1. Discover running app with 'computer_list_apps' (or 'computer_list_windows').
+  2. Inspect state with 'computer_get_app_state(app: "<app>", restoreWindow: true)'. The screenshot is automatically saved to disk and its path returned.
+  3. For UWP/WinUI apps (e.g. WhatsApp) or web views where elements may lack specific tree indices:
+     - Use keyboard shortcuts to navigate: 'computer_hotkey(app: "<app>", key: "Ctrl+F")' to focus search/chat, 'Ctrl+N' for new chat.
+     - Or use window-local coordinate click: 'computer_click(app: "<app>", x: <x>, y: <y>)' based on the screenshot image.
+  4. Type messages with 'computer_type_text' or 'computer_paste_text', then press Return with 'computer_press_key(app: "<app>", key: "Return")'.
 
 NATIVE BROWSER AUTOMATION PROTOCOL:
 - You have direct, live control over the native browser in the desktop sidepanel.
@@ -2253,6 +2275,7 @@ export class ConstAgent {
                 onEvent({ type: "artifact_created", artifact });
               },
               browserHandler: this.config.browserHandler,
+              computerHandler: this.config.computerHandler,
               voiceConfig: this.config.voiceConfig,
               imageConfig: this.config.imageConfig,
               speechHandler: this.config.speechHandler,
