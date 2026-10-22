@@ -1,4 +1,4 @@
-﻿import fs from "node:fs/promises";
+import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -720,7 +720,7 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Native Computer Use Tool Definitions (Desktop GUI Automation - Orca/Const)
+// Native Computer Use Tool Definitions (Desktop GUI Automation)
 // ---------------------------------------------------------------------------
 
 export const COMPUTER_LIST_APPS_TOOL: NativeToolDefinition = {
