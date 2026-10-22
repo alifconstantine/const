@@ -20,7 +20,8 @@ import {
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "../workbench/file-icon";
 import { MarkdownContent } from "../workbench/markdown-content";
-import { highlightCodeLines } from "../settings/skills-settings";
+import { highlightCodeToHtmlLines } from "../../lib/code-highlighter";
+import { useCodeFontSize } from "../../lib/theme";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
 
@@ -51,6 +52,7 @@ export function FilePreviewTab({
   onUpdateTab,
 }: FilePreviewTabProps) {
   const { t } = useTranslation();
+  const [codeFontSize] = useCodeFontSize();
 
   // Active workspace path (prop or from tab cwd/project)
   const workspacePath = useMemo(() => {
@@ -491,22 +493,91 @@ export function FilePreviewTab({
   const ext = fileName.includes(".") ? fileName.split(".").pop()?.toLowerCase() || "" : "";
   const highlightedLines = useMemo(() => {
     if (isMarkdown && mode === "formatted") return [];
-    return highlightCodeLines(content, ext);
+    return highlightCodeToHtmlLines(content, ext);
   }, [content, ext, isMarkdown, mode]);
 
   const rawLines = useMemo(() => content.split(/\r?\n/), [content]);
 
   // Check if a line begins a foldable block
-  const isFoldableLine = (lineText: string) => {
+  const isFoldableLine = useCallback((lineText: string) => {
     const trimmed = lineText.trim();
     return (
       trimmed.endsWith("{") ||
       trimmed.endsWith("(") ||
       trimmed.endsWith("[") ||
       trimmed.endsWith("=>") ||
+      trimmed.endsWith(":") ||
       /\b(function|class|interface|type)\b.*[{([][^})\]]*$/.test(trimmed)
     );
-  };
+  }, []);
+
+  // Compute closing line of a folded block
+  const getFoldEndLine = useCallback((lines: string[], startIdx: number): number => {
+    const startLine = lines[startIdx] || "";
+    let openBraces = 0;
+    let openParens = 0;
+    let openBrackets = 0;
+    let hasDelimiter = false;
+
+    for (let i = startIdx; i < lines.length; i++) {
+      const l = lines[i] || "";
+      for (let c = 0; c < l.length; c++) {
+        const ch = l[c];
+        if (ch === "{") {
+          openBraces++;
+          hasDelimiter = true;
+        } else if (ch === "}") {
+          openBraces--;
+        } else if (ch === "(") {
+          openParens++;
+          hasDelimiter = true;
+        } else if (ch === ")") {
+          openParens--;
+        } else if (ch === "[") {
+          openBrackets++;
+          hasDelimiter = true;
+        } else if (ch === "]") {
+          openBrackets--;
+        }
+      }
+      if (
+        i > startIdx &&
+        hasDelimiter &&
+        openBraces <= 0 &&
+        openParens <= 0 &&
+        openBrackets <= 0
+      ) {
+        return i;
+      }
+    }
+
+    // Fallback: indentation-based folding (e.g. Python, YAML)
+    const startIndentMatch = startLine.match(/^\s*/);
+    const startIndent = startIndentMatch ? startIndentMatch[0].length : 0;
+    for (let i = startIdx + 1; i < lines.length; i++) {
+      const l = lines[i] || "";
+      if (!l.trim()) continue;
+      const indentMatch = l.match(/^\s*/);
+      const indent = indentMatch ? indentMatch[0].length : 0;
+      if (indent <= startIndent) {
+        return i - 1;
+      }
+    }
+
+    return lines.length - 1;
+  }, []);
+
+  // Set of lines hidden due to collapsed parent blocks
+  const hiddenLineIndices = useMemo(() => {
+    const hidden = new Set<number>();
+    for (const startIdx of collapsedLines) {
+      const endIdx = getFoldEndLine(rawLines, startIdx);
+      for (let i = startIdx + 1; i <= endIdx; i++) {
+        hidden.add(i);
+      }
+    }
+    return hidden;
+  }, [collapsedLines, rawLines, getFoldEndLine]);
 
   const toggleFoldLine = (lineIdx: number) => {
     setCollapsedLines((prev) => {
@@ -1020,8 +1091,15 @@ export function FilePreviewTab({
           ) : (
             /* Monospace Code Viewer matching Image 2 with Line Numbers & Fold chevrons */
             <ScrollArea className="w-full max-w-full h-full">
-              <div className="w-full max-w-full py-3 font-mono text-[12px] leading-5 select-text">
+              <div
+                style={{ fontSize: `${codeFontSize}px` }}
+                className="w-full max-w-full py-3 font-mono leading-5 select-text [tab-size:2]"
+              >
                 {rawLines.map((line, idx) => {
+                  if (hiddenLineIndices.has(idx)) {
+                    return null;
+                  }
+
                   const foldable = isFoldableLine(line);
                   const isCollapsed = collapsedLines.has(idx);
 
@@ -1038,7 +1116,7 @@ export function FilePreviewTab({
                             type="button"
                             onClick={() => toggleFoldLine(idx)}
                             className="p-0.5 -mr-1 text-neutral-500 hover:text-white cursor-pointer opacity-70 group-hover:opacity-100 transition-opacity"
-                            title="Fold code block"
+                            title={isCollapsed ? "Unfold code block" : "Fold code block"}
                           >
                             {isCollapsed ? (
                               <ChevronRight className="w-2.5 h-2.5" />
@@ -1051,13 +1129,24 @@ export function FilePreviewTab({
                         )}
                       </div>
 
-                      {/* Syntax Highlighted Code */}
-                      <div
-                        className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4]"
-                        dangerouslySetInnerHTML={{
-                          __html: highlightedLines[idx] || "&nbsp;",
-                        }}
-                      />
+                      {/* Syntax Highlighted Code Line */}
+                      <div className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4] flex items-center flex-wrap gap-1">
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: highlightedLines[idx] || "&nbsp;",
+                          }}
+                        />
+                        {isCollapsed && (
+                          <button
+                            type="button"
+                            onClick={() => toggleFoldLine(idx)}
+                            className="inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded text-[10px] font-mono bg-white/10 hover:bg-white/20 text-neutral-400 hover:text-white transition-colors cursor-pointer select-none"
+                            title="Unfold code block"
+                          >
+                            ...
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

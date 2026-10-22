@@ -70,69 +70,8 @@ import {
 import { FileIcon } from "../workbench/file-icon";
 import { MarkdownContent } from "../workbench/markdown-content";
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function highlightPythonLine(line: string): string {
-  const regex =
-    /(#.*$)|(f?["'](?:\\.|[^"'\\])*["'])|(\b(?:def|class|return|if|elif|else|for|while|try|except|finally|with|as|import|from|in|is|not|and|or|lambda|yield|raise|pass|break|continue|async|await|global|nonlocal|assert)\b)|(\b(?:True|False|None|self|cls|print|len|range|open|int|str|float|bool|list|dict|set|tuple|enumerate|zip|map|filter|type)\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z_]\w*(?=\s*\())|([a-zA-Z_]\w*)|([^\s\w]+)|(\s+)/g;
-
-  return line.replace(
-    regex,
-    (match, comment, str, kw, builtin, num, fnCall, _ident, _symbol, spaces) => {
-      if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-      if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-      if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-      if (builtin) return `<span class="text-sky-600 dark:text-sky-400">${escapeHtml(builtin)}</span>`;
-      if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-      if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
-      if (spaces) return spaces;
-      return escapeHtml(match);
-    }
-  );
-}
-
-function highlightJsTsLine(line: string): string {
-  const regex =
-    /(\/\/.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b(?:import|export|from|as|default|const|let|var|function|return|if|else|switch|case|break|continue|for|while|do|try|catch|finally|throw|new|class|extends|implements|interface|type|enum|public|private|protected|readonly|static|async|await|yield|typeof|instanceof|void|null|undefined|this|super|true|false)\b)|(\b(?:string|number|boolean|any|unknown|never|object|Symbol|BigInt|Array|Record|Promise|Map|Set|Date|RegExp|Error|JSON|Math|console)\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z_$][\w$]*(?=\s*\())|([a-zA-Z_$][\w$]*)|([^\s\w$]+)|(\s+)/g;
-
-  return line.replace(
-    regex,
-    (match, comment, str, kw, builtin, num, fnCall, _ident, _symbol, spaces) => {
-      if (comment) return `<span class="text-zinc-400 dark:text-zinc-500 italic">${escapeHtml(comment)}</span>`;
-      if (str) return `<span class="text-emerald-600 dark:text-emerald-400">${escapeHtml(str)}</span>`;
-      if (kw) return `<span class="text-purple-600 dark:text-purple-400 font-semibold">${escapeHtml(kw)}</span>`;
-      if (builtin) return `<span class="text-sky-600 dark:text-sky-400">${escapeHtml(builtin)}</span>`;
-      if (num) return `<span class="text-amber-600 dark:text-amber-400">${escapeHtml(num)}</span>`;
-      if (fnCall) return `<span class="text-blue-600 dark:text-blue-300">${escapeHtml(fnCall)}</span>`;
-      if (spaces) return spaces;
-      return escapeHtml(match);
-    }
-  );
-}
-
-export function highlightCodeLines(code: string, filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
-  const lines = code.split("\n");
-
-  return lines
-    .map((line, idx) => {
-      let highlighted = escapeHtml(line);
-      if (ext === "py") {
-        highlighted = highlightPythonLine(line);
-      } else if (ext === "ts" || ext === "js" || ext === "tsx" || ext === "jsx" || ext === "json") {
-        highlighted = highlightJsTsLine(line);
-      }
-      return `<div class="table-row hover:bg-[#252528] transition-colors leading-5"><span class="table-cell select-none pr-4 text-right text-[11px] text-[#5d5d5d] font-mono w-10">${idx + 1}</span><span class="table-cell select-text text-xs font-mono text-[#d4d4d4] whitespace-pre">${highlighted || "&nbsp;"}</span></div>`;
-    })
-    .join("");
-}
+import { highlightCodeLines, highlightCodeToHtmlLines } from "../../lib/code-highlighter";
+export { highlightCodeLines, highlightCodeToHtmlLines };
 
 function SkillCodeViewer({ code, filename }: { code: string; filename: string }) {
   const highlightedHtml = useMemo(() => {
