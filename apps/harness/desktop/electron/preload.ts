@@ -258,11 +258,20 @@ contextBridge.exposeInMainWorld("electron", {
     listApps: () => ipcRenderer.invoke("computer:list-apps"),
   },
   marketplace: {
+    listPlugins: (workspacePath?: string) => ipcRenderer.invoke("marketplace:list-plugins", workspacePath),
+    installPlugin: (payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => ipcRenderer.invoke("marketplace:install-plugin", payload),
+    uninstallPlugin: (payload: { id: string; workspacePath?: string }) => ipcRenderer.invoke("marketplace:uninstall-plugin", payload),
+    setEnabled: (payload: { id: string; enabled: boolean; workspacePath?: string }) => ipcRenderer.invoke("marketplace:set-enabled", payload),
+    onChanged: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on("marketplace:changed", handler);
+      return () => ipcRenderer.removeListener("marketplace:changed", handler);
+    },
     listInstalled: (workspacePath?: string) =>
       ipcRenderer.invoke("marketplace:list-installed", workspacePath),
     installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) =>
       ipcRenderer.invoke("marketplace:install-skill", payload),
-    uninstallSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) =>
+    uninstallSkill: (payload: { id: string; workspacePath?: string }) =>
       ipcRenderer.invoke("marketplace:uninstall-skill", payload),
     openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) =>
       ipcRenderer.invoke("marketplace:open-skills-folder", payload),

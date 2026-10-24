@@ -4,7 +4,7 @@ import { Toaster } from "@const/ui";
 import App from "./App";
 import { initThemeListener } from "./lib/theme";
 import { I18nProvider } from "./lib/i18n";
-import { ensureDefaultSkillsSeeded } from "./lib/skills/skills-service";
+import { initializeSkillStorage } from "./lib/skills/skills-service";
 import "./index.css";
 
 // Catch global uncaught errors and rejections to log them clearly
@@ -22,7 +22,7 @@ try {
   console.warn("Failed to initialize theme listener:", err);
 }
 
-ensureDefaultSkillsSeeded().catch((err) => console.warn("Failed to seed skills on startup:", err));
+initializeSkillStorage().catch((err) => console.warn("Failed to initialize skills on startup:", err));
 
 interface ErrorBoundaryState {
   hasError: boolean;

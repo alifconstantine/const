@@ -499,7 +499,17 @@ declare global {
         }>>;
       };
       marketplace?: {
+        listPlugins: (workspacePath?: string) => Promise<import("./lib/plugins/types").PluginInventory>;
+        installPlugin: (payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => Promise<void>;
+        uninstallPlugin: (payload: { id: string; workspacePath?: string }) => Promise<void>;
+        setEnabled: (payload: { id: string; enabled: boolean; workspacePath?: string }) => Promise<void>;
+        onChanged: (callback: () => void) => () => void;
         listInstalled: (workspacePath?: string) => Promise<Array<{
+          id: string;
+          isEnabled: boolean;
+          workspacePath?: string;
+          pluginId?: string;
+          pluginName?: string;
           slug: string;
           name: string;
           description: string;
@@ -511,6 +521,11 @@ declare global {
           files?: Record<string, string>;
         }>>;
         installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) => Promise<{
+          id: string;
+          isEnabled: boolean;
+          workspacePath?: string;
+          pluginId?: string;
+          pluginName?: string;
           slug: string;
           name: string;
           description: string;
@@ -521,7 +536,7 @@ declare global {
           version?: string;
           files?: Record<string, string>;
         } | null>;
-        uninstallSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) => Promise<boolean>;
+        uninstallSkill: (payload: { id: string; workspacePath?: string }) => Promise<boolean>;
         openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) => Promise<string>;
         getSkillContent: (slug: string, workspacePath?: string) => Promise<{
           slug: string;

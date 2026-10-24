@@ -5,6 +5,7 @@ export * from "./mutation-ledger.js";
 export * from "./checkpoint.js";
 export * from "./subagent.js";
 export * from "./const-agent.js";
+export * from "./skill-registry.js";
 export * from "./edit-engine.js";
 export * from "./bash-interceptor.js";
 export * from "./output-spooler.js";

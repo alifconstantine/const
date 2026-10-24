@@ -2,8 +2,15 @@ import { app, shell } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { resolveSkillRegistry, readPluginManifest, installPluginFromDirectory, setCapabilityEnabled, uninstallRegisteredSkill, uninstallPlugin as removePlugin } from "@const/agent";
+import type { PluginInventory } from "../src/lib/plugins/types";
 
 export interface InstalledSkillRecord {
+  id: string;
+  isEnabled: boolean;
+  workspacePath?: string;
+  pluginId?: string;
+  pluginName?: string;
   slug: string;
   name: string;
   description: string;
@@ -112,6 +119,7 @@ export class MarketplaceService {
 
   private async downloadSkillFromRemote(slug: string, destDir: string): Promise<boolean> {
     const cleanSlug = slug.toLowerCase().trim();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) throw new Error("Invalid skill name.");
     const manifest = this.getManifest();
     const matched = manifest?.skills?.find((s) => s.slug === cleanSlug);
     const filesToDownload = matched?.files && matched.files.length > 0 ? matched.files : ["SKILL.md"];
@@ -181,32 +189,42 @@ export class MarketplaceService {
   }
 
   public listInstalledSkills(workspacePath?: string): InstalledSkillRecord[] {
-    const results: InstalledSkillRecord[] = [];
-    const seenSlugs = new Set<string>();
+    return resolveSkillRegistry(workspacePath).skills.map((skill) => ({ ...skill, files: undefined }));
+  }
 
-    // 1. Workspace skills (highest priority)
-    if (workspacePath && workspacePath !== "Outside Project") {
-      const wsAgentsSkills = path.join(workspacePath, ".agents", "skills");
-      const wsConstSkills = path.join(workspacePath, ".const", "skills");
-      for (const dir of [wsAgentsSkills, wsConstSkills]) {
-        if (fs.existsSync(dir)) {
-          this.scanSkillsDirectory(dir, "workspace", results, seenSlugs);
-        }
-      }
-    }
+  private getBundledPluginsDir(): string {
+    const candidates = [path.join(process.resourcesPath, "plugins"), path.join(app.getAppPath(), "plugins"),
+      path.join(__dirname, "..", "plugins"), path.join(process.cwd(), "apps", "harness", "desktop", "plugins")];
+    const root = candidates.find((candidate) => fs.existsSync(candidate) && fs.readdirSync(candidate, { withFileTypes: true }).some((entry) => entry.isDirectory() && fs.existsSync(path.join(candidate, entry.name, "plugin.json"))));
+    if (!root) throw new Error("Bundled plugins are unavailable.");
+    return root;
+  }
 
-    // 2. Global skills (~/.const/harness/skills)
-    if (fs.existsSync(this.globalSkillsDir)) {
-      this.scanSkillsDirectory(this.globalSkillsDir, "user", results, seenSlugs);
-    }
+  public listPlugins(workspacePath?: string): PluginInventory {
+    const root = this.getBundledPluginsDir();
+    const catalog = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => {
+      const dir = path.join(root, entry.name);
+      const manifest = readPluginManifest(dir);
+      const skillSlugs = fs.readdirSync(path.join(dir, "skills")).filter((slug) => fs.existsSync(path.join(dir, "skills", slug, "SKILL.md"))).sort();
+      return { ...manifest, skillSlugs };
+    });
+    const installed = resolveSkillRegistry(workspacePath).plugins.map(({ skills, ...plugin }) => ({
+      ...plugin, skillSlugs: skills.map((skill) => skill.slug.split(":")[1]!),
+    }));
+    return { catalog, installed };
+  }
 
-    // 3. User standard agents skills (~/.agents/skills)
-    const userAgentsDir = path.join(os.homedir(), ".agents", "skills");
-    if (fs.existsSync(userAgentsDir)) {
-      this.scanSkillsDirectory(userAgentsDir, "user", results, seenSlugs);
-    }
+  public installPlugin(name: string, scope: "user" | "workspace", workspacePath?: string): void {
+    if (!this.listPlugins(workspacePath).catalog.some((plugin) => plugin.name === name)) throw new Error("Unknown plugin.");
+    installPluginFromDirectory(path.join(this.getBundledPluginsDir(), name), scope, workspacePath);
+  }
 
-    return results;
+  public setEnabled(id: string, enabled: boolean, workspacePath?: string): void {
+    setCapabilityEnabled(id, enabled, workspacePath);
+  }
+
+  public uninstallPlugin(id: string, workspacePath?: string): void {
+    removePlugin(id, workspacePath);
   }
 
   public async getSkillContent(
@@ -214,26 +232,9 @@ export class MarketplaceService {
     workspacePath?: string
   ): Promise<SkillContentResult | null> {
     const cleanSlug = slug.toLowerCase().trim();
-
-    // 1. Workspace installed
-    if (workspacePath && workspacePath !== "Outside Project") {
-      const wsDir = path.join(workspacePath, ".agents", "skills", cleanSlug);
-      if (fs.existsSync(path.join(wsDir, "SKILL.md"))) {
-        return this.loadSkillDetailsFromDir(wsDir, cleanSlug, true, "workspace");
-      }
-    }
-
-    // 2. Global installed (~/.const/harness/skills/<slug>)
-    const userDir = path.join(this.globalSkillsDir, cleanSlug);
-    if (fs.existsSync(path.join(userDir, "SKILL.md"))) {
-      return this.loadSkillDetailsFromDir(userDir, cleanSlug, true, "user");
-    }
-
-    // 3. User .agents/skills
-    const agentDir = path.join(os.homedir(), ".agents", "skills", cleanSlug);
-    if (fs.existsSync(path.join(agentDir, "SKILL.md"))) {
-      return this.loadSkillDetailsFromDir(agentDir, cleanSlug, true, "user");
-    }
+    const registered = resolveSkillRegistry(workspacePath).skills.find((skill) => skill.slug === cleanSlug);
+    if (registered) return this.loadSkillDetailsFromDir(registered.path, cleanSlug, true, registered.scope);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) throw new Error("Invalid skill name.");
 
     // 4. Bundled repository / catalog source
     const bundledDir = path.join(this.getBundledSkillsDir(), cleanSlug);
@@ -289,55 +290,14 @@ export class MarketplaceService {
     };
   }
 
-  private scanSkillsDirectory(
-    dir: string,
-    scope: "user" | "workspace",
-    results: InstalledSkillRecord[],
-    seenSlugs: Set<string>
-  ): void {
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const slug = entry.name.toLowerCase().trim();
-        if (seenSlugs.has(slug)) continue;
-
-        const skillDirPath = path.join(dir, entry.name);
-        const skillMdPath = path.join(skillDirPath, "SKILL.md");
-        if (!fs.existsSync(skillMdPath)) continue;
-
-        try {
-          const content = fs.readFileSync(skillMdPath, "utf8");
-          const parsed = this.parseFrontmatter(content);
-          const files = this.readSkillFiles(skillDirPath);
-
-          seenSlugs.add(slug);
-          results.push({
-            slug,
-            name: parsed.name || entry.name,
-            description: parsed.description || "Installed agent skill.",
-            content,
-            path: skillDirPath,
-            scope,
-            author: parsed.author,
-            version: parsed.version || "1.0.0",
-            files,
-          });
-        } catch (err) {
-          console.warn(`[MarketplaceService] Error reading skill ${slug}:`, err);
-        }
-      }
-    } catch (err) {
-      console.warn(`[MarketplaceService] Failed to scan ${dir}:`, err);
-    }
-  }
-
   public async installSkill(
     slug: string,
     targetScope: "user" | "workspace" = "user",
     workspacePath?: string
   ): Promise<InstalledSkillRecord | null> {
     const cleanSlug = slug.toLowerCase().trim();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) throw new Error("Invalid skill name.");
+    if (!this.getManifest()?.skills.some((skill) => skill.slug === cleanSlug)) throw new Error("Skill is not in the standalone catalog.");
 
     // Check candidate sources for real skill files locally
     const candidates = [
@@ -353,6 +313,7 @@ export class MarketplaceService {
       }
     }
 
+    if (targetScope === "workspace" && (!workspacePath || workspacePath === "Outside Project")) throw new Error("Workspace is required.");
     const targetBaseDir =
       targetScope === "workspace" && workspacePath && workspacePath !== "Outside Project"
         ? path.join(workspacePath, ".agents", "skills")
@@ -381,45 +342,15 @@ export class MarketplaceService {
     const skillMdPath = path.join(destDir, "SKILL.md");
     if (!fs.existsSync(skillMdPath)) return null;
 
-    const content = fs.readFileSync(skillMdPath, "utf8");
-    const parsed = this.parseFrontmatter(content);
     const files = this.readSkillFiles(destDir);
 
-    return {
-      slug: cleanSlug,
-      name: parsed.name || cleanSlug,
-      description: parsed.description || "Installed agent skill.",
-      content,
-      path: destDir,
-      scope: targetScope,
-      author: parsed.author,
-      version: parsed.version || "1.0.0",
-      files,
-    };
+    const record = this.listInstalledSkills(targetScope === "workspace" ? workspacePath : undefined).find((skill) => skill.path === destDir);
+    return record ? { ...record, files } : null;
   }
 
-  public uninstallSkill(
-    slug: string,
-    scope: "user" | "workspace" = "user",
-    workspacePath?: string
-  ): boolean {
-    const cleanSlug = slug.toLowerCase().trim();
-    const targetBaseDir =
-      scope === "workspace" && workspacePath && workspacePath !== "Outside Project"
-        ? path.join(workspacePath, ".agents", "skills")
-        : this.globalSkillsDir;
-
-    const destDir = path.join(targetBaseDir, cleanSlug);
-    if (fs.existsSync(destDir)) {
-      try {
-        fs.rmSync(destDir, { recursive: true, force: true });
-        return true;
-      } catch (err) {
-        console.error(`[MarketplaceService] Failed to delete ${destDir}:`, err);
-        return false;
-      }
-    }
-    return false;
+  public uninstallSkill(id: string, workspacePath?: string): boolean {
+    uninstallRegisteredSkill(id, workspacePath);
+    return true;
   }
 
   private readSkillFiles(dir: string, prefix = ""): Record<string, string> {

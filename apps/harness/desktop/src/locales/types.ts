@@ -882,6 +882,19 @@ export interface TranslationDictionary {
     allRightsReserved: string;
   };
   marketplace: {
+    pluginOverridden: string;
+    hyperframesDescription: string;
+    pluginUsageHint: string;
+    pluginSkillsCount: string;
+    pluginIncludedSkills: string;
+    pluginChooseWorkspace: string;
+    pluginLoadError: string;
+    pluginMutationError: string;
+    pluginInstalledSuccess: string;
+    pluginUninstalledSuccess: string;
+    pluginUninstallConfirm: string;
+    pluginToggleLabel: string;
+    pluginMentionTooltip: string;
     title: string;
     subtitle: string;
     tabSkills: string;
@@ -901,9 +914,6 @@ export interface TranslationDictionary {
     noInstalledDesc: string;
     noAvailableTitle: string;
     noAvailableDesc: string;
-    pluginsComingSoonTitle: string;
-    pluginsComingSoonDesc: string;
-    inDevelopment: string;
     globalScope: string;
     workspaceScope: string;
     filterAll: string;

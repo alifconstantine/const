@@ -1,76 +1,28 @@
 import { db } from "../db";
-import type { LocalSkill, LocalSkillBundle, SkillFrontmatter, SkillCategory } from "./types";
-import { DEFAULT_SKILLS, DEFAULT_SKILL_BUNDLES } from "./default-skills";
+import type { LocalSkill, SkillFrontmatter, SkillCategory } from "./types";
+import { DEFAULT_SKILLS } from "./default-skills";
 import { MARKETPLACE_CATALOG, type MarketplaceSkill } from "./skills-catalog";
 
 export { MARKETPLACE_CATALOG, type MarketplaceSkill };
 
 /**
- * Synchronize skills installed on filesystem into local Dexie database
+ * Read the workspace's effective skills from the native registry.
  */
-export async function syncInstalledSkillsFromDisk(workspacePath?: string): Promise<void> {
-  if (window.electron?.marketplace) {
-    try {
-      const installed = await window.electron.marketplace.listInstalled(workspacePath);
-      const existing = await db.skills.toArray();
-      const existingMap = new Map(existing.map((s) => [s.slug, s]));
-
-      // 1. Insert or update skills found on disk
-      for (const item of installed) {
-        const match = existingMap.get(item.slug);
-        const catalogMatch = MARKETPLACE_CATALOG.find((c) => c.slug === item.slug);
-        const category: SkillCategory = catalogMatch?.category || "custom";
-
-        if (!match) {
-          await db.skills.put({
-            id: `skill_${item.slug}`,
-            slug: item.slug,
-            name: item.name,
-            description: item.description,
-            content: item.content,
-            icon: catalogMatch?.icon || "PencilSparkles",
-            category,
-            isBuiltIn: false,
-            isEnabled: true,
-            scope: item.scope,
-            author: item.author || catalogMatch?.author || "User",
-            version: item.version || "1.0.0",
-            overview: generateSkillOverview(item.name, item.slug, item.content, item.description),
-            files: item.files,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          });
-        } else {
-          if (match.content !== item.content || !match.files || match.description !== item.description) {
-            await db.skills.update(match.id, {
-              name: item.name,
-              content: item.content,
-              files: item.files,
-              description: item.description,
-              author: item.author || match.author,
-              version: item.version || match.version,
-              overview: generateSkillOverview(item.name, item.slug, item.content, item.description),
-              updatedAt: Date.now(),
-            });
-          }
-        }
-      }
-
-      // If no skills exist yet in Dexie, seed pre-installed default skills (docx, pdf, pptx)
-      const totalCount = await db.skills.count();
-      if (totalCount === 0 && DEFAULT_SKILLS.length > 0) {
-        await db.skills.bulkPut(DEFAULT_SKILLS);
-      }
-    } catch (err) {
-      console.warn("[SkillsService] Failed to sync installed skills from disk:", err);
-    }
-  } else {
-    // Web fallback
-    const count = await db.skills.count();
-    if (count === 0 && DEFAULT_SKILLS.length > 0) {
-      await db.skills.bulkPut(DEFAULT_SKILLS);
-    }
-  }
+export async function loadInstalledSkills(workspacePath?: string): Promise<LocalSkill[]> {
+  if (!window.electron?.marketplace) return DEFAULT_SKILLS;
+  const installed = await window.electron.marketplace.listInstalled(workspacePath);
+  const records: LocalSkill[] = installed.map((item) => {
+    const catalog = MARKETPLACE_CATALOG.find((skill) => skill.slug === item.slug);
+    return {
+      id: item.id, slug: item.slug, name: item.name, description: item.description,
+      content: item.content, path: item.path, workspacePath: item.workspacePath,
+      pluginId: item.pluginId, pluginName: item.pluginName,
+      icon: catalog?.icon, category: catalog?.category ?? "custom", isBuiltIn: false,
+      isEnabled: item.isEnabled, scope: item.scope, author: item.author ?? catalog?.author,
+      version: item.version ?? "1.0.0", createdAt: 0, updatedAt: 0,
+    };
+  });
+  return records;
 }
 
 /**
@@ -78,7 +30,8 @@ export async function syncInstalledSkillsFromDisk(workspacePath?: string): Promi
  */
 export async function fetchSkillContent(
   slug: string,
-  workspacePath?: string
+  workspacePath?: string,
+  skillId?: string
 ): Promise<{
   content: string;
   files: Record<string, string>;
@@ -90,8 +43,8 @@ export async function fetchSkillContent(
   const cleanSlug = slug.toLowerCase().trim();
 
   // 1. Check local Dexie first
-  const local = await db.skills.where("slug").equals(cleanSlug).first();
-  if (local && local.files && Object.keys(local.files).length > 0) {
+  const local = skillId ? await db.skills.get(skillId) : undefined;
+  if (local && !local.path && (local.scope !== "workspace" || local.workspacePath === workspacePath) && local.files && Object.keys(local.files).length > 0) {
     return {
       content: local.content,
       files: local.files,
@@ -138,7 +91,7 @@ export async function fetchSkillContent(
 }
 
 /**
- * Install a skill from the marketplace catalog to filesystem and Dexie DB
+ * Install a catalog skill through the native registry.
  */
 export async function installSkillFromMarketplace(
   slug: string,
@@ -158,7 +111,7 @@ export async function installSkillFromMarketplace(
   const category: SkillCategory = catalogMatch?.category || "custom";
 
   const localSkill: LocalSkill = {
-    id: `skill_${installed.slug}`,
+    id: installed.id,
     slug: installed.slug,
     name: installed.name,
     description: installed.description,
@@ -166,17 +119,20 @@ export async function installSkillFromMarketplace(
     icon: catalogMatch?.icon || "PencilSparkles",
     category,
     isBuiltIn: false,
-    isEnabled: true,
+    isEnabled: installed.isEnabled,
     scope: installed.scope,
+    path: installed.path,
+    workspacePath: installed.workspacePath,
+    pluginId: installed.pluginId,
+    pluginName: installed.pluginName,
     author: installed.author || catalogMatch?.author || "User",
     version: installed.version || catalogMatch?.version || "1.0.0",
-    overview: generateSkillOverview(installed.name, installed.slug, installed.content, installed.description),
+    overview: generateSkillOverview(installed.slug, installed.content, installed.description),
     files: installed.files,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
 
-  await db.skills.put(localSkill);
   return localSkill;
 }
 
@@ -184,16 +140,15 @@ export async function installSkillFromMarketplace(
  * Uninstall a skill from filesystem and delete from Dexie DB
  */
 export async function uninstallSkillFromMarketplace(
-  id: string,
-  slug: string,
-  scope: "user" | "workspace" = "user",
+  skill: LocalSkill,
   workspacePath?: string
 ): Promise<boolean> {
   try {
-    if (window.electron?.marketplace) {
-      await window.electron.marketplace.uninstallSkill({ slug, scope, workspacePath });
+    if (skill.path && window.electron?.marketplace) {
+      const removed = await window.electron.marketplace.uninstallSkill({ id: skill.id, workspacePath });
+      if (!removed) throw new Error("Skill could not be removed from disk.");
     }
-    await db.skills.delete(id);
+    await db.skills.delete(skill.id);
     return true;
   } catch (err) {
     console.error("[SkillsService] Failed to uninstall skill:", err);
@@ -202,68 +157,18 @@ export async function uninstallSkillFromMarketplace(
 }
 
 /**
- * Initialize and seed built-in skills and bundles in local Dexie database
+ * Remove legacy filesystem snapshots from local storage
  */
-export async function ensureDefaultSkillsSeeded(forceReset = false): Promise<void> {
-  try {
-    if (forceReset) {
-      await db.skillBundles.clear();
-      await db.skills.clear();
-    }
-    await syncInstalledSkillsFromDisk();
-  } catch (err) {
-    console.warn("[SkillsService] Failed to seed default skills:", err);
-  }
-}
-
-/**
- * Creates a custom skill autonomously (e.g. called from agent or UI)
- */
-export async function createCustomSkill(data: {
-  slug: string;
-  name: string;
-  description?: string;
-  content: string;
-  category?: SkillCategory;
-  author?: string;
-  files?: Record<string, string>;
-}): Promise<LocalSkill> {
-  const scan = runSecurityScan(data.content);
-  if (!scan.passed) {
-    throw new Error(`Security validation failed: ${scan.message} (${scan.details?.join(", ")})`);
-  }
-
-  const id = `skill_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
-  const now = Date.now();
-  const slug = data.slug.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-");
-
-  const newSkill: LocalSkill = {
-    id,
-    slug,
-    name: data.name.trim(),
-    description: data.description?.trim() || "",
-    content: data.content.trim(),
-    category: data.category || "custom",
-    isBuiltIn: false,
-    isEnabled: true,
-    scope: "user",
-    author: data.author || "User",
-    version: "1.0.0",
-    overview: generateSkillOverview(data.name, slug, data.content, data.description),
-    files: data.files,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.skills.put(newSkill);
-  return newSkill;
+export async function initializeSkillStorage(): Promise<void> {
+  // Remove obsolete filesystem snapshots. Custom drafts remain in IndexedDB.
+  const stale = await db.skills.filter((skill) => !!skill.path || skill.id === "skill_" + skill.slug).primaryKeys();
+  await db.skills.bulkDelete(stale);
 }
 
 /**
  * Generate a clean structured AI overview for a skill based on its content
  */
 export function generateSkillOverview(
-  name: string,
   slug: string,
   content: string,
   description?: string
@@ -293,8 +198,6 @@ export function generateSkillOverview(
     overviewText += `\n`;
   }
 
-  overviewText += `### Safety & Sandboxing\n`;
-  overviewText += `Runs locally within Const Agent. Verified safe with no unauthorized external telemetry or malicious command execution.`;
 
   return overviewText.trim();
 }
@@ -419,28 +322,6 @@ export function parseSkillMarkdown(rawMarkdown: string): {
 }
 
 /**
- * Format active skills for injection into the agent's system prompt or turn
- */
-export function formatSkillsSystemPrompt(skills: LocalSkill[]): string {
-  const active = skills.filter((s) => s.isEnabled);
-  if (active.length === 0) return "";
-
-  const list = active
-    .map((s) => `- /${s.slug} (${s.name}): ${s.description}`)
-    .join("\n");
-
-  return (
-    `\n\n[AVAILABLE AGENT SKILLS]:\n` +
-    `You have the following modular skills and specialized capabilities installed:\n` +
-    `${list}\n\n` +
-    `Guidelines for skills:\n` +
-    `1. When the user starts their prompt with or mentions a slash trigger (e.g. /${active[0]?.slug || "skill"}), strictly apply that skill's methodology and standards.\n` +
-    `2. Even without an explicit slash command, you may autonomously select and apply any relevant skill if the user's intent matches its domain.\n` +
-    `3. To create a new skill for future use, you can write a valid SKILL.md specification and register it with the system.`
-  );
-}
-
-/**
  * Detects any skills referenced in the prompt (either via inline mention badge `/[title](skill://slug)`
  * or explicit slash tokens like `/browser-use` or `/manim-video`) and returns the clean human-facing text
  * plus the augmented prompt with full skill instructions.
@@ -462,25 +343,23 @@ export function extractSkillsAndAugmentPrompt(
 
   // 1. Detect inline badge format: /[title](skill://slug)
   const badgeRegex = /\/\[([^\]]+)\]\(skill:\/\/([^\)]+)\)/g;
-  let cleanPrompt = rawPrompt.replace(badgeRegex, (_match, _title, slug) => {
+  const cleanPrompt = rawPrompt.replace(badgeRegex, (_match, _title, slug) => {
     const cleanSlug = slug.toLowerCase().trim();
     matchedSlugs.add(cleanSlug);
     return `/${cleanSlug}`;
   });
 
   // 2. Also check for raw slash commands like `/skill-slug`
-  const slashTokens = cleanPrompt.match(/\/([a-zA-Z0-9_-]+)/g);
-  if (slashTokens) {
-    for (const token of slashTokens) {
-      const slugCandidate = token.slice(1).toLowerCase();
-      matchedSlugs.add(slugCandidate);
-    }
+  const slashTokens = Array.from(cleanPrompt.matchAll(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?=$|\s|[.,!?](?=\s|$))/g), (match) => "/" + match[1]);
+  for (const token of slashTokens) {
+    const slugCandidate = token.slice(1).toLowerCase();
+    matchedSlugs.add(slugCandidate);
   }
 
   // Find all matching skills in availableSkills
   for (const slug of matchedSlugs) {
     const skill = availableSkills.find(
-      (s) => s.slug.toLowerCase() === slug || s.id.toLowerCase() === slug
+      (s) => s.isEnabled && (s.slug.toLowerCase() === slug || s.id.toLowerCase() === slug)
     );
     if (skill && !matchedSkills.some((s) => s.slug === skill.slug)) {
       matchedSkills.push(skill);
@@ -505,23 +384,5 @@ export function extractSkillsAndAugmentPrompt(
     augmentedPrompt,
     matchedSkills,
   };
-}
-
-/**
- * Register a new custom skill directly from raw markdown content
- */
-export async function registerSkillFromContent(
-  rawMarkdown: string,
-  category?: SkillCategory
-): Promise<LocalSkill> {
-  const parsed = parseSkillMarkdown(rawMarkdown);
-  return createCustomSkill({
-    slug: parsed.slug,
-    name: parsed.name,
-    description: parsed.description,
-    content: parsed.content,
-    category: category || (parsed.frontmatter.category as SkillCategory) || "custom",
-    author: (parsed.frontmatter.author as string) || "Agent Autonomously Created",
-  });
 }
 

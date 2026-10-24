@@ -792,6 +792,22 @@ app.whenReady().then(() => {
 
   // ---------------------------------------------------------------------------
   // Marketplace & Skills Management IPC Handlers
+  const capabilitiesChanged = () => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("marketplace:changed");
+  };
+  ipcMain.handle("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
+  ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => {
+    marketplaceService.installPlugin(payload.name, payload.scope, payload.workspacePath);
+    capabilitiesChanged();
+  });
+  ipcMain.handle("marketplace:uninstall-plugin", (_event, payload: { id: string; workspacePath?: string }) => {
+    marketplaceService.uninstallPlugin(payload.id, payload.workspacePath);
+    capabilitiesChanged();
+  });
+  ipcMain.handle("marketplace:set-enabled", (_event, payload: { id: string; enabled: boolean; workspacePath?: string }) => {
+    marketplaceService.setEnabled(payload.id, payload.enabled, payload.workspacePath);
+    capabilitiesChanged();
+  });
   // ---------------------------------------------------------------------------
   ipcMain.handle("marketplace:list-installed", async (_event, workspacePath?: string) => {
     return marketplaceService.listInstalledSkills(workspacePath);
@@ -803,7 +819,9 @@ app.whenReady().then(() => {
       _event,
       payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }
     ) => {
-      return marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath);
+      const installed = await marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath);
+      if (installed) capabilitiesChanged();
+      return installed;
     }
   );
 
@@ -811,9 +829,11 @@ app.whenReady().then(() => {
     "marketplace:uninstall-skill",
     async (
       _event,
-      payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }
+      payload: { id: string; workspacePath?: string }
     ) => {
-      return marketplaceService.uninstallSkill(payload.slug, payload.scope, payload.workspacePath);
+      const removed = marketplaceService.uninstallSkill(payload.id, payload.workspacePath);
+      if (removed) capabilitiesChanged();
+      return removed;
     }
   );
 

@@ -37,7 +37,10 @@ export function MarkdownContent({
     let kind = "file";
     let href = `file:///${trimmedPath}`;
 
-    if (
+    if (trimmedPath.startsWith("plugin://")) {
+      kind = "plugin";
+      href = trimmedPath;
+    } else if (
       trimmedPath.includes("transcript.jsonl") ||
       trimmedPath.startsWith("brain/") ||
       trimmedPath.startsWith("conversation://") ||
@@ -119,6 +122,7 @@ export function MarkdownContent({
     if (!target) return;
 
     const href = target.getAttribute("href") || "";
+    if (href.startsWith("plugin://")) { e.preventDefault(); return; }
 
     // Trajectory / Conversation links
     if (href.startsWith("trajectory://") || href.startsWith("conversation://")) {

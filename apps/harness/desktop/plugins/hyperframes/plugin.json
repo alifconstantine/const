@@ -1,0 +1,13 @@
+{
+  "name": "hyperframes",
+  "version": "0.8.191",
+  "description": "Create, edit, preview, and render videos, motion graphics, explainers, captions, and interactive presentations with HyperFrames. Includes the router, production workflows, animation, audio, media, and CLI skills.",
+  "author": { "name": "HyperFrames" },
+  "homepage": "https://hyperframes.heygen.com",
+  "skills": "./skills/",
+  "entrypoint": "hyperframes",
+  "interface": {
+    "displayName": "HyperFrames",
+    "icon": "./assets/icon.svg"
+  }
+}

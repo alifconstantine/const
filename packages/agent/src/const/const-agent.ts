@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { resolveSkillRegistry, pluginInvocationInstructions } from "./skill-registry.js";
 import type {
   AgentConfig,
   AgentEvent,
@@ -401,98 +402,8 @@ function escapeSkillXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function parseSkillFrontmatter(content: string): {
-  name?: string;
-  description?: string;
-  disableModelInvocation?: boolean;
-} {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  if (!match || !match[1]) return {};
-  const metaBlock = match[1];
-  const meta: Record<string, string> = {};
-  const lines = metaBlock.split(/\r?\n/);
-  let currentKey: string | null = null;
-  let multilineVal: string[] = [];
-
-  for (const line of lines) {
-    const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
-    if (keyMatch && keyMatch[1] && keyMatch[2] !== undefined) {
-      if (currentKey) {
-        meta[currentKey] = multilineVal.join(" ").trim();
-      }
-      currentKey = keyMatch[1].toLowerCase();
-      const val = keyMatch[2].trim();
-      if (val === ">" || val === "|" || val === ">-" || val === "|-") {
-        multilineVal = [];
-      } else {
-        multilineVal = [val.replace(/^['"]|['"]$/g, "")];
-      }
-    } else if (currentKey && (line.startsWith("  ") || line.startsWith("\t"))) {
-      multilineVal.push(line.trim().replace(/^['"]|['"]$/g, ""));
-    }
-  }
-  if (currentKey) {
-    meta[currentKey] = multilineVal.join(" ").trim();
-  }
-
-  const disableModel =
-    meta["disable-model-invocation"] === "true" ||
-    meta["disable_model_invocation"] === "true";
-
-  return {
-    name: meta.name,
-    description: meta.description,
-    disableModelInvocation: disableModel,
-  };
-}
-
 export function scanInstalledSkills(workspacePath?: string): Skill[] {
-  const results: Skill[] = [];
-  const seen = new Set<string>();
-
-  const scanDir = (dir: string) => {
-    if (!fs.existsSync(dir)) return;
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const slug = entry.name.toLowerCase().trim();
-        if (seen.has(slug)) continue;
-
-        const skillMd = path.join(dir, entry.name, "SKILL.md");
-        if (!fs.existsSync(skillMd)) continue;
-
-        try {
-          const content = fs.readFileSync(skillMd, "utf-8");
-          const parsed = parseSkillFrontmatter(content);
-          seen.add(slug);
-          results.push({
-            name: parsed.name || entry.name,
-            description: parsed.description || "",
-            content,
-            filePath: skillMd,
-            disableModelInvocation: parsed.disableModelInvocation,
-          });
-        } catch {
-          // ignore read error
-        }
-      }
-    } catch {
-      // ignore readdir error
-    }
-  };
-
-  // 1. Workspace skills (highest priority)
-  if (workspacePath && workspacePath !== "Outside Project") {
-    scanDir(path.join(workspacePath, ".agents", "skills"));
-    scanDir(path.join(workspacePath, ".const", "skills"));
-  }
-
-  // 2. Global user skills
-  scanDir(path.join(os.homedir(), ".const", "harness", "skills"));
-  scanDir(path.join(os.homedir(), ".agents", "skills"));
-
-  return results;
+  return resolveSkillRegistry(workspacePath).skills.filter((skill) => skill.isEnabled);
 }
 
 export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
@@ -1075,6 +986,14 @@ export class ConstAgent {
             : buildConstSystemPrompt(workspacePath, this.config.systemPrompt);
 
         let effectiveSystemPrompt = systemPrompt;
+        const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === "user");
+        const latestUserText = typeof latestUserMessage?.content === "string"
+          ? latestUserMessage.content
+          : Array.isArray(latestUserMessage?.content)
+            ? latestUserMessage.content.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n")
+            : "";
+        const pluginInstructions = pluginInvocationInstructions(latestUserText, resolveSkillRegistry(workspacePath).plugins);
+        if (pluginInstructions) effectiveSystemPrompt += "\n\n" + pluginInstructions;
         const hasWriteTools = activeTools.some(
           (t) => t.function.name === "write" || t.function.name === "edit"
         );

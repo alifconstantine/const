@@ -1,15 +1,16 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   Folder,
-  FileText,
   Image as ImageIcon,
   MessageSquare,
   ChevronRight,
+  Blocks,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { useTranslation } from "../../lib/i18n";
 import type { MentionCandidate } from "../../lib/mention-search";
+import { pluginIconUrl } from "../../lib/plugins/plugins-service";
 
 export interface MentionPopoverProps {
   candidates: MentionCandidate[];
@@ -21,6 +22,10 @@ export interface MentionPopoverProps {
 }
 
 function CandidateIcon({ candidate }: { candidate: MentionCandidate }) {
+  if (candidate.kind === "plugin") {
+    const icon = pluginIconUrl(candidate.fullPath?.replace("plugin://", "") ?? "");
+    return icon ? <img src={icon} alt="" className="w-5 h-5 rounded shrink-0" /> : <Blocks className="w-4 h-4 shrink-0" />;
+  }
   if (candidate.kind === "directory") {
     return <Folder className="w-4 h-4 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />;
   }
@@ -60,6 +65,7 @@ export function MentionPopover({
     (c) => c.kind === "directory" || c.kind === "file" || c.kind === "media"
   );
   const sessions = candidates.filter((c) => c.kind === "session");
+  const plugins = candidates.filter((c) => c.kind === "plugin");
 
   return (
     <div
@@ -77,8 +83,20 @@ export function MentionPopover({
           {t("workbench.noFilesFound")}
         </div>
       ) : (
-        <ScrollArea className="max-h-80 overflow-y-auto pr-1">
+        <ScrollArea className="max-h-80 pr-1">
           <div className="flex flex-col gap-0.5">
+            {plugins.length > 0 && <div>
+              <div className="px-3 pt-2 pb-1.5 text-xs font-medium text-[#969696]">{t("marketplace.tabPlugins")}</div>
+              {plugins.map((candidate) => {
+                const index = candidates.indexOf(candidate);
+                const selected = index === selectedIndex;
+                return <button key={candidate.id} type="button" ref={selected ? activeItemRef : undefined}
+                  onMouseDown={(event) => { event.preventDefault(); onSelect(candidate); }} onMouseMove={() => onHover(index)}
+                  className={cn("w-full h-10 px-3 flex items-center gap-2.5 rounded-xl text-left text-[13px] font-sans cursor-pointer", selected ? "bg-[#f0f0f2] dark:bg-[#303030] text-black dark:text-white" : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2c2c2c]")}>
+                  <CandidateIcon candidate={candidate} /><span>{candidate.title}</span>
+                </button>;
+              })}
+            </div>}
             {/* 1. Files & folders Section */}
             {filesAndFolders.length > 0 && (
               <div>

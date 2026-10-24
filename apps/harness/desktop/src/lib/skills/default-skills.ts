@@ -1,4 +1,4 @@
-import type { LocalSkill, LocalSkillBundle } from "./types";
+import type { LocalSkill } from "./types";
 
 /**
  * Pre-installed default skills (docx, pdf, pptx) with their complete, genuine markdown instructions
@@ -125,4 +125,3 @@ export const DEFAULT_INSTALLED_SKILLS: LocalSkill[] = [
 ];
 
 export const DEFAULT_SKILLS: LocalSkill[] = DEFAULT_INSTALLED_SKILLS;
-export const DEFAULT_SKILL_BUNDLES: LocalSkillBundle[] = [];

@@ -33,6 +33,10 @@ export interface LocalSkill {
   isBuiltIn: boolean;
   isEnabled: boolean;
   scope?: "user" | "workspace";
+  path?: string;
+  workspacePath?: string;
+  pluginId?: string;
+  pluginName?: string;
   author?: string;
   version?: string;
   updatedAtText?: string;

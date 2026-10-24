@@ -4223,6 +4223,7 @@ function AuthenticatedContent({
             <ScrollArea className="flex-1 w-full h-full min-h-0">
               <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
                 <SkillsSettings
+                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
                   isSidebarOpen={isSidebarOpen}
                   onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
                 />

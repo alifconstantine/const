@@ -6,8 +6,13 @@ import React, {
   useState,
 } from "react";
 import { cn } from "@const/ui";
-import { useI18n } from "../../lib/i18n";
+import { useI18n, translate } from "../../lib/i18n";
+import { pluginIconUrl } from "../../lib/plugins/plugins-service";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
+
+function escapeMentionHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
 export interface ActiveSlashToken {
   range: [number, number];
@@ -68,6 +73,10 @@ export function getMentionIconMarkup({
   kind?: string;
   fileType?: string;
 }): string {
+  if (kind === "plugin") {
+    const icon = pluginIconUrl(title.toLowerCase());
+    return icon ? `<img src="${icon}" alt="" width="16" height="16" class="rounded shrink-0 inline-block" />` : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`;
+  }
   if (kind === "skill") {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><path d="m18 2 4 4-10 10H8v-4L18 2Z"/><path d="m14 6 4 4"/><path d="M4 12v8a2 2 0 0 0 2 2h8"/><path d="m21.5 13-1.5-1.5-1.5 1.5 1.5 1.5Z"/><path d="m3 3 1.5 1.5L3 6l-1.5-1.5Z"/></svg>`;
   }
@@ -102,6 +111,7 @@ export function renderMentionBadgeHtml({
   kind?: string;
   fileType?: string;
 }): string {
+  const isPlugin = kind === "plugin" || href.startsWith("plugin://");
   const isSkill = kind === "skill" || href.startsWith("skill://");
   const isSession =
     !isSkill &&
@@ -116,7 +126,7 @@ export function renderMentionBadgeHtml({
     !isSession &&
     (kind === "directory" || href.startsWith("folder://") || title.endsWith("/") || href.endsWith("/"));
 
-  const resolvedKind = isSkill ? "skill" : isSession ? "session" : isDirectory ? "directory" : (kind || "file");
+  const resolvedKind = isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : isDirectory ? "directory" : (kind || "file");
   const cleanTitle = title.replace(/^[\s💬📁📄✨]+/, "").replace(/\/$/, "");
 
   const iconHtml = getMentionIconMarkup({
@@ -125,7 +135,7 @@ export function renderMentionBadgeHtml({
     fileType,
   });
 
-  const tooltip = isSkill
+  const tooltip = isPlugin ? translate("marketplace.pluginMentionTooltip").replace("{name}", cleanTitle) : isSkill
     ? `Skill: ${cleanTitle}`
     : isSession
     ? `Trajectory: ${cleanTitle} • Click to view`
@@ -133,7 +143,7 @@ export function renderMentionBadgeHtml({
     ? `Directory: ${cleanTitle} • Click to open`
     : `File: ${cleanTitle} • Click to preview`;
 
-  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" data-mention-kind="${resolvedKind}" title="${tooltip}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${cleanTitle}</span></a>`;
+  return `<a href="${escapeMentionHtml(href)}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" data-mention-kind="${escapeMentionHtml(resolvedKind)}" title="${escapeMentionHtml(tooltip)}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${escapeMentionHtml(cleanTitle)}</span></a>`;
 }
 
 /**
@@ -156,6 +166,7 @@ function createMentionBadgeElement(
   badge.setAttribute("data-mention-token", "true");
 
   const targetPath = candidate.fullPath || candidate.path || candidate.title;
+  const isPlugin = candidate.kind === "plugin" || targetPath.startsWith("plugin://");
   const isSkill = candidate.kind === "skill" || targetPath.startsWith("skill://");
   const isSession =
     !isSkill &&
@@ -163,7 +174,7 @@ function createMentionBadgeElement(
       Boolean(candidate.conversationId) ||
       (candidate.path && candidate.path.includes("transcript.jsonl")));
 
-  const resolvedKind = isSkill ? "skill" : isSession ? "session" : (candidate.kind || "file");
+  const resolvedKind = isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : (candidate.kind || "file");
   badge.setAttribute("data-mention-path", targetPath);
   badge.setAttribute("data-mention-kind", resolvedKind);
   badge.setAttribute("data-mention-title", candidate.title);
@@ -173,7 +184,7 @@ function createMentionBadgeElement(
 
   badge.className =
     "inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors group";
-  badge.title = isSkill
+  badge.title = isPlugin ? translate("marketplace.pluginMentionTooltip").replace("{name}", candidate.title) : isSkill
     ? `Skill: ${candidate.title}`
     : isSession
     ? `Trajectory: ${candidate.title} • Click to view`
@@ -186,10 +197,15 @@ function createMentionBadgeElement(
     fileType: candidate.fileType,
   });
 
-  badge.innerHTML = `${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium">${cleanName}</span>`;
+  badge.innerHTML = iconHtml;
+  const titleNode = document.createElement("span");
+  titleNode.className = "leading-tight text-[13.5px] font-sans font-medium";
+  titleNode.textContent = cleanName;
+  badge.appendChild(titleNode);
 
   badge.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (isPlugin) return;
     if (isSession) {
       const convoId =
         candidate.conversationId ||
@@ -242,6 +258,8 @@ function serializeContainer(container: Node, forActiveToken = false): string {
           if (kind === "skill") {
             const cleanPath = path.startsWith("skill://") ? path : `skill://${path}`;
             result += `/[${title}](${cleanPath})`;
+          } else if (kind === "plugin") {
+            result += `@[${title}](${path})`;
           } else if (kind === "session") {
             const cleanTitle = title || path.split("/").filter(Boolean).pop() || "Chat";
             result += `@[${cleanTitle}](${path})`;
@@ -388,12 +406,14 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           const rawLink = match[2];
           if (!rawTitle) continue;
 
-          let kind: "file" | "directory" | "session" | "skill" = isSlashBadge ? "skill" : "file";
+          let kind: "file" | "directory" | "session" | "skill" | "plugin" = isSlashBadge ? "skill" : "file";
           let targetPath = rawLink || rawTitle;
           let displayTitle = rawTitle;
           let convoId: string | undefined = undefined;
 
-          if (isSlashBadge || (rawLink && rawLink.startsWith("skill://")) || rawTitle.startsWith("skill:")) {
+          if (rawLink?.startsWith("plugin://")) {
+            kind = "plugin";
+          } else if (isSlashBadge || (rawLink && rawLink.startsWith("skill://")) || rawTitle.startsWith("skill:")) {
             kind = "skill";
             displayTitle = rawTitle.replace(/^skill:/, "");
             targetPath = rawLink || `skill://${displayTitle}`;
@@ -613,16 +633,26 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
           const sel = window.getSelection();
           let range: Range;
-          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
-            range = savedRangeRef.current;
-          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+          if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
             range = sel.getRangeAt(0);
+          } else if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
           } else {
             range = document.createRange();
             range.selectNodeContents(editor);
             range.collapse(false);
           }
 
+          // Chromium may leave the caret on the editor after its final text node.
+          if (range.startContainer.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            let previous: Node | undefined = range.startContainer.childNodes[range.startOffset - 1];
+            while (previous?.lastChild && !(previous instanceof HTMLElement && previous.dataset.mentionToken === "true")) previous = previous.lastChild;
+            if (previous?.nodeType === Node.TEXT_NODE) {
+              const offset = previous.nodeValue?.length ?? 0;
+              range.setStart(previous, offset);
+              range.setEnd(previous, offset);
+            }
+          }
           // Find and replace active @token in text node
           if (range.startContainer.nodeType === Node.TEXT_NODE) {
             const node = range.startContainer;

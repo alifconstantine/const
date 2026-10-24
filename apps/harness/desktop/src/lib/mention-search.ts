@@ -5,6 +5,7 @@
 
 import type { ConversationItem } from "./conversation-store";
 import { formatRelativeTime, getCleanConversationTitle } from "./conversation-store";
+import type { InstalledPluginRecord } from "./plugins/types";
 
 export interface WorkspaceFileEntry {
   id: string;
@@ -26,7 +27,7 @@ export interface SessionMediaItem {
   path?: string;
 }
 
-export type MentionCandidateKind = "directory" | "file" | "media" | "session";
+export type MentionCandidateKind = "directory" | "file" | "media" | "session" | "plugin";
 
 export interface MentionCandidate {
   id: string;
@@ -202,6 +203,7 @@ export function formatFileSize(bytes?: number): string {
 }
 
 export interface SearchMentionsOptions {
+  plugins?: InstalledPluginRecord[];
   query: string;
   quoted?: boolean;
   files?: WorkspaceFileEntry[];
@@ -216,6 +218,7 @@ export interface SearchMentionsOptions {
  * Only sessions belonging to currentProject are included.
  */
 export function searchMentionCandidates({
+  plugins = [],
   query,
   quoted = false,
   files = [],
@@ -393,7 +396,22 @@ export function searchMentionCandidates({
   }
 
   // Combine: Files & Folders first, followed by Sessions, capped at maxResults
-  const combined = [...filesAndFolders.slice(0, 16), ...sessionCandidates.slice(0, 8)];
+  const seenPlugins = new Set<string>();
+  const pluginCandidates: MentionCandidate[] = [];
+  if (!hasSlash && !quoted) for (const plugin of plugins) {
+    if (seenPlugins.has(plugin.name)) continue;
+    seenPlugins.add(plugin.name);
+    if (!plugin.isEnabled) continue;
+    const score = scoreCandidate(plugin.interface.displayName, plugin.name + " " + plugin.description, normalizedQuery);
+    if (score === null) continue;
+    pluginCandidates.push({
+      id: plugin.id, kind: "plugin", title: plugin.interface.displayName,
+      fullPath: `plugin://${plugin.name}`,
+      insertion: `@[${plugin.interface.displayName}](plugin://${plugin.name})`, score,
+    });
+  }
+  pluginCandidates.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
+  const combined = [...pluginCandidates.slice(0, 8), ...filesAndFolders.slice(0, 16), ...sessionCandidates.slice(0, 8)];
   return combined.slice(0, maxResults);
 }
 

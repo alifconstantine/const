@@ -1,63 +1,37 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
 import {
   Button,
   Input,
   ScrollArea,
   Switch,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   toast,
   cn,
 } from "@const/ui";
 import {
   Search,
-  Plus,
   PanelLeft,
-  RotateCw,
-  MoreHorizontal,
   Trash2,
   PencilSparkles,
-  FileText,
-  FileCode,
   Upload,
-  Eye,
-  Code,
   X,
-  Check,
-  ChevronRight,
-  User,
   ArrowLeft,
   Copy,
-  Shield,
-  ShieldCheck,
-  ShieldAlert,
-  File,
-  Terminal,
   Blocks,
-  Store,
   Folder,
   Loader2,
-  Sparkles,
   CheckCircle2,
   AlertCircle,
   Download,
 } from "lucide-react";
-import { marked } from "marked";
 import JSZip from "jszip";
 import {
   db,
   localDb,
   type LocalSkill,
-  type LocalSkillBundle,
   type SkillCategory,
 } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import {
-  syncInstalledSkillsFromDisk,
   installSkillFromMarketplace,
   uninstallSkillFromMarketplace,
   fetchSkillContent,
@@ -68,6 +42,9 @@ import {
   type MarketplaceSkill,
 } from "../../lib/skills/skills-service";
 import { FileIcon } from "../workbench/file-icon";
+import { PluginsMarketplace } from "./plugins-marketplace";
+import { useResolvedSkills } from "../../lib/skills/use-skills";
+import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import { MarkdownContent } from "../workbench/markdown-content";
 
 import { highlightCodeLines, highlightCodeToHtmlLines } from "../../lib/code-highlighter";
@@ -91,6 +68,7 @@ export interface SkillsSettingsProps {
   onToggleSidebar?: () => void;
   isModal?: boolean;
   initialTab?: "skills" | "plugins";
+  workspacePath?: string;
 }
 
 export function SkillsSettings({
@@ -99,13 +77,14 @@ export function SkillsSettings({
   onToggleSidebar,
   isModal = false,
   initialTab = "skills",
+  workspacePath,
 }: SkillsSettingsProps = {}) {
   const { t } = useI18n();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadDropzoneInputRef = useRef<HTMLInputElement | null>(null);
 
   // Live Query of installed skills from Dexie DB
-  const skills = useLiveQuery(() => db.skills.toArray(), [], [] as LocalSkill[]);
+  const skills = useResolvedSkills(workspacePath).filter((skill) => !skill.pluginId);
+  const { catalog: pluginCatalog } = usePluginInventory(workspacePath);
 
   // Marketplace tab: Skills vs Plugins
   const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(initialTab);
@@ -125,7 +104,6 @@ export function SkillsSettings({
   const [selectedScope, setSelectedScope] = useState<"all" | "user" | "workspace">("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [deleteConfirmSkill, setDeleteConfirmSkill] = useState<LocalSkill | null>(null);
-  const [isManualCreateOpen, setIsManualCreateOpen] = useState(false);
 
   // Async loaded detail for real SKILL.md and scripts/files
   const [loadedSkillDetail, setLoadedSkillDetail] = useState<{
@@ -139,11 +117,11 @@ export function SkillsSettings({
 
   useEffect(() => {
     let cancelled = false;
+    setLoadedSkillDetail(null);
     if (selectedSkill) {
-      fetchSkillContent(selectedSkill.slug).then((res) => {
+      fetchSkillContent(selectedSkill.slug, workspacePath, selectedSkill.id).then((res) => {
         if (!cancelled && res) {
           const overview = generateSkillOverview(
-            res.name || selectedSkill.name,
             selectedSkill.slug,
             res.content,
             res.description || selectedSkill.description
@@ -157,21 +135,12 @@ export function SkillsSettings({
             description: res.description,
           });
         }
-      });
-    } else {
-      setLoadedSkillDetail(null);
+      }).catch(() => { if (!cancelled) setLoadedSkillDetail(null); });
     }
     return () => {
       cancelled = true;
     };
-  }, [selectedSkill?.slug]);
-
-  // Sync installed skills from disk on mount
-  useEffect(() => {
-    syncInstalledSkillsFromDisk().catch((err) =>
-      console.warn("[Marketplace] Disk sync on mount:", err)
-    );
-  }, []);
+  }, [selectedSkill?.slug, selectedSkill?.id, workspacePath]);
 
   // Update selected skill when db updates
   useEffect(() => {
@@ -260,7 +229,10 @@ export function SkillsSettings({
   // Handlers
   const handleToggleSkill = async (id: string, isEnabled: boolean) => {
     try {
-      await localDb.toggleSkill(id, isEnabled);
+      const skill = skills.find((item) => item.id === id);
+      if (skill?.path && window.electron?.marketplace) {
+        await window.electron.marketplace.setEnabled({ id, enabled: isEnabled, workspacePath });
+      } else { await localDb.toggleSkill(id, isEnabled); }
       toast.success(isEnabled ? t("skillEnabled") : t("skillDisabled"));
     } catch {
       toast.error(t("marketplace.failedToUpdateStatus"));
@@ -272,7 +244,8 @@ export function SkillsSettings({
     try {
       const installed = await installSkillFromMarketplace(
         skill.slug,
-        selectedScope === "workspace" ? "workspace" : "user"
+        selectedScope === "workspace" ? "workspace" : "user",
+        workspacePath
       );
       toast.success(t("marketplace.installedSuccess").replace("{name}", skill.name));
       if (selectedSkill && selectedSkill.slug === skill.slug) {
@@ -287,7 +260,8 @@ export function SkillsSettings({
 
   const handleUninstallSkill = async (skill: LocalSkill) => {
     try {
-      await uninstallSkillFromMarketplace(skill.id, skill.slug, skill.scope);
+      const removed = await uninstallSkillFromMarketplace(skill, workspacePath);
+      if (!removed) throw new Error(t("marketplace.failedToUninstall"));
       toast.success(t("marketplace.uninstalledSuccess").replace("{name}", skill.name));
       setDeleteConfirmSkill(null);
       if (selectedSkill && (selectedSkill as LocalSkill).id === skill.id) {
@@ -303,6 +277,7 @@ export function SkillsSettings({
     if (window.electron?.marketplace) {
       window.electron.marketplace.openSkillsFolder({
         scope: selectedScope === "workspace" ? "workspace" : "user",
+        workspacePath,
       });
     } else if (window.electron?.openConstFolder) {
       window.electron.openConstFolder();
@@ -321,13 +296,6 @@ export function SkillsSettings({
   const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "passed" | "failed">("idle");
   const [scanMessage, setScanMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
-
-  // Manual create form state
-  const [manualName, setManualName] = useState("");
-  const [manualSlug, setManualSlug] = useState("");
-  const [manualDescription, setManualDescription] = useState("");
-  const [manualContent, setManualContent] = useState("");
-  const [manualCategory, setManualCategory] = useState<SkillCategory>("custom");
 
   const handleFileProcess = async (file: File) => {
     setUploadFile(file);
@@ -367,7 +335,7 @@ export function SkillsSettings({
         setUploadSkillName(parsed.name || file.name.replace(".zip", ""));
         setUploadSkillSlug(parsed.slug || file.name.replace(".zip", "").toLowerCase());
         setUploadSkillDescription(parsed.description || "");
-        setUploadSkillOverview(generateSkillOverview(parsed.name, parsed.slug, mainContent, parsed.description));
+        setUploadSkillOverview(generateSkillOverview(parsed.slug, mainContent, parsed.description));
         setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
         setScanStatus("passed");
         setScanMessage(t("securityScanClean"));
@@ -385,7 +353,7 @@ export function SkillsSettings({
         setUploadSkillName(parsed.name || file.name.replace(/\.[^/.]+$/, ""));
         setUploadSkillSlug(parsed.slug || file.name.replace(/\.[^/.]+$/, "").toLowerCase());
         setUploadSkillDescription(parsed.description || "");
-        setUploadSkillOverview(generateSkillOverview(parsed.name, parsed.slug, text, parsed.description));
+        setUploadSkillOverview(generateSkillOverview(parsed.slug, text, parsed.description));
         setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
         setUploadFilesMap({ "SKILL.md": text });
         setScanStatus("passed");
@@ -406,6 +374,7 @@ export function SkillsSettings({
     try {
       const id = "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
       const now = Date.now();
+      if (scanStatus !== "passed" || !uploadSkillContent.trim() || (selectedScope === "workspace" && !workspacePath)) throw new Error("Invalid skill upload.");
       await db.skills.add({
         id,
         slug: uploadSkillSlug.trim().toLowerCase(),
@@ -417,6 +386,7 @@ export function SkillsSettings({
         isBuiltIn: false,
         isEnabled: true,
         scope: selectedScope === "workspace" ? "workspace" : "user",
+        workspacePath: selectedScope === "workspace" ? workspacePath : undefined,
         author: "Uploaded",
         version: "1.0.0",
         overview: uploadSkillOverview,
@@ -430,45 +400,6 @@ export function SkillsSettings({
       setUploadFile(null);
     } catch {
       toast.error(t("marketplace.failedToSaveSkill"));
-    }
-  };
-
-  const handleManualSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualName.trim() || !manualSlug.trim()) {
-      toast.error(t("marketplace.nameAndSlugRequired"));
-      return;
-    }
-    try {
-      const id = "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-      const now = Date.now();
-      await db.skills.add({
-        id,
-        slug: manualSlug.trim().toLowerCase(),
-        name: manualName.trim(),
-        description: manualDescription.trim(),
-        content: manualContent,
-        icon: "PencilSparkles",
-        category: manualCategory,
-        isBuiltIn: false,
-        isEnabled: true,
-        scope: selectedScope === "workspace" ? "workspace" : "user",
-        author: "User",
-        version: "1.0.0",
-        overview: generateSkillOverview(manualName, manualSlug, manualContent, manualDescription),
-        files: { "SKILL.md": manualContent },
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      toast.success(t("skillAddedSuccess").replace("{name}", manualName));
-      setIsManualCreateOpen(false);
-      setManualName("");
-      setManualSlug("");
-      setManualDescription("");
-      setManualContent("");
-    } catch {
-      toast.error(t("marketplace.failedToCreateSkill"));
     }
   };
 
@@ -902,7 +833,7 @@ export function SkillsSettings({
                   onClick={() => setViewMode("list")}
                   className="h-9 px-4 text-xs text-[#969696] hover:text-white"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -941,7 +872,7 @@ export function SkillsSettings({
               {t("marketplace.title")}
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-sans tabular-nums">
-              {skills.length + availableMarketplaceSkills.length}
+              {marketplaceTab === "plugins" ? pluginCatalog.length : skills.length + availableMarketplaceSkills.length}
             </span>
           </div>
           <p className="text-xs text-[#969696] mt-0.5">
@@ -1038,7 +969,7 @@ export function SkillsSettings({
           </button>
         </div>
 
-        {marketplaceTab === "skills" && (
+        {(
           <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] ml-auto">
             <button
               type="button"
@@ -1074,25 +1005,7 @@ export function SkillsSettings({
         )}
       </div>
 
-      {/* 3. TAB CONTENT: PLUGINS (EMPTY STATE) */}
-      {marketplaceTab === "plugins" && (
-        <div className="rounded-2xl bg-[#222222] border border-[#383838] p-12 flex flex-col items-center justify-center text-center gap-3">
-          <div className="w-16 h-16 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696] mb-1">
-            <Blocks className="w-8 h-8 text-[#969696]" />
-          </div>
-          <h3 className="text-base font-medium text-white">
-            {t("marketplace.pluginsComingSoonTitle")}
-          </h3>
-          <p className="text-xs text-[#969696] max-w-md leading-relaxed">
-            {t("marketplace.pluginsComingSoonDesc")}
-          </p>
-          <div className="mt-2">
-            <span className="px-3 py-1 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] text-xs font-sans">
-              {t("marketplace.inDevelopment")}
-            </span>
-          </div>
-        </div>
-      )}
+      {marketplaceTab === "plugins" && <PluginsMarketplace workspacePath={workspacePath} scope={selectedScope} search={searchQuery} />}
 
       {/* 4. TAB CONTENT: SKILLS */}
       {marketplaceTab === "skills" && (
@@ -1360,106 +1273,6 @@ export function SkillsSettings({
         </div>
       )}
 
-      {/* Manual Create Dialog */}
-      {isManualCreateOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => setIsManualCreateOpen(false)}
-        >
-          <div
-            className="w-[560px] max-w-[95vw] max-h-[85vh] bg-[#222222] border border-[#383838] rounded-2xl flex flex-col overflow-hidden text-white shadow-2xl animate-in zoom-in-[0.985] duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-[#2e2e2e] flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  Create Skill from Scratch
-                </h3>
-                <p className="text-xs text-[#969696] mt-0.5">
-                  Write customized instructions and prompt triggers for your agent.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsManualCreateOpen(false)}
-                className="p-1 rounded-lg text-[#969696] hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleManualSave} className="flex-1 min-h-0 flex flex-col">
-              <ScrollArea className="flex-1 p-5 space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
-                    {t("skillName")}
-                  </label>
-                  <Input
-                    value={manualName}
-                    onChange={(e) => setManualName(e.target.value)}
-                    placeholder={t("marketplace.skillNamePlaceholder")}
-                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
-                    {t("skillSlug")}
-                  </label>
-                  <Input
-                    value={manualSlug}
-                    onChange={(e) => setManualSlug(e.target.value)}
-                    placeholder={t("marketplace.skillSlugPlaceholder")}
-                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl font-mono"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
-                    {t("skillDescription")}
-                  </label>
-                  <Input
-                    value={manualDescription}
-                    onChange={(e) => setManualDescription(e.target.value)}
-                    placeholder={t("marketplace.skillDescPlaceholder")}
-                    className="bg-[#2b2b2b] border-[#383838] text-white text-xs h-9 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[#d4d4d4] block mb-1">
-                    {t("skillContent")}
-                  </label>
-                  <textarea
-                    value={manualContent}
-                    onChange={(e) => setManualContent(e.target.value)}
-                    rows={8}
-                    placeholder={t("marketplace.skillContentPlaceholder")}
-                    className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl p-3 text-xs text-white font-mono placeholder-[#5d5d5d] focus:outline-none focus:border-[#383838] resize-none"
-                    required
-                  />
-                </div>
-              </ScrollArea>
-
-              <div className="p-4 border-t border-[#2e2e2e] flex justify-end gap-2 bg-[#222222]">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setIsManualCreateOpen(false)}
-                  className="h-8 px-3 text-xs text-[#969696] hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="h-8 px-4 text-xs bg-white text-black hover:bg-zinc-200 rounded-xl font-medium"
-                >
-                  Create Skill
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import {
   Folder,
   ChevronDown,
-  ChevronUp,
   Plus,
   Hand,
   ArrowUp,
@@ -18,7 +17,6 @@ import {
   AtSign,
   SquarePen,
   Globe,
-  Play,
   X,
   Brain,
   Gauge,
@@ -39,8 +37,6 @@ import {
   PopoverContent,
   toast,
 } from "@const/ui";
-import { useQuery } from "convex/react";
-import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import type { BackgroundTaskItem } from "../../vite-env";
@@ -50,17 +46,17 @@ import {
   type ActiveAtToken,
   type MentionCandidate,
   type WorkspaceFileEntry,
-  activeAtToken,
   searchMentionCandidates,
 } from "../../lib/mention-search";
 import { MentionPopover } from "./mention-popover";
 import { FileIcon } from "./file-icon";
 import { RichMentionEditor, type RichMentionEditorRef, type ActiveSlashToken } from "./rich-mention-editor";
 import { QueueDock, type QueuedMessageItem } from "./queue-dock";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, type LocalSkill } from "../../lib/db";
-import { SkillSlashPopover, orderSkillsBySections } from "./skill-slash-popover";
+import type { LocalSkill } from "../../lib/db";
+import { SkillSlashPopover } from "./skill-slash-popover";
 import { extractSkillsAndAugmentPrompt } from "../../lib/skills/skills-service";
+import { useResolvedSkills } from "../../lib/skills/use-skills";
+import { usePluginInventory } from "../../lib/plugins/plugins-service";
 
 
 function formatTokenDisplay(tokens: number): string {
@@ -553,6 +549,8 @@ export function ChatCard({
   }, [initialProject]);
 
   // Mention & Context Autocomplete State
+  const { installed: installedPlugins } = usePluginInventory(currentProject === "Outside Project" ? undefined : currentProject);
+  const resolvedSkills = useResolvedSkills(currentProject === "Outside Project" ? undefined : currentProject);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
   const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -603,6 +601,7 @@ export function ChatCard({
   const mentionCandidates = useMemo(() => {
     if (!mentionToken) return [];
     return searchMentionCandidates({
+      plugins: installedPlugins,
       query: mentionToken.query,
       quoted: mentionToken.quoted,
       files: workspaceFiles,
@@ -611,7 +610,7 @@ export function ChatCard({
       currentProject,
       maxResults: 25,
     });
-  }, [mentionToken, workspaceFiles, allSessionMedia, conversations, currentProject]);
+  }, [mentionToken, workspaceFiles, allSessionMedia, conversations, currentProject, installedPlugins]);
 
   const handleDrillDirectory = (candidate: MentionCandidate) => {
     if (!candidate || !candidate.drillPath) return;
@@ -627,10 +626,9 @@ export function ChatCard({
   };
 
   // Skills from Dexie Database
-  const rawSkills = useLiveQuery(() => db.skills.toArray(), []);
   const availableSkills: LocalSkill[] = useMemo(() => {
-    return (rawSkills || []).filter((s) => s.isEnabled);
-  }, [rawSkills]);
+    return resolvedSkills.filter((s) => s.isEnabled && !s.pluginId);
+  }, [resolvedSkills]);
 
   // Slash token state for SkillSlashPopover
   const [slashToken, setSlashToken] = useState<ActiveSlashToken | null>(null);
@@ -685,7 +683,6 @@ export function ChatCard({
   const modeMenuRef = useRef<HTMLDivElement>(null);
 
   // 3. Model Selector State (Persistent in localStorage & ~/.const/config.json)
-  const quota = useQuery(api.router.quotas.getUserQuota, {});
   const isConstProvider = (p?: string) => {
     if (!p) return true;
     const clean = p.toLowerCase().trim();

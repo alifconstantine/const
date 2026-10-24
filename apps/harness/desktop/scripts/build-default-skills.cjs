@@ -330,7 +330,7 @@ for (const slug of defaultSlugs) {
   });
 }
 
-const defaultSkillsCode = `import type { LocalSkill, LocalSkillBundle } from "./types";
+const defaultSkillsCode = `import type { LocalSkill } from "./types";
 
 /**
  * Pre-installed default skills (docx, pdf, pptx) with their complete, genuine markdown instructions
@@ -339,7 +339,6 @@ const defaultSkillsCode = `import type { LocalSkill, LocalSkillBundle } from "./
 export const DEFAULT_INSTALLED_SKILLS: LocalSkill[] = ${JSON.stringify(defaultSkills, null, 2)};
 
 export const DEFAULT_SKILLS: LocalSkill[] = DEFAULT_INSTALLED_SKILLS;
-export const DEFAULT_SKILL_BUNDLES: LocalSkillBundle[] = [];
 `;
 
 fs.writeFileSync(defaultSkillsFile, defaultSkillsCode, 'utf8');
