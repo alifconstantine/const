@@ -19,7 +19,7 @@ class FakeProcess extends EventEmitter {
 }
 
 const hosts: DesktopScriptRuntimeHost[] = [];
-function runtime(ready = true, platform?: NodeJS.Platform) {
+function runtime(ready = true, platform: NodeJS.Platform = "win32") {
   const children: FakeProcess[] = [];
   const launch = vi.fn(() => {
     const child = new FakeProcess(); children.push(child);
