@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "check-types": "tsc --noEmit",
+    "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
+    "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
     "package:win": "tsc && vite build && electron-builder --win --x64 --arm64",
     "package:win:x64": "tsc && vite build && electron-builder --win --x64",
     "package:win:arm64": "tsc && vite build && electron-builder --win --arm64",
@@ -19,6 +21,8 @@
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
     "@iconify/react": "^6.0.2",
+    "@openuidev/lang-core": "1.0.1",
+    "@openuidev/react-lang": "1.0.1",
     "@thesvg/react": "^3.3.13",
     "@types/marked": "^6.0.0",
     "@xterm/addon-fit": "^0.11.0",
@@ -31,7 +35,8 @@
     "marked": "18.0.5",
     "motion": "^13.4.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "4.3.6"
   },
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
@@ -47,6 +52,7 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "4.20.6",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-electron": "^1.1.2",
@@ -87,4 +93,3 @@
     }
   }
 }
-

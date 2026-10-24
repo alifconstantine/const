@@ -11,6 +11,9 @@ import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { ChatCard, type AttachedFile } from "../workbench/chat-card";
 import { MarkdownContent } from "../workbench/markdown-content";
 import { ExecutionTrace } from "../workbench/execution-trace";
+import { AssistantResponse } from "../intelligence-ui/assistant-response";
+import { assistantResponseToText, updateIntelligenceUiState } from "../intelligence-ui/protocol";
+import type { IntelligenceUiState } from "../intelligence-ui/schema";
 import {
   loadSideConversation,
   saveSideConversation,
@@ -37,6 +40,7 @@ export interface SideChatMessage {
   mutations?: FileMutationRecord[];
   timestamp: number;
   durationMs?: number;
+  intelligenceUiState?: IntelligenceUiState;
   attachments?: AttachedFile[];
 }
 
@@ -103,6 +107,27 @@ export function SideChatTab({
   const messagesRef = useRef<SideChatMessage[]>(messages);
   messagesRef.current = messages;
 
+  const commitMessages = useCallback((next: SideChatMessage[]) => {
+    messagesRef.current = next;
+    setMessages(next);
+  }, []);
+
+  const handleIntelligenceStateChange = useCallback((messageId: string, blockId: string, state: Record<string, unknown>) => {
+    const next = updateIntelligenceUiState(messagesRef.current, messageId, blockId, state);
+    commitMessages(next);
+    saveSideConversation({
+      id: sideChatId,
+      parentConversationId: effectiveParentId,
+      title: tab.title || t("rightPane.sideChat"),
+      project: tab.project || "Outside Project",
+      model: activeModel,
+      mode: activeMode,
+      createdAt: tab.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      messages: next,
+    });
+  }, [sideChatId, effectiveParentId, tab.title, tab.project, tab.createdAt, activeModel, activeMode, commitMessages, t]);
+
   // Auto-scroll logic
   const scrollToBottom = useCallback((smooth = true) => {
     if (messagesEndRef.current) {
@@ -158,7 +183,7 @@ export function SideChatTab({
               traceSteps: steps,
               durationMs: last.durationMs || (last.timestamp ? Date.now() - last.timestamp : undefined),
             };
-            setMessages(current);
+            commitMessages(current);
           }
         }
         // Persist final conversation state
@@ -213,13 +238,13 @@ export function SideChatTab({
           content: last.content + (event.token || ""),
           traceSteps: steps,
         };
-        setMessages(current);
+        commitMessages(current);
       } else if (event.type === "token_reset") {
         current[lastIdx] = {
           ...last,
           content: "",
         };
-        setMessages(current);
+        commitMessages(current);
       } else if (event.type === "thinking") {
         const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
         const lastStep = steps[steps.length - 1];
@@ -241,7 +266,7 @@ export function SideChatTab({
           thinking: (last.thinking || "") + (event.thinking || ""),
           traceSteps: steps,
         };
-        setMessages(current);
+        commitMessages(current);
       } else if (event.type === "tool_call") {
         const toolCalls = [...(last.toolCalls || [])];
         toolCalls.push({
@@ -275,7 +300,7 @@ export function SideChatTab({
           toolCalls,
           traceSteps: steps,
         };
-        setMessages(current);
+        commitMessages(current);
       } else if (event.type === "tool_result") {
         const toolCalls = (last.toolCalls || []).map((tc) =>
           tc.id === event.toolCallId
@@ -305,7 +330,7 @@ export function SideChatTab({
           traceSteps: steps,
           mutations,
         };
-        setMessages(current);
+        commitMessages(current);
       } else if (event.type === "file_mutation") {
         const mutations = [...(last.mutations || [])];
         if (event.record) {
@@ -325,7 +350,7 @@ export function SideChatTab({
           mutations,
           traceSteps: steps,
         };
-        setMessages(current);
+        commitMessages(current);
       }
     });
 
@@ -339,7 +364,7 @@ export function SideChatTab({
       unsubscribe();
       unsubEnded?.();
     };
-  }, [sideChatId, effectiveParentId, tab.title, tab.project, tab.createdAt, activeModel, activeMode]);
+  }, [sideChatId, effectiveParentId, tab.title, tab.project, tab.createdAt, activeModel, activeMode, commitMessages]);
 
   const handleSendMessage = async ({
     prompt,
@@ -377,7 +402,7 @@ export function SideChatTab({
     };
 
     const nextMessages = [...messages, userMsg, assistantPlaceholder];
-    setMessages(nextMessages);
+    commitMessages(nextMessages);
     setIsExecuting(true);
 
     const modelToUse = model || activeModel;
@@ -521,11 +546,14 @@ Answer the user's query directly. Only modify workspace files or run commands if
     setIsExecuting(false);
   };
 
-  const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast.success(t("toast.copied"));
+  const handleCopy = async (id: string, text: string) => {
+    try {
+      const isAssistant = messagesRef.current.find((message) => message.id === id)?.role === "assistant";
+      await navigator.clipboard.writeText(isAssistant ? assistantResponseToText(text) : text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+      toast.success(t("toast.copied"));
+    } catch { toast.error(t("toast.copyFailed")); }
   };
 
   const handleClearChat = () => {
@@ -604,8 +632,13 @@ Answer the user's query directly. Only modify workspace files or run commands if
 
                   {msg.content && (
                     <div className="text-xs text-[#262626] dark:text-[#d4d4d4] leading-relaxed break-words select-text cursor-text">
-                      <MarkdownContent
+                      <AssistantResponse
                         content={msg.content}
+                        isStreaming={isExecuting && msg.id === messages[messages.length - 1]?.id}
+                        disabled={isExecuting}
+                        state={msg.intelligenceUiState}
+                        onStateChange={(blockId, state) => handleIntelligenceStateChange(msg.id, blockId, state)}
+                        onSubmit={(prompt) => handleSendMessage({ prompt, project: tab.project || "Outside Project", mode: activeMode, model: activeModel })}
                         onOpenFilePreview={onOpenFilePreview}
                         onOpenTrajectory={onOpenTrajectory}
                       />
@@ -632,7 +665,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                       <button
                         type="button"
                         onClick={() => {
-                          onInsertToMainPrompt(msg.content);
+                          onInsertToMainPrompt(assistantResponseToText(msg.content));
                           toast.success(t("rightPane.sentToMainChat"));
                         }}
                         className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-1 text-[#3b82f6] hover:text-[#2563eb] cursor-pointer"

@@ -36,6 +36,7 @@ import {
 import { browserController, type ControlState } from "./browser-controller";
 import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
+import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -1173,7 +1174,7 @@ app.whenReady().then(() => {
       }
 
       // Assemble personalization systemPrompt from user configuration
-      const personalizationParts: string[] = [];
+      const personalizationParts: string[] = [INTELLIGENCE_UI_PROMPT];
       if (config.personalizationWorkRole?.trim()) {
         personalizationParts.push(`Primary Domain / Role of User: ${config.personalizationWorkRole.trim()}`);
       }

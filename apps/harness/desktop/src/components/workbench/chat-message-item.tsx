@@ -6,6 +6,8 @@ import { MarkdownContent } from "./markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./execution-trace";
 import { InlineMessageEditor } from "./inline-message-editor";
 import { useTranslation } from "../../lib/i18n";
+import { AssistantResponse } from "../intelligence-ui/assistant-response";
+import type { IntelligenceUiState } from "../intelligence-ui/schema";
 
 export interface ChatMessage {
   id: string;
@@ -23,6 +25,7 @@ export interface ChatMessage {
   mutations?: FileMutationRecord[];
   timestamp?: number;
   durationMs?: number;
+  intelligenceUiState?: IntelligenceUiState;
   attachments?: any[];
 }
 
@@ -52,6 +55,9 @@ export interface ChatMessageItemProps {
   renderAttachment?: (att: any) => React.ReactNode;
   userBubbleWidthClass?: string;
   isReadOnly?: boolean;
+  isConversationBusy?: boolean;
+  onIntelligenceStateChange?: (messageId: string, blockId: string, state: Record<string, unknown>) => void;
+  onIntelligenceSubmit?: (prompt: string) => void | Promise<void>;
 }
 
 export function formatMessageTimestamp(timestamp?: number): string {
@@ -86,6 +92,9 @@ export function ChatMessageItem({
   renderAttachment,
   userBubbleWidthClass = "max-w-[85%] sm:max-w-[78%] md:max-w-[72%]",
   isReadOnly = false,
+  isConversationBusy = false,
+  onIntelligenceStateChange,
+  onIntelligenceSubmit,
 }: ChatMessageItemProps) {
   const { t } = useTranslation();
   if (!message) return null;
@@ -233,8 +242,13 @@ export function ChatMessageItem({
       {/* Formatted Markdown Content */}
       {message.content ? (
         <div className="px-0.5 select-text cursor-text">
-          <MarkdownContent
+          <AssistantResponse
             content={message.content}
+            isStreaming={isExecuting}
+            disabled={isReadOnly || isConversationBusy}
+            state={message.intelligenceUiState}
+            onStateChange={onIntelligenceStateChange ? (blockId, state) => onIntelligenceStateChange(message.id, blockId, state) : undefined}
+            onSubmit={onIntelligenceSubmit}
             onOpenFilePreview={onOpenFilePreview}
             onOpenTrajectory={onOpenTrajectory}
           />

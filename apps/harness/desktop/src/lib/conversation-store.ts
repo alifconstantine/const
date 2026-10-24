@@ -1,3 +1,5 @@
+import { shiftIntelligenceUiState } from "../components/intelligence-ui/protocol";
+
 export interface ConversationItem {
   id: string;
   title: string;
@@ -89,10 +91,18 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
           toolCalls: Array.isArray(msg.toolCalls) ? [...msg.toolCalls] : [],
           mutations: Array.isArray(msg.mutations) ? [...msg.mutations] : [],
           durationMs: msg.durationMs,
+          intelligenceUiState: msg.intelligenceUiState,
           timestamp: msg.timestamp || msg.createdAt || Date.now(),
         };
       } else {
         if (msg.content) {
+          if (msg.intelligenceUiState) {
+            const offset = currentAssistant.content ? currentAssistant.content.length + 2 : 0;
+            currentAssistant.intelligenceUiState = {
+              ...currentAssistant.intelligenceUiState,
+              ...shiftIntelligenceUiState(msg.intelligenceUiState, offset),
+            };
+          }
           currentAssistant.content = currentAssistant.content
             ? `${currentAssistant.content}\n\n${msg.content}`
             : msg.content;

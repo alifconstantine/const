@@ -126,6 +126,21 @@ export interface TranslationDictionary {
     dragToReorder: string;
     newTaskIn: string;
   };
+  intelligenceUi: {
+    preparing: string;
+    unavailable: string;
+    showSource: string;
+    tableTitle: string;
+    searchTable: string;
+    noRows: string;
+    rowCount: string;
+    sortColumn: string;
+    showData: string;
+    hideData: string;
+    label: string;
+    value: string;
+    submitFailed: string;
+  };
   workbench: {
     findInTask: string;
     noResults: string;

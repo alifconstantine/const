@@ -43,6 +43,8 @@ import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-c
 import { QuestionCard } from "./components/workbench/question-card";
 import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
 import { ChatMessageItem } from "./components/workbench/chat-message-item";
+import { assistantResponseToText, updateIntelligenceUiState } from "./components/intelligence-ui/protocol";
+import type { IntelligenceUiState } from "./components/intelligence-ui/schema";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -138,6 +140,7 @@ interface ChatMessage {
   mutations?: FileMutationRecord[];
   timestamp: number;
   durationMs?: number;
+  intelligenceUiState?: IntelligenceUiState;
   attachments?: AttachedFile[];
 }
 
@@ -1441,6 +1444,23 @@ function AuthenticatedContent({
   const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
 
+  const handleIntelligenceStateChange = useCallback((messageId: string, blockId: string, state: Record<string, unknown>) => {
+    const target = loadConversations().find((item) => item.id === conversationId);
+    const current = conversationIdRef.current === conversationId
+      ? messagesRef.current
+      : activeSessionMessagesRef.current.get(conversationId) || target?.messages || [];
+    const next = updateIntelligenceUiState(current, messageId, blockId, state);
+    if (activeSessionMessagesRef.current.has(conversationId)) activeSessionMessagesRef.current.set(conversationId, next);
+    if (conversationIdRef.current === conversationId) {
+      messagesRef.current = next;
+      setMessages(next);
+    }
+    if (target) {
+      saveConversation({ ...target, messages: next });
+      setConversations(loadConversations());
+    }
+  }, [conversationId]);
+
   const handleQueueMessage = useCallback((payload: { prompt: string; attachments?: AttachedFile[] }) => {
     const newItem: QueuedMessageItem = {
       id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1828,7 +1848,8 @@ function AuthenticatedContent({
 
   const handleCopyMessage = async (id: string, text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      const isAssistant = messagesRef.current.find((message) => message.id === id)?.role === "assistant";
+      await navigator.clipboard.writeText(isAssistant ? assistantResponseToText(text) : text);
       setCopiedId(id);
       toast.success(t("toast.copied"));
       setTimeout(() => setCopiedId(null), 2000);
@@ -4414,6 +4435,9 @@ function AuthenticatedContent({
                   <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col select-text cursor-text">
                     <ChatMessageItem
                       message={msg}
+                      isConversationBusy={isExecuting}
+                      onIntelligenceStateChange={handleIntelligenceStateChange}
+                      onIntelligenceSubmit={(prompt) => handleSendMessage({ prompt, project: currentProject, mode: currentMode, model: activeModelItem?.id || activeModelItem?.name })}
                       idx={idx}
                       isExecuting={isExecuting && idx === messages.length - 1}
                       liveDurationMs={liveDurationMs}
