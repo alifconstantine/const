@@ -515,14 +515,6 @@ data: [DONE]`}</pre>
                   </thead>
                   <tbody className="divide-y divide-[#383838]/40 font-mono text-[#d4d4d4]">
                     <tr>
-                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT 6 Luna</td>
-                      <td className="py-2.5 px-3">272K</td>
-                      <td className="py-2.5 px-3">128K</td>
-                      <td className="py-2.5 px-3 text-white">$0.0125</td>
-                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
-                      <td className="py-2.5 px-3 text-white">$0.065</td>
-                    </tr>
-                    <tr>
                       <td className="py-2.5 px-4 font-sans font-medium text-white">GLM 5.3 Flash</td>
                       <td className="py-2.5 px-3">1M</td>
                       <td className="py-2.5 px-3">128K</td>

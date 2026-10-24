@@ -183,7 +183,6 @@ export default function CombosPage() {
     { modelId: "glm-5.3-flash", name: "GLM 5.3 Flash", desc: "High-speed reasoning, 1M context" },
     { modelId: "deepseek-v4.1-flash", name: "Deepseek v4.1 Flash", desc: "Advanced coding & math, 1M context" },
     { modelId: "qwen-3.8-omni-flash", name: "Qwen 3.8 Omni Flash", desc: "Multilingual & vision, 1M context" },
-    { modelId: "gpt-6-luna", name: "GPT 6 Luna", desc: "Complex synthesis, 272K context" },
   ];
 
   // Live Candidate Step

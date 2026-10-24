@@ -201,7 +201,6 @@ export default function SettingsPage() {
                 <SelectItem value="glm-5.3-flash">glm-5.3-flash</SelectItem>
                 <SelectItem value="deepseek-v4.1-flash">deepseek-v4.1-flash</SelectItem>
                 <SelectItem value="qwen-3.8-omni-flash">qwen-3.8-omni-flash</SelectItem>
-                <SelectItem value="gpt-6-luna">gpt-6-luna</SelectItem>
                 {combos &&
                   combos
                     .filter(

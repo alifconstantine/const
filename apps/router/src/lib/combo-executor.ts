@@ -282,18 +282,7 @@ export async function executeComboChat(
           headers["Authorization"] = `Bearer ${apiKey}`;
         }
 
-        // Context clamping safeguard for models with 272K limit (GPT 6 Luna)
-        let targetMessages = formattedMessages;
-        if (targetModel.toLowerCase().includes("luna") || target.modelId.toLowerCase().includes("luna")) {
-          let curTokens = estimateMessagesTokens(targetMessages);
-          if (curTokens > 265000 && targetMessages.length > 2) {
-            targetMessages = [...formattedMessages];
-            while (curTokens > 265000 && targetMessages.length > 2) {
-              targetMessages.splice(1, 1);
-              curTokens = estimateMessagesTokens(targetMessages);
-            }
-          }
-        }
+        const targetMessages = formattedMessages;
 
         const constPayload: Record<string, unknown> = {
           model: targetModel,

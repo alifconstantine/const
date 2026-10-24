@@ -38,28 +38,6 @@ export interface ModelSpec {
 // Built-in models matching exactly what is managed by Const Gateway
 export const BUILTIN_MODELS: ModelSpec[] = [
   {
-    id: "gpt-6-luna",
-    name: "GPT 6 Luna",
-    modelId: "gpt-6-luna",
-    provider: "const",
-    providerName: "Const",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 272000,
-    contextWindow: "272K",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.0125",
-      cache: "$0.0125",
-      output: "$0.065",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image"],
-    outputTypes: ["text"],
-  },
-  {
     id: "glm-5.3-flash",
     name: "GLM 5.3 Flash",
     modelId: "glm-5.3-flash",
@@ -249,16 +227,6 @@ export function normalizeConstModelName(modelId: string): string {
     return "atmo/ali/qwen3.8-omni-flash";
   }
 
-  // 5. GPT 6 Luna
-  if (
-    clean === "gpt-6-luna" ||
-    clean === "gpt 6 luna" ||
-    clean === "gpt-luna-6" ||
-    clean.includes("luna")
-  ) {
-    return "atmo/cx/gpt-6-luna";
-  }
-
   // Audio: Whisper Large v3 Turbo
   if (
     clean === "whisper-large-v3-turbo" ||
@@ -297,7 +265,6 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
     clean === "glm-5.3-flash" || clean === "glm 5.3 flash" || clean.includes("glm-5.3") ||
     clean === "deepseek-v4.1-flash" || clean === "deepseek v4.1 flash" || clean.includes("deepseek-v4") ||
     clean === "qwen-3.8-omni-flash" || clean === "qwen 3.8 omni flash" || clean.includes("qwen") ||
-    clean === "gpt-6-luna" || clean === "gpt 6 luna" || clean.includes("luna") ||
     clean === "whisper-large-v3-turbo" || clean === "whisper large v3 turbo" ||
     clean === "whisper-1" || clean === "whisper"
   ) {
@@ -377,7 +344,7 @@ export function hasFixedThinking(modelId: string, name?: string): boolean {
  * In 2026: All frontier generative models support thinking natively.
  * - Non-generative models (embeddings, tts, flux): false
  * - Fixed-tier models (gemini-3.8-flash-high, etc.): false (thinking is already included in provider config)
- * - Base generative models (gemini-3.8-flash, gpt-6, claude-opus-5, etc.): true (dynamic thinking UI shown)
+ * - Base generative models (gemini-3.8-flash, deepseek-v4.1-flash, claude-opus-5, etc.): true (dynamic thinking UI shown)
  */
 export function checkSupportsThinking(
   modelId: string,
