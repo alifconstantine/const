@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id, Doc } from "../_generated/dataModel";
 
-export const DEFAULT_INITIAL_BALANCE = 1.0938; // Default demo balance matching UI
+export const DEFAULT_INITIAL_BALANCE = 0; // Default balance for users is 0 USD
 
 // Cryptographic hash for secure API key verification
 async function hashKey(key: string): Promise<string> {
@@ -20,8 +20,10 @@ async function resolveUserId(
   rawApiKey?: string,
   ssoToken?: string
 ): Promise<Id<"users"> | null> {
-  const sessionUserId = await getAuthUserId(ctx);
-  if (sessionUserId) return sessionUserId;
+  try {
+    const sessionUserId = await getAuthUserId(ctx);
+    if (sessionUserId) return sessionUserId;
+  } catch {}
 
   if (ssoToken) {
     try {
@@ -41,7 +43,7 @@ async function resolveUserId(
           if (typeof sub === "string" && sub) {
             const [subUserId] = sub.split("|");
             if (subUserId) {
-              const userDoc = await ctx.db.get(subUserId as Id<"users">);
+              const userDoc = await ctx.db.get(subUserId as Id<"users">).catch(() => null);
               if (userDoc) return userDoc._id;
             }
           }
@@ -51,14 +53,16 @@ async function resolveUserId(
   }
 
   if (rawApiKey) {
-    const keyHash = await hashKey(rawApiKey.trim());
-    const apiKeyDoc = await ctx.db
-      .query("apiKeys")
-      .withIndex("by_key_hash", (q: any) => q.eq("keyHash", keyHash))
-      .first();
-    if (apiKeyDoc && apiKeyDoc.status === "active") {
-      return apiKeyDoc.userId;
-    }
+    try {
+      const keyHash = await hashKey(rawApiKey.trim());
+      const apiKeyDoc = await ctx.db
+        .query("apiKeys")
+        .withIndex("by_key_hash", (q: any) => q.eq("keyHash", keyHash))
+        .first();
+      if (apiKeyDoc && apiKeyDoc.status === "active") {
+        return apiKeyDoc.userId;
+      }
+    } catch {}
   }
 
   return null;
@@ -66,7 +70,7 @@ async function resolveUserId(
 
 /**
  * 1. Get current authenticated user's credit balance.
- * Returns existing credit record or creates initial state with default balance.
+ * Returns existing credit record or creates initial state with 0 balance.
  */
 export const getUserCredits = query({
   args: {
@@ -74,39 +78,52 @@ export const getUserCredits = query({
     ssoToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
-    if (!userId) {
+    try {
+      const userId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
+      if (!userId) {
+        return {
+          balanceUsd: 0,
+          totalDepositedUsd: 0,
+          totalSpentUsd: 0,
+          formattedBalance: "$0.0000",
+          isAuthenticated: false,
+        };
+      }
+
+      // Safe query with catch if table/record is not found or empty
+      const creditDoc = await ctx.db
+        .query("userCredits")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first()
+        .catch(() => null);
+
+      if (!creditDoc) {
+        return {
+          balanceUsd: 0,
+          totalDepositedUsd: 0,
+          totalSpentUsd: 0,
+          formattedBalance: "$0.0000",
+          isAuthenticated: true,
+        };
+      }
+
+      const balance = typeof creditDoc.balanceUsd === "number" ? creditDoc.balanceUsd : 0;
       return {
-        balanceUsd: DEFAULT_INITIAL_BALANCE,
-        totalDepositedUsd: DEFAULT_INITIAL_BALANCE,
+        balanceUsd: balance,
+        totalDepositedUsd: creditDoc.totalDepositedUsd ?? 0,
+        totalSpentUsd: creditDoc.totalSpentUsd ?? 0,
+        formattedBalance: `$${balance.toFixed(4)}`,
+        isAuthenticated: true,
+      };
+    } catch {
+      return {
+        balanceUsd: 0,
+        totalDepositedUsd: 0,
         totalSpentUsd: 0,
-        formattedBalance: `$${DEFAULT_INITIAL_BALANCE.toFixed(4)}`,
+        formattedBalance: "$0.0000",
         isAuthenticated: false,
       };
     }
-
-    const creditDoc = await ctx.db
-      .query("userCredits")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-
-    if (!creditDoc) {
-      return {
-        balanceUsd: DEFAULT_INITIAL_BALANCE,
-        totalDepositedUsd: DEFAULT_INITIAL_BALANCE,
-        totalSpentUsd: 0,
-        formattedBalance: `$${DEFAULT_INITIAL_BALANCE.toFixed(4)}`,
-        isAuthenticated: true,
-      };
-    }
-
-    return {
-      balanceUsd: creditDoc.balanceUsd,
-      totalDepositedUsd: creditDoc.totalDepositedUsd,
-      totalSpentUsd: creditDoc.totalSpentUsd,
-      formattedBalance: `$${creditDoc.balanceUsd.toFixed(4)}`,
-      isAuthenticated: true,
-    };
   },
 });
 
@@ -120,54 +137,24 @@ export const getCreditTransactions = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
-    if (!userId) {
-      // Return a sample transaction for unauthenticated demo
-      return [
-        {
-          _id: "demo_init" as unknown as Id<"creditTransactions">,
-          userId: "demo" as unknown as Id<"users">,
-          type: "bonus" as const,
-          amountUsd: DEFAULT_INITIAL_BALANCE,
-          balanceAfterUsd: DEFAULT_INITIAL_BALANCE,
-          paymentMethod: "Welcome Bonus",
-          token: "USD",
-          network: "System",
-          status: "completed" as const,
-          txHash: undefined as string | undefined,
-          description: "Welcome sign-up credit grant",
-          createdAt: Date.now() - 86400000,
-        },
-      ];
+    try {
+      const userId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
+      if (!userId) {
+        return [];
+      }
+
+      const limit = args.limit || 50;
+      const txs = await ctx.db
+        .query("creditTransactions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .take(limit)
+        .catch(() => []);
+
+      return txs || [];
+    } catch {
+      return [];
     }
-
-    const limit = args.limit || 50;
-    const txs = await ctx.db
-      .query("creditTransactions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(limit);
-
-    if (txs.length === 0) {
-      return [
-        {
-          _id: "demo_init" as unknown as Id<"creditTransactions">,
-          userId,
-          type: "bonus" as const,
-          amountUsd: DEFAULT_INITIAL_BALANCE,
-          balanceAfterUsd: DEFAULT_INITIAL_BALANCE,
-          paymentMethod: "Welcome Bonus",
-          token: "USD",
-          network: "System",
-          status: "completed" as const,
-          txHash: undefined as string | undefined,
-          description: "Welcome sign-up credit grant",
-          createdAt: Date.now() - 86400000,
-        },
-      ];
-    }
-
-    return txs;
   },
 });
 

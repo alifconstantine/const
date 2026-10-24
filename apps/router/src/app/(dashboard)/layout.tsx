@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
@@ -30,6 +30,62 @@ import {
   CreditCard,
 } from "lucide-react";
 
+// Safe Error Boundary to prevent any credit query failure from crashing the dashboard
+class SafeCreditBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any) {
+    // Gracefully handle server query errors
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Link href="/credits">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
+          >
+            <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>$0.0000</span>
+          </Button>
+        </Link>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function HeaderCreditBalance() {
+  const { isAuthenticated } = useRouterAuth();
+  const credits = useQuery(
+    api.router.credits.getUserCredits,
+    isAuthenticated ? {} : "skip"
+  );
+  const balance = typeof credits?.balanceUsd === "number" ? credits.balanceUsd : 0;
+
+  return (
+    <Link href="/credits">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
+      >
+        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+        <span>${balance.toFixed(4)}</span>
+      </Button>
+    </Link>
+  );
+}
+
 const ROUTE_TITLES: Record<string, string> = {
   "/dashboard": "Overview",
   "/logs": "Usage logs",
@@ -54,10 +110,6 @@ export default function DashboardLayout({
   const { isAuthenticated, isLoading, isSigningOut, signIn, refreshSession } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
-    isAuthenticated ? {} : "skip"
-  );
-  const credits = useQuery(
-    api.router.credits.getUserCredits,
     isAuthenticated ? {} : "skip"
   );
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -212,17 +264,10 @@ export default function DashboardLayout({
                 <Bell className="h-4 w-4 stroke-[1.75]" />
               </Button>
 
-              {/* Credit Balance Pill linking to /credits */}
-              <Link href="/credits">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
-                >
-                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>${(credits?.balanceUsd ?? 0).toFixed(4)}</span>
-                </Button>
-              </Link>
+              {/* Credit Balance Pill linking to /credits (Protected by SafeCreditBoundary) */}
+              <SafeCreditBoundary>
+                <HeaderCreditBalance />
+              </SafeCreditBoundary>
 
               <Link href="/keys">
                 <Button
