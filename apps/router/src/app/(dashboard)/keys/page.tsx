@@ -61,7 +61,7 @@ export default function KeysPage() {
   // 1. Live Convex Data
   const keys = useQuery(
     api.router.keys.listKeys,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
   const createKeyMutation = useMutation(api.router.keys.createKey);
   const revokeKeyMutation = useMutation(api.router.keys.revokeKey);
@@ -70,7 +70,9 @@ export default function KeysPage() {
   // 2. Local State
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedKeyText, setCopiedKeyText] = useState<string | null>(null);
-  const [revealedKeyIds, setRevealedKeyIds] = useState<Record<string, boolean>>({});
+  const [revealedKeyIds, setRevealedKeyIds] = useState<Record<string, boolean>>(
+    {},
+  );
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   // Dialog State: Create Key
@@ -99,7 +101,7 @@ export default function KeysPage() {
     return keys.filter(
       (k) =>
         k.name.toLowerCase().includes(query) ||
-        k.keyPrefix.toLowerCase().includes(query)
+        k.keyPrefix.toLowerCase().includes(query),
     );
   }, [keys, searchQuery]);
 
@@ -120,7 +122,7 @@ export default function KeysPage() {
     } else {
       toast.warning("Key prefix copied", {
         description:
-          "This key was created before secret key retention was enabled. Please create a new key to copy the full API key.",
+          "Secret keys are shown only once. Rotate this key if you no longer have the secret.",
       });
     }
     setTimeout(() => setCopiedKeyId(null), 2000);
@@ -177,7 +179,11 @@ export default function KeysPage() {
 
   // Revoke key
   const handleRevoke = async (keyId: Id<"apiKeys">, name: string) => {
-    if (!confirm(`Are you sure you want to revoke "${name}"? Any applications using this key will immediately stop working.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to revoke "${name}"? Any applications using this key will immediately stop working.`,
+      )
+    ) {
       return;
     }
 
@@ -198,7 +204,9 @@ export default function KeysPage() {
 
   // Delete key
   const handleDelete = async (keyId: Id<"apiKeys">, name: string) => {
-    if (!confirm(`Permanently delete "${name}"? This action cannot be undone.`)) {
+    if (
+      !confirm(`Permanently delete "${name}"? This action cannot be undone.`)
+    ) {
       return;
     }
 
@@ -234,10 +242,10 @@ export default function KeysPage() {
             API Keys.
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground font-light">
-            Manage your gateway access keys, inspect usage tokens, and configure rate caps.
+            Manage your gateway access keys, inspect usage tokens, and configure
+            rate caps.
           </p>
         </div>
-
 
         {/* 4. Controls: Search + Create Key Button */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -282,7 +290,8 @@ export default function KeysPage() {
                 Authentication Required
               </h3>
               <p className="text-xs text-muted-foreground font-light max-w-sm mx-auto">
-                Sign in with your Const account to generate and manage gateway access keys.
+                Sign in with your Const account to generate and manage gateway
+                access keys.
               </p>
               <Button
                 onClick={() => signIn("/keys")}
@@ -326,7 +335,9 @@ export default function KeysPage() {
                     <Key className="h-6 w-6 stroke-[1.5]" />
                   </EmptyMedia>
                   <EmptyTitle className="text-base font-medium font-sans text-foreground">
-                    {searchQuery ? "No matching keys" : "No secret keys created yet"}
+                    {searchQuery
+                      ? "No matching keys"
+                      : "No secret keys created yet"}
                   </EmptyTitle>
                   <EmptyDescription className="text-xs text-muted-foreground font-light max-w-sm">
                     {searchQuery
@@ -533,7 +544,8 @@ export default function KeysPage() {
                 Create new secret key
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
-                Give your secret key a recognizable name to keep track of its usage across applications.
+                Give your secret key a recognizable name to keep track of its
+                usage across applications.
               </DialogDescription>
             </DialogHeader>
 
@@ -571,7 +583,8 @@ export default function KeysPage() {
                   className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
                 />
                 <p className="text-[11px] text-muted-foreground font-light">
-                  Optionally limit total tokens consumed per day through this key.
+                  Optionally limit total tokens consumed per day through this
+                  key.
                 </p>
               </div>
 
@@ -625,7 +638,8 @@ export default function KeysPage() {
                 Save your secret key
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
-                Please copy this secret key now. For your security, you will not be able to view it again.
+                Please copy this secret key now. For your security, you will not
+                be able to view it again.
               </DialogDescription>
             </DialogHeader>
 
@@ -641,10 +655,10 @@ export default function KeysPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border-none text-xs font-mono w-full min-w-0">
-                    <span
-                      className="text-foreground select-all break-all min-w-0 flex-1 font-mono text-xs font-normal leading-relaxed pr-1"
-                    >
-                      {showPlainKey ? revealKey.rawKey : "•".repeat(Math.min(revealKey.rawKey.length, 36))}
+                    <span className="text-foreground select-all break-all min-w-0 flex-1 font-mono text-xs font-normal leading-relaxed pr-1">
+                      {showPlainKey
+                        ? revealKey.rawKey
+                        : "•".repeat(Math.min(revealKey.rawKey.length, 36))}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Button
@@ -693,7 +707,11 @@ export default function KeysPage() {
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border-none text-amber-600 dark:text-amber-400 flex items-start gap-2.5 text-xs w-full min-w-0">
                   <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="font-light leading-relaxed">
-                    Store this key securely in your password manager or <code className="font-mono bg-amber-500/15 px-1 py-0.5 rounded">.env</code> file. Do not commit it to public git repositories.
+                    Store this key securely in your password manager or{" "}
+                    <code className="font-mono bg-amber-500/15 px-1 py-0.5 rounded">
+                      .env
+                    </code>{" "}
+                    file. Do not commit it to public git repositories.
                   </p>
                 </div>
               </div>

@@ -75,7 +75,7 @@ export function ViewCodeDialog({
       stream: true,
     },
     null,
-    2
+    2,
   )}'`;
 
   // 2. Python (OpenAI SDK Compatible) snippet
@@ -90,15 +90,17 @@ response = client.chat.completions.create(
     model="${modelId}",
     messages=${JSON.stringify(payloadMessages, null, 4)},
     temperature=${temperature},${
-    thinkingLevel ? `\n    reasoning_effort="${thinkingLevel}",` : ""
-  }${
-    webSearch && webSearch !== "off" ? `\n    extra_body={"web_search": "${webSearch}"},` : ""
-  }
+      thinkingLevel ? `\n    reasoning_effort="${thinkingLevel}",` : ""
+    }${
+      webSearch && webSearch !== "off"
+        ? `\n    extra_body={"web_search": "${webSearch}"},`
+        : ""
+    }
     stream=True,
 )
 
 for chunk in response:
-    content = chunk.choices[0].delta.content or ""
+    content = (chunk.choices[0].delta.content or "") if chunk.choices else ""
     print(content, end="", flush=True)
 `;
 
@@ -115,10 +117,12 @@ async function main() {
     model: "${modelId}",
     messages: ${JSON.stringify(payloadMessages, null, 4)},
     temperature: ${temperature},${
-    thinkingLevel ? `\n    reasoning_effort: "${thinkingLevel}",` : ""
-  }${
-    webSearch && webSearch !== "off" ? `\n    // @ts-ignore - custom grounding parameter\n    web_search: "${webSearch}",` : ""
-  }
+      thinkingLevel ? `\n    reasoning_effort: "${thinkingLevel}",` : ""
+    }${
+      webSearch && webSearch !== "off"
+        ? `\n    // @ts-ignore - custom grounding parameter\n    web_search: "${webSearch}",`
+        : ""
+    }
     stream: true,
   });
 
@@ -180,7 +184,11 @@ main().catch(console.error);
               onClick={handleCopy}
               className="h-8 rounded-full text-xs font-medium gap-1.5 border-none bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-foreground" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-foreground" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
               <span>{copied ? "Copied" : "Copy code"}</span>
             </Button>
             <SheetClose asChild>
@@ -197,7 +205,11 @@ main().catch(console.error);
         </div>
 
         {/* Tabs & Code Viewport */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="flex-1 flex flex-col min-h-0"
+        >
           <div className="px-4 sm:px-6 pt-3 pb-3 bg-secondary/20 shrink-0">
             <TabsList className="bg-secondary/60 rounded-full h-8 p-0.5 border-none">
               <TabsTrigger

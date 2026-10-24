@@ -42,7 +42,7 @@ export function MarkdownContent({
         compact
           ? "space-y-2.5 text-[13px] sm:text-[13.5px] leading-relaxed text-foreground/85 select-text font-sans"
           : "space-y-3.5 text-[14px] sm:text-[15px] leading-relaxed text-foreground select-text font-sans",
-        className
+        className,
       )}
     >
       {tokens.map((token, index) => (
@@ -72,26 +72,30 @@ function BlockTokenRenderer({
   switch (token.type) {
     case "heading": {
       const heading = token as Tokens.Heading;
-      const Tag = `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
+      const Tag =
+        `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
       const sizeClasses = compact
         ? heading.depth === 1
           ? "text-base font-semibold text-foreground mt-3 mb-1.5 tracking-tight border-b border-border/30 pb-1"
           : heading.depth === 2
-          ? "text-sm sm:text-base font-semibold text-foreground mt-2.5 mb-1 tracking-tight"
-          : heading.depth === 3
-          ? "text-xs sm:text-sm font-semibold text-foreground/95 mt-2 mb-1"
-          : "text-xs font-medium text-foreground/90 mt-1.5 mb-0.5"
+            ? "text-sm sm:text-base font-semibold text-foreground mt-2.5 mb-1 tracking-tight"
+            : heading.depth === 3
+              ? "text-xs sm:text-sm font-semibold text-foreground/95 mt-2 mb-1"
+              : "text-xs font-medium text-foreground/90 mt-1.5 mb-0.5"
         : heading.depth === 1
           ? "text-xl sm:text-2xl font-semibold text-foreground mt-5 mb-2.5 tracking-tight border-b border-border/40 pb-1.5"
           : heading.depth === 2
-          ? "text-lg sm:text-xl font-semibold text-foreground mt-4 mb-2 tracking-tight border-b border-border/30 pb-1"
-          : heading.depth === 3
-          ? "text-base sm:text-lg font-semibold text-foreground mt-3 mb-1.5"
-          : "text-sm sm:text-base font-medium text-foreground/90 mt-2 mb-1";
+            ? "text-lg sm:text-xl font-semibold text-foreground mt-4 mb-2 tracking-tight border-b border-border/30 pb-1"
+            : heading.depth === 3
+              ? "text-base sm:text-lg font-semibold text-foreground mt-3 mb-1.5"
+              : "text-sm sm:text-base font-medium text-foreground/90 mt-2 mb-1";
 
       return (
         <Tag className={cn(sizeClasses, "font-sans")}>
-          <InlineTokensRenderer tokens={heading.tokens} fallbackText={heading.text} />
+          <InlineTokensRenderer
+            tokens={heading.tokens}
+            fallbackText={heading.text}
+          />
         </Tag>
       );
     }
@@ -102,10 +106,15 @@ function BlockTokenRenderer({
         <p
           className={cn(
             "leading-relaxed",
-            compact ? "text-foreground/85 my-1.5 text-[13px] sm:text-[13.5px]" : "text-foreground/90 my-2"
+            compact
+              ? "text-foreground/85 my-1.5 text-[13px] sm:text-[13.5px]"
+              : "text-foreground/90 my-2",
           )}
         >
-          <InlineTokensRenderer tokens={paragraph.tokens} fallbackText={paragraph.text} />
+          <InlineTokensRenderer
+            tokens={paragraph.tokens}
+            fallbackText={paragraph.text}
+          />
         </p>
       );
     }
@@ -138,7 +147,7 @@ function BlockTokenRenderer({
         <blockquote
           className={cn(
             "border-l-2 border-foreground/30 pl-4 text-muted-foreground bg-secondary/15 rounded-r-xl italic font-sans",
-            compact ? "py-1 my-2 text-xs sm:text-[13px]" : "py-1.5 my-3"
+            compact ? "py-1 my-2 text-xs sm:text-[13px]" : "py-1.5 my-3",
           )}
         >
           {bq.tokens?.map((t, i) => (
@@ -149,7 +158,9 @@ function BlockTokenRenderer({
     }
 
     case "hr":
-      return <hr className={cn("border-border/60", compact ? "my-2.5" : "my-4")} />;
+      return (
+        <hr className={cn("border-border/60", compact ? "my-2.5" : "my-4")} />
+      );
 
     case "space":
       return null;
@@ -157,10 +168,7 @@ function BlockTokenRenderer({
     case "html": {
       const htmlToken = token as Tokens.HTML;
       return (
-        <div
-          dangerouslySetInnerHTML={{ __html: htmlToken.text }}
-          className={compact ? "my-1" : "my-2"}
-        />
+        <div children={htmlToken.text} className={compact ? "my-1" : "my-2"} />
       );
     }
 
@@ -229,20 +237,20 @@ export function CodeBlock({
       className={cn(
         "rounded-2xl overflow-hidden bg-[#0d1117] border border-[#30363d] select-none shadow-md",
         compact ? "my-2" : "my-3.5",
-        className
+        className,
       )}
     >
       {/* GitHub Dark Code Header */}
       <div
         className={cn(
           "flex items-center justify-between bg-[#161b22] border-b border-[#30363d] text-xs",
-          compact ? "px-3.5 py-1.5" : "px-4 py-2"
+          compact ? "px-3.5 py-1.5" : "px-4 py-2",
         )}
       >
         <span
           className={cn(
             "font-mono text-[#8b949e] font-medium tracking-wide lowercase",
-            compact ? "text-[11px]" : "text-[11.5px]"
+            compact ? "text-[11px]" : "text-[11.5px]",
           )}
         >
           {cleanLang}
@@ -252,13 +260,19 @@ export function CodeBlock({
           onClick={handleCopy}
           className={cn(
             "flex items-center gap-1.5 font-mono text-[#8b949e] hover:text-[#c9d1d9] transition-colors cursor-pointer rounded-lg hover:bg-white/5 active:scale-95",
-            compact ? "text-[10.5px] py-0.5 px-2" : "text-[11px] py-1 px-2"
+            compact ? "text-[10.5px] py-0.5 px-2" : "text-[11px] py-1 px-2",
           )}
           title="Copy code"
         >
           {copied ? (
             <>
-              <Check className={compact ? "w-3 h-3 text-[#3fb950]" : "w-3.5 h-3.5 text-[#3fb950]"} />
+              <Check
+                className={
+                  compact
+                    ? "w-3 h-3 text-[#3fb950]"
+                    : "w-3.5 h-3.5 text-[#3fb950]"
+                }
+              />
               <span className="text-[#3fb950] font-medium">Copied!</span>
             </>
           ) : (
@@ -274,7 +288,9 @@ export function CodeBlock({
       <pre
         className={cn(
           "overflow-x-auto font-mono leading-relaxed text-[#c9d1d9] select-text [scrollbar-width:thin] github-dark-highlight",
-          compact ? "p-3 text-[12px] sm:text-[12.5px]" : "p-4 text-[13px] sm:text-[13.5px]"
+          compact
+            ? "p-3 text-[12px] sm:text-[12.5px]"
+            : "p-4 text-[13px] sm:text-[13.5px]",
         )}
       >
         <code
@@ -378,7 +394,7 @@ function TableRenderer({
     <div
       className={cn(
         "overflow-x-auto rounded-2xl border border-[#30363d] bg-[#0d1117] shadow-sm select-text [scrollbar-width:thin]",
-        compact ? "my-2 text-xs" : "my-4"
+        compact ? "my-2 text-xs" : "my-4",
       )}
     >
       <table className="w-full text-left text-xs sm:text-sm font-sans border-collapse">
@@ -389,15 +405,15 @@ function TableRenderer({
                 table.align[idx] === "center"
                   ? "text-center"
                   : table.align[idx] === "right"
-                  ? "text-right"
-                  : "text-left";
+                    ? "text-right"
+                    : "text-left";
               return (
                 <th
                   key={idx}
                   className={cn(
                     "font-semibold text-foreground/90 tracking-wide border-r border-[#30363d]/50 last:border-r-0 whitespace-nowrap",
                     compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-xs",
-                    alignClass
+                    alignClass,
                   )}
                 >
                   <InlineTokensRenderer
@@ -420,15 +436,15 @@ function TableRenderer({
                   table.align[cellIdx] === "center"
                     ? "text-center"
                     : table.align[cellIdx] === "right"
-                    ? "text-right"
-                    : "text-left";
+                      ? "text-right"
+                      : "text-left";
                 return (
                   <td
                     key={cellIdx}
                     className={cn(
                       "text-foreground/85 border-r border-[#30363d]/50 last:border-r-0",
                       compact ? "px-3 py-1.5 text-xs" : "px-4 py-2.5",
-                      alignClass
+                      alignClass,
                     )}
                   >
                     <InlineTokensRenderer
@@ -460,11 +476,15 @@ function ListRenderer({
   const listClasses = list.ordered
     ? cn(
         "list-decimal pl-6 text-foreground/90",
-        compact ? "space-y-1 my-1.5 text-xs sm:text-[13px]" : "space-y-1.5 my-2.5"
+        compact
+          ? "space-y-1 my-1.5 text-xs sm:text-[13px]"
+          : "space-y-1.5 my-2.5",
       )
     : cn(
         "list-disc pl-6 text-foreground/90",
-        compact ? "space-y-1 my-1.5 text-xs sm:text-[13px]" : "space-y-1.5 my-2.5"
+        compact
+          ? "space-y-1 my-1.5 text-xs sm:text-[13px]"
+          : "space-y-1.5 my-2.5",
       );
 
   return (
@@ -497,7 +517,13 @@ function ListItemRenderer({
             item.tokens.map((tok, i) => {
               if (tok.type === "checkbox") return null;
               if (tok.type === "list") {
-                return <ListRenderer key={i} list={tok as Tokens.List} compact={compact} />;
+                return (
+                  <ListRenderer
+                    key={i}
+                    list={tok as Tokens.List}
+                    compact={compact}
+                  />
+                );
               }
               if (tok.type === "text") {
                 const textTok = tok as Tokens.Text;
@@ -509,7 +535,9 @@ function ListItemRenderer({
                   />
                 );
               }
-              return <BlockTokenRenderer key={i} token={tok} compact={compact} />;
+              return (
+                <BlockTokenRenderer key={i} token={tok} compact={compact} />
+              );
             })
           ) : (
             <InlineTokensRenderer fallbackText={item.text} />
@@ -524,7 +552,13 @@ function ListItemRenderer({
       {item.tokens ? (
         item.tokens.map((tok, i) => {
           if (tok.type === "list") {
-            return <ListRenderer key={i} list={tok as Tokens.List} compact={compact} />;
+            return (
+              <ListRenderer
+                key={i}
+                list={tok as Tokens.List}
+                compact={compact}
+              />
+            );
           }
           if (tok.type === "text") {
             const textTok = tok as Tokens.Text;
@@ -620,7 +654,11 @@ function InlineToken({ token }: { token: Token }) {
       const link = token as Tokens.Link;
       return (
         <a
-          href={link.href}
+          href={
+            /^https?:\/\//i.test(link.href) || link.href.startsWith("mailto:")
+              ? link.href
+              : undefined
+          }
           target="_blank"
           rel="noopener noreferrer"
           className="text-[#58a6ff] hover:text-[#79c0ff] hover:underline underline-offset-2 transition-colors break-all inline-flex items-center gap-0.5 font-medium"

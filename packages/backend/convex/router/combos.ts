@@ -1,6 +1,8 @@
 import { query, mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { resolveIdentity } from "./access";
+import { getManagedModel } from "./modelCatalog";
 
 // System default slugs (none reserved, users create their own)
 export const SYSTEM_DEFAULT_SLUGS: readonly string[] = [];
@@ -19,9 +21,9 @@ function slugify(name: string): string {
 
 // 1. List All Combos (User-created Custom Combos only)
 export const listCombos = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+  args: { rawApiKey: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const { userId } = await resolveIdentity(ctx, args.rawApiKey);
     if (!userId) {
       return [];
     }
@@ -32,27 +34,20 @@ export const listCombos = query({
       .order("desc")
       .collect();
 
-    return userCombos
-      .filter(
-        (c) =>
-          !(c as any).isBuiltin &&
-          !String(c._id).startsWith("builtin_") &&
-          !["auto", "fast", "coding"].includes(c.slug)
-      )
-      .map((c) => ({
-        _id: c._id,
-        name: c.name,
-        slug: c.slug,
-        description: c.description,
-        systemMessage: c.systemMessage,
-        contextLength: c.contextLength,
-        strategy: c.strategy,
-        models: c.models,
-        isBuiltin: false,
-        status: c.status,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      }));
+    return userCombos.map((c) => ({
+      _id: c._id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      systemMessage: c.systemMessage,
+      contextLength: c.contextLength,
+      strategy: c.strategy,
+      models: c.models,
+      isBuiltin: false,
+      status: c.status,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
   },
 });
 
@@ -76,7 +71,11 @@ export const getCombo = query({
     let userId = await getAuthUserId(ctx);
 
     // If no direct session, check rawApiKey for sk-const-live-
-    if (!userId && args.rawApiKey && args.rawApiKey.startsWith("sk-const-live-")) {
+    if (
+      !userId &&
+      args.rawApiKey &&
+      args.rawApiKey.startsWith("sk-const-live-")
+    ) {
       const keyHash = await hashApiKey(args.rawApiKey);
       const keyDoc = await ctx.db
         .query("apiKeys")
@@ -93,9 +92,12 @@ export const getCombo = query({
     if (cleanSlug) {
       const combo = await ctx.db
         .query("routerCombos")
-        .withIndex("by_user_slug", (q) => q.eq("userId", userId).eq("slug", cleanSlug))
+        .withIndex("by_user_slug", (q) =>
+          q.eq("userId", userId).eq("slug", cleanSlug),
+        )
         .first();
-      if (combo) return { ...combo, isBuiltin: false };
+      if (combo && combo.status === "active")
+        return { ...combo, isBuiltin: false };
     }
 
     if (args.id) {
@@ -122,7 +124,11 @@ export const createCombo = mutation({
     systemMessage: v.optional(v.string()),
     contextLength: v.optional(v.number()),
     strategy: v.optional(
-      v.union(v.literal("priority"), v.literal("round-robin"), v.literal("random"))
+      v.union(
+        v.literal("priority"),
+        v.literal("round-robin"),
+        v.literal("random"),
+      ),
     ),
     models: v.array(
       v.object({
@@ -131,7 +137,7 @@ export const createCombo = mutation({
         providerName: v.string(),
         priority: v.number(),
         weight: v.optional(v.number()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -152,17 +158,23 @@ export const createCombo = mutation({
 
     // Check collision with built-in slugs
     if (SYSTEM_DEFAULT_SLUGS.includes(cleanSlug as any)) {
-      throw new Error(`The slug "${cleanSlug}" is reserved by a system default combo.`);
+      throw new Error(
+        `The slug "${cleanSlug}" is reserved by a system default combo.`,
+      );
     }
 
     // Check collision with user's existing combos
     const existing = await ctx.db
       .query("routerCombos")
-      .withIndex("by_user_slug", (q) => q.eq("userId", userId).eq("slug", cleanSlug))
+      .withIndex("by_user_slug", (q) =>
+        q.eq("userId", userId).eq("slug", cleanSlug),
+      )
       .first();
 
     if (existing) {
-      throw new Error(`A combo with slug "${cleanSlug}" already exists in your account.`);
+      throw new Error(
+        `A combo with slug "${cleanSlug}" already exists in your account.`,
+      );
     }
 
     if (!args.models || args.models.length === 0) {
@@ -177,6 +189,7 @@ export const createCombo = mutation({
         priority: idx + 1,
       }));
 
+    validateTargets(args.models);
     const now = Date.now();
     const comboId = await ctx.db.insert("routerCombos", {
       userId,
@@ -205,7 +218,11 @@ export const updateCombo = mutation({
     systemMessage: v.optional(v.string()),
     contextLength: v.optional(v.number()),
     strategy: v.optional(
-      v.union(v.literal("priority"), v.literal("round-robin"), v.literal("random"))
+      v.union(
+        v.literal("priority"),
+        v.literal("round-robin"),
+        v.literal("random"),
+      ),
     ),
     models: v.array(
       v.object({
@@ -214,7 +231,7 @@ export const updateCombo = mutation({
         providerName: v.string(),
         priority: v.number(),
         weight: v.optional(v.number()),
-      })
+      }),
     ),
     status: v.optional(v.union(v.literal("active"), v.literal("disabled"))),
   },
@@ -240,6 +257,7 @@ export const updateCombo = mutation({
         priority: idx + 1,
       }));
 
+    validateTargets(args.models);
     await ctx.db.patch(args.id, {
       name: args.name.trim(),
       description: args.description?.trim() || undefined,
@@ -267,7 +285,10 @@ export const deleteCombo = mutation({
     }
 
     // Safely ignore legacy or virtual builtin IDs (builtin_auto, etc.)
-    if (args.id.startsWith("builtin_") || SYSTEM_DEFAULT_SLUGS.includes(args.id as any)) {
+    if (
+      args.id.startsWith("builtin_") ||
+      SYSTEM_DEFAULT_SLUGS.includes(args.id as any)
+    ) {
       return { success: true };
     }
 
@@ -307,38 +328,48 @@ export const clearAllCombos = mutation({
   },
 });
 
-// 6. Resolve Combo for Gateway Execution
-export const resolveComboForExecution = query({
-  args: {
-    slug: v.string(),
-    userId: v.optional(v.id("users")),
-  },
+function validateTargets(
+  models: Array<{ modelId: string; providerId: string }>,
+) {
+  if (
+    !models.length ||
+    models.length > 12 ||
+    models.some(
+      (m) =>
+        m.providerId !== "const" ||
+        getManagedModel(m.modelId)?.category !== "llm",
+    )
+  )
+    throw new Error(
+      "Select up to 12 available Const chat models; only listed :free IDs are free.",
+    );
+}
+export const prepareCombo = mutation({
+  args: { slug: v.string(), rawApiKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const cleanSlug = slugify(args.slug);
-    let userId = args.userId;
-    if (!userId) {
-      userId = (await getAuthUserId(ctx)) ?? undefined;
-    }
-
-    if (!userId) return null;
-
+    const { userId } = await resolveIdentity(ctx, args.rawApiKey);
     const combo = await ctx.db
       .query("routerCombos")
-      .withIndex("by_user_slug", (q) => q.eq("userId", userId!).eq("slug", cleanSlug))
-      .first();
-
-    if (!combo || combo.status === "disabled") {
-      return null;
+      .withIndex("by_user_slug", (q) =>
+        q.eq("userId", userId).eq("slug", args.slug),
+      )
+      .unique();
+    if (!combo || combo.status !== "active")
+      throw new Error("Combo not found or disabled");
+    validateTargets(combo.models);
+    let models = [...combo.models].sort((a, b) => a.priority - b.priority);
+    if (combo.strategy === "random") {
+      for (let i = models.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [models[i], models[j]] = [models[j]!, models[i]!];
+      }
+    } else if (combo.strategy === "round-robin") {
+      const next = (combo.executionCount ?? 0) % models.length;
+      models = [...models.slice(next), ...models.slice(0, next)];
+      await ctx.db.patch(combo._id, {
+        executionCount: (combo.executionCount ?? 0) + 1,
+      });
     }
-
-    return {
-      name: combo.name,
-      slug: combo.slug,
-      systemMessage: combo.systemMessage,
-      contextLength: combo.contextLength,
-      strategy: combo.strategy,
-      models: combo.models,
-      isBuiltin: false,
-    };
+    return { ...combo, models };
   },
 });

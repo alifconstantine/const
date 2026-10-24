@@ -130,9 +130,13 @@ export function Sidebar({
   const { isAuthenticated } = useRouterAuth();
   const quota = useQuery(
     api.router.quotas.getUserQuota,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
 
+  const settings = useQuery(
+    api.router.settings.getSettings,
+    isAuthenticated ? {} : "skip",
+  );
   const metrics = useMemo(() => {
     return calculateQuotaMetrics(quota);
   }, [quota]);
@@ -144,7 +148,7 @@ export function Sidebar({
       className={cn(
         "h-full flex flex-col bg-sidebar text-sidebar-foreground select-none transition-all duration-300",
         isCollapsed ? "w-16" : "w-64",
-        className
+        className,
       )}
     >
       {/* 1. Top Logo in Sidebar matching AtmoRouter design */}
@@ -207,22 +211,31 @@ export function Sidebar({
             title={isCollapsed ? "Overview" : undefined}
             className={cn(
               "rounded-xl text-xs font-sans transition-colors group flex items-center",
-              isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2",
+              isCollapsed
+                ? "justify-center p-2.5"
+                : "justify-between px-3 py-2",
               isOverviewActive
                 ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
-                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
+                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80",
             )}
           >
-            <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
+            <div
+              className={cn(
+                "flex items-center min-w-0",
+                !isCollapsed && "gap-2.5",
+              )}
+            >
               <LayoutGrid
                 className={cn(
                   "h-4 w-4 shrink-0 transition-colors",
                   isOverviewActive
                     ? "text-sidebar-accent-foreground stroke-[2]"
-                    : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]"
+                    : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]",
                 )}
               />
-              {!isCollapsed && <span className="truncate font-medium">Overview</span>}
+              {!isCollapsed && (
+                <span className="truncate font-medium">Overview</span>
+              )}
             </div>
           </Link>
         </div>
@@ -241,7 +254,8 @@ export function Sidebar({
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive =
-                  pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                  pathname === item.href ||
+                  pathname?.startsWith(`${item.href}/`);
 
                 return (
                   <Link
@@ -251,22 +265,31 @@ export function Sidebar({
                     title={isCollapsed ? item.title : undefined}
                     className={cn(
                       "rounded-xl text-xs font-sans transition-colors group flex items-center",
-                      isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2",
+                      isCollapsed
+                        ? "justify-center p-2.5"
+                        : "justify-between px-3 py-2",
                       isActive
                         ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium shadow-xs"
-                        : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80"
+                        : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/80",
                     )}
                   >
-                    <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
+                    <div
+                      className={cn(
+                        "flex items-center min-w-0",
+                        !isCollapsed && "gap-2.5",
+                      )}
+                    >
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0 transition-colors",
                           isActive
                             ? "text-sidebar-accent-foreground stroke-[2]"
-                            : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]"
+                            : "text-sidebar-foreground group-hover:text-sidebar-accent-foreground stroke-[1.75]",
                         )}
                       />
-                      {!isCollapsed && <span className="truncate">{item.title}</span>}
+                      {!isCollapsed && (
+                        <span className="truncate">{item.title}</span>
+                      )}
                     </div>
                     {!isCollapsed && (
                       <div className="flex items-center gap-1.5">
@@ -288,18 +311,18 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* 3. Mini Pay As You Go Quota Indicator in Sidebar */}
+      {/* 3. Mini Free usage Quota Indicator in Sidebar */}
       {!isCollapsed && isAuthenticated && (
         <div className="px-2 pt-2">
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} tokens · ${metrics.usedImages} of ${metrics.limitImages} images`}
+            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} free tokens`}
             className="block p-3 rounded-xl bg-card hover:bg-card/90 border border-border transition-all font-mono group"
           >
             <div className="flex items-center justify-between text-xs text-foreground mb-2">
               <span className="font-semibold uppercase tracking-wider text-foreground">
-                PAY AS YOU GO
+                Free usage
               </span>
               <span className="tabular-nums font-bold text-foreground">
                 {quota ? `${metrics.percentRemaining.toFixed(0)}%` : "..."}
@@ -311,7 +334,7 @@ export function Sidebar({
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-500 ease-out",
-                  metrics.barColor
+                  metrics.barColor,
                 )}
                 style={{ width: `${metrics.percentRemaining}%` }}
               />
@@ -319,7 +342,9 @@ export function Sidebar({
 
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="tabular-nums font-medium text-foreground/90">
-                {quota ? `${metrics.formattedRemaining} tok · ${metrics.remainingImages} img` : "7M tok · 20 img"}
+                {quota
+                  ? `${metrics.formattedRemaining} free tokens`
+                  : "7M free tokens"}
               </span>
               <span className="uppercase text-muted-foreground">
                 {metrics.resetsInText ? `reset in ${metrics.resetsInText}` : ""}
@@ -329,6 +354,11 @@ export function Sidebar({
         </div>
       )}
 
+      {settings?.notifyLowQuota && metrics.isLow && (
+        <p role="status" className="px-4 pb-3 text-xs text-amber-500">
+          {isCollapsed ? "Low quota" : "Less than 15% of free tokens remain."}
+        </p>
+      )}
       {/* 4. Account Profile Card at the Bottom */}
       <div className="p-2 shrink-0 bg-sidebar border-t border-border/50">
         <AccountMenu isCollapsed={isCollapsed} />

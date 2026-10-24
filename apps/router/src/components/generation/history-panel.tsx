@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Button, Input, cn, Sheet, SheetContent, SheetClose, SheetTitle } from "@const/ui";
+import {
+  Button,
+  Input,
+  cn,
+  Sheet,
+  SheetContent,
+  SheetClose,
+  SheetTitle,
+} from "@const/ui";
 import { X, Search, History, MessageSquare, Trash2 } from "lucide-react";
 
 export interface ChatSessionMeta {
@@ -25,6 +33,7 @@ interface HistoryPanelProps {
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
+  onLoadMore?: () => void;
 }
 
 export function HistoryPanel({
@@ -34,6 +43,7 @@ export function HistoryPanel({
   activeChatId,
   onSelectChat,
   onDeleteChat,
+  onLoadMore,
 }: HistoryPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -43,7 +53,8 @@ export function HistoryPanel({
     return sessions.filter(
       (s) =>
         s.title.toLowerCase().includes(q) ||
-        (s.lastMessageSnippet && s.lastMessageSnippet.toLowerCase().includes(q))
+        (s.lastMessageSnippet &&
+          s.lastMessageSnippet.toLowerCase().includes(q)),
     );
   }, [sessions, searchQuery]);
 
@@ -151,12 +162,14 @@ export function HistoryPanel({
                           "group relative flex items-center justify-between px-3 py-2.5 rounded-xl text-xs cursor-pointer transition-colors select-none",
                           isActive
                             ? "bg-foreground text-background font-medium"
-                            : "hover:bg-secondary/70 text-foreground"
+                            : "hover:bg-secondary/70 text-foreground",
                         )}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
                           <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                          <span className="truncate">{session.title || "Untitled Chat"}</span>
+                          <span className="truncate">
+                            {session.title || "Untitled Chat"}
+                          </span>
                         </div>
 
                         <button
@@ -166,7 +179,9 @@ export function HistoryPanel({
                           }}
                           className={cn(
                             "opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-background/20 cursor-pointer shrink-0",
-                            isActive ? "text-background" : "text-muted-foreground hover:text-destructive"
+                            isActive
+                              ? "text-background"
+                              : "text-muted-foreground hover:text-destructive",
                           )}
                           title="Delete chat"
                         >
@@ -181,6 +196,11 @@ export function HistoryPanel({
           )}
         </div>
 
+        {onLoadMore && (
+          <Button variant="ghost" onClick={onLoadMore}>
+            Load older chats
+          </Button>
+        )}
         {/* Footer */}
         <div className="p-3 px-5 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-mono text-[11px] text-muted-foreground/80">

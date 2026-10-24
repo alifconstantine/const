@@ -54,7 +54,7 @@ export const saveUserProvider = mutation({
       v.literal("openai-compatible"),
       v.literal("anthropic"),
       v.literal("google-ai"),
-      v.literal("custom")
+      v.literal("custom"),
     ),
     apiKey: v.optional(v.string()),
     baseUrl: v.optional(v.string()),
@@ -77,7 +77,7 @@ export const saveUserProvider = mutation({
     const existing = await ctx.db
       .query("userProviders")
       .withIndex("by_user_provider", (q) =>
-        q.eq("userId", userId).eq("providerId", args.providerId)
+        q.eq("userId", userId).eq("providerId", args.providerId),
       )
       .unique();
 
@@ -232,7 +232,10 @@ export const getDecryptedProviderKey = internalQuery({
       return null;
     }
 
-    const decryptedKey = await decryptApiKey(provider.keyCipher, provider.keyIv);
+    const decryptedKey = await decryptApiKey(
+      provider.keyCipher,
+      provider.keyIv,
+    );
     return {
       providerId: provider.providerId,
       name: provider.name,
@@ -245,7 +248,7 @@ export const getDecryptedProviderKey = internalQuery({
 });
 
 // 7. Safe authenticated query for server-side testing & proxy routing
-export const getProviderCredentials = query({
+export const getProviderCredentials = internalQuery({
   args: {
     providerDocId: v.optional(v.id("userProviders")),
     modelId: v.optional(v.string()),
@@ -255,7 +258,11 @@ export const getProviderCredentials = query({
     let userId = await getAuthUserId(ctx);
 
     // If no direct user session, allow authentication via valid Const API key (sk-const-live-xxxx)
-    if (!userId && args.rawApiKey && args.rawApiKey.startsWith("sk-const-live-")) {
+    if (
+      !userId &&
+      args.rawApiKey &&
+      args.rawApiKey.startsWith("sk-const-live-")
+    ) {
       const encoder = new TextEncoder();
       const data = encoder.encode(args.rawApiKey.trim());
       const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -274,7 +281,9 @@ export const getProviderCredentials = query({
     }
 
     if (!userId) {
-      throw new Error("Unauthorized: Please sign in or provide a valid API key.");
+      throw new Error(
+        "Unauthorized: Please sign in or provide a valid API key.",
+      );
     }
 
     let provider = null;
@@ -294,7 +303,7 @@ export const getProviderCredentials = query({
             m.enabled &&
             (m.modelId === args.modelId ||
               `${p.providerId}/${m.modelId}` === args.modelId ||
-              m.name === args.modelId)
+              m.name === args.modelId),
         );
         if (found) {
           provider = p;
@@ -307,7 +316,7 @@ export const getProviderCredentials = query({
       throw new Error(
         args.modelId
           ? `No active provider found for model '${args.modelId}'. Please connect a provider in /providers.`
-          : "Provider not found or unauthorized access."
+          : "Provider not found or unauthorized access.",
       );
     }
 
@@ -315,7 +324,10 @@ export const getProviderCredentials = query({
       throw new Error(`Provider '${provider.name}' is currently disabled.`);
     }
 
-    const decryptedKey = await decryptApiKey(provider.keyCipher, provider.keyIv);
+    const decryptedKey = await decryptApiKey(
+      provider.keyCipher,
+      provider.keyIv,
+    );
     return {
       providerDocId: provider._id,
       providerId: provider.providerId,

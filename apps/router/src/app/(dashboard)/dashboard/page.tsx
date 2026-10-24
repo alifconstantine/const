@@ -1,514 +1,255 @@
 "use client";
-
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
-import { calculateQuotaMetrics } from "@/lib/quota";
-import {
-  Card,
-  Button,
-  Badge,
-  Skeleton,
-  cn,
-  toast,
-} from "@const/ui";
-import {
-  CheckCircle2,
-  Circle,
-  RefreshCw,
-  ArrowRight,
-  Copy,
-  Check,
-  Terminal,
-  BookOpen,
-  Bot,
-  ExternalLink,
-  ShieldCheck,
-  Zap,
-} from "lucide-react";
-
-type TimeRangeOption = "24h" | "7d" | "30d" | "all";
-
-export default function DashboardOverviewPage() {
+import { useRouterAuth } from "@/components/providers/convex-client-provider";
+import { QueryBoundary } from "@/components/query-boundary";
+import { Button, Skeleton, Badge, ScrollArea } from "@const/ui";
+import { BUILTIN_MODELS } from "@/lib/model-specs";
+import { formatTokenAmount, calculateQuotaMetrics } from "@/lib/quota";
+const dollars = (n: number) => "$" + n.toFixed(6);
+function Overview() {
   const { isAuthenticated } = useRouterAuth();
-  const user = useQuery(
-    api.auth.queries.currentUser,
-    isAuthenticated ? {} : "skip"
-  );
-
-  const keys = useQuery(
-    api.router.keys.listKeys,
-    isAuthenticated ? {} : "skip"
-  );
-  const activeKeys = useMemo(() => {
-    return keys?.filter((k) => k.status === "active") || [];
-  }, [keys]);
-  const activeKey = activeKeys[0];
-
-  const quota = useQuery(
-    api.router.quotas.getUserQuota,
-    isAuthenticated ? {} : "skip"
-  );
-  const quotaMetrics = useMemo(() => {
-    return calculateQuotaMetrics(quota);
-  }, [quota]);
-
-  const [timeRange, setTimeRange] = useState<TimeRangeOption>("7d");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
-
-  const tzOffset = useMemo(() => {
-    return typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
-  }, []);
-
-  const backendTimeRange = useMemo(() => {
-    if (timeRange === "24h") return "today";
-    return timeRange;
-  }, [timeRange]);
-
+  const [range, setRange] = useState("7d");
   const analytics = useQuery(
     api.router.logs.getDashboardAnalytics,
-    isAuthenticated ? { timeRange: backendTimeRange, tzOffset } : "skip"
+    isAuthenticated ? { timeRange: range } : "skip",
   );
-
-  const recentLogs = useQuery(
+  const quota = useQuery(
+    api.router.quotas.getUserQuota,
+    isAuthenticated ? {} : "skip",
+  );
+  const logs = useQuery(
     api.router.logs.listLogs,
-    isAuthenticated ? { limit: 6 } : "skip"
+    isAuthenticated ? { limit: 6 } : "skip",
   );
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success("Dashboard metrics refreshed");
-    }, 600);
-  };
-
-  const userName = useMemo(() => {
-    if (user?.email) {
-      return user.email.split("@")[0];
-    }
-    if (user?.name) {
-      return user.name.toLowerCase().replace(/\s+/g, "");
-    }
-    return "developer";
-  }, [user]);
-
-  // Estimated spend based on input + output tokens with standard blended gateway rate ($1.25 / 1M)
-  const estimatedSpend = useMemo(() => {
-    if (!analytics?.kpi?.totalTokens) return "$0.00";
-    const totalTokens = analytics.kpi.totalTokens;
-    const spend = (totalTokens / 1_000_000) * 1.25;
-    return `$${spend < 0.0001 ? "0.0001" : spend.toFixed(4)}`;
-  }, [analytics?.kpi?.totalTokens]);
-
-  const savedVsOfficial = useMemo(() => {
-    if (!analytics?.kpi?.totalTokens) return "$0.0000";
-    const saved = (analytics.kpi.totalTokens / 1_000_000) * 0.65;
-    return `$${saved.toFixed(4)}`;
-  }, [analytics?.kpi?.totalTokens]);
-
-  const avgCostPerReq = useMemo(() => {
-    if (!analytics?.kpi?.totalRequests || !analytics?.kpi?.totalTokens) return "$0.000000";
-    const totalSpend = (analytics.kpi.totalTokens / 1_000_000) * 1.25;
-    const avg = totalSpend / analytics.kpi.totalRequests;
-    return `$${avg.toFixed(6)}`;
-  }, [analytics?.kpi?.totalRequests, analytics?.kpi?.totalTokens]);
-
-  const curlKey = activeKey ? activeKey.keyPrefix : "sk-const-live-...";
-  const pythonSnippet = `from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://router.const.web.id/v1",
-    api_key="${curlKey}",
-)
-
-response = client.chat.completions.create(
-    model="gemini-3.8-flash",
-    messages=[{"role": "user", "content": "Hello world!"}],
-)`;
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(pythonSnippet);
-    setCopiedCode(true);
-    toast.success("SDK snippet copied to clipboard");
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
+  const metrics = calculateQuotaMetrics(quota),
+    kpi = analytics?.kpi;
+  const max = Math.max(1, ...(analytics?.timeline.map((t) => t.tokens) ?? []));
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
-      {/* 1. Header: Welcome Title + Time Range Pills & Refresh Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-        <h1 className="text-2xl sm:text-3xl font-sans font-medium text-foreground tracking-tight">
-          Welcome, {userName}
-        </h1>
-
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-full border border-border/70">
-            {(
-              [
-                { label: "24h", value: "24h" },
-                { label: "7d", value: "7d" },
-                { label: "30d", value: "30d" },
-                { label: "All time", value: "all" },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.value}
-                onClick={() => setTimeRange(item.value)}
-                className={cn(
-                  "px-3 py-1 text-xs font-sans rounded-full transition-colors cursor-pointer",
-                  timeRange === item.value
-                    ? "bg-foreground text-background font-medium shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            className="rounded-full text-xs h-8 px-3 text-muted-foreground hover:text-foreground cursor-pointer gap-1.5 border border-transparent hover:border-border"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-            <span>Refresh</span>
-          </Button>
+    <div className="max-w-6xl mx-auto space-y-7 pb-12">
+      <header className="flex flex-wrap justify-between gap-4 items-start">
+        <div>
+          <h1 className="text-3xl font-medium tracking-tight">Overview</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Requests, free allowance, and paid usage in one place.
+          </p>
         </div>
-      </div>
-
-      {/* 2. Top Row: Spend Card (Left) & Available Balance Card (Right) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Card 1: Spend */}
-        <Card className="rounded-3xl border border-border/80 bg-card p-6 flex flex-col justify-between shadow-none space-y-6">
-          <div className="space-y-1">
-            <span className="text-xs font-sans text-muted-foreground font-normal">
-              Spend
-            </span>
-            <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground font-sans tabular-nums pt-1">
-              {analytics ? estimatedSpend : <Skeleton className="h-10 w-32 rounded-xl" />}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-sans">Requests</span>
-              <div className="text-lg font-semibold text-foreground font-sans tabular-nums">
-                {analytics ? (
-                  analytics.kpi.totalRequests.toLocaleString()
-                ) : (
-                  <Skeleton className="h-6 w-16 rounded" />
-                )}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs text-muted-foreground font-sans">Total tokens</span>
-              <div className="text-lg font-semibold text-foreground font-sans tabular-nums">
-                {analytics ? (
-                  analytics.kpi.totalTokens.toLocaleString()
-                ) : (
-                  <Skeleton className="h-6 w-24 rounded" />
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-border/60 pt-4 space-y-2 text-xs font-sans">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1">
-                Saved vs official
-                <span className="underline decoration-dotted cursor-help text-[11px] text-muted-foreground/80">
-                  How is this calculated?
-                </span>
-              </span>
-              <span className="font-medium text-foreground tabular-nums">
-                {analytics ? savedVsOfficial : "$0.00"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Avg cost / req</span>
-              <span className="font-medium text-foreground tabular-nums">
-                {analytics ? avgCostPerReq : "$0.00"}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Card 2: Available balance */}
-        <Card className="rounded-3xl border border-border/80 bg-card p-6 flex flex-col justify-between shadow-none space-y-6">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-sans text-muted-foreground font-normal">
-                Available balance
-              </span>
-              <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground font-sans tabular-nums pt-1">
-                {quota ? (
-                  `$${((quotaMetrics.percentRemaining / 100) * 1.5).toFixed(4)}`
-                ) : (
-                  "$1.0000"
-                )}
-              </div>
-            </div>
-
-            <Link href="/keys">
-              <Button
-                size="sm"
-                className="rounded-full h-8 px-4 text-xs font-medium gap-1.5 bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-none"
-              >
-                <span>Add funds</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </div>
-
-          <div className="border-t border-border/60 pt-4 space-y-2.5 text-xs font-sans">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Active API keys</span>
-              <span className="font-medium text-foreground tabular-nums">
-                {keys ? activeKeys.length : 1}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Available models</span>
-              <span className="font-medium text-foreground tabular-nums">
-                {analytics?.infrastructure?.activeModelsCount
-                  ? Math.max(142, analytics.infrastructure.activeModelsCount + 137)
-                  : 142}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-muted-foreground pt-1 border-t border-border/40">
-              <span>Pay As You Go Quota</span>
-              <span className="font-mono text-[11px] text-foreground font-medium tabular-nums">
-                {quota ? `${quotaMetrics.formattedRemaining} tok · ${quotaMetrics.percentRemaining.toFixed(0)}%` : "7M tok"}
-              </span>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* 3. Middle Row: "Get started" Checklist (Left) & "Connect your SDK" (Right) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Left: Get started Checklist */}
-        <Card className="rounded-3xl border border-border/80 bg-card p-6 flex flex-col justify-between shadow-none space-y-5">
-          <h2 className="text-base font-sans font-medium text-foreground">
-            Get started
-          </h2>
-
-          <div className="space-y-4">
-            {/* Step 1: Create an API key */}
-            <Link
-              href="/keys"
-              className="flex items-center gap-3 group text-xs font-sans text-foreground transition-colors hover:text-foreground"
-            >
-              <div className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0">
-                <Check className="h-3 w-3 stroke-[2.5]" />
-              </div>
-              <span className="group-hover:underline">Create an API key</span>
-            </Link>
-
-            {/* Step 2: Top up your balance */}
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 group text-xs font-sans text-foreground transition-colors hover:text-foreground"
-            >
-              <div className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0">
-                <Check className="h-3 w-3 stroke-[2.5]" />
-              </div>
-              <span className="group-hover:underline">Top up your balance</span>
-            </Link>
-
-            {/* Step 3: Make your first request */}
-            <Link
-              href="/generation"
-              className="flex items-center gap-3 group text-xs font-sans text-foreground transition-colors hover:text-foreground"
-            >
-              <div
-                className={cn(
-                  "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
-                  (analytics?.kpi?.totalRequests || 0) > 0
-                    ? "bg-emerald-500/15 text-emerald-500"
-                    : "bg-secondary text-muted-foreground"
-                )}
-              >
-                {(analytics?.kpi?.totalRequests || 0) > 0 ? (
-                  <Check className="h-3 w-3 stroke-[2.5]" />
-                ) : (
-                  <Circle className="h-2 w-2" />
-                )}
-              </div>
-              <span className="group-hover:underline">Make your first request</span>
-            </Link>
-          </div>
-        </Card>
-
-        {/* Right: Connect your SDK */}
-        <Card className="rounded-3xl border border-border/80 bg-card p-6 flex flex-col justify-between shadow-none space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-sans font-medium text-foreground">
-              Connect your SDK
-            </h2>
+        <div className="flex gap-1 bg-secondary rounded-full p-1">
+          {[
+            ["24h", "today"],
+            ["7 days", "7d"],
+            ["30 days", "30d"],
+            ["All time", "all"],
+          ].map(([label, value]) => (
             <Button
-              variant="ghost"
+              key={value}
               size="sm"
-              onClick={handleCopyCode}
-              className="h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground rounded-lg cursor-pointer gap-1"
+              variant={range === value ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setRange(value!)}
             >
-              {copiedCode ? (
-                <>
-                  <Check className="h-3 w-3 text-emerald-500" />
-                  <span className="text-emerald-500 font-medium">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3" />
-                  <span>Copy</span>
-                </>
-              )}
+              {label}
             </Button>
-          </div>
-
-          {/* Dark Snippet Container */}
-          <div className="relative rounded-2xl bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-300 border border-border/40 overflow-x-auto scrollbar-thin">
-            <pre>
-              <code>
-                <span className="text-zinc-500">from</span> openai <span className="text-zinc-500">import</span> OpenAI{"\n\n"}
-                client = OpenAI({" \n"}
-                {"    "}base_url=<span className="text-emerald-400">&quot;https://router.const.web.id/v1&quot;</span>,{"\n"}
-                {"    "}api_key=<span className="text-emerald-400">&quot;{curlKey}&quot;</span>,{"\n"}
-                )
-              </code>
-            </pre>
-          </div>
-
-          {/* Quick Nav Buttons */}
-          <div className="flex items-center gap-2 pt-1">
-            <Link href="/docs">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full text-xs h-8 px-4 border-border bg-secondary/80 text-foreground hover:bg-secondary cursor-pointer gap-1.5"
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                <span>Documentation</span>
-              </Button>
-            </Link>
-
-            <Link href="/generation">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full text-xs h-8 px-4 border-border bg-secondary/80 text-foreground hover:bg-secondary cursor-pointer gap-1.5"
-              >
-                <Bot className="h-3.5 w-3.5" />
-                <span>Playground</span>
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      {/* 4. Bottom Section: Recent requests Table */}
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-sans font-medium text-foreground">
-            Recent requests
-          </h2>
-
-          <Link
-            href="/logs"
-            className="text-xs font-sans text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-          >
-            <span>All logs</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          ))}
         </div>
-
-        <Card className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-none">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-sans">
-              <thead className="bg-secondary/30 text-muted-foreground border-b border-border/60">
+      </header>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          ["Paid usage", kpi ? dollars(kpi.costUsd) : undefined],
+          ["Requests", kpi?.totalRequests.toLocaleString()],
+          [
+            "Free tokens used",
+            kpi ? formatTokenAmount(kpi.freeTokens) : undefined,
+          ],
+          [
+            "Paid tokens used",
+            kpi ? formatTokenAmount(kpi.paidTokens) : undefined,
+          ],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-2xl bg-card p-6 space-y-4">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {value === undefined ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <p className="text-2xl font-medium tabular-nums">{value}</p>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="grid lg:grid-cols-[1.5fr_1fr] gap-5">
+        <section className="bg-card rounded-2xl p-6 space-y-5">
+          <div className="flex justify-between">
+            <h2 className="font-medium">Token activity</h2>
+            <span className="text-xs text-muted-foreground">
+              Hourly totals · Live
+            </span>
+          </div>
+          {!analytics ? (
+            <Skeleton className="h-36 w-full" />
+          ) : !analytics.timeline.length ? (
+            <div className="h-36 flex items-center justify-center text-sm text-muted-foreground">
+              Send your first request to see activity.
+            </div>
+          ) : (
+            <div
+              className="h-36 flex gap-1 items-end overflow-hidden"
+              aria-label="Tokens used by hour"
+            >
+              {analytics.timeline.slice(-120).map((t) => (
+                <div
+                  key={t.timestamp}
+                  className="bg-foreground/75 min-w-1 flex-1 rounded-t-sm"
+                  style={{ height: Math.max(2, (t.tokens / max) * 100) + "%" }}
+                  title={
+                    new Date(t.timestamp).toLocaleString() +
+                    ": " +
+                    t.tokens +
+                    " tokens"
+                  }
+                />
+              ))}
+            </div>
+          )}
+          <div className="flex gap-5 text-xs text-muted-foreground">
+            <span>
+              Success rate: {kpi ? kpi.successRate.toFixed(1) + "%" : "—"}
+            </span>
+            <span>
+              Average duration:{" "}
+              {kpi ? (kpi.avgDurationMs / 1000).toFixed(2) + "s" : "—"}
+            </span>
+          </div>
+        </section>
+        <section className="bg-card rounded-2xl p-6 flex flex-col justify-between gap-5">
+          <div>
+            <h2 className="font-medium">Weekly free allowance</h2>
+            <p className="text-3xl font-medium tabular-nums mt-5">
+              {quota ? metrics.formattedRemaining : "—"}{" "}
+              <span className="text-sm text-muted-foreground font-normal">
+                tokens left
+              </span>
+            </p>
+          </div>
+          <div>
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-foreground rounded-full"
+                style={{ width: metrics.percentRemaining + "%" }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              Only listed :free models use this allowance. Resets in{" "}
+              {metrics.resetsInText}.
+            </p>
+          </div>
+          <Link href="/models" className="text-sm underline underline-offset-4">
+            Browse {BUILTIN_MODELS.filter((m) => m.tier === "free").length} free
+            models
+          </Link>
+        </section>
+      </div>
+      <section className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="font-medium">Usage by model</h2>
+          <span className="text-xs text-muted-foreground">
+            Actual metered cost
+          </span>
+        </div>
+        <div className="bg-card rounded-2xl">
+          <ScrollArea orientation="horizontal">
+            <table className="min-w-[550px] w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground">
                 <tr>
-                  <th className="py-3 px-5 font-medium">Request</th>
-                  <th className="py-3 px-5 font-medium">Model</th>
-                  <th className="py-3 px-5 font-medium">Status</th>
-                  <th className="py-3 px-5 font-medium text-right">Tokens</th>
-                  <th className="py-3 px-5 font-medium text-right">Duration</th>
-                  <th className="py-3 px-5 font-medium text-right">Time</th>
+                  {["Model", "Requests", "Tokens", "Cost"].map((t) => (
+                    <th key={t} className="p-4 font-normal">
+                      {t}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/40">
-                {recentLogs === undefined ? (
-                  Array.from({ length: 4 }).map((_, idx) => (
-                    <tr key={idx}>
-                      <td className="py-3.5 px-5"><Skeleton className="h-4 w-28 rounded" /></td>
-                      <td className="py-3.5 px-5"><Skeleton className="h-4 w-32 rounded" /></td>
-                      <td className="py-3.5 px-5"><Skeleton className="h-5 w-12 rounded-full" /></td>
-                      <td className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-16 rounded ml-auto" /></td>
-                      <td className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-14 rounded ml-auto" /></td>
-                      <td className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-20 rounded ml-auto" /></td>
-                    </tr>
-                  ))
-                ) : recentLogs.length === 0 ? (
+              <tbody>
+                {analytics?.modelBreakdown.map((m) => (
+                  <tr key={m.model} className="border-t border-border/40">
+                    <td className="p-4 font-mono text-xs">
+                      {m.model} <Badge variant="secondary">{m.tier}</Badge>
+                    </td>
+                    <td className="p-4 tabular-nums">{m.requests}</td>
+                    <td className="p-4 tabular-nums">
+                      {m.tokens.toLocaleString()}
+                    </td>
+                    <td className="p-4 tabular-nums">{dollars(m.costUsd)}</td>
+                  </tr>
+                ))}
+                {analytics && !analytics.modelBreakdown.length && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-muted-foreground">
-                      No requests logged yet. Send your first request using the SDK or Playground.
+                    <td
+                      colSpan={4}
+                      className="p-8 text-center text-muted-foreground"
+                    >
+                      No usage in this period.
                     </td>
                   </tr>
-                ) : (
-                  recentLogs.map((log) => {
-                    const isSuccess = log.status >= 200 && log.status < 300;
-                    const dateStr = new Date(log.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    });
-
-                    return (
-                      <tr
-                        key={log._id}
-                        className="hover:bg-secondary/20 transition-colors"
-                      >
-                        <td className="py-3 px-5 font-mono text-[11px] text-foreground">
-                          {log.requestId}
-                        </td>
-                        <td className="py-3 px-5 font-medium text-foreground">
-                          {log.model}
-                        </td>
-                        <td className="py-3 px-5">
-                          <span
-                            className={cn(
-                              "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium",
-                              isSuccess
-                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                : "bg-destructive/10 text-destructive border border-destructive/20"
-                            )}
-                          >
-                            {log.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-5 text-right tabular-nums text-foreground">
-                          {log.totalTokens.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-5 text-right tabular-nums text-muted-foreground">
-                          {log.durationMs}ms
-                        </td>
-                        <td className="py-3 px-5 text-right text-muted-foreground">
-                          {dateStr}
-                        </td>
-                      </tr>
-                    );
-                  })
                 )}
               </tbody>
             </table>
-          </div>
-        </Card>
+          </ScrollArea>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Updates automatically after each request. Totals use hourly buckets.
+          Earlier requests without recorded prices are not assigned an estimated
+          cost.
+        </p>
+      </section>
+      <section className="space-y-4">
+        <div className="flex justify-between">
+          <h2 className="font-medium">Recent requests</h2>
+          <Link href="/logs" className="text-sm underline underline-offset-4">
+            View usage logs
+          </Link>
+        </div>
+        <div className="bg-card rounded-2xl divide-y divide-border/40">
+          {logs?.map((log) => (
+            <div
+              key={log._id}
+              className="p-4 flex flex-wrap items-center justify-between gap-2 text-xs"
+            >
+              <span className="font-mono">{log.model}</span>
+              <span className="text-muted-foreground">
+                {log.totalTokens.toLocaleString()} tokens ·{" "}
+                {new Date(log.createdAt).toLocaleString()}
+              </span>
+              <Badge variant={log.status >= 400 ? "destructive" : "secondary"}>
+                {log.status}
+              </Badge>
+            </div>
+          ))}
+          {logs?.length === 0 && (
+            <p className="p-8 text-sm text-muted-foreground text-center">
+              Your requests will appear here.
+            </p>
+          )}
+        </div>
+      </section>
+      <div className="flex flex-wrap gap-3">
+        <Button asChild className="rounded-full">
+          <Link href="/generation">Open Playground</Link>
+        </Button>
+        <Button asChild variant="outline" className="rounded-full">
+          <Link href="/keys">Manage API keys</Link>
+        </Button>
+        <Button asChild variant="outline" className="rounded-full">
+          <Link href="/docs">Read documentation</Link>
+        </Button>
       </div>
     </div>
+  );
+}
+export default function DashboardPage() {
+  return (
+    <QueryBoundary name="Overview">
+      <Overview />
+    </QueryBoundary>
   );
 }

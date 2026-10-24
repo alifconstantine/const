@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Button, Input, Sheet, SheetContent, SheetClose, SheetTitle, ScrollArea, cn } from "@const/ui";
+import {
+  Button,
+  Input,
+  Sheet,
+  SheetContent,
+  SheetClose,
+  SheetTitle,
+  ScrollArea,
+  cn,
+} from "@const/ui";
 import { Search, Check, X, Layers } from "lucide-react";
 import { BUILTIN_MODELS, type ModelSpec } from "@/lib/model-specs";
 
@@ -25,7 +34,9 @@ export function ModelSelectorPanel({
   const [searchQuery, setSearchQuery] = useState("");
 
   const standardModels = useMemo(() => {
-    return [...BUILTIN_MODELS, ...customModels];
+    return [...BUILTIN_MODELS, ...customModels].filter(
+      (m) => m.category === "llm",
+    );
   }, [customModels]);
 
   const filteredCombos = useMemo(() => {
@@ -35,7 +46,7 @@ export function ModelSelectorPanel({
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.modelId.toLowerCase().includes(q) ||
-        (m.comboSlug && m.comboSlug.toLowerCase().includes(q))
+        (m.comboSlug && m.comboSlug.toLowerCase().includes(q)),
     );
   }, [comboModels, searchQuery]);
 
@@ -46,7 +57,7 @@ export function ModelSelectorPanel({
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.modelId.toLowerCase().includes(q) ||
-        (m.providerName && m.providerName.toLowerCase().includes(q))
+        (m.providerName && m.providerName.toLowerCase().includes(q)),
     );
   }, [standardModels, searchQuery]);
 
@@ -129,7 +140,7 @@ export function ModelSelectorPanel({
                           "group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors select-none",
                           isSelected
                             ? "bg-foreground text-background font-medium shadow-sm"
-                            : "hover:bg-secondary/70 text-foreground"
+                            : "hover:bg-secondary/70 text-foreground",
                         )}
                       >
                         <div className="flex flex-col min-w-0 pr-2">
@@ -143,17 +154,20 @@ export function ModelSelectorPanel({
                                   "text-[10px] px-1.5 py-0.5 rounded-md font-mono shrink-0",
                                   isSelected
                                     ? "bg-background/20 text-background"
-                                    : "bg-secondary text-muted-foreground"
+                                    : "bg-secondary text-muted-foreground",
                                 )}
                               >
-                                {m.modelsCount} {m.modelsCount === 1 ? "model" : "models"}
+                                {m.modelsCount}{" "}
+                                {m.modelsCount === 1 ? "model" : "models"}
                               </span>
                             )}
                           </div>
                           <span
                             className={cn(
                               "text-xs truncate font-mono mt-0.5",
-                              isSelected ? "text-background/80" : "text-muted-foreground"
+                              isSelected
+                                ? "text-background/80"
+                                : "text-muted-foreground",
                             )}
                           >
                             {m.modelId}
@@ -168,7 +182,7 @@ export function ModelSelectorPanel({
                 </div>
               )}
 
-              {/* Standard Models Section */}
+              {/* Free & paid models Section */}
               {filteredStandardModels.length > 0 && (
                 <div className="space-y-1">
                   <div className="px-3 py-1 text-xs font-semibold text-muted-foreground tracking-wider uppercase">
@@ -189,17 +203,19 @@ export function ModelSelectorPanel({
                           "group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors select-none",
                           isSelected
                             ? "bg-foreground text-background font-medium shadow-sm"
-                            : "hover:bg-secondary/70 text-foreground"
+                            : "hover:bg-secondary/70 text-foreground",
                         )}
                       >
                         <div className="flex flex-col min-w-0 pr-2">
                           <span className="truncate text-sm sm:text-base font-medium">
-                            {m.name}
+                            {m.name} {m.tier === "free" ? " · Free" : " · Paid"}
                           </span>
                           <span
                             className={cn(
                               "text-xs truncate font-mono mt-0.5",
-                              isSelected ? "text-background/80" : "text-muted-foreground"
+                              isSelected
+                                ? "text-background/80"
+                                : "text-muted-foreground",
                             )}
                           >
                             {m.providerName} • {m.modelId}
@@ -220,7 +236,8 @@ export function ModelSelectorPanel({
         {/* Footer */}
         <div className="p-3.5 px-5 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-sans text-xs text-muted-foreground">
-            {totalCount} options available ({filteredCombos.length} combos, {filteredStandardModels.length} models)
+            {totalCount} options available ({filteredCombos.length} combos,{" "}
+            {filteredStandardModels.length} models)
           </span>
           <Button
             size="sm"

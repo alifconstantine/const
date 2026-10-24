@@ -1,6 +1,7 @@
-import { query, mutation } from "../_generated/server";
+import { query, mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { keyUsageToday, dayStart } from "./access";
 
 // Cryptographic hash for secure API key verification
 async function hashKey(key: string): Promise<string> {
@@ -42,10 +43,10 @@ export const listKeys = query({
       _id: key._id,
       name: key.name,
       keyPrefix: key.keyPrefix,
-      rawKey: key.rawKey,
+      rawKey: undefined,
       status: key.status,
       dailyLimitTokens: key.dailyLimitTokens,
-      usedTodayTokens: key.usedTodayTokens,
+      usedTodayTokens: keyUsageToday(key),
       createdAt: key.createdAt,
       lastUsedAt: key.lastUsedAt,
     }));
@@ -70,7 +71,10 @@ export const createKey = mutation({
     }
 
     if (args.dailyLimitTokens !== undefined) {
-      if (!Number.isInteger(args.dailyLimitTokens) || args.dailyLimitTokens <= 0) {
+      if (
+        !Number.isInteger(args.dailyLimitTokens) ||
+        args.dailyLimitTokens <= 0
+      ) {
         throw new Error("Daily token limit must be a positive integer.");
       }
     }
@@ -81,7 +85,9 @@ export const createKey = mutation({
       .collect();
 
     if (existingKeys.length >= 25) {
-      throw new Error("Quota exceeded: You can only have up to 25 API keys. Please delete an unused key first.");
+      throw new Error(
+        "Quota exceeded: You can only have up to 25 API keys. Please delete an unused key first.",
+      );
     }
 
     const { rawKey, keyPrefix } = generateSecureKey();
@@ -93,7 +99,7 @@ export const createKey = mutation({
       name: trimmedName,
       keyPrefix,
       keyHash,
-      rawKey,
+      dailyPeriodStartAt: dayStart(),
       dailyLimitTokens: args.dailyLimitTokens,
       usedTodayTokens: 0,
       status: "active",
@@ -180,12 +186,15 @@ export const verifyApiKey = query({
       return { valid: false, reason: "Key revoked" as const };
     }
 
-    if (keyDoc.dailyLimitTokens && keyDoc.usedTodayTokens >= keyDoc.dailyLimitTokens) {
+    if (
+      keyDoc.dailyLimitTokens &&
+      keyUsageToday(keyDoc) >= keyDoc.dailyLimitTokens
+    ) {
       return {
         valid: false,
         reason: "Daily token limit exceeded" as const,
         dailyLimitTokens: keyDoc.dailyLimitTokens,
-        usedTodayTokens: keyDoc.usedTodayTokens,
+        usedTodayTokens: keyUsageToday(keyDoc),
       };
     }
 
@@ -196,25 +205,19 @@ export const verifyApiKey = query({
       name: keyDoc.name,
       keyPrefix: keyDoc.keyPrefix,
       dailyLimitTokens: keyDoc.dailyLimitTokens,
-      usedTodayTokens: keyDoc.usedTodayTokens,
+      usedTodayTokens: keyUsageToday(keyDoc),
     };
   },
 });
 
-// 6. Record usage after successful gateway request
-export const recordKeyUsage = mutation({
-  args: {
-    keyId: v.id("apiKeys"),
-    tokensConsumed: v.number(),
-  },
-  handler: async (ctx, args) => {
-    if (args.tokensConsumed <= 0) return;
-    const key = await ctx.db.get(args.keyId);
-    if (!key) return;
-
-    await ctx.db.patch(args.keyId, {
-      usedTodayTokens: key.usedTodayTokens + args.tokensConsumed,
-      lastUsedAt: Date.now(),
-    });
+export const removeStoredSecrets = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const page = await ctx.db
+      .query("apiKeys")
+      .filter((q) => q.neq(q.field("rawKey"), undefined))
+      .take(100);
+    for (const key of page) await ctx.db.patch(key._id, { rawKey: undefined });
+    return { updated: page.length };
   },
 });

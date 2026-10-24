@@ -4,9 +4,9 @@ const MASTER_SALT = "const-platform-provider-master-v1";
 
 async function getEncryptionKey(): Promise<CryptoKey> {
   const secretSource =
-    process.env.PROVIDER_KEY_ENCRYPTION_SECRET ||
-    process.env.JWT_PRIVATE_KEY ||
-    "const-platform-default-dev-secret-salt-32b";
+    process.env.PROVIDER_KEY_ENCRYPTION_SECRET || process.env.JWT_PRIVATE_KEY;
+  if (!secretSource)
+    throw new Error("Provider encryption secret is not configured");
 
   const encoder = new TextEncoder();
   const rawData = encoder.encode(`${secretSource}:${MASTER_SALT}`);
@@ -17,12 +17,13 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     keyDigest,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt", "decrypt"]
+    ["encrypt", "decrypt"],
   );
 }
 
 function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
-  const byteArray = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const byteArray =
+    buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   return Array.from(byteArray)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -41,7 +42,7 @@ function hexToBuffer(hex: string): Uint8Array {
  * Encrypts a sensitive API key using AES-256-GCM with a unique 12-byte IV.
  */
 export async function encryptApiKey(
-  plainKey: string
+  plainKey: string,
 ): Promise<{ cipher: string; iv: string }> {
   const key = await getEncryptionKey();
   const iv = new Uint8Array(12);
@@ -53,7 +54,7 @@ export async function encryptApiKey(
   const encryptedBuffer = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
-    data
+    data,
   );
 
   return {
@@ -67,7 +68,7 @@ export async function encryptApiKey(
  */
 export async function decryptApiKey(
   cipherHex: string,
-  ivHex: string
+  ivHex: string,
 ): Promise<string> {
   const key = await getEncryptionKey();
   const iv = hexToBuffer(ivHex);
@@ -76,7 +77,7 @@ export async function decryptApiKey(
   const decryptedBuffer = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: iv as unknown as BufferSource },
     key,
-    cipherBuffer as unknown as BufferSource
+    cipherBuffer as unknown as BufferSource,
   );
 
   const decoder = new TextDecoder();

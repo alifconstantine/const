@@ -8,7 +8,11 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import {
+  ConvexProviderWithAuth,
+  ConvexReactClient,
+  useConvexAuth,
+} from "convex/react";
 import {
   getAccountsUrl,
   getAppUrl,
@@ -17,7 +21,8 @@ import {
   deleteCookie,
 } from "@/lib/auth-constants";
 
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://placeholder.convex.cloud";
+const convexUrl =
+  process.env.NEXT_PUBLIC_CONVEX_URL || "https://placeholder.convex.cloud";
 export const convex = new ConvexReactClient(convexUrl);
 
 import { api } from "@const/backend/_generated/api";
@@ -28,7 +33,10 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isSigningOut: boolean;
-  signIn: (destinationPath?: string, options?: { switchAccount?: boolean }) => void;
+  signIn: (
+    destinationPath?: string,
+    options?: { switchAccount?: boolean },
+  ) => void;
   signOut: (destinationPath?: string) => void;
   refreshSession: () => Promise<boolean>;
 }
@@ -45,7 +53,13 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function useRouterAuth() {
-  return useContext(AuthContext);
+  const auth = useContext(AuthContext);
+  const verified = useConvexAuth();
+  return {
+    ...auth,
+    isLoading: auth.isLoading || verified.isLoading,
+    isAuthenticated: auth.isAuthenticated && verified.isAuthenticated,
+  };
 }
 
 function getStoredToken(): string | null {
@@ -54,7 +68,9 @@ function getStoredToken(): string | null {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("token");
     if (urlToken) return urlToken;
-    return localStorage.getItem("const_sso_token") || getCookie("const_sso_token");
+    return (
+      localStorage.getItem("const_sso_token") || getCookie("const_sso_token")
+    );
   } catch {
     return null;
   }
@@ -63,7 +79,9 @@ function getStoredToken(): string | null {
 function isValidConvexRefreshToken(token: unknown): token is string {
   if (typeof token !== "string" || !token.trim()) return false;
   const parts = token.split("|");
-  return parts.length === 2 && Boolean(parts[0]?.length) && Boolean(parts[1]?.length);
+  return (
+    parts.length === 2 && Boolean(parts[0]?.length) && Boolean(parts[1]?.length)
+  );
 }
 
 function getStoredRefreshToken(): string | null {
@@ -74,10 +92,12 @@ function getStoredRefreshToken(): string | null {
     if (urlRefresh && isValidConvexRefreshToken(urlRefresh)) return urlRefresh;
 
     const cookieRefresh = getCookie("const_sso_refresh_token");
-    if (cookieRefresh && isValidConvexRefreshToken(cookieRefresh)) return cookieRefresh;
+    if (cookieRefresh && isValidConvexRefreshToken(cookieRefresh))
+      return cookieRefresh;
 
     const localRefresh = localStorage.getItem("const_sso_refresh_token");
-    if (localRefresh && isValidConvexRefreshToken(localRefresh)) return localRefresh;
+    if (localRefresh && isValidConvexRefreshToken(localRefresh))
+      return localRefresh;
   } catch {
     return null;
   }
@@ -85,7 +105,8 @@ function getStoredRefreshToken(): string | null {
 }
 
 function useConvexAuthAdapter() {
-  const { token, refreshSession, isLoading, isAuthenticated } = useContext(AuthContext);
+  const { token, refreshSession, isLoading, isAuthenticated } =
+    useContext(AuthContext);
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken?: boolean } = {}) => {
       if (forceRefreshToken) {
@@ -96,7 +117,7 @@ function useConvexAuthAdapter() {
       }
       return token;
     },
-    [token, refreshSession]
+    [token, refreshSession],
   );
   return {
     isLoading,
@@ -111,37 +132,40 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
 
-  const updateTokens = useCallback((newToken: string | null, newRefreshToken?: string | null) => {
-    if (newToken) {
-      setCookie("const_sso_token", newToken);
-      try {
-        localStorage.setItem("const_sso_token", newToken);
-      } catch {}
-      setToken(newToken);
-    } else {
-      deleteCookie("const_sso_token");
-      try {
-        localStorage.removeItem("const_sso_token");
-      } catch {}
-      setToken(null);
-    }
-
-    if (newRefreshToken !== undefined) {
-      if (newRefreshToken && isValidConvexRefreshToken(newRefreshToken)) {
-        setCookie("const_sso_refresh_token", newRefreshToken);
+  const updateTokens = useCallback(
+    (newToken: string | null, newRefreshToken?: string | null) => {
+      if (newToken) {
+        setCookie("const_sso_token", newToken);
         try {
-          localStorage.setItem("const_sso_refresh_token", newRefreshToken);
+          localStorage.setItem("const_sso_token", newToken);
         } catch {}
-        setRefreshToken(newRefreshToken);
+        setToken(newToken);
       } else {
-        deleteCookie("const_sso_refresh_token");
+        deleteCookie("const_sso_token");
         try {
-          localStorage.removeItem("const_sso_refresh_token");
+          localStorage.removeItem("const_sso_token");
         } catch {}
-        setRefreshToken(null);
+        setToken(null);
       }
-    }
-  }, []);
+
+      if (newRefreshToken !== undefined) {
+        if (newRefreshToken && isValidConvexRefreshToken(newRefreshToken)) {
+          setCookie("const_sso_refresh_token", newRefreshToken);
+          try {
+            localStorage.setItem("const_sso_refresh_token", newRefreshToken);
+          } catch {}
+          setRefreshToken(newRefreshToken);
+        } else {
+          deleteCookie("const_sso_refresh_token");
+          try {
+            localStorage.removeItem("const_sso_refresh_token");
+          } catch {}
+          setRefreshToken(null);
+        }
+      }
+    },
+    [],
+  );
 
   const refreshSession = useCallback(async (): Promise<boolean> => {
     const currentRefresh = refreshToken || getStoredRefreshToken();
@@ -161,11 +185,17 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
       });
 
       if (result?.tokens?.token) {
-        updateTokens(result.tokens.token, result.tokens.refreshToken ?? currentRefresh);
+        updateTokens(
+          result.tokens.token,
+          result.tokens.refreshToken ?? currentRefresh,
+        );
         return true;
       }
     } catch (err) {
-      console.warn("Silent token refresh failed, purging invalid refresh token:", err);
+      console.warn(
+        "Silent token refresh failed, purging invalid refresh token:",
+        err,
+      );
       updateTokens(token, null);
     }
     return false;
@@ -202,7 +232,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
       window.history.replaceState(
         {},
         document.title,
-        `${window.location.pathname}${newQuery}`
+        `${window.location.pathname}${newQuery}`,
       );
 
       setIsLoading(false);
@@ -230,28 +260,41 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, [updateTokens]);
 
-  const signIn = useCallback((destinationPath?: string | unknown, options?: { switchAccount?: boolean }) => {
-    if (typeof window === "undefined") return;
-    const accountsUrl = getAccountsUrl();
-    const appUrl = getAppUrl();
-    const targetPath = typeof destinationPath === "string" ? destinationPath : "/dashboard";
-    const returnUrl = `${appUrl}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`;
-    const switchParam = options?.switchAccount ? "&prompt=select_account" : "";
-    window.location.href = `${accountsUrl}/?continue=${encodeURIComponent(returnUrl)}${switchParam}`;
-  }, []);
-
-  const signOut = useCallback((destinationPath?: string | unknown) => {
-    setIsSigningOut(true);
-    updateTokens(null, null);
-    if (typeof window !== "undefined") {
+  const signIn = useCallback(
+    (
+      destinationPath?: string | unknown,
+      options?: { switchAccount?: boolean },
+    ) => {
+      if (typeof window === "undefined") return;
       const accountsUrl = getAccountsUrl();
       const appUrl = getAppUrl();
-      const targetPath = typeof destinationPath === "string" ? destinationPath : "/";
-      const returnTarget = `${appUrl}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`;
-      // Perform federated SSO sign-out via Accounts Hub
-      window.location.href = `${accountsUrl}/signout?continue=${encodeURIComponent(returnTarget)}`;
-    }
-  }, [updateTokens]);
+      const targetPath =
+        typeof destinationPath === "string" ? destinationPath : "/dashboard";
+      const returnUrl = `${appUrl}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`;
+      const switchParam = options?.switchAccount
+        ? "&prompt=select_account"
+        : "";
+      window.location.href = `${accountsUrl}/?continue=${encodeURIComponent(returnUrl)}${switchParam}`;
+    },
+    [],
+  );
+
+  const signOut = useCallback(
+    (destinationPath?: string | unknown) => {
+      setIsSigningOut(true);
+      updateTokens(null, null);
+      if (typeof window !== "undefined") {
+        const accountsUrl = getAccountsUrl();
+        const appUrl = getAppUrl();
+        const targetPath =
+          typeof destinationPath === "string" ? destinationPath : "/";
+        const returnTarget = `${appUrl}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`;
+        // Perform federated SSO sign-out via Accounts Hub
+        window.location.href = `${accountsUrl}/signout?continue=${encodeURIComponent(returnTarget)}`;
+      }
+    },
+    [updateTokens],
+  );
 
   const authValue: AuthContextType = {
     token,

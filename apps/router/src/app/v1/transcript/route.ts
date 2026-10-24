@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authenticate, errorResponse } from "@/lib/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export async function OPTIONS() {
   });
 }
 
-function corsJson(data: any, init?: { status?: number; headers?: Record<string, string> }) {
+function corsJson(
+  data: any,
+  init?: { status?: number; headers?: Record<string, string> },
+) {
   return NextResponse.json(data, {
     status: init?.status ?? 200,
     headers: {
@@ -35,7 +39,9 @@ function extractYouTubeVideoId(urlOrId: string): string | null {
   }
 
   try {
-    const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    const parsed = new URL(
+      trimmed.startsWith("http") ? trimmed : `https://${trimmed}`,
+    );
     if (parsed.hostname.includes("youtube.com")) {
       if (parsed.pathname === "/watch") {
         return parsed.searchParams.get("v");
@@ -55,7 +61,9 @@ function extractYouTubeVideoId(urlOrId: string): string | null {
     }
   } catch {
     // Regex fallback
-    const match = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+    const match = trimmed.match(
+      /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
+    );
     if (match && match[1]) {
       return match[1];
     }
@@ -78,8 +86,12 @@ function decodeXmlEntities(text: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
-    .replace(/&#([0-9]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/&#([0-9]+);/g, (_, dec) =>
+      String.fromCharCode(parseInt(dec, 10)),
+    );
 }
 
 interface ClientProfile {
@@ -165,13 +177,14 @@ interface Json3Transcript {
 
 export async function POST(req: NextRequest) {
   try {
+    await authenticate(req);
     const body = await req.json().catch(() => ({}));
     const input = body?.url || body?.videoId || body?.id;
 
     if (!input || typeof input !== "string" || !input.trim()) {
       return corsJson(
         { error: { message: "The 'url' or 'videoId' field is required." } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -179,7 +192,7 @@ export async function POST(req: NextRequest) {
     if (!videoId) {
       return corsJson(
         { error: { message: "Invalid YouTube URL or Video ID provided." } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -236,7 +249,8 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        const tracks =
+          data.captions?.playerCaptionsTracklistRenderer?.captionTracks;
         if (tracks && Array.isArray(tracks) && tracks.length > 0) {
           selectedPlayerData = data;
           selectedClient = client;
@@ -250,14 +264,16 @@ export async function POST(req: NextRequest) {
           selectedClient = client;
         }
       } catch (err: any) {
-        clientErrors.push(`${client.name} error: ${err?.message || String(err)}`);
+        clientErrors.push(
+          `${client.name} error: ${err?.message || String(err)}`,
+        );
       }
     }
 
     const videoTitle =
-      selectedPlayerData?.videoDetails?.title?.trim() || `YouTube Video (${videoId})`;
-    const author =
-      selectedPlayerData?.videoDetails?.author?.trim() || "";
+      selectedPlayerData?.videoDetails?.title?.trim() ||
+      `YouTube Video (${videoId})`;
+    const author = selectedPlayerData?.videoDetails?.author?.trim() || "";
 
     if (availableTracks.length === 0) {
       return corsJson(
@@ -267,22 +283,30 @@ export async function POST(req: NextRequest) {
               "No captions or transcript track available for this YouTube video. Please choose a video with subtitles or closed captions enabled.",
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // Prioritize English or Indonesian, or fallback to the first track
     const selectedTrack =
-      availableTracks.find((t) => t.vssId === ".en" || t.languageCode === "en") ||
-      availableTracks.find((t) => t.vssId?.startsWith("a.en") || t.languageCode?.startsWith("en")) ||
-      availableTracks.find((t) => t.vssId === ".id" || t.languageCode === "id") ||
-      availableTracks.find((t) => t.vssId?.startsWith("a.id") || t.languageCode?.startsWith("id")) ||
+      availableTracks.find(
+        (t) => t.vssId === ".en" || t.languageCode === "en",
+      ) ||
+      availableTracks.find(
+        (t) => t.vssId?.startsWith("a.en") || t.languageCode?.startsWith("en"),
+      ) ||
+      availableTracks.find(
+        (t) => t.vssId === ".id" || t.languageCode === "id",
+      ) ||
+      availableTracks.find(
+        (t) => t.vssId?.startsWith("a.id") || t.languageCode?.startsWith("id"),
+      ) ||
       availableTracks[0];
 
     if (!selectedTrack?.baseUrl) {
       return corsJson(
         { error: { message: "Caption track URL is missing." } },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -303,8 +327,12 @@ export async function POST(req: NextRequest) {
 
     if (!trackRes.ok) {
       return corsJson(
-        { error: { message: `Failed to download caption track (HTTP ${trackRes.status}).` } },
-        { status: 502 }
+        {
+          error: {
+            message: `Failed to download caption track (HTTP ${trackRes.status}).`,
+          },
+        },
+        { status: 502 },
       );
     }
 
@@ -327,12 +355,15 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Fallback: parse as timedtext XML if not json3
-      const textRegex = /<text\s+start="([0-9.]+)"(?:\s+dur="([0-9.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
+      const textRegex =
+        /<text\s+start="([0-9.]+)"(?:\s+dur="([0-9.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
       let match: RegExpExecArray | null;
       while ((match = textRegex.exec(trackBody)) !== null) {
         if (!match[1] || !match[3]) continue;
         const startSec = parseFloat(match[1]);
-        const cleanContent = decodeXmlEntities(match[3].replace(/<[^>]*>/g, "")).trim();
+        const cleanContent = decodeXmlEntities(
+          match[3].replace(/<[^>]*>/g, ""),
+        ).trim();
         if (cleanContent) {
           lines.push(`${formatTime(startSec)} ${cleanContent}`);
         }
@@ -347,7 +378,7 @@ export async function POST(req: NextRequest) {
               "Transcript captions were empty or could not be parsed for this video.",
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -367,22 +398,22 @@ export async function POST(req: NextRequest) {
       transcript: fullTranscript,
       lineCount: lines.length,
     });
-  } catch (err: any) {
-    return corsJson(
-      { error: { message: err?.message || "Internal error fetching YouTube transcript." } },
-      { status: 500 }
-    );
+  } catch (err: unknown) {
+    return errorResponse(err);
   }
 }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url") || searchParams.get("v") || searchParams.get("videoId");
+  const url =
+    searchParams.get("url") ||
+    searchParams.get("v") ||
+    searchParams.get("videoId");
 
   if (!url) {
     return corsJson(
       { error: { message: "Query parameter 'url' or 'videoId' is required." } },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

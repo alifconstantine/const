@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { type Id } from "@const/backend/_generated/dataModel";
 import {
@@ -52,28 +59,44 @@ import {
   checkSupportsThinking,
 } from "@/lib/model-specs";
 import { ModelSelectorPanel } from "@/components/generation/model-selector-panel";
-import { HistoryPanel, type ChatSessionMeta } from "@/components/generation/history-panel";
+import {
+  HistoryPanel,
+  type ChatSessionMeta,
+} from "@/components/generation/history-panel";
 import { SystemInstructionPanel } from "@/components/generation/system-instruction-panel";
 import { ViewCodeDialog } from "@/components/generation/view-code-dialog";
-import { ChatMessageItem, type ChatMessage, type ChatAttachment, type SearchResultItem } from "@/components/generation/chat-message-item";
+import {
+  ChatMessageItem,
+  type ChatMessage,
+  type ChatAttachment,
+  type SearchResultItem,
+} from "@/components/generation/chat-message-item";
 
 export default function GenerationPage() {
   const { isAuthenticated, token } = useRouterAuth();
 
   // Convex Queries & Mutations
-  const userChats = useQuery(
+  const chatPages = usePaginatedQuery(
     api.router.chats.listChats,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
+    { initialNumItems: 30 },
   );
+  const userChats = chatPages.results;
   const userKeys = useQuery(
     api.router.keys.listKeys,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
-  const availableCombos = useQuery(
-    api.router.combos.listCombos,
-    {}
-  );
+  const availableCombos = useQuery(api.router.combos.listCombos, {});
 
+  const generateUploadUrl = useMutation(api.router.chats.generateUploadUrl);
+  const registerFile = useMutation(api.router.chats.registerFile);
+  const revisionRef = useRef(0);
+  const activeRun = useRef<symbol | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "failed">(
+    "saved",
+  );
+  const pendingSave = useRef<(() => Promise<void>) | null>(null);
   const createChatMutation = useMutation(api.router.chats.createChat);
   const updateChatMutation = useMutation(api.router.chats.updateChat);
   const deleteChatMutation = useMutation(api.router.chats.deleteChat);
@@ -82,12 +105,7 @@ export default function GenerationPage() {
   const comboModels = useMemo<ModelSpec[]>(() => {
     if (!availableCombos) return [];
     return availableCombos
-      .filter(
-        (c) =>
-          !c.isBuiltin &&
-          !String(c._id).startsWith("builtin_") &&
-          !["auto", "fast", "coding"].includes(c.slug)
-      )
+      .filter((c) => c.status === "active")
       .map((c) => ({
         id: `combo/${c.slug}`,
         name: c.name,
@@ -115,7 +133,9 @@ export default function GenerationPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputPrompt, setInputPrompt] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [stagedAttachments, setStagedAttachments] = useState<ChatAttachment[]>([]);
+  const [stagedAttachments, setStagedAttachments] = useState<ChatAttachment[]>(
+    [],
+  );
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMultiLine, setIsMultiLine] = useState(false);
@@ -150,7 +170,10 @@ export default function GenerationPage() {
       return;
     }
 
-    const nextHeight = Math.min(Math.max(scrollHeight, MIN_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
+    const nextHeight = Math.min(
+      Math.max(scrollHeight, MIN_TEXTAREA_HEIGHT),
+      MAX_TEXTAREA_HEIGHT,
+    );
     setScrollAreaHeight(nextHeight);
     textarea.style.height = `${scrollHeight}px`;
     setIsMultiLine(nextHeight > 38 || inputPrompt.includes("\n"));
@@ -171,41 +194,55 @@ export default function GenerationPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Convert File object to base64 Data URL
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // Process uploaded or pasted files
   const processUploadedFiles = async (files: FileList | File[]) => {
-    const newAttachments: ChatAttachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!file) continue;
-      // Max 25MB limit per file
-      if (file.size > 25 * 1024 * 1024) {
-        toast.error(`File "${file.name}" is too large (max 25MB).`);
-        continue;
-      }
-      try {
-        const dataUrl = await fileToBase64(file);
-        newAttachments.push({
-          name: file.name,
-          type: file.type || "application/octet-stream",
-          size: file.size,
-          dataUrl,
-        });
-      } catch {
-        toast.error(`Failed to read "${file.name}".`);
-      }
+    if (stagedAttachments.length + files.length > 8) {
+      toast.error("Attach up to 8 images per message.");
+      return;
     }
-    if (newAttachments.length > 0) {
-      setStagedAttachments((prev) => [...prev, ...newAttachments]);
+    setUploading(true);
+    try {
+      const attachments: ChatAttachment[] = [];
+      for (const file of Array.from(files)) {
+        const image = ["image/png", "image/jpeg", "image/webp"].includes(
+          file.type,
+        );
+        const text =
+          file.type.startsWith("text/") ||
+          file.type === "application/json" ||
+          /\.(txt|md|csv|json|js|jsx|ts|tsx|py|html|css)$/i.test(file.name);
+        if (
+          (!image && !text) ||
+          file.size > (image ? 5 * 1024 * 1024 : 512 * 1024)
+        )
+          throw new Error("Use images up to 5 MB or text files up to 512 KB.");
+        const contentType = image
+          ? file.type
+          : file.type === "application/json"
+            ? "application/json"
+            : "text/plain";
+        const uploadUrl = await generateUploadUrl();
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": contentType },
+          body: file,
+        });
+        if (!response.ok)
+          throw new Error("Image upload failed. Retry the upload.");
+        const { storageId } = await response.json();
+        const saved = await registerFile({ storageId, name: file.name });
+        attachments.push({
+          name: file.name,
+          type: saved.type,
+          size: saved.size,
+          url: saved.url ?? undefined,
+          fileId: saved.fileId,
+        });
+      }
+      setStagedAttachments((previous) => [...previous, ...attachments]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -230,11 +267,17 @@ export default function GenerationPage() {
   };
 
   // Parameters State
-  const [selectedModel, setSelectedModel] = useState<ModelSpec>(BUILTIN_MODELS[0]!);
+  const [selectedModel, setSelectedModel] = useState<ModelSpec>(
+    BUILTIN_MODELS[0]!,
+  );
   const [systemInstruction, setSystemInstruction] = useState("");
   const [temperature, setTemperature] = useState<number>(1.0);
-  const [thinkingLevel, setThinkingLevel] = useState<"low" | "medium" | "high">("medium");
-  const [webSearch, setWebSearch] = useState<"off" | "auto" | "research" | "deep-research">("off");
+  const [thinkingLevel, setThinkingLevel] = useState<"low" | "medium" | "high">(
+    "medium",
+  );
+  const [webSearch, setWebSearch] = useState<
+    "off" | "auto" | "research" | "deep-research"
+  >("off");
 
   // API Key Selection & Custom Paste (defaults to logged in session)
   const [selectedKeyId, setSelectedKeyId] = useState<string>("account-session");
@@ -249,24 +292,15 @@ export default function GenerationPage() {
   const [isSystemInstructionOpen, setIsSystemInstructionOpen] = useState(false);
   const [isViewCodeOpen, setIsViewCodeOpen] = useState(false);
 
-  // Load custom API key from localStorage on mount
-  useEffect(() => {
-    try {
-      const savedKey = localStorage.getItem("const_playground_custom_api_key");
-      if (savedKey) {
-        setCustomApiKey(savedKey);
-      }
-    } catch {}
-  }, []);
-
   // Sync active chat session from Convex when activeChatId changes
   const activeChatQuery = useQuery(
     api.router.chats.getChat,
-    activeChatId ? { chatId: activeChatId as Id<"routerChats"> } : "skip"
+    activeChatId ? { chatId: activeChatId as Id<"routerChats"> } : "skip",
   );
 
   useEffect(() => {
-    if (activeChatQuery) {
+    if (activeChatQuery && !isStreaming) {
+      revisionRef.current = activeChatQuery.revision;
       setChatTitle(activeChatQuery.title || "Untitled Chat");
       setTitleDraft(activeChatQuery.title || "Untitled Chat");
       setMessages(activeChatQuery.messages);
@@ -281,10 +315,16 @@ export default function GenerationPage() {
         }
       }
       if ((activeChatQuery as any).webSearch) {
-        setWebSearch((activeChatQuery as any).webSearch === "auto" ? "auto" : "off");
+        setWebSearch(
+          (activeChatQuery as any).webSearch === "auto" ? "auto" : "off",
+        );
       }
       const matched =
-        comboModels.find((m) => m.modelId === activeChatQuery.modelId || m.id === activeChatQuery.modelId) ||
+        comboModels.find(
+          (m) =>
+            m.modelId === activeChatQuery.modelId ||
+            m.id === activeChatQuery.modelId,
+        ) ||
         customModels.find((m) => m.modelId === activeChatQuery.modelId) ||
         BUILTIN_MODELS.find((m) => m.modelId === activeChatQuery.modelId);
       if (matched) {
@@ -295,24 +335,34 @@ export default function GenerationPage() {
 
   // Check if current model supports dynamic thinking UI
   const supportsThinking = useMemo(() => {
-    return checkSupportsThinking(selectedModel.modelId, customModels, selectedModel.name);
+    return checkSupportsThinking(
+      selectedModel.modelId,
+      customModels,
+      selectedModel.name,
+    );
   }, [selectedModel.modelId, selectedModel.name, customModels]);
+
+  useEffect(
+    () => () => {
+      abortControllerRef.current?.abort();
+    },
+    [],
+  );
 
   // Auto scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  // Save custom key change to local storage
   const handleCustomKeyChange = (val: string) => {
     setCustomApiKey(val);
-    try {
-      localStorage.setItem("const_playground_custom_api_key", val.trim());
-    } catch {}
+    setSelectedKeyId(val.trim() ? "custom" : "account-session");
   };
 
   // Start a fresh new chat session
   const handleNewChat = () => {
+    activeRun.current = null;
+    revisionRef.current = 0;
     if (isStreaming) {
       abortControllerRef.current?.abort();
       setIsStreaming(false);
@@ -359,17 +409,22 @@ export default function GenerationPage() {
 
   // Stop active streaming
   const handleStopStreaming = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
+    abortControllerRef.current?.abort();
   };
 
   // Send prompt and handle SSE stream
   const handleSendPrompt = async () => {
     const trimmedPrompt = inputPrompt.trim();
-    if ((!trimmedPrompt && stagedAttachments.length === 0) || isStreaming) return;
+    if (
+      (!trimmedPrompt && stagedAttachments.length === 0) ||
+      isStreaming ||
+      uploading
+    )
+      return;
+    const run = Symbol("generation");
+    activeRun.current = run;
+    let sessionId = activeChatId;
+    let revision = revisionRef.current;
 
     // Determine effective API key
     let effectiveKey = "";
@@ -386,7 +441,8 @@ export default function GenerationPage() {
       id: crypto.randomUUID(),
       role: "user",
       content: trimmedPrompt,
-      attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+      attachments:
+        currentAttachments.length > 0 ? currentAttachments : undefined,
       createdAt: Date.now(),
     };
 
@@ -419,8 +475,12 @@ export default function GenerationPage() {
     let effectiveTitle = chatTitle;
     if (chatTitle === "Untitled Chat" && messages.length === 0) {
       const autoTitle = trimmedPrompt
-        ? (trimmedPrompt.length > 36 ? `${trimmedPrompt.slice(0, 36).trim()}...` : trimmedPrompt)
-        : (currentAttachments[0]?.name ? `File: ${currentAttachments[0].name}` : "Untitled Chat");
+        ? trimmedPrompt.length > 36
+          ? `${trimmedPrompt.slice(0, 36).trim()}...`
+          : trimmedPrompt
+        : currentAttachments[0]?.name
+          ? `File: ${currentAttachments[0].name}`
+          : "Untitled Chat";
       setChatTitle(autoTitle);
       setTitleDraft(autoTitle);
       effectiveTitle = autoTitle;
@@ -431,10 +491,73 @@ export default function GenerationPage() {
 
     let accumulatedContent = "";
     let accumulatedThinking = "";
-    let activeSearchQuery: string | undefined = isSearchActive ? trimmedPrompt : undefined;
+    let failureMessage: string | undefined;
+    let activeSearchQuery: string | undefined = isSearchActive
+      ? trimmedPrompt
+      : undefined;
     let activeSearchResults: SearchResultItem[] | undefined = undefined;
 
+    const persistMessages = async (list: ChatMessage[]) => {
+      if (!isAuthenticated) return;
+      const clean = list.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+        ...(m.thinkingContent ? { thinkingContent: m.thinkingContent } : {}),
+        ...(m.searchQuery ? { searchQuery: m.searchQuery } : {}),
+        ...(m.searchResults?.length
+          ? {
+              searchResults: m.searchResults.map((r) => ({
+                title: r.title,
+                url: r.url,
+                ...(r.snippet ? { snippet: r.snippet } : {}),
+              })),
+            }
+          : {}),
+        ...(m.attachments?.length
+          ? {
+              attachments: m.attachments.map((a) => ({
+                name: a.name,
+                type: a.type,
+                size: a.size,
+                ...(a.fileId ? { fileId: a.fileId } : {}),
+                ...(a.dataUrl ? { dataUrl: a.dataUrl } : {}),
+              })),
+            }
+          : {}),
+      }));
+      setSaveStatus("saving");
+      const payload = {
+        title: effectiveTitle,
+        modelId: selectedModel.modelId,
+        providerId: selectedModel.provider,
+        systemInstruction,
+        temperature,
+        thinkingLevel: supportsThinking ? thinkingLevel : undefined,
+        messages: clean as any,
+      };
+      if (!sessionId) {
+        const saved = await createChatMutation(payload);
+        sessionId = saved.chatId;
+        revision = saved.revision;
+        if (activeRun.current === run) setActiveChatId(saved.chatId);
+      } else {
+        const saved = await updateChatMutation({
+          ...payload,
+          chatId: sessionId as Id<"routerChats">,
+          expectedRevision: revision,
+        });
+        revision = saved.revision;
+      }
+      if (activeRun.current === run) {
+        revisionRef.current = revision;
+        pendingSave.current = null;
+        setSaveStatus("saved");
+      }
+    };
     try {
+      await persistMessages([...messages, userMessage]);
       const response = await fetch("/api/generation/chat", {
         method: "POST",
         headers: {
@@ -450,7 +573,8 @@ export default function GenerationPage() {
           })),
           model: selectedModel.modelId,
           providerId: selectedModel.provider,
-          providerDocId: (selectedModel as { providerDocId?: string }).providerDocId,
+          providerDocId: (selectedModel as { providerDocId?: string })
+            .providerDocId,
           systemInstruction,
           temperature,
           thinkingLevel: supportsThinking ? thinkingLevel : "off",
@@ -519,8 +643,8 @@ export default function GenerationPage() {
                         searchQueries: activeSearchQueries,
                         searchMode: mode,
                       }
-                    : msg
-                )
+                    : msg,
+                ),
               );
               continue;
             }
@@ -547,8 +671,8 @@ export default function GenerationPage() {
                         searchResults: activeSearchResults,
                         searchMode: mode,
                       }
-                    : msg
-                )
+                    : msg,
+                ),
               );
               continue;
             }
@@ -582,11 +706,15 @@ export default function GenerationPage() {
                       content: accumulatedContent,
                       thinkingContent: accumulatedThinking,
                     }
-                  : msg
-              )
+                  : msg,
+              ),
             );
           } catch (pErr) {
-            if (pErr instanceof Error && pErr.message && !pErr.message.includes("JSON")) {
+            if (
+              pErr instanceof Error &&
+              pErr.message &&
+              !pErr.message.includes("JSON")
+            ) {
               throw pErr;
             }
           }
@@ -601,70 +729,26 @@ export default function GenerationPage() {
         thinkingContent: accumulatedThinking || undefined,
         isSearching: false,
         searchQuery: activeSearchQuery,
-        searchResults: activeSearchResults && activeSearchResults.length > 0 ? activeSearchResults : undefined,
+        searchResults:
+          activeSearchResults && activeSearchResults.length > 0
+            ? activeSearchResults
+            : undefined,
         createdAt: Date.now(),
       };
 
-      const finalMessagesList = [...messages, userMessage, finalAssistantMessage];
+      const finalMessagesList = [
+        ...messages,
+        userMessage,
+        finalAssistantMessage,
+      ];
       setMessages(finalMessagesList);
-
-      // Persist to Convex database
-      if (isAuthenticated) {
-        try {
-          const sanitizedMessages = finalMessagesList.map((m) => {
-            const clean: Record<string, unknown> = {
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.createdAt,
-            };
-            if (m.thinkingContent) clean.thinkingContent = m.thinkingContent;
-            if (m.searchQuery) clean.searchQuery = m.searchQuery;
-            if (m.searchResults && m.searchResults.length > 0) {
-              clean.searchResults = m.searchResults.map((s) => ({
-                title: s.title,
-                url: s.url,
-                snippet: s.snippet,
-              }));
-            }
-            if (m.attachments && m.attachments.length > 0) {
-              clean.attachments = m.attachments;
-            }
-            return clean;
-          });
-
-          if (!activeChatId) {
-            const res = await createChatMutation({
-              title: effectiveTitle,
-              modelId: selectedModel.modelId,
-              providerId: selectedModel.provider,
-              systemInstruction,
-              temperature,
-              thinkingLevel: supportsThinking ? thinkingLevel : undefined,
-              messages: sanitizedMessages as any,
-            });
-            setActiveChatId(res.chatId);
-          } else {
-            await updateChatMutation({
-              chatId: activeChatId as Id<"routerChats">,
-              title: effectiveTitle,
-              modelId: selectedModel.modelId,
-              providerId: selectedModel.provider,
-              systemInstruction,
-              temperature,
-              thinkingLevel: supportsThinking ? thinkingLevel : undefined,
-              messages: sanitizedMessages as any,
-            });
-          }
-        } catch (dbErr) {
-          console.warn("Could not sync chat to database:", dbErr);
-        }
-      }
     } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") {
         return;
       }
-      const errorMessage = err instanceof Error ? err.message : "Error generating response";
+      const errorMessage =
+        err instanceof Error ? err.message : "Error generating response";
+      failureMessage = errorMessage;
       toast.error("Generation Error", {
         description: errorMessage,
       });
@@ -676,12 +760,40 @@ export default function GenerationPage() {
                 ...msg,
                 content: `⚠️ Error: ${errorMessage}`,
               }
-            : msg
-        )
+            : msg,
+        ),
       );
     } finally {
-      setIsStreaming(false);
-      abortControllerRef.current = null;
+      controller.abort();
+      const partial: ChatMessage = {
+        id: assistantPlaceholderId,
+        role: "assistant",
+        content: accumulatedContent || failureMessage || "Generation stopped.",
+        thinkingContent: accumulatedThinking || undefined,
+        createdAt: Date.now(),
+        isSearching: false,
+        searchQuery: activeSearchQuery,
+        searchResults: activeSearchResults,
+      };
+      const finalList = [...messages, userMessage, partial];
+      const retry = () => persistMessages(finalList);
+      try {
+        await retry();
+      } catch (error) {
+        pendingSave.current = retry;
+        setSaveStatus("failed");
+        toast.error("Chat could not be saved", {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Retry saving before leaving the page.",
+        });
+      }
+      if (activeRun.current === run) {
+        setMessages(finalList);
+        setIsStreaming(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -710,7 +822,10 @@ export default function GenerationPage() {
     }
   };
 
-  const renderRunSettingsContent = (onClose: () => void, isMobileView: boolean = false) => (
+  const renderRunSettingsContent = (
+    onClose: () => void,
+    isMobileView: boolean = false,
+  ) => (
     <div className="flex flex-col h-full overflow-hidden bg-card/40">
       {/* Header Bar */}
       <div className="p-4 flex items-center justify-between shrink-0 border-b border-border/40">
@@ -794,11 +909,14 @@ export default function GenerationPage() {
             className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 transition-all cursor-pointer space-y-1.5 group"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">System instructions</span>
+              <span className="text-sm font-medium text-foreground">
+                System instructions
+              </span>
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
             <p className="text-xs text-muted-foreground font-normal line-clamp-2 leading-relaxed">
-              {systemInstruction.trim() || "Optional tone and style instructions for the model"}
+              {systemInstruction.trim() ||
+                "Optional tone and style instructions for the model"}
             </p>
           </div>
         </div>
@@ -815,63 +933,38 @@ export default function GenerationPage() {
                 onClick={() => setShowApiKey(!showApiKey)}
                 className="text-xs text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
               >
-                {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showApiKey ? (
+                  <EyeOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5" />
+                )}
                 <span>{showApiKey ? "Hide" : "Show"}</span>
               </button>
             )}
           </div>
 
-          {/* Selector or custom paste */}
-          {userKeys && userKeys.length > 0 ? (
-            <div className="space-y-2">
-              <Select value={selectedKeyId} onValueChange={setSelectedKeyId}>
-                <SelectTrigger className="h-9 rounded-full text-xs font-sans bg-secondary/50 border-border/70 text-foreground">
-                  <SelectValue placeholder="Choose Key" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border/70 text-xs font-sans">
-                  <SelectItem value="account-session" className="cursor-pointer font-sans text-foreground">
-                    Const Account Session (Default)
-                  </SelectItem>
-                  <SelectItem value="custom" className="cursor-pointer font-sans text-foreground">
-                    Use Custom Pasted Key
-                  </SelectItem>
-                  {userKeys.map((k) => (
-                    <SelectItem key={k._id} value={k._id} className="cursor-pointer text-foreground">
-                      {k.name} ({k.keyPrefix})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {selectedKeyId === "custom" && (
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  value={customApiKey}
-                  onChange={(e) => handleCustomKeyChange(e.target.value)}
-                  placeholder="Paste Gemini, OpenAI, or Const Key..."
-                  className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
-                />
-              )}
-            </div>
-          ) : (
-            <Input
-              type={showApiKey ? "text" : "password"}
-              value={customApiKey}
-              onChange={(e) => handleCustomKeyChange(e.target.value)}
-              placeholder="Paste Gemini, OpenAI, or Const Key..."
-              className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
-            />
-          )}
-          <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-            Key is used for direct streaming execution and saved in your local browser session.
+          <Input
+            type={showApiKey ? "text" : "password"}
+            value={customApiKey}
+            onChange={(e) => handleCustomKeyChange(e.target.value)}
+            placeholder="Optional Const API key"
+            className="h-9 rounded-full text-xs font-mono"
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave empty to use your account session. Pasted keys are held only
+            while this page is open.
           </p>
         </div>
 
         {/* 4. Temperature Slider */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-foreground">Temperature</span>
-            <span className="text-xs font-mono font-medium text-foreground">{temperature.toFixed(1)}</span>
+            <span className="text-xs font-medium text-foreground">
+              Temperature
+            </span>
+            <span className="text-xs font-mono font-medium text-foreground">
+              {temperature.toFixed(1)}
+            </span>
           </div>
           <Slider
             value={[temperature]}
@@ -891,33 +984,50 @@ export default function GenerationPage() {
         {supportsThinking && (
           <div className="space-y-2.5 pt-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground">Thinking level</span>
-              <Badge variant="secondary" className="text-xs px-2 py-0.5 font-sans text-foreground font-medium">
+              <span className="text-xs font-medium text-foreground">
+                Thinking level
+              </span>
+              <Badge
+                variant="secondary"
+                className="text-xs px-2 py-0.5 font-sans text-foreground font-medium"
+              >
                 Reasoning
               </Badge>
             </div>
 
             <Select
               value={thinkingLevel}
-              onValueChange={(val: "low" | "medium" | "high") => setThinkingLevel(val)}
+              onValueChange={(val: "low" | "medium" | "high") =>
+                setThinkingLevel(val)
+              }
             >
               <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
                 <SelectValue placeholder="Thinking Level" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border/70 text-xs font-sans">
-                <SelectItem value="low" className="cursor-pointer text-foreground">
+                <SelectItem
+                  value="low"
+                  className="cursor-pointer text-foreground"
+                >
                   Low (Fast Verification)
                 </SelectItem>
-                <SelectItem value="medium" className="cursor-pointer text-foreground">
+                <SelectItem
+                  value="medium"
+                  className="cursor-pointer text-foreground"
+                >
                   Medium (Balanced Reasoning)
                 </SelectItem>
-                <SelectItem value="high" className="cursor-pointer text-foreground">
+                <SelectItem
+                  value="high"
+                  className="cursor-pointer text-foreground"
+                >
                   High (Deep Step-by-Step Logic)
                 </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-              Configures reasoning effort and token allocation before producing output.
+              Configures reasoning effort and token allocation before producing
+              output.
             </p>
           </div>
         )}
@@ -927,7 +1037,9 @@ export default function GenerationPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">Web search</span>
+              <span className="text-xs font-medium text-foreground">
+                Web search
+              </span>
             </div>
             <Badge
               variant={webSearch !== "off" ? "default" : "secondary"}
@@ -935,7 +1047,7 @@ export default function GenerationPage() {
                 "text-xs px-2 py-0.5 font-sans font-medium",
                 webSearch !== "off"
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {webSearch === "deep-research"
@@ -948,25 +1060,37 @@ export default function GenerationPage() {
 
           <Select
             value={webSearch}
-            onValueChange={(val: "off" | "auto" | "research" | "deep-research") => setWebSearch(val)}
+            onValueChange={(
+              val: "off" | "auto" | "research" | "deep-research",
+            ) => setWebSearch(val)}
           >
             <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
               <SelectValue placeholder="Web Search" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border/70 text-xs font-sans">
-              <SelectItem value="off" className="cursor-pointer text-foreground">
+              <SelectItem
+                value="off"
+                className="cursor-pointer text-foreground"
+              >
                 Off (Standard inference)
               </SelectItem>
-              <SelectItem value="research" className="cursor-pointer text-foreground">
+              <SelectItem
+                value="research"
+                className="cursor-pointer text-foreground"
+              >
                 Research (Fast live search)
               </SelectItem>
-              <SelectItem value="deep-research" className="cursor-pointer text-foreground">
+              <SelectItem
+                value="deep-research"
+                className="cursor-pointer text-foreground"
+              >
                 DeepResearch (In-depth multi-source)
               </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-            Grounds answers with live web research or deep multi-source synthesis via Const Search.
+            Grounds answers with live web research or deep multi-source
+            synthesis via Const Search.
           </p>
         </div>
       </div>
@@ -977,6 +1101,28 @@ export default function GenerationPage() {
     <div className="flex-1 flex h-full w-full bg-background text-foreground overflow-hidden">
       {/* Main Center Canvas: Full Width */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
+        <div
+          role="status"
+          aria-live="polite"
+          className="px-4 py-1.5 text-xs text-muted-foreground bg-secondary/20"
+        >
+          {uploading ? (
+            "Uploading images…"
+          ) : saveStatus === "saving" ? (
+            "Saving chat…"
+          ) : saveStatus === "failed" ? (
+            <button
+              className="underline text-destructive"
+              onClick={() =>
+                pendingSave.current?.().catch(() => setSaveStatus("failed"))
+              }
+            >
+              Chat not saved. Retry saving
+            </button>
+          ) : (
+            "Chat history saved"
+          )}
+        </div>
         {/* Top Chat Title Bar (Editable, Default "Untitled Chat") */}
         <div className="h-14 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur border-b border-border/40">
           <div className="flex items-center gap-2 min-w-0 max-w-lg">
@@ -1066,7 +1212,7 @@ export default function GenerationPage() {
             }}
             className={cn(
               "max-w-3xl mx-auto relative rounded-3xl bg-secondary/40 backdrop-blur-md shadow-sm transition-all focus-within:shadow-md overflow-hidden",
-              isDraggingOver && "bg-secondary/60 ring-2 ring-foreground/20"
+              isDraggingOver && "bg-secondary/60 ring-2 ring-foreground/20",
             )}
           >
             {/* Hidden native file input */}
@@ -1075,7 +1221,7 @@ export default function GenerationPage() {
               ref={fileInputRef}
               onChange={handleFileSelect}
               multiple
-              accept="image/*,video/*,audio/*,application/pdf,text/*,.json,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css,.md"
+              accept="image/png,image/jpeg,image/webp,text/*,.json,.csv,.ts,.tsx,.js,.jsx,.py,.html,.css,.md"
               className="hidden"
             />
 
@@ -1087,10 +1233,11 @@ export default function GenerationPage() {
                     key={`${att.name}-${idx}`}
                     className="group relative flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-secondary text-xs font-sans animate-in fade-in zoom-in-95 duration-150"
                   >
-                    {att.type.startsWith("image/") && att.dataUrl ? (
+                    {att.type.startsWith("image/") &&
+                    (att.url || att.dataUrl) ? (
                       <div className="h-7 w-7 rounded-lg overflow-hidden shrink-0 bg-background/50">
                         <img
-                          src={att.dataUrl}
+                          src={att.url || att.dataUrl}
                           alt={att.name}
                           className="h-full w-full object-cover"
                         />
@@ -1129,15 +1276,12 @@ export default function GenerationPage() {
             <div
               className={cn(
                 "w-full flex flex-col p-3 sm:p-3.5",
-                isExpanded && "h-[72vh] min-h-[460px] max-h-[85vh]"
+                isExpanded && "h-[72vh] min-h-[460px] max-h-[85vh]",
               )}
             >
               {/* Scrollable Textarea Area using @const/ui ScrollArea */}
               <ScrollArea
-                className={cn(
-                  "w-full",
-                  isExpanded ? "flex-1 min-h-0" : ""
-                )}
+                className={cn("w-full", isExpanded ? "flex-1 min-h-0" : "")}
                 viewportClassName="pr-3"
                 style={{
                   height: isExpanded ? "100%" : `${scrollAreaHeight}px`,
@@ -1187,7 +1331,9 @@ export default function GenerationPage() {
                       setTimeout(() => textareaRef.current?.focus(), 50);
                     }}
                     className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                    title={isExpanded ? "Collapse prompt (Esc)" : "Expand prompt"}
+                    title={
+                      isExpanded ? "Collapse prompt (Esc)" : "Expand prompt"
+                    }
                   >
                     {isExpanded ? (
                       <Minimize2 className="h-4 w-4" />
@@ -1209,10 +1355,17 @@ export default function GenerationPage() {
                   ) : (
                     <Button
                       onClick={handleSendPrompt}
-                      disabled={!inputPrompt.trim() && stagedAttachments.length === 0}
+                      disabled={
+                        uploading ||
+                        (!inputPrompt.trim() && stagedAttachments.length === 0)
+                      }
                       size="icon"
                       className="rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-opacity"
-                      title={isExpanded ? "Send (Cmd+Enter / Ctrl+Enter)" : "Send (Enter)"}
+                      title={
+                        isExpanded
+                          ? "Send (Cmd+Enter / Ctrl+Enter)"
+                          : "Send (Enter)"
+                      }
                     >
                       <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.25]" />
                     </Button>
@@ -1240,7 +1393,10 @@ export default function GenerationPage() {
           </div>
         ) : (
           <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-hidden transition-all">
-            {renderRunSettingsContent(() => setIsRunSettingsCollapsed(true), false)}
+            {renderRunSettingsContent(
+              () => setIsRunSettingsCollapsed(true),
+              false,
+            )}
           </div>
         )}
       </div>
@@ -1280,8 +1436,18 @@ export default function GenerationPage() {
         onClose={() => setIsHistoryOpen(false)}
         sessions={(userChats as unknown as ChatSessionMeta[]) || []}
         activeChatId={activeChatId}
-        onSelectChat={(id) => setActiveChatId(id)}
+        onSelectChat={(id) => {
+          activeRun.current = null;
+          abortControllerRef.current?.abort();
+          setIsStreaming(false);
+          setActiveChatId(id);
+        }}
         onDeleteChat={handleDeleteChat}
+        onLoadMore={
+          chatPages.status === "CanLoadMore"
+            ? () => chatPages.loadMore(30)
+            : undefined
+        }
       />
 
       {/* System Instruction Slide-Over Panel */}

@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import { Button, cn, toast } from "@const/ui";
-import { Copy, Check, ChevronDown, ChevronRight, Pencil, FileText, Film, Music, File, Globe, ExternalLink } from "lucide-react";
+import {
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  FileText,
+  Film,
+  Music,
+  File,
+  Globe,
+  ExternalLink,
+} from "lucide-react";
 import { MarkdownContent } from "./markdown-content";
 
 export interface ChatAttachment {
@@ -11,6 +23,7 @@ export interface ChatAttachment {
   size: number;
   url?: string;
   dataUrl?: string;
+  fileId?: string;
 }
 
 export interface SearchResultItem {
@@ -57,9 +70,15 @@ export function ChatMessageItem({
   const [isSourcesOpen, setIsSourcesOpen] = useState(false);
 
   const isUser = message.role === "user";
-  const hasThinking = Boolean(message.thinkingContent && message.thinkingContent.trim().length > 0);
-  const hasAttachments = Boolean(message.attachments && message.attachments.length > 0);
-  const hasSources = Boolean(message.searchResults && message.searchResults.length > 0);
+  const hasThinking = Boolean(
+    message.thinkingContent && message.thinkingContent.trim().length > 0,
+  );
+  const hasAttachments = Boolean(
+    message.attachments && message.attachments.length > 0,
+  );
+  const hasSources = Boolean(
+    message.searchResults && message.searchResults.length > 0,
+  );
   const isSearching = Boolean(message.isSearching);
 
   const handleCopy = () => {
@@ -92,7 +111,10 @@ export function ChatMessageItem({
 
                 if (isImg && att.dataUrl) {
                   return (
-                    <div key={idx} className="overflow-hidden rounded-2xl border border-border/60 shadow-sm max-w-xs">
+                    <div
+                      key={idx}
+                      className="overflow-hidden rounded-2xl border border-border/60 shadow-sm max-w-xs"
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={att.dataUrl}
@@ -141,7 +163,11 @@ export function ChatMessageItem({
             className="h-7 w-7 rounded-full hover:text-foreground hover:bg-secondary cursor-pointer"
             title="Copy prompt"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
           </Button>
 
           {onEditPrompt && (
@@ -168,14 +194,17 @@ export function ChatMessageItem({
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-blue-500/30 text-xs font-sans text-muted-foreground animate-pulse select-none my-1">
           <Globe className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
           <span>
-            {message.searchMode === "deep-research" ? "DeepResearch in progress" : "Searching the web"}{" "}
+            {message.searchMode === "deep-research"
+              ? "DeepResearch in progress"
+              : "Searching the web"}{" "}
             {message.searchQueries && message.searchQueries.length > 1 ? (
-              <>
-                ({message.searchQueries.length} parallel queries)
-              </>
+              <>({message.searchQueries.length} parallel queries)</>
             ) : message.searchQuery ? (
               <>
-                for <strong className="text-foreground font-medium">&quot;{message.searchQuery}&quot;</strong>
+                for{" "}
+                <strong className="text-foreground font-medium">
+                  &quot;{message.searchQuery}&quot;
+                </strong>
               </>
             ) : (
               "..."
@@ -194,7 +223,9 @@ export function ChatMessageItem({
           >
             <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
             <span className="font-medium text-foreground/90">
-              {message.searchMode === "deep-research" ? "DeepResearch" : "Searched"}{" "}
+              {message.searchMode === "deep-research"
+                ? "DeepResearch"
+                : "Searched"}{" "}
               {message.searchResults.length}{" "}
               {message.searchResults.length === 1 ? "source" : "sources"}
             </span>
@@ -219,7 +250,9 @@ export function ChatMessageItem({
               {/* Multi-Tool Call Sub-Queries Chips */}
               {message.searchQueries && message.searchQueries.length > 1 && (
                 <div className="flex flex-wrap items-center gap-1.5 pb-1">
-                  <span className="text-[11px] text-muted-foreground mr-1">Parallel queries:</span>
+                  <span className="text-[11px] text-muted-foreground mr-1">
+                    Parallel queries:
+                  </span>
                   {message.searchQueries.map((q, qIdx) => (
                     <span
                       key={qIdx}
@@ -233,45 +266,50 @@ export function ChatMessageItem({
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {message.searchResults.map((source, sIdx) => {
-                let hostname = "";
-                try {
-                  hostname = new URL(source.url).hostname.replace(/^www\./, "");
-                } catch {
-                  hostname = source.url;
-                }
-                return (
-                  <a
-                    key={sIdx}
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col p-2.5 rounded-xl bg-secondary/40 hover:bg-secondary/80 border border-border/60 hover:border-blue-500/40 transition-all text-xs group"
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
-                        alt=""
-                        className="h-3.5 w-3.5 rounded shrink-0"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = "none";
-                        }}
-                      />
-                      <span className="truncate max-w-[150px]">{hostname}</span>
-                      <ExternalLink className="h-2.5 w-2.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
-                    </div>
-                    <span className="font-medium text-foreground group-hover:text-primary line-clamp-2 leading-snug">
-                      {source.title || source.url}
-                    </span>
-                    {source.snippet && (
-                      <span className="text-[11px] text-muted-foreground/80 line-clamp-2 mt-1 leading-normal">
-                        {source.snippet}
+                {message.searchResults.map((source, sIdx) => {
+                  let hostname = "";
+                  try {
+                    hostname = new URL(source.url).hostname.replace(
+                      /^www\./,
+                      "",
+                    );
+                  } catch {
+                    hostname = source.url;
+                  }
+                  return (
+                    <a
+                      key={sIdx}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col p-2.5 rounded-xl bg-secondary/40 hover:bg-secondary/80 border border-border/60 hover:border-blue-500/40 transition-all text-xs group"
+                    >
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+                          alt=""
+                          className="h-3.5 w-3.5 rounded shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                        <span className="truncate max-w-[150px]">
+                          {hostname}
+                        </span>
+                        <ExternalLink className="h-2.5 w-2.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                      </div>
+                      <span className="font-medium text-foreground group-hover:text-primary line-clamp-2 leading-snug">
+                        {source.title || source.url}
                       </span>
-                    )}
-                  </a>
-                );
-              })}
+                      {source.snippet && (
+                        <span className="text-[11px] text-muted-foreground/80 line-clamp-2 mt-1 leading-normal">
+                          {source.snippet}
+                        </span>
+                      )}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -297,9 +335,13 @@ export function ChatMessageItem({
             ) : (
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
             )}
-            <span className="font-medium text-foreground/80 group-hover:text-foreground">Thought Process</span>
+            <span className="font-medium text-foreground/80 group-hover:text-foreground">
+              Thought Process
+            </span>
             {isStreaming && isLast && !message.content && (
-              <span className="text-xs text-foreground animate-pulse font-mono">(active)</span>
+              <span className="text-xs text-foreground animate-pulse font-mono">
+                (active)
+              </span>
             )}
           </button>
 
@@ -347,7 +389,11 @@ export function ChatMessageItem({
             className="h-7 w-7 rounded-full hover:text-foreground hover:bg-secondary cursor-pointer"
             title="Copy response"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
       )}

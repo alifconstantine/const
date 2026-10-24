@@ -23,12 +23,7 @@ import {
   cn,
   toast,
 } from "@const/ui";
-import {
-  Loader2,
-  Menu,
-  Bell,
-  CreditCard,
-} from "lucide-react";
+import { Loader2, Menu, Bell, CreditCard } from "lucide-react";
 
 // Safe Error Boundary to prevent any credit query failure from crashing the dashboard
 class SafeCreditBoundary extends React.Component<
@@ -55,7 +50,7 @@ class SafeCreditBoundary extends React.Component<
             className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
           >
             <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>$0.0000</span>
+            <span>Balance unavailable</span>
           </Button>
         </Link>
       );
@@ -68,9 +63,10 @@ function HeaderCreditBalance() {
   const { isAuthenticated } = useRouterAuth();
   const credits = useQuery(
     api.router.credits.getUserCredits,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
-  const balance = typeof credits?.balanceUsd === "number" ? credits.balanceUsd : 0;
+  const balance =
+    typeof credits?.balanceUsd === "number" ? credits.balanceUsd : 0;
 
   return (
     <Link href="/credits">
@@ -80,7 +76,7 @@ function HeaderCreditBalance() {
         className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
       >
         <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>${balance.toFixed(4)}</span>
+        <span>{credits ? `${balance.toFixed(4)}` : "Loading balance…"}</span>
       </Button>
     </Link>
   );
@@ -95,8 +91,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/models": "Models & Pricing",
   "/generation": "Playground",
   "/integrations": "Integrations",
-  "/credits": "Deposit",
-  "/deposit": "Deposit",
+  "/credits": "Credits & balance",
+  "/deposit": "Credits & balance",
   "/settings": "Settings & data",
   "/docs": "Documentation",
 };
@@ -107,17 +103,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading, isSigningOut, signIn, refreshSession } = useRouterAuth();
+  const { isAuthenticated, isLoading, isSigningOut, signIn, refreshSession } =
+    useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasAttemptedRefresh, setHasAttemptedRefresh] = useState(false);
 
   const currentTitle = useMemo(() => {
-    if (!pathname || pathname === "/" || pathname === "/dashboard") return "Overview";
+    if (!pathname || pathname === "/" || pathname === "/dashboard")
+      return "Overview";
     if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
     for (const [route, title] of Object.entries(ROUTE_TITLES)) {
       if (pathname.startsWith(`${route}/`)) return title;
@@ -126,7 +124,10 @@ export default function DashboardLayout({
   }, [pathname]);
 
   const isGeneration = useMemo(() => {
-    return pathname === "/generation" || Boolean(pathname?.startsWith("/generation/"));
+    return (
+      pathname === "/generation" ||
+      Boolean(pathname?.startsWith("/generation/"))
+    );
   }, [pathname]);
 
   useEffect(() => {
@@ -164,16 +165,39 @@ export default function DashboardLayout({
         });
       }
     }
-  }, [isAuthenticated, user, isSigningOut, hasAttemptedRefresh, refreshSession, signIn, pathname]);
+  }, [
+    isAuthenticated,
+    user,
+    isSigningOut,
+    hasAttemptedRefresh,
+    refreshSession,
+    signIn,
+    pathname,
+  ]);
+
+  if (isLoading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2
+          className="h-5 w-5 animate-spin"
+          aria-label="Verifying session"
+        />
+      </div>
+    );
 
   // Unauthenticated / Signing Out Fallback
   if (!isLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
         <div className="flex flex-col items-center gap-3 text-center">
-          <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
+          <ConstLogoIcon
+            size="md"
+            className="w-8 h-8 text-foreground animate-pulse"
+          />
           <p className="text-xs font-mono text-muted-foreground">
-            {isSigningOut ? "Signing out of Const Platform..." : "Connecting to Const Accounts..."}
+            {isSigningOut
+              ? "Signing out of Const Platform..."
+              : "Connecting to Const Accounts..."}
           </p>
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
         </div>
@@ -186,14 +210,14 @@ export default function DashboardLayout({
       <title>{`${currentTitle} - Const Router`}</title>
       <div
         className={cn(
-          "flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground"
+          "flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground",
         )}
       >
         {/* Full-height Desktop Left Sidebar */}
         <div
           className={cn(
             "hidden md:block shrink-0 transition-all duration-300 bg-sidebar border-r border-border/70 h-full",
-            isCollapsed ? "w-16" : "w-64"
+            isCollapsed ? "w-16" : "w-64",
           )}
         >
           <Sidebar
@@ -205,7 +229,11 @@ export default function DashboardLayout({
         {/* Mobile Slide-out Drawer */}
         <div className="md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetContent side="left" className="p-0 w-64 border-none bg-sidebar" showCloseButton={false}>
+            <SheetContent
+              side="left"
+              className="p-0 w-64 border-none bg-sidebar"
+              showCloseButton={false}
+            >
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <Sidebar
                 onNavigate={() => setMobileOpen(false)}
@@ -259,7 +287,10 @@ export default function DashboardLayout({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-                aria-label="Notifications"
+                aria-label="View quota and notification settings"
+                onClick={() => {
+                  window.location.href = "/settings";
+                }}
               >
                 <Bell className="h-4 w-4 stroke-[1.75]" />
               </Button>
@@ -286,7 +317,7 @@ export default function DashboardLayout({
               "flex-1 min-w-0 w-full overflow-y-auto",
               isGeneration
                 ? "p-0 overflow-hidden flex flex-col h-full"
-                : "p-6 md:p-8"
+                : "p-6 md:p-8",
             )}
           >
             {children}

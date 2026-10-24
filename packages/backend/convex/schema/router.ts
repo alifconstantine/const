@@ -1,5 +1,6 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
+import { chatMessageValidator } from "../router/validators";
 
 export const routerTables = {
   // 1. User API Keys to access Const Router AI Gateway (sk-const-live-xxxx)
@@ -7,13 +8,15 @@ export const routerTables = {
     userId: v.id("users"),
     name: v.string(),
     keyPrefix: v.string(), // e.g. "sk-const-live-...d2e4"
-    keyHash: v.string(),   // SHA-256 hash for safe, high-speed lookup
+    keyHash: v.string(), // SHA-256 hash for safe, high-speed lookup
     rawKey: v.optional(v.string()), // Full secret key for user copying and viewing
     dailyLimitTokens: v.optional(v.number()),
     usedTodayTokens: v.number(),
     status: v.union(v.literal("active"), v.literal("revoked")),
     createdAt: v.number(),
     lastUsedAt: v.optional(v.number()),
+    dailyPeriodStartAt: v.optional(v.number()),
+    reservedTokens: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_key_hash", ["keyHash"]),
@@ -27,13 +30,17 @@ export const routerTables = {
       v.literal("openai-compatible"),
       v.literal("anthropic"),
       v.literal("google-ai"),
-      v.literal("custom")
+      v.literal("custom"),
     ),
     baseUrl: v.optional(v.string()),
     keyCipher: v.string(), // AES-256-GCM ciphertext in hex
-    keyIv: v.string(),     // 12-byte IV in hex
+    keyIv: v.string(), // 12-byte IV in hex
     keyPrefix: v.string(), // Masked key for display e.g. "sk-proj-...8a1f"
-    status: v.union(v.literal("active"), v.literal("disabled"), v.literal("error")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("disabled"),
+      v.literal("error"),
+    ),
     importedModels: v.array(
       v.object({
         modelId: v.string(),
@@ -44,7 +51,7 @@ export const routerTables = {
         outputTypes: v.optional(v.array(v.string())),
         capabilities: v.optional(v.array(v.string())),
         enabled: v.boolean(),
-      })
+      }),
     ),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -56,41 +63,15 @@ export const routerTables = {
   routerChats: defineTable({
     userId: v.id("users"),
     title: v.string(),
+    messageCount: v.optional(v.number()),
+    lastMessageSnippet: v.optional(v.string()),
+    revision: v.optional(v.number()),
     modelId: v.string(),
     providerId: v.string(),
     systemInstruction: v.optional(v.string()),
     temperature: v.number(),
     thinkingLevel: v.optional(v.string()),
-    messages: v.array(
-      v.object({
-        id: v.string(),
-        role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
-        content: v.string(),
-        thinkingContent: v.optional(v.string()),
-        attachments: v.optional(
-          v.array(
-            v.object({
-              name: v.string(),
-              type: v.string(),
-              size: v.number(),
-              url: v.optional(v.string()),
-              dataUrl: v.optional(v.string()),
-            })
-          )
-        ),
-        searchQuery: v.optional(v.string()),
-        searchResults: v.optional(
-          v.array(
-            v.object({
-              title: v.string(),
-              url: v.string(),
-              snippet: v.optional(v.string()),
-            })
-          )
-        ),
-        createdAt: v.number(),
-      })
-    ),
+    messages: v.array(chatMessageValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -115,7 +96,7 @@ export const routerTables = {
     completionTokens: v.number(),
     totalTokens: v.number(),
     ttftMs: v.optional(v.number()), // Time to first token in ms
-    durationMs: v.number(),          // Total execution duration in ms
+    durationMs: v.number(), // Total execution duration in ms
     tokensPerSecond: v.optional(v.number()), // Speed in tok/s
     ip: v.optional(v.string()),
     userAgent: v.optional(v.string()),
@@ -123,18 +104,28 @@ export const routerTables = {
       v.union(
         v.literal("chat"),
         v.literal("image_generation"),
-        v.literal("image_edit")
-      )
+        v.literal("image_edit"),
+      ),
     ),
     imageCount: v.optional(v.number()),
     imageUrls: v.optional(v.array(v.string())),
     prompt: v.optional(v.string()),
+    billingTier: v.optional(v.union(v.literal("free"), v.literal("paid"))),
+    costNanoUsd: v.optional(v.number()),
+    resolvedModel: v.optional(v.string()),
+    usageEstimated: v.optional(v.boolean()),
+    searchText: v.optional(v.string()),
+    rollupVersion: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_user_created", ["userId", "createdAt"])
     .index("by_user_model", ["userId", "model"])
-    .index("by_request_id", ["requestId"]),
+    .index("by_request_id", ["requestId"])
+    .searchIndex("search_logs", {
+      searchField: "searchText",
+      filterFields: ["userId"],
+    }),
 
   // 5. Virtual Combos (Model Chains, Dynamic Fallbacks & Load Balancing)
   routerCombos: defineTable({
@@ -147,7 +138,7 @@ export const routerTables = {
     strategy: v.union(
       v.literal("priority"),
       v.literal("round-robin"),
-      v.literal("random")
+      v.literal("random"),
     ),
     models: v.array(
       v.object({
@@ -156,9 +147,10 @@ export const routerTables = {
         providerName: v.string(),
         priority: v.number(), // 1 for primary, 2 for fallback, etc.
         weight: v.optional(v.number()),
-      })
+      }),
     ),
     status: v.union(v.literal("active"), v.literal("disabled")),
+    executionCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -168,28 +160,30 @@ export const routerTables = {
   // 6. User Weekly Free Token Quotas (7M tokens/week for Const-managed models)
   userQuotas: defineTable({
     userId: v.id("users"),
-    weeklyLimitTokens: v.number(),  // Default 7_000_000 (7M)
-    usedTokens: v.number(),         // Accumulated input + output tokens this cycle
-    periodStartAt: v.number(),      // Cycle start timestamp (ms)
-    periodEndAt: v.number(),        // Cycle reset timestamp (ms) (periodStartAt + 7 * 24 * 60 * 60 * 1000)
+    weeklyLimitTokens: v.number(), // Default 7_000_000 (7M)
+    usedTokens: v.number(), // Accumulated input + output tokens this cycle
+    periodStartAt: v.number(), // Cycle start timestamp (ms)
+    periodEndAt: v.number(), // Cycle reset timestamp (ms) (periodStartAt + 7 * 24 * 60 * 60 * 1000)
     lastDeductedAt: v.optional(v.number()),
+    reservedTokens: v.optional(v.number()),
     weeklyLimitImages: v.optional(v.number()), // Default 20 generations/edits per week
-    usedImages: v.optional(v.number()),        // Count of images generated/edited this cycle
+    usedImages: v.optional(v.number()), // Count of images generated/edited this cycle
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // 7. User Account Balance & API Credits (Pay-As-You-Go / Paid Plan)
   userCredits: defineTable({
     userId: v.id("users"),
-    balanceUsd: v.number(),        // Current wallet balance in USD
+    balanceUsd: v.number(), // Current wallet balance in USD
     totalDepositedUsd: v.number(), // Lifetime total deposited in USD
-    totalSpentUsd: v.number(),     // Lifetime total spent on API calls in USD
+    totalSpentUsd: v.number(), // Lifetime total spent on API calls in USD
+    balanceNanoUsd: v.optional(v.number()),
+    totalSpentNanoUsd: v.optional(v.number()),
+    reservedNanoUsd: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   // 8. Deposit & Credit Transaction History
   creditTransactions: defineTable({
@@ -198,24 +192,105 @@ export const routerTables = {
       v.literal("deposit"),
       v.literal("deduction"),
       v.literal("bonus"),
-      v.literal("refund")
+      v.literal("refund"),
     ),
-    amountUsd: v.number(),          // Transaction amount in USD
-    balanceAfterUsd: v.number(),    // Resulting balance in USD
-    paymentMethod: v.string(),      // e.g. "USDT (Solana)", "USDC (Polygon)", "QRIS (IDR)", "System Bonus"
-    token: v.optional(v.string()),  // e.g. "USDT", "USDC", "IDR"
-    network: v.optional(v.string()),// e.g. "Solana", "BNB Chain", "Polygon", "QRIS"
+    amountUsd: v.number(), // Transaction amount in USD
+    balanceAfterUsd: v.number(), // Resulting balance in USD
+    paymentMethod: v.string(), // e.g. "USDT (Solana)", "USDC (Polygon)", "QRIS (IDR)", "System Bonus"
+    token: v.optional(v.string()), // e.g. "USDT", "USDC", "IDR"
+    network: v.optional(v.string()), // e.g. "Solana", "BNB Chain", "Polygon", "QRIS"
     status: v.union(
       v.literal("completed"),
       v.literal("pending"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     txHash: v.optional(v.string()),
     description: v.string(),
+    requestId: v.optional(v.string()),
+    amountNanoUsd: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_created", ["userId", "createdAt"]),
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_request", ["requestId"]),
+
+  routerSettings: defineTable({
+    userId: v.id("users"),
+    defaultModel: v.string(),
+    defaultTemperature: v.number(),
+    enableStreaming: v.boolean(),
+    logPayloads: v.boolean(),
+    anonymizeTelemetry: v.boolean(),
+    notifyLowQuota: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  routerRequests: defineTable({
+    requestId: v.string(),
+    userId: v.id("users"),
+    apiKeyId: v.optional(v.id("apiKeys")),
+    model: v.string(),
+    requestedModel: v.string(),
+    comboName: v.optional(v.string()),
+    tier: v.union(v.literal("free"), v.literal("paid")),
+    state: v.union(v.literal("pending"), v.literal("settled")),
+    reservedTokens: v.number(),
+    reservedNanoUsd: v.number(),
+    periodStartAt: v.optional(v.number()),
+    keyPeriodStartAt: v.number(),
+    pricing: v.object({
+      input: v.number(),
+      output: v.number(),
+      cache: v.number(),
+      unit: v.number(),
+    }),
+    costNanoUsd: v.optional(v.number()),
+    createdAt: v.number(),
+    settledAt: v.optional(v.number()),
+    settings: v.object({
+      logPayloads: v.boolean(),
+      anonymizeTelemetry: v.boolean(),
+    }),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_user_state", ["userId", "state"]),
+
+  routerUsageBuckets: defineTable({
+    userId: v.id("users"),
+    bucketAt: v.number(),
+    model: v.string(),
+    provider: v.string(),
+    keyName: v.string(),
+    tier: v.string(),
+    requests: v.number(),
+    successes: v.number(),
+    promptTokens: v.number(),
+    completionTokens: v.number(),
+    cachedTokens: v.number(),
+    totalTokens: v.number(),
+    costNanoUsd: v.number(),
+    durationMs: v.number(),
+    ttftSum: v.number(),
+    ttftCount: v.number(),
+  })
+    .index("by_user_bucket", ["userId", "bucketAt"])
+    .index("by_identity", ["userId", "bucketAt", "model", "keyName", "tier"]),
+
+  routerMessages: defineTable({
+    chatId: v.id("routerChats"),
+    userId: v.id("users"),
+    position: v.number(),
+    message: chatMessageValidator,
+  }).index("by_chat", ["chatId", "position"]),
+
+  routerFiles: defineTable({
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+    name: v.string(),
+    type: v.string(),
+    size: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_storage", ["storageId"]),
 };
-
-
