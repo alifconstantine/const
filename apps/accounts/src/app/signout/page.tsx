@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { ConstLogoIcon } from "@const/ui";
 import { getSafeRedirectUrl, getDefaultRedirectUrl, isNativeRedirectUrl } from "@/lib/safe-redirect";
+import { AuthBackground } from "@/components/auth/auth-background";
 import { Loader2 } from "lucide-react";
 
 export default function SignOutPage() {
@@ -109,8 +110,9 @@ export default function SignOutPage() {
   }, [signOut]);
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background text-foreground select-none">
-      <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+    <main className="min-h-screen w-full relative flex flex-col items-center justify-center p-4 bg-background text-foreground select-none overflow-hidden transition-colors duration-300">
+      <AuthBackground />
+      <div className="relative z-10 flex flex-col items-center gap-4 text-center max-w-sm">
         <div className="relative mb-2">
           <ConstLogoIcon size="lg" className="w-12 h-12 text-foreground animate-pulse" />
         </div>
