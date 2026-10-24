@@ -67,10 +67,6 @@ export class MarketplaceService {
     void this.ensureDefaultSkillsInstalled();
   }
 
-  public getGlobalSkillsDir(): string {
-    return this.globalSkillsDir;
-  }
-
   public getBundledSkillsDir(): string {
     const candidates = [
       path.join(process.resourcesPath, "skills"),

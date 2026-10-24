@@ -47,8 +47,7 @@ import { useResolvedSkills } from "../../lib/skills/use-skills";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import { MarkdownContent } from "../workbench/markdown-content";
 
-import { highlightCodeLines, highlightCodeToHtmlLines } from "../../lib/code-highlighter";
-export { highlightCodeLines, highlightCodeToHtmlLines };
+import { highlightCodeLines } from "../../lib/code-highlighter";
 
 function SkillCodeViewer({ code, filename }: { code: string; filename: string }) {
   const highlightedHtml = useMemo(() => {

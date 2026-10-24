@@ -263,7 +263,7 @@ export function resolveSkillRegistry(
           continue;
         try {
           const skill = readSkill(dir, root.scope, state, root.workspacePath);
-          if (identity(skillRoot) === identity(capabilityDirectory(root.scope, root.workspacePath, "skills", options)) &&
+          if (root.scope === "user" && identity(skillRoot) === identity(capabilityDirectory("user", undefined, "skills", options)) &&
               legacyComponents.get(slug) === skill.content) continue;
           skills.push(skill);
           seen.add(slug);

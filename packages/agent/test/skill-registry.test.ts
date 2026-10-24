@@ -244,6 +244,12 @@ describe("plugin lifecycle and shared skill resolution", () => {
     expect(fs.existsSync(independent)).toBe(false);
     expect(fs.existsSync(plugin.path)).toBe(true);
     expect(() => uninstallRegisteredSkill(plugin.skills[0]!.id, undefined, options)).toThrow("Standalone skill");
+    const workspace = path.join(root, "project");
+    installPluginFromDirectory(source, "workspace", workspace, options);
+    const projectSkill = path.join(workspace, ".agents", "skills", "hyperframes");
+    fs.mkdirSync(projectSkill, { recursive: true });
+    fs.writeFileSync(path.join(projectSkill, "SKILL.md"), skillText("hyperframes"));
+    expect(resolveSkillRegistry(workspace, options).skills.find((skill) => skill.slug === "hyperframes")?.path).toBe(projectSkill);
   });
 
   it("keeps a customized managed skill alongside the plugin", () => {
