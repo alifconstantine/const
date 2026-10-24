@@ -9,6 +9,7 @@
     "check-types": "tsc --noEmit",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
+    "test:intelligence-ui:live": "tsx tests/intelligence-ui.live.ts",
     "package:win": "tsc && vite build && electron-builder --win --x64 --arm64",
     "package:win:x64": "tsc && vite build && electron-builder --win --x64",
     "package:win:arm64": "tsc && vite build && electron-builder --win --arm64",

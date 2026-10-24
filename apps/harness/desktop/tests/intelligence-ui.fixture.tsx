@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nProvider } from "../src/lib/i18n";
 import { AssistantResponse } from "../src/components/intelligence-ui/assistant-response";
@@ -15,6 +15,32 @@ const program = [
 const content = `## Review\n\nThese are test values for the shared response renderer.\n\n\`\`\`openui-lang\n${program}\n\`\`\`\n\n| Legacy Markdown | Status |\n|---|---|\n| Shared table | Ready |`;
 
 function Fixture() {
+  const isLive =
+    new URLSearchParams(window.location.search).get("live") === "1";
+  const storageKey = isLive
+    ? "intelligence-live-fixture-state"
+    : "intelligence-fixture-state";
+  const [liveResult, setLiveResult] = useState<{
+    content: string;
+    model: string;
+  } | null>(null);
+  const [liveError, setLiveError] = useState(false);
+  useEffect(() => {
+    if (!isLive) return;
+    const controller = new AbortController();
+    fetch("/__intelligence-ui-live", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Live result unavailable");
+        const result = await response.json();
+        if (typeof result.content !== "string")
+          throw new Error("Invalid live result");
+        if (!controller.signal.aborted) setLiveResult(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setLiveError(true);
+      });
+    return () => controller.abort();
+  }, [isLive]);
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [invalid, setInvalid] = useState(false);
@@ -23,12 +49,27 @@ function Fixture() {
   >([]);
   const [revision, setRevision] = useState(0);
   const [states, setStates] = useState<Record<string, IntelligenceUiState>>(
-    () =>
-      JSON.parse(localStorage.getItem("intelligence-fixture-state") || "{}"),
+    () => JSON.parse(localStorage.getItem(storageKey) || "{}"),
   );
+  if (isLive && !liveResult)
+    return (
+      <main className="p-6">
+        <p role="status">
+          {liveError
+            ? "Set INTELLIGENCE_UI_LIVE_RESULT to a live test artifact and restart the fixture server."
+            : "Loading live model output..."}
+        </p>
+      </main>
+    );
+  const responseContent = liveResult?.content || content;
   return (
     <main className="min-h-screen bg-white p-6 font-sans text-[#262626] dark:bg-[#161616] dark:text-white">
       <h1 className="mb-4 text-lg">Intelligence UI browser fixture</h1>
+      {liveResult && (
+        <p className="mb-4 text-sm" data-live-model>
+          {liveResult.model}
+        </p>
+      )}
       <nav className="mb-6 flex flex-wrap gap-4 text-sm">
         <label>
           <input
@@ -83,8 +124,11 @@ function Fixture() {
                 invalid
                   ? 'Before\n\n```openui-lang\nroot = Stack([form])\nform = Form("constructor", "Invalid form", [{name: "scope", label: "Scope", type: "text"}], "Continue")\n```\n\nAfter'
                   : streaming
-                    ? `Streaming\n\n\`\`\`openui-lang\n${program.slice(0, 180)}`
-                    : content
+                    ? responseContent.slice(
+                        0,
+                        Math.floor(responseContent.length * 0.65),
+                      )
+                    : responseContent
               }
               isStreaming={streaming}
               disabled={busy || streaming}
@@ -95,10 +139,7 @@ function Fixture() {
                     ...previous,
                     [scope]: { ...previous[scope], [blockId]: state },
                   };
-                  localStorage.setItem(
-                    "intelligence-fixture-state",
-                    JSON.stringify(next),
-                  );
+                  localStorage.setItem(storageKey, JSON.stringify(next));
                   return next;
                 })
               }
