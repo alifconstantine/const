@@ -54,9 +54,11 @@ Use this skill to inspect and drive visible local application windows on Windows
 
 1. **Element Indexes Are Ephemeral**: Always use the fresh state returned by each action or call `computer_get_app_state` before selecting the next element index. Indices change after scrolling, dialog popups, or window focus shifts.
 2. **Prefer Semantic Actions**: Use `computer_set_value` for form inputs and text fields instead of clicking and typing character-by-character.
-3. **Screenshots & Scaling**: Window-local coordinates match visual pixels scaled by `screenshot.scale`. When clicking by coordinates, compute:
-   `action_x = pixel_x / screenshot.scale`
+3. **Screenshots & Scaling**: Screenshots are attached as visual tool observations. Window-local coordinates use the unscaled window bounds. Compute both `action_x = pixel_x / screenshotScale` and `action_y = pixel_y / screenshotScale`. Do not add the screen origin. If the model cannot receive images, use accessible elements; do not guess coordinates from file metadata.
 4. **Safety & Sensitive Apps**: Password managers and password fields are protected and blocked from observation. Never attempt to automate credential entry or expose secrets unless explicitly instructed by the user.
+5. **Delivery Is Not Verification**: An action can deliver input while its intended effect remains `unverified`. Inspect the returned screenshot/tree before stating that a chat opened, text appeared, or a message was sent. If the observation is insufficient, report that limit explicitly.
+6. **Timeouts & Changed Windows**: Input may have occurred before a timeout or failed post-action snapshot. Inspect fresh state before retrying so clicks, pastes, and messages are not duplicated. Refresh the app state after `snapshot_required` or `stale_element`.
+7. **One Desktop Owner**: If `desktop_busy` is returned, another chat owns the desktop. Wait for that chat to finish; do not bypass the lock through shell scripts.
 
 ## App Notes & Troubleshooting
 

@@ -49,7 +49,7 @@ registerGlobalBrowserToolHandler(async (toolName, args) => {
   return browserController.executeTool(toolName, args);
 });
 
-registerGlobalComputerToolHandler(async (toolName, args) => {
+registerGlobalComputerToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
   if (config.enableComputerUse === false) {
     return {
@@ -57,8 +57,10 @@ registerGlobalComputerToolHandler(async (toolName, args) => {
       isError: true,
     };
   }
-  return computerController.executeTool(toolName, args);
+  return computerController.executeTool(toolName, args, context);
 });
+
+app.on("before-quit", () => computerController.shutdown());
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -98,6 +100,7 @@ export interface UserConfig {
     baseUrl?: string;
     supportsThinking?: boolean;
     supportsTools?: boolean;
+    inputTypes?: string[];
   }>;
   workspaceMemoryEnabled?: boolean;
   enableComputerUse?: boolean;
@@ -1190,6 +1193,7 @@ app.whenReady().then(() => {
         workspacePath: targetWorkspace,
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
+        inputTypes: modelDef?.inputTypes,
         systemPrompt,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
@@ -1217,7 +1221,7 @@ app.whenReady().then(() => {
           }
           return await browserController.executeTool(toolName, args);
         },
-        computerHandler: async (toolName, args) => {
+        computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
           if (cfg.enableComputerUse === false) {
             return {
@@ -1225,7 +1229,7 @@ app.whenReady().then(() => {
               isError: true,
             };
           }
-          return await computerController.executeTool(toolName, args);
+          return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
       });
 
@@ -1298,6 +1302,7 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message };
       } finally {
+        computerController.releaseSession(convoId);
         activeSessions.delete(convoId);
         for (const [tcId, resolver] of pendingQuestions.entries()) {
           pendingQuestions.delete(tcId);
@@ -2005,7 +2010,11 @@ app.whenReady().then(() => {
           previousAgentMessages.push({
             id: m.id,
             role: m.role as any,
-            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+            content: m.content,
+            toolObservationId: m.toolObservationId,
+            tool_call_id: m.tool_call_id,
+            tool_calls: m.tool_calls,
+            name: m.name,
             thinking: m.thinking,
             timestamp: m.createdAt || m.timestamp,
           });
@@ -2050,6 +2059,8 @@ app.whenReady().then(() => {
         baseUrl,
         apiKey,
         model,
+        conversationId: convoId,
+        inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
         mode: "full_access",
         thinkingLevel: "medium",
@@ -2064,7 +2075,7 @@ app.whenReady().then(() => {
           }
           return await browserController.executeTool(toolName, args);
         },
-        computerHandler: async (toolName, args) => {
+        computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
           if (cfg.enableComputerUse === false) {
             return {
@@ -2072,7 +2083,7 @@ app.whenReady().then(() => {
               isError: true,
             };
           }
-          return await computerController.executeTool(toolName, args);
+          return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
       });
 
@@ -2128,6 +2139,7 @@ app.whenReady().then(() => {
 
         return { sessionId: convoId };
       } finally {
+        computerController.releaseSession(convoId);
         if (blockerId !== null && powerSaveBlocker.isStarted(blockerId)) {
           try {
             powerSaveBlocker.stop(blockerId);

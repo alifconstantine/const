@@ -1,0 +1,48 @@
+name: Computer Use
+
+on:
+  push:
+    paths:
+      - "apps/harness/desktop/**"
+      - "packages/agent/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/computer-use.yml"
+  pull_request:
+    paths:
+      - "apps/harness/desktop/**"
+      - "packages/agent/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/computer-use.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  platform-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @const/agent exec vitest run test/desktop-computer.test.ts test/tool-observations.test.ts
+      - run: pnpm --filter @const/harness-desktop check-types
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -B -m unittest discover -s apps/harness/desktop/native/computer-use-linux -p "*_test.py"
+      - if: runner.os == 'Windows'
+        run: powershell.exe -NoProfile -NonInteractive -File apps/harness/desktop/native/computer-use-windows/runtime-input.test.ps1
+      - if: runner.os == 'Windows'
+        run: powershell.exe -NoProfile -NonInteractive -File apps/harness/desktop/native/computer-use-windows/runtime-render.test.ps1
+      - if: runner.os == 'macOS'
+        run: swift test --package-path apps/harness/desktop/native/computer-use-macos
+      - if: runner.os == 'macOS'
+        run: pnpm --filter @const/harness-desktop build:native

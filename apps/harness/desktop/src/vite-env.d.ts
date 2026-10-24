@@ -221,6 +221,7 @@ export interface UserConfig {
     baseUrl?: string;
     supportsThinking?: boolean;
     supportsTools?: boolean;
+    inputTypes?: string[];
   }>;
   workspaceMemoryEnabled?: boolean;
   enableComputerUse?: boolean;

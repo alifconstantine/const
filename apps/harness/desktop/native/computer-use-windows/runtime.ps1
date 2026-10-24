@@ -92,7 +92,16 @@ public static class ConstDesktopWin32 {
     public static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
-    public static extern void SwitchToThisWindow(IntPtr hwnd, bool fAltTab);
+    public static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsChild(IntPtr parent, IntPtr child);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
     public static extern bool BringWindowToTop(IntPtr hwnd);
@@ -105,24 +114,24 @@ public static class ConstDesktopWin32 {
 
     public static bool ForceForegroundWindow(IntPtr hwnd) {
         if (hwnd == IntPtr.Zero) return false;
-        ShowWindow(hwnd, 9);
+        if (IsIconic(hwnd)) ShowWindow(hwnd, 9);
         IntPtr foreHwnd = GetForegroundWindow();
         if (foreHwnd == hwnd) return true;
         uint forePid = 0;
         uint appPid = 0;
         uint foreThread = GetWindowThreadProcessId(foreHwnd, out forePid);
         uint appThread = GetWindowThreadProcessId(hwnd, out appPid);
-        if (foreThread != 0 && appThread != 0 && foreThread != appThread) {
-            AttachThreadInput(foreThread, appThread, true);
+        uint currentThread = GetCurrentThreadId();
+        bool attachedFore = foreThread != 0 && foreThread != currentThread && AttachThreadInput(currentThread, foreThread, true);
+        bool attachedApp = appThread != 0 && appThread != currentThread && appThread != foreThread && AttachThreadInput(currentThread, appThread, true);
+        try {
             BringWindowToTop(hwnd);
             SetForegroundWindow(hwnd);
-            AttachThreadInput(foreThread, appThread, false);
-        } else {
-            BringWindowToTop(hwnd);
-            SetForegroundWindow(hwnd);
+        } finally {
+            if (attachedApp) AttachThreadInput(currentThread, appThread, false);
+            if (attachedFore) AttachThreadInput(currentThread, foreThread, false);
         }
-        try { SwitchToThisWindow(hwnd, true); } catch {}
-        return true;
+        return GetForegroundWindow() == hwnd;
     }
 
     [DllImport("user32.dll")]
@@ -131,8 +140,48 @@ public static class ConstDesktopWin32 {
     [DllImport("user32.dll")]
     public static extern void mouse_event(uint dwFlags, uint dx, uint dy, int dwData, UIntPtr dwExtraInfo);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint count, INPUT[] inputs, int size);
+
+    [DllImport("user32.dll", EntryPoint = "VkKeyScanW", ExactSpelling = true, CharSet = CharSet.Unicode)]
+    public static extern short VkKeyScan(char character);
+
+    private static void SendChecked(INPUT[] inputs) {
+        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        if (sent != inputs.Length) {
+            throw new InvalidOperationException("input_delivery_failed: SendInput accepted " + sent + "/" + inputs.Length + " events (Win32 " + Marshal.GetLastWin32Error() + "); check the interactive desktop and target elevation");
+        }
+    }
+
+    public static void SendKeyChord(byte[] modifiers, ushort key) {
+        var inputs = new List<INPUT>();
+        foreach (byte modifier in modifiers) inputs.Add(KeyboardInput(1, modifier, 0));
+        inputs.Add(KeyboardInput(1, key, 0));
+        inputs.Add(KeyboardInput(1, key, 2));
+        for (int i = modifiers.Length - 1; i >= 0; i--) inputs.Add(KeyboardInput(1, modifiers[i], 2));
+        try { SendChecked(inputs.ToArray()); }
+        catch {
+            var releases = new List<INPUT>();
+            releases.Add(KeyboardInput(1, key, 2));
+            for (int i = modifiers.Length - 1; i >= 0; i--) releases.Add(KeyboardInput(1, modifiers[i], 2));
+            SendInput((uint)releases.Count, releases.ToArray(), Marshal.SizeOf(typeof(INPUT)));
+            throw;
+        }
+    }
+
+    public static void SendMouseEvent(uint flags, int data) {
+        SendChecked(new INPUT[] { new INPUT { type = 0, data = new INPUTUNION { mouse = new MOUSEINPUT { flags = flags, mouseData = unchecked((uint)data) } } } });
+    }
+
+    public static void SendUnicodeText(string text) {
+        foreach (char value in text) {
+            if (value == '\r') continue;
+            if (value == '\n') { SendKeyChord(new byte[0], 13); continue; }
+            var down = new INPUT { type = 1, data = new INPUTUNION { keyboard = new KEYBDINPUT { scanCode = value, flags = 4 } } };
+            var up = new INPUT { type = 1, data = new INPUTUNION { keyboard = new KEYBDINPUT { scanCode = value, flags = 6 } } };
+            SendChecked(new INPUT[] { down, up });
+        }
+    }
 
     public static void SendModifiedClick(byte[] modifiers, uint mouseDown, uint mouseUp) {
         const uint keyboardInput = 1;
@@ -161,7 +210,8 @@ public static class ConstDesktopWin32 {
         }
     }
 
-    private static INPUT KeyboardInput(uint type, byte virtualKey, uint flags) {
+    private static INPUT KeyboardInput(uint type, ushort virtualKey, uint flags) {
+        if ((virtualKey >= 0x21 && virtualKey <= 0x2E) || virtualKey == 0x5B || virtualKey == 0x5C) flags |= 1;
         return new INPUT {
             type = type,
             data = new INPUTUNION {
@@ -180,6 +230,8 @@ public static class ConstDesktopWin32 {
     }
 }
 "@
+
+try { [void][ConstDesktopWin32]::SetThreadDpiAwarenessContext([IntPtr](-4)) } catch {}
 
 $MaxNodes = 1200
 $MaxDepth = 64
@@ -258,7 +310,7 @@ function Find-ConstProcess([string]$Query) {
     $parsedProcessId = 0
     $processes = Get-ConstWindowProcesses
     if ([int]::TryParse($needle, [ref]$parsedProcessId)) {
-        $match = $processes | Where-Object { $_.Id -eq $parsedProcessId } | Select-Object -First 1
+        $match = Get-Process -Id $parsedProcessId -ErrorAction SilentlyContinue
         if ($null -ne $match) {
             Assert-ConstProcessAllowed $match
             return $match
@@ -424,17 +476,10 @@ function Restore-ConstWindow($Process) {
 }
 
 function Test-ConstWindowFocused([IntPtr]$WindowHandle) {
-    if ($WindowHandle -eq [IntPtr]::Zero) { return $true }
+    if ($WindowHandle -eq [IntPtr]::Zero) { return $false }
     $foreground = [ConstDesktopWin32]::GetForegroundWindow()
     if ($foreground -eq $WindowHandle) { return $true }
-    try {
-        $foregroundPid = 0
-        [ConstDesktopWin32]::GetWindowThreadProcessId($foreground, [ref]$foregroundPid)
-        $targetPid = 0
-        [ConstDesktopWin32]::GetWindowThreadProcessId($WindowHandle, [ref]$targetPid)
-        if ($foregroundPid -ne 0 -and $foregroundPid -eq $targetPid) { return $true }
-    } catch {}
-    $false
+    [bool][ConstDesktopWin32]::IsChild($WindowHandle, $foreground)
 }
 
 function Wait-ConstWindowFocused([IntPtr]$WindowHandle, [int]$TimeoutMilliseconds) {
@@ -447,7 +492,7 @@ function Wait-ConstWindowFocused([IntPtr]$WindowHandle, [int]$TimeoutMillisecond
 }
 
 function Assert-ConstKeyboardFocus([IntPtr]$WindowHandle, $Operation) {
-    if ($WindowHandle -eq [IntPtr]::Zero) { return }
+    if ($WindowHandle -eq [IntPtr]::Zero) { throw "window_not_focused: no valid target window handle" }
     if (Test-ConstWindowFocused $WindowHandle) { return }
     if ([bool]$Operation.restoreWindow) {
         [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle)
@@ -1058,9 +1103,9 @@ function Get-ConstRequiredNumber($Value, [string]$Name) {
 
 function Get-ConstPositiveInteger($Value, [string]$Name) {
     if ($null -eq $Value) { $Value = 1 }
-    $number = [int]$Value
-    if ($number -le 0) { throw "$Name must be a positive integer" }
-    $number
+    $number = Get-ConstRequiredNumber $Value $Name
+    if ($number -le 0 -or $number -gt [int]::MaxValue -or $number -ne [Math]::Truncate($number)) { throw "$Name must be a positive integer" }
+    [int]$number
 }
 
 function Get-ConstPositiveNumber($Value, [string]$Name) {
@@ -1083,6 +1128,9 @@ function Get-ConstScreenPoint($Operation, $WindowFrame) {
     }
     $x = Get-ConstRequiredNumber $Operation.x "x"
     $y = Get-ConstRequiredNumber $Operation.y "y"
+    if ($null -eq $WindowFrame -or $x -lt 0 -or $y -lt 0 -or $x -ge $WindowFrame.width -or $y -ge $WindowFrame.height) {
+        throw "invalid_coordinates: use coordinates inside the current window bounds; divide image pixels by screenshotScale"
+    }
     @{
         x = [int][Math]::Round($WindowFrame.x + $x)
         y = [int][Math]::Round($WindowFrame.y + $y)
@@ -1092,6 +1140,7 @@ function Get-ConstScreenPoint($Operation, $WindowFrame) {
 function Get-ConstElementScreenPoint($Element) {
     if ($null -eq $Element) { return $null }
     try {
+        if ($Element.Current.IsOffscreen) { throw "element_offscreen: scroll the element into view before clicking" }
         $rect = $Element.Current.BoundingRectangle
         if ($rect.Width -gt 0 -and $rect.Height -gt 0) {
             return @{
@@ -1099,13 +1148,13 @@ function Get-ConstElementScreenPoint($Element) {
                 y = [int][Math]::Round($rect.Y + ($rect.Height / 2))
             }
         }
-    } catch {}
+    } catch { if ($_.Exception.Message -like 'element_offscreen*') { throw } }
     $null
 }
 
 function Send-ConstMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$ScreenY, [string]$Button, [int]$Count, [string]$Modifiers) {
-    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
-    [void][ConstDesktopWin32]::SetCursorPos($ScreenX, $ScreenY)
+    Assert-ConstKeyboardFocus $WindowHandle ([pscustomobject]@{ restoreWindow = $true })
+    if (-not [ConstDesktopWin32]::SetCursorPos($ScreenX, $ScreenY)) { throw "cursor_position_failed" }
     $buttonName = if ([string]::IsNullOrWhiteSpace($Button)) { "left" } else { $Button.ToLowerInvariant() }
     switch ($buttonName) {
         "left" { $down = $MouseEvents.LeftDown; $up = $MouseEvents.LeftUp }
@@ -1116,14 +1165,6 @@ function Send-ConstMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$Screen
 
     $modifierKeys = @(Get-ConstClickModifierVirtualKeys $Modifiers)
     $clickCount = Get-ConstPositiveInteger $Count "click_count"
-    if ($modifierKeys.Count -eq 0) {
-        for ($i = 0; $i -lt $clickCount; $i++) {
-            [ConstDesktopWin32]::mouse_event($down, 0, 0, 0, [UIntPtr]::Zero)
-            Start-Sleep -Milliseconds 35
-            [ConstDesktopWin32]::mouse_event($up, 0, 0, 0, [UIntPtr]::Zero)
-        }
-        return
-    }
     for ($i = 0; $i -lt $clickCount; $i++) {
         [ConstDesktopWin32]::SendModifiedClick(
             [byte[]]$modifierKeys,
@@ -1135,36 +1176,28 @@ function Send-ConstMouseClick([IntPtr]$WindowHandle, [int]$ScreenX, [int]$Screen
 }
 
 function Send-ConstDrag([IntPtr]$WindowHandle, $From, $To) {
-    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
+    Assert-ConstKeyboardFocus $WindowHandle ([pscustomobject]@{ restoreWindow = $true })
     $startX = [int]$From.x
     $startY = [int]$From.y
     $endX = [int]$To.x
     $endY = [int]$To.y
-    [void][ConstDesktopWin32]::SetCursorPos($startX, $startY)
-    [ConstDesktopWin32]::mouse_event($MouseEvents.LeftDown, 0, 0, 0, [UIntPtr]::Zero)
-    for ($step = 1; $step -le 12; $step++) {
-        $x = [int][Math]::Round($startX + (($endX - $startX) * $step / 12))
-        $y = [int][Math]::Round($startY + (($endY - $startY) * $step / 12))
-        [void][ConstDesktopWin32]::SetCursorPos($x, $y)
-        Start-Sleep -Milliseconds 20
+    if (-not [ConstDesktopWin32]::SetCursorPos($startX, $startY)) { throw "cursor_position_failed" }
+    [ConstDesktopWin32]::SendMouseEvent($MouseEvents.LeftDown, 0)
+    try {
+        for ($step = 1; $step -le 12; $step++) {
+            $x = [int][Math]::Round($startX + (($endX - $startX) * $step / 12))
+            $y = [int][Math]::Round($startY + (($endY - $startY) * $step / 12))
+            if (-not [ConstDesktopWin32]::SetCursorPos($x, $y)) { throw "cursor_position_failed" }
+            Start-Sleep -Milliseconds 20
+        }
+    } finally {
+        [ConstDesktopWin32]::SendMouseEvent($MouseEvents.LeftUp, 0)
     }
-    [ConstDesktopWin32]::mouse_event($MouseEvents.LeftUp, 0, 0, 0, [UIntPtr]::Zero)
 }
 
 function Send-ConstText([IntPtr]$WindowHandle, [string]$Text) {
-    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
-    $hasNonAscii = $false
-    foreach ($character in $Text.ToCharArray()) {
-        if ([int][char]$character -gt 0x7F) { $hasNonAscii = $true; break }
-    }
-    if ($hasNonAscii) {
-        foreach ($character in $Text.ToCharArray()) {
-            [void][ConstDesktopWin32]::PostMessage($WindowHandle, $WindowsMessages.Char, [IntPtr][int][char]$character, [IntPtr]::Zero)
-            Start-Sleep -Milliseconds 8
-        }
-        return
-    }
-    [System.Windows.Forms.SendKeys]::SendWait((ConvertTo-ConstSendKeysText $Text))
+    Assert-ConstKeyboardFocus $WindowHandle ([pscustomobject]@{ restoreWindow = $true })
+    [ConstDesktopWin32]::SendUnicodeText($Text)
 }
 
 function Get-ConstVirtualKey([string]$Key) {
@@ -1173,15 +1206,25 @@ function Get-ConstVirtualKey([string]$Key) {
         "return" = 0x0D; "enter" = 0x0D; "tab" = 0x09; "escape" = 0x1B; "esc" = 0x1B
         "backspace" = 0x08; "delete" = 0x2E; "space" = 0x20; "left" = 0x25
         "up" = 0x26; "right" = 0x27; "down" = 0x28; "home" = 0x24; "end" = 0x23
+        "pageup" = 0x21; "page_up" = 0x21; "pagedown" = 0x22; "page_down" = 0x22; "insert" = 0x2D
     }
     if ($map.ContainsKey($normalized)) { return $map[$normalized] }
-    if ($normalized.Length -eq 1) { return [int][char]$normalized.ToUpperInvariant()[0] }
+    if ($normalized -match '^f([1-9]|1[0-9]|2[0-4])$') { return 0x70 + [int]$Matches[1] - 1 }
+    if ($normalized.Length -eq 1) {
+        $mapped = [int][ConstDesktopWin32]::VkKeyScan([char]$normalized[0])
+        if ($mapped -ge 0) { return $mapped -band 0xff }
+    }
     throw "Unsupported key: $Key"
 }
 
 function Send-ConstKey([IntPtr]$WindowHandle, [string]$Key) {
-    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
-    [System.Windows.Forms.SendKeys]::SendWait((ConvertTo-ConstSendKeysKey $Key))
+    if ($Key.Length -eq 1) {
+        Send-ConstText $WindowHandle $Key
+        return
+    }
+    $virtualKey = Get-ConstVirtualKey $Key
+    Assert-ConstKeyboardFocus $WindowHandle ([pscustomobject]@{ restoreWindow = $true })
+    [ConstDesktopWin32]::SendKeyChord([byte[]]@(), [uint16]$virtualKey)
 }
 
 function Get-ConstModifierVirtualKey([string]$Modifier) {
@@ -1205,65 +1248,31 @@ function Get-ConstClickModifierVirtualKeys([string]$Modifiers) {
 }
 
 function Send-ConstHotkey([IntPtr]$WindowHandle, [string]$KeySpec) {
-    $parts = @($KeySpec.Split("+") | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    if ($parts.Count -eq 0) { throw "Unsupported key: $KeySpec" }
+    if ($KeySpec -eq '+') { $parts = @('+') }
+    elseif ($KeySpec.EndsWith('++')) { $parts = @($KeySpec.Substring(0, $KeySpec.Length - 2).Split('+') | ForEach-Object { $_.Trim() }) + @('+') }
+    else { $parts = @($KeySpec.Split("+") | ForEach-Object { $_.Trim() }) }
+    if ($parts.Count -eq 0 -or @($parts | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) { throw "Unsupported key: $KeySpec" }
     $key = $parts[$parts.Count - 1]
-    $prefix = ""
+    $modifierKeys = @()
     if ($parts.Count -gt 1) {
         foreach ($modifier in $parts[0..($parts.Count - 2)]) {
-            $prefix += ConvertTo-ConstSendKeysModifier $modifier
+            $modifierKeys += Get-ConstModifierVirtualKey $modifier
         }
     }
-    if ($WindowHandle -ne [IntPtr]::Zero) { [void][ConstDesktopWin32]::ForceForegroundWindow($WindowHandle) }
-    [System.Windows.Forms.SendKeys]::SendWait($prefix + (ConvertTo-ConstSendKeysKey $key))
-}
-
-function ConvertTo-ConstSendKeysText([string]$Text) {
-    $builder = New-Object System.Text.StringBuilder
-    foreach ($character in $Text.ToCharArray()) {
-        $value = [string]$character
-        if ($value -eq "`r") { continue }
-        if ($value -eq "`n") { [void]$builder.Append("{ENTER}"); continue }
-        if ("+^%~(){}[]".Contains($value)) {
-            [void]$builder.Append("{").Append($value).Append("}")
-        } else {
-            [void]$builder.Append($value)
-        }
-    }
-    $builder.ToString()
-}
-
-function ConvertTo-ConstSendKeysKey([string]$Key) {
-    switch ($Key.ToLowerInvariant()) {
-        { $_ -in @("return", "enter") } { return "{ENTER}" }
-        "tab" { return "{TAB}" }
-        { $_ -in @("escape", "esc") } { return "{ESC}" }
-        "backspace" { return "{BACKSPACE}" }
-        "delete" { return "{DELETE}" }
-        "space" { return " " }
-        "left" { return "{LEFT}" }
-        "up" { return "{UP}" }
-        "right" { return "{RIGHT}" }
-        "down" { return "{DOWN}" }
-        "home" { return "{HOME}" }
-        "end" { return "{END}" }
-        { $_ -in @("pageup", "page_up") } { return "{PGUP}" }
-        { $_ -in @("pagedown", "page_down") } { return "{PGDN}" }
-        "insert" { return "{INSERT}" }
-        default {
-            if ($Key.Length -eq 1) { return (ConvertTo-ConstSendKeysText $Key) }
-            throw "Unsupported key: $Key"
-        }
-    }
-}
-
-function ConvertTo-ConstSendKeysModifier([string]$Modifier) {
-    switch ($Modifier.ToLowerInvariant()) {
-        { $_ -in @("ctrl", "control", "cmdorctrl", "commandorcontrol") } { return "^" }
-        "shift" { return "+" }
-        { $_ -in @("alt", "option") } { return "%" }
-        default { throw "Unsupported modifier: $Modifier" }
-    }
+    if ($key -ieq 'plus') { $key = '+' }
+    if ($key.Length -eq 1) {
+        $character = [char]$key[0]
+        if ([char]::IsLetter($character)) { $character = [char]::ToLowerInvariant($character) }
+        $mapped = [int][ConstDesktopWin32]::VkKeyScan($character)
+        if ($mapped -lt 0) { throw "Unsupported shortcut key for the current keyboard layout: $key" }
+        $virtualKey = $mapped -band 0xff
+        $implicitModifiers = ($mapped -shr 8) -band 7
+        if (($implicitModifiers -band 1) -ne 0 -and $modifierKeys -notcontains 0x10) { $modifierKeys += 0x10 }
+        if (($implicitModifiers -band 2) -ne 0 -and $modifierKeys -notcontains 0x11) { $modifierKeys += 0x11 }
+        if (($implicitModifiers -band 4) -ne 0 -and $modifierKeys -notcontains 0x12) { $modifierKeys += 0x12 }
+    } else { $virtualKey = Get-ConstVirtualKey $key }
+    Assert-ConstKeyboardFocus $WindowHandle ([pscustomobject]@{ restoreWindow = $true })
+    [ConstDesktopWin32]::SendKeyChord([byte[]]$modifierKeys, [uint16]$virtualKey)
 }
 
 function Send-ConstPasteText([IntPtr]$WindowHandle, [string]$Text) {
@@ -1274,6 +1283,7 @@ function Send-ConstPasteText([IntPtr]$WindowHandle, [string]$Text) {
     try {
         Set-Clipboard -Value $Text
         Send-ConstHotkey $WindowHandle "Ctrl+v"
+        Start-Sleep -Milliseconds 150
     } finally {
         if ($hadPrevious) {
             try { [System.Windows.Forms.Clipboard]::SetDataObject($previous, $true) } catch {}
@@ -1315,7 +1325,7 @@ function Invoke-ConstOperation($Operation) {
             }
         } catch {}
     }
-    if ($Operation.tool -in @("type_text", "press_key", "hotkey", "paste_text")) {
+    if ($Operation.tool -in @("click", "scroll", "drag", "type_text", "press_key", "hotkey", "paste_text")) {
         Assert-ConstKeyboardFocus $handle $Operation
     }
     $action = $null
@@ -1361,28 +1371,26 @@ function Invoke-ConstOperation($Operation) {
                 throw "unsupported scroll direction: $($Operation.direction)"
             }
             $point = Get-ConstElementScreenPoint $element
-            if ($null -eq $point) { $point = Get-ConstScreenPoint $Operation $windowFrame }
-            [void][ConstDesktopWin32]::SetForegroundWindow($handle)
-            [void][ConstDesktopWin32]::SetCursorPos([int]$point.x, [int]$point.y)
-            [ConstDesktopWin32]::mouse_event($mouseEvent, 0, 0, $delta, [UIntPtr]::Zero)
+            if ($null -eq $point) {
+                if ($null -eq $Operation.element -and $null -eq $Operation.x -and $null -eq $Operation.y) {
+                    $point = Get-ConstScreenPoint ([pscustomobject]@{ x = $windowFrame.width / 2; y = $windowFrame.height / 2 }) $windowFrame
+                } else { $point = Get-ConstScreenPoint $Operation $windowFrame }
+            }
+            Assert-ConstKeyboardFocus $handle $Operation
+            if (-not [ConstDesktopWin32]::SetCursorPos([int]$point.x, [int]$point.y)) { throw "cursor_position_failed" }
+            [ConstDesktopWin32]::SendMouseEvent($mouseEvent, $delta)
             $action = [pscustomobject]@{ path = "synthetic"; actionName = "scroll"; fallbackReason = $null }
         }
         "drag" {
             $from = Get-ConstElementScreenPoint $fromElement
             if ($null -eq $from -and $null -ne $Operation.fromElement) { throw "stale element frame; run get-app-state again and use a fresh element index" }
             if ($null -eq $from) {
-                $from = @{
-                    x = $windowFrame.x + (Get-ConstRequiredNumber $Operation.from_x "from_x")
-                    y = $windowFrame.y + (Get-ConstRequiredNumber $Operation.from_y "from_y")
-                }
+                $from = Get-ConstScreenPoint ([pscustomobject]@{ x = $Operation.from_x; y = $Operation.from_y }) $windowFrame
             }
             $to = Get-ConstElementScreenPoint $toElement
             if ($null -eq $to -and $null -ne $Operation.toElement) { throw "stale element frame; run get-app-state again and use a fresh element index" }
             if ($null -eq $to) {
-                $to = @{
-                    x = $windowFrame.x + (Get-ConstRequiredNumber $Operation.to_x "to_x")
-                    y = $windowFrame.y + (Get-ConstRequiredNumber $Operation.to_y "to_y")
-                }
+                $to = Get-ConstScreenPoint ([pscustomobject]@{ x = $Operation.to_x; y = $Operation.to_y }) $windowFrame
             }
             Send-ConstDrag $handle $from $to
             $action = [pscustomobject]@{ path = "synthetic"; actionName = "drag"; fallbackReason = $null }
@@ -1414,16 +1422,19 @@ function Invoke-ConstOperation($Operation) {
         }
     }
 
+    if ($null -eq $action.verification) {
+        $action | Add-Member -NotePropertyName verification -NotePropertyValue ([pscustomobject]@{ state = "unverified"; reason = "action_result_not_asserted" })
+    }
+    $snapshot = $null
+    $observationError = $null
     try {
+        Start-Sleep -Milliseconds 100
         $snapshot = New-ConstSnapshot $Operation.app $includeScreenshot $Operation.windowId $Operation.windowIndex
     } catch {
-        if ($null -eq $Operation.windowId -and $null -eq $Operation.windowIndex) { throw }
-        if ($null -eq $action.verification) {
-            $action | Add-Member -NotePropertyName verification -NotePropertyValue ([pscustomobject]@{ state = "unverified"; reason = "window_changed" })
-        }
-        $snapshot = New-ConstSnapshot $Operation.app $includeScreenshot $null $null
+        $observationError = [string]$_.Exception.Message
+        $action.verification = [pscustomobject]@{ state = "unverified"; reason = "post_action_observation_failed" }
     }
-    [pscustomobject]@{ ok = $true; action = $action; snapshot = $snapshot }
+    [pscustomobject]@{ ok = $true; action = $action; snapshot = $snapshot; observationError = $observationError }
 }
 
 function Invoke-ConstServeLoop {

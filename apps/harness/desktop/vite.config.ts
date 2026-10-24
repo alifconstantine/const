@@ -10,6 +10,9 @@ export default defineConfig({
     electron([
       {
         entry: "electron/main.ts",
+        async onstart(args) {
+          await args.startup([path.resolve(__dirname)]);
+        },
         vite: {
           build: {
             outDir: "dist-electron",

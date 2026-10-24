@@ -61,6 +61,7 @@ export function isSideChatConversation(convo?: { id?: string } | string | null):
 
 export function normalizeUiMessages(rawMessages: any[]): any[] {
   if (!Array.isArray(rawMessages) || rawMessages.length === 0) return [];
+  rawMessages = rawMessages.filter(message => !message?.toolObservationId);
 
   const hasToolRole = rawMessages.some((m) => m && m.role === "tool");
   if (!hasToolRole) {

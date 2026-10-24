@@ -174,6 +174,7 @@ def restore_window(app, window=None):
         check=False,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        timeout=5,
     )
 
 
@@ -701,7 +702,7 @@ def list_windows_response(query):
 def handshake_response():
     is_wayland = os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
     has_hotkey = shutil.which("xdotool") is not None and not is_wayland
-    has_clipboard = any(shutil.which(command) for command in ("wl-copy", "xclip", "xsel"))
+    has_clipboard = has_hotkey and any(shutil.which(command) for command in ("xclip", "xsel"))
     has_screenshot = Gdk is not None and GdkPixbuf is not None and not is_wayland
     return {
         "platform": "linux",
@@ -714,8 +715,8 @@ def handshake_response():
             "observation": {"screenshot": has_screenshot, "annotatedScreenshot": False, "elementFrames": True, "ocr": False},
             "actions": {
                 "click": True,
-                "typeText": True,
-                "pressKey": True,
+                "typeText": not is_wayland,
+                "pressKey": not is_wayland and Gdk is not None,
                 "hotkey": has_hotkey,
                 "pasteText": has_clipboard,
                 "scroll": True,
@@ -797,7 +798,24 @@ def screen_point(window_rect, saved_element=None, x=None, y=None, node=None):
         raise RuntimeError("stale element frame; run get-app-state again and use a fresh element index")
     if window_rect is None or x is None or y is None:
         raise RuntimeError("coordinate action requires a visible window and coordinates")
-    return window_rect.x + float(x), window_rect.y + float(y)
+    local_x, local_y = float(x), float(y)
+    if not math.isfinite(local_x) or not math.isfinite(local_y) or not (0 <= local_x < window_rect.width and 0 <= local_y < window_rect.height):
+        raise RuntimeError("invalid_coordinates: use coordinates inside the current window bounds")
+    return window_rect.x + local_x, window_rect.y + local_y
+
+
+def checked_mouse_event(x, y, event):
+    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
+        raise RuntimeError("unsupported_capability: synthetic pointer input requires an X11 session")
+    if Atspi.generate_mouse_event(x, y, event) is False:
+        raise RuntimeError("input_delivery_failed: AT-SPI rejected the pointer event")
+
+
+def checked_keyboard_event(key, text, kind):
+    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
+        raise RuntimeError("unsupported_capability: synthetic keyboard input requires an X11 session")
+    if Atspi.generate_keyboard_event(key, text, kind) is False:
+        raise RuntimeError("input_delivery_failed: AT-SPI rejected the keyboard event")
 
 
 def require_positive_integer(value, name):
@@ -838,10 +856,10 @@ def click_at(x, y, button, count, modifiers=None):
         return
     down, up = buttons[button]
     for _ in range(parsed_count):
-        Atspi.generate_mouse_event(round(x), round(y), "abs")
-        Atspi.generate_mouse_event(round(x), round(y), down)
+        checked_mouse_event(round(x), round(y), "abs")
+        checked_mouse_event(round(x), round(y), down)
         time.sleep(0.03)
-        Atspi.generate_mouse_event(round(x), round(y), up)
+        checked_mouse_event(round(x), round(y), up)
 
 
 def click_modifier_keys(raw):
@@ -895,21 +913,23 @@ def scroll_at(x, y, direction, pages):
     down, up = wheel_events[direction]
     page_count = max(1, math.ceil(require_positive_number(1 if pages is None else pages, "pages")))
     for _ in range(page_count):
-        Atspi.generate_mouse_event(round(x), round(y), "abs")
-        Atspi.generate_mouse_event(round(x), round(y), down)
+        checked_mouse_event(round(x), round(y), "abs")
+        checked_mouse_event(round(x), round(y), down)
         time.sleep(0.03)
-        Atspi.generate_mouse_event(round(x), round(y), up)
+        checked_mouse_event(round(x), round(y), up)
 
 
 def drag_between(start, end):
-    Atspi.generate_mouse_event(round(start[0]), round(start[1]), "abs")
-    Atspi.generate_mouse_event(round(start[0]), round(start[1]), "b1p")
-    for step in range(1, 13):
-        x = start[0] + (end[0] - start[0]) * step / 12
-        y = start[1] + (end[1] - start[1]) * step / 12
-        Atspi.generate_mouse_event(round(x), round(y), "abs")
-        time.sleep(0.02)
-    Atspi.generate_mouse_event(round(end[0]), round(end[1]), "b1r")
+    checked_mouse_event(round(start[0]), round(start[1]), "abs")
+    checked_mouse_event(round(start[0]), round(start[1]), "b1p")
+    try:
+        for step in range(1, 13):
+            x = start[0] + (end[0] - start[0]) * step / 12
+            y = start[1] + (end[1] - start[1]) * step / 12
+            checked_mouse_event(round(x), round(y), "abs")
+            time.sleep(0.02)
+    finally:
+        checked_mouse_event(round(end[0]), round(end[1]), "b1r")
 
 
 def key_name(raw):
@@ -925,18 +945,23 @@ def key_name(raw):
 def press_key(raw):
     name = key_name(raw)
     if len(name) == 1:
-        Atspi.generate_keyboard_event(0, name, Atspi.KeySynthType.STRING)
+        checked_keyboard_event(0, name, Atspi.KeySynthType.STRING)
         return
     if Gdk is None:
         raise RuntimeError("GDK is required for non-character key synthesis")
-    Atspi.generate_keyboard_event(Gdk.keyval_from_name(name), None, Atspi.KeySynthType.PRESSRELEASE)
+    keyval = Gdk.keyval_from_name(name)
+    if not keyval:
+        raise RuntimeError("Unsupported key: " + name)
+    checked_keyboard_event(keyval, None, Atspi.KeySynthType.PRESSRELEASE)
 
 
 def hotkey(raw):
     key_spec = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw))
     xdotool = shutil.which("xdotool")
+    if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
+        raise RuntimeError("unsupported_capability: global shortcuts require an X11 session; Wayland needs compositor/portal integration")
     if xdotool:
-        subprocess.run([xdotool, "key", key_spec], check=True)
+        subprocess.run([xdotool, "key", key_spec], check=True, timeout=5)
         return
     if "+" in key_spec:
         raise RuntimeError("hotkey combinations require xdotool")
@@ -944,7 +969,7 @@ def hotkey(raw):
 
 
 def type_text(value):
-    Atspi.generate_keyboard_event(0, str(value), Atspi.KeySynthType.STRING)
+    checked_keyboard_event(0, str(value), Atspi.KeySynthType.STRING)
 
 
 def paste_text(value):
@@ -1072,6 +1097,7 @@ def run_operation(operation):
         has_modifiers = bool(str(operation.get("modifiers") or "").strip())
         handled = not has_modifiers and operation.get("mouse_button", "left") == "left" and click_count <= 1 and perform_action(node, preferred)
         if not handled:
+            require_keyboard_focus(window, operation)
             click_at(
                 *screen_point(bounds, saved, operation.get("x"), operation.get("y"), node),
                 operation.get("mouse_button", "left"),
@@ -1094,12 +1120,17 @@ def run_operation(operation):
         # Why: pointer wheel events should land in the requested app window even
         # when another desktop window is currently foregrounded.
         restore_window(app, window)
-        scroll_at(*screen_point(bounds, saved, operation.get("x"), operation.get("y"), node), operation.get("direction"), operation.get("pages"))
+        require_keyboard_focus(window, operation)
+        x, y = operation.get("x"), operation.get("y")
+        if saved is None and x is None and y is None and bounds is not None:
+            x, y = bounds.width / 2, bounds.height / 2
+        scroll_at(*screen_point(bounds, saved, x, y, node), operation.get("direction"), operation.get("pages"))
         action = {"path": "synthetic", "actionName": "scroll", "fallbackReason": None}
     elif tool == "drag":
         # Why: pointer drags are synthetic global input, so activate the target
         # window before using cached coordinates from its accessibility tree.
         restore_window(app, window)
+        require_keyboard_focus(window, operation)
         drag_between(
             screen_point(bounds, operation.get("fromElement"), operation.get("from_x"), operation.get("from_y"), from_node),
             screen_point(bounds, operation.get("toElement"), operation.get("to_x"), operation.get("to_y"), to_node),
@@ -1124,6 +1155,8 @@ def run_operation(operation):
     else:
         raise RuntimeError("unknown tool: " + str(tool))
 
+    action.setdefault("verification", {"state": "unverified", "reason": "action_result_not_asserted"})
+    observation_error = None
     try:
         snapshot = make_snapshot(
             operation.get("app", ""),
@@ -1131,17 +1164,46 @@ def run_operation(operation):
             operation.get("windowId"),
             operation.get("windowIndex"),
         )
-    except Exception:
-        if operation.get("windowId") is None and operation.get("windowIndex") is None:
-            raise
-        action.setdefault("verification", {"state": "unverified", "reason": "window_changed"})
-        snapshot = make_snapshot(operation.get("app", ""), include_screenshot, None, None)
+    except Exception as exc:
+        snapshot = None
+        observation_error = str(exc)
+        action["verification"] = {"state": "unverified", "reason": "post_action_observation_failed"}
 
-    return {"ok": True, "action": action, "snapshot": snapshot}
+    return {"ok": True, "action": action, "snapshot": snapshot, "observationError": observation_error}
+
+
+def serve(input_stream=None, output_stream=None):
+    ensure_desktop_bus()
+    input_stream = sys.stdin if input_stream is None else input_stream
+    output_stream = sys.stdout if output_stream is None else output_stream
+    output_stream.write('{"ready":true}\n')
+    output_stream.flush()
+    for line in input_stream:
+        if not line.strip():
+            continue
+        request_id = None
+        try:
+            operation = json.loads(line)
+            request_id = operation.get("requestId")
+            if not isinstance(request_id, int) or isinstance(request_id, bool) or request_id < 1:
+                raise ValueError("requestId must be a positive integer")
+            response = run_operation(operation)
+        except Exception as exc:
+            response = {"ok": False, "error": str(exc)}
+            if request_id is None:
+                match = re.search(r'"requestId"\s*:\s*(\d+)', line)
+                request_id = int(match.group(1)) if match else None
+        if request_id is not None:
+            response["requestId"] = request_id
+        output_stream.write(json.dumps(response, separators=(",", ":")) + "\n")
+        output_stream.flush()
 
 
 def main():
     try:
+        if len(sys.argv) > 1 and sys.argv[1] == "-Serve":
+            serve()
+            return
         ensure_desktop_bus()
         with open(sys.argv[1], "r", encoding="utf-8") as handle:
             operation = json.load(handle)

@@ -4,8 +4,8 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/build-computer-use-macos.cjs && vite",
+    "build": "node scripts/build-computer-use-macos.cjs && tsc && vite build",
     "check-types": "tsc --noEmit",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
@@ -14,7 +14,9 @@
     "package:win:arm64": "tsc && vite build && electron-builder --win --arm64",
     "package:linux": "tsc && vite build && electron-builder --linux AppImage pacman",
     "package:linux:appimage": "tsc && vite build && electron-builder --linux AppImage",
-    "package:linux:pacman": "tsc && vite build && electron-builder --linux pacman"
+    "package:linux:pacman": "tsc && vite build && electron-builder --linux pacman",
+    "build:native": "node scripts/build-computer-use-macos.cjs",
+    "package:mac": "tsc && vite build && electron-builder --mac --x64 --arm64"
   },
   "dependencies": {
     "@const/agent": "workspace:*",
@@ -74,12 +76,17 @@
       {
         "from": "skills",
         "to": "skills",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "native",
         "to": "native",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*",
+          "!computer-use-macos/**"
+        ]
       }
     ],
     "win": {
@@ -90,6 +97,20 @@
       "icon": "build/icon.png",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "category": "Development"
+    },
+    "beforePack": "scripts/before-pack.cjs",
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.developer-tools",
+      "minimumSystemVersion": "14.0",
+      "extraResources": [
+        {
+          "from": "native/computer-use-macos/bin/${arch}/ConstComputerUse.app",
+          "to": "native/computer-use-macos/ConstComputerUse.app"
+        }
+      ]
     }
   }
 }

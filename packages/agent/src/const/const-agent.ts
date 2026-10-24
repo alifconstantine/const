@@ -27,6 +27,7 @@ import {
   calculateContextOccupancy,
 } from "./token-meter.js";
 import { DEFAULT_MODELS } from "./models.js";
+import { appendToolObservations, disableToolObservationImages, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -297,7 +298,7 @@ export function compactHistoryForContext(
   // Identify the latest user message index
   let latestUserIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]?.role === "user") {
+    if (messages[i]?.role === "user" && !messages[i]?.toolObservationId) {
       latestUserIndex = i;
       break;
     }
@@ -577,9 +578,10 @@ Available tools:
 - browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
 - browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
 - browser_request_help: Hand over control to the human user for CAPTCHAs, 2FA/OTP verification, or masked password/secret entry, pausing until the user hands control back.
+Computer actions report input delivery separately from verified outcomes. Never claim a message was sent or a task completed from a successful input call alone. Inspect the returned screenshot/tree for evidence. For messaging, verify the intended recipient in the open chat header (including the self-chat label when requested) before submitting. If vision is unavailable and the tree is insufficient, report the outcome as unverified. After a timeout, input may already have occurred: inspect before retrying to avoid duplicate actions.
 - computer_list_apps: List visible running desktop applications (e.g. WhatsApp, Spotify, Chrome, Notepad).
 - computer_list_windows: List all open windows for a given application.
-- computer_get_app_state: Capture the accessible UI elements tree and a screenshot of the target app window (saved to disk).
+- computer_get_app_state: Capture the accessible UI tree and a screenshot attached as a visual tool observation.
 - computer_click: Click a UI element by elementIndex (recommended) or window-local (x, y) coordinates.
 - computer_set_value: Directly set text or value in an editable input element without keystroke lag.
 - computer_type_text: Type text into the focused control in the active app window.
@@ -979,6 +981,7 @@ export class ConstAgent {
     const signal = this.abortController.signal;
 
     const conversationHistory: AgentMessage[] = [...messages];
+    let toolVisionUnavailable = false;
     let currentTurn = 0;
     let consecutiveStreamRetries = 0;
     let consecutivePlanningTurns = 0;
@@ -1233,7 +1236,8 @@ export class ConstAgent {
           if (
             msgWithImages &&
             Array.isArray(msgWithImages.content) &&
-            (response.status === 502 || cleanMessage.includes("Playground") || cleanMessage.includes("502") || cleanMessage.includes("gateway"))
+            (response.status === 502 || cleanMessage.includes("Playground") || cleanMessage.includes("502") || cleanMessage.includes("gateway") ||
+              (msgWithImages.toolObservationId && /image|vision|multimodal|modality/i.test(cleanMessage)))
           ) {
             const textParts = msgWithImages.content
               .filter((p: any) => p.type === "text")
@@ -1241,7 +1245,11 @@ export class ConstAgent {
               .join("\n");
             const imgCount = msgWithImages.content.filter((p: any) => p.type === "image_url").length;
 
-            msgWithImages.content = `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
+            if (msgWithImages.toolObservationId) {
+              toolVisionUnavailable = true;
+              disableToolObservationImages(conversationHistory);
+            }
+            msgWithImages.content = msgWithImages.toolObservationId ? UNAVAILABLE_TOOL_VISION : `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
 
             onEvent({
               type: "status",
@@ -1459,7 +1467,11 @@ export class ConstAgent {
               .join("\n");
             const imgCount = msgWithImages.content.filter((p: any) => p.type === "image_url").length;
 
-            msgWithImages.content = `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
+            if (msgWithImages.toolObservationId) {
+              toolVisionUnavailable = true;
+              disableToolObservationImages(conversationHistory);
+            }
+            msgWithImages.content = msgWithImages.toolObservationId ? UNAVAILABLE_TOOL_VISION : `${textParts}\n\n[PEMBERITAHUAN MEDIA: Pengguna melampirkan ${imgCount} berkas visual (gambar/media). Sistem/model saat ini tidak dapat membuka atau memuat berkas visual tersebut ke model secara langsung. Sampaikan kepada pengguna secara ramah bahwa Anda tidak dapat melihat atau membuka gambar/media tersebut secara langsung, lalu lanjutkan memberikan bantuan atau jawaban atas pertanyaan pengguna berdasarkan konteks teks di atas.]`;
 
             onEvent({
               type: "status",
@@ -1890,6 +1902,7 @@ export class ConstAgent {
           toolName: string;
         }> = [];
 
+        const toolObservations: ToolObservation[] = [];
         let tcIdx = 0;
         for (const tc of toolCalls) {
           if (signal.aborted || this._isCancelled) {
@@ -2236,7 +2249,7 @@ export class ConstAgent {
             ? { ...parsedArgs, run_in_background: true }
             : parsedArgs;
 
-          const { result, isError } = await executeNativeTool(
+          const { result, isError, images } = await executeNativeTool(
             tc.function.name,
             effectiveArgs,
             workspacePath,
@@ -2301,6 +2314,10 @@ export class ConstAgent {
             isError,
           });
 
+          if (!isError && images?.length) {
+            toolObservations.push({ id: tc.id, name: tc.function.name, images });
+            if (toolObservations.length > 2) toolObservations.shift();
+          }
           const rawResultText = typeof result === "string" ? result : JSON.stringify(result, null, 2);
           const toolContent = isError
             ? `[TOOL ERROR - ACTION FAILED]:\n${rawResultText}\n\n(The action failed. Please inspect the error above and adapt your approach. Do NOT repeat the exact same call).`
@@ -2359,6 +2376,9 @@ export class ConstAgent {
           }
           tcIdx++;
         }
+
+        const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find(model => model.id === this.config.model)?.inputTypes;
+        appendToolObservations(conversationHistory, toolObservations, !toolVisionUnavailable && (!modelInputTypes || modelInputTypes.includes("image")));
 
         // If multiple subagents were spawned in parallel, wait for all of them to complete
         if (spawnedParallelAgents.length > 0) {

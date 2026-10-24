@@ -19,6 +19,26 @@ export interface AgentMessage {
   tool_calls?: ToolCall[];
   thinking?: string;
   timestamp?: number;
+  toolObservationId?: string;
+}
+
+export interface ToolResultImage {
+  data: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  scale?: number;
+}
+
+export interface ToolExecutionResult {
+  result: any;
+  isError: boolean;
+  images?: ToolResultImage[];
+}
+
+export interface ComputerToolContext {
+  sessionId?: string;
+  signal?: AbortSignal;
 }
 
 export interface ModelConfig {
@@ -210,6 +230,7 @@ export interface AgentConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  inputTypes?: string[];
   preset?: "harness" | "learn";
   tools?: NativeToolDefinition[];
   systemPrompt?: string;
@@ -229,7 +250,7 @@ export interface AgentConfig {
   contextWindow?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
   browserHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
-  computerHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
+  computerHandler?: (toolName: string, args: Record<string, any>, context?: ComputerToolContext) => Promise<ToolExecutionResult>;
   voiceConfig?: any;
   imageConfig?: any;
   speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;

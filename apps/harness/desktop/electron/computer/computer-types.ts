@@ -16,6 +16,7 @@ export interface ComputerWindow {
 
 export interface ComputerElement {
   index: number;
+  runtimeId?: number[];
   role?: string;
   name?: string;
   value?: string;
@@ -67,9 +68,11 @@ export interface ComputerActionResult {
   };
   snapshot?: ComputerSnapshot;
   error?: string;
+  observationError?: string;
 }
 
 export interface BridgeRequest {
+  session?: string;
   requestId?: number;
   tool: string;
   app?: string;
@@ -107,4 +110,5 @@ export interface BridgeResponse {
   snapshot?: ComputerSnapshot;
   action?: any;
   error?: string;
+  observationError?: string;
 }

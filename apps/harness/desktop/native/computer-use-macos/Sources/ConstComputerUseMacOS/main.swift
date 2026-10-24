@@ -246,14 +246,9 @@ final class Provider {
         var action = try runAction()
         do {
             return try renderActionResult(action: action, snapshot: observe(params: params))
-        } catch let error as ProviderError where (error.code == "window_not_found" || error.code == "window_stale") && hasRequestedWindowSelector(params) {
-            var fallbackParams = params
-            fallbackParams.removeValue(forKey: "windowId")
-            fallbackParams.removeValue(forKey: "windowIndex")
-            if action["verification"] == nil {
-                action["verification"] = ["state": "unverified", "reason": "window_changed"]
-            }
-            return try renderActionResult(action: action, snapshot: observe(params: fallbackParams))
+        } catch {
+            action["verification"] = ["state": "unverified", "reason": "post_action_observation_failed"]
+            return ["action": action, "observationError": String(describing: error)]
         }
     }
 
@@ -704,7 +699,8 @@ final class Provider {
                 "coordinateSpace": "window",
                 "treeText": snapshot.treeText,
                 "elementCount": snapshot.elements.count,
-                "focusedElementId": snapshot.focusedElementId as Any,
+                "elements": snapshot.elements.keys.sorted().map { ["index": $0] },
+                "focusedElementId": jsonNullable(snapshot.focusedElementId),
                 "truncation": [
                     "truncated": snapshot.truncated,
                     "maxNodes": TreeRenderer.maxNodes,
@@ -4192,6 +4188,54 @@ private func runStdio() {
     exit(13)
 }
 
+// The inherited pipes belong to the verified parent; no shared socket or token is exposed.
+private final class StdioRequestWorker: @unchecked Sendable {
+    func run() {
+        let provider = Provider()
+        let lock = NSLock()
+        let decoder = JSONDecoder()
+        writeJSON(["ready": true], to: nil)
+        while let line = readLine(from: STDIN_FILENO) {
+            guard let data = line.data(using: .utf8), let request = try? decoder.decode(Request.self, from: data) else {
+                fputs("invalid computer-use RPC request\n", stderr)
+                break
+            }
+            writeJSON(handleRequest(provider: provider, lock: lock, request: request, expectedToken: nil, authorizedPeer: true), to: nil)
+        }
+        DispatchQueue.main.async { NSApp.terminate(nil) }
+    }
+}
+
+@MainActor
+private final class StdioAgentRuntime: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        let worker = StdioRequestWorker()
+        Thread.detachNewThread { worker.run() }
+    }
+}
+
+@MainActor
+private func runStdioAgent(parent: pid_t) {
+    guard parent == getppid(), let app = NSRunningApplication(processIdentifier: parent), let bundleId = app.bundleIdentifier else {
+        fputs("computer-use stdio agent requires its Const desktop parent\n", stderr)
+        exit(13)
+    }
+    let packagedParent = bundleId == "id.web.const.harness.desktop"
+    let developmentParent = bundleId == "com.github.Electron" && processCommand(parent).map {
+        $0.contains("apps/harness/desktop") || $0.contains("dist-electron/main.js")
+    } == true
+    guard packagedParent || developmentParent else {
+        fputs("computer-use stdio agent refused an untrusted parent application\n", stderr)
+        exit(13)
+    }
+    let application = NSApplication.shared
+    let delegate = StdioAgentRuntime()
+    application.delegate = delegate
+    setenv("CONST_COMPUTER_USE_SCK_SCREENSHOTS", "1", 1)
+    application.run()
+}
+
 private func handleRequest(
     provider: Provider,
     lock: NSLock,
@@ -4284,7 +4328,13 @@ private func writeAll(_ data: Data, to fd: Int32) -> Bool {
 }
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-if arguments.first == "--agent" {
+if arguments.first == "--stdio-agent" {
+    guard arguments.count == 3, arguments[1] == "--parent-pid", let parent = pid_t(arguments[2]), parent > 1 else {
+        fputs("usage: const-computer-use-macos --stdio-agent --parent-pid <pid>\n", stderr)
+        exit(2)
+    }
+    runStdioAgent(parent: parent)
+} else if arguments.first == "--agent" {
     guard arguments.count >= 2 else {
         fputs("usage: const-computer-use-macos --agent <socket-path> --token-file <token-path>\n", stderr)
         exit(2)

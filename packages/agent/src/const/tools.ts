@@ -13,7 +13,10 @@ import type {
   NativeToolDefinition,
   SubAgentItem,
   AgentConfig,
+  ToolExecutionResult,
+  ComputerToolContext,
 } from "./types.js";
+import { detectSupportedImageMimeType } from "../harness/tools/image.js";
 import { executeLspQuery, type LspOperation } from "./lsp.js";
 import { executeAstGrep } from "./ast-grep.js";
 import { executeWebSearch, executeWebFetch } from "./web.js";
@@ -47,8 +50,9 @@ export type BrowserToolHandler = (
 
 export type ComputerToolHandler = (
   toolName: string,
-  args: Record<string, any>
-) => Promise<{ result: any; isError: boolean }>;
+  args: Record<string, any>,
+  context?: ComputerToolContext,
+) => Promise<ToolExecutionResult>;
 
 let globalBrowserToolHandler: BrowserToolHandler | null = null;
 let globalComputerToolHandler: ComputerToolHandler | null = null;
@@ -761,7 +765,7 @@ export const COMPUTER_GET_APP_STATE_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_get_app_state",
     description:
-      "Inspects a visible desktop app window: extracts its complete Accessibility Tree with numbered element indexes and captures a visual window screenshot saved to disk. Always use this instead of writing custom PowerShell/OCR scripts.",
+      "Inspects a visible desktop app window: extracts its complete Accessibility Tree with numbered element indexes and attaches a visual window screenshot to the next model request and saves a reference copy to disk. Always use this instead of writing custom PowerShell/OCR scripts.",
     parameters: {
       type: "object",
       properties: {
@@ -800,6 +804,8 @@ export const COMPUTER_CLICK_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -848,6 +854,8 @@ export const COMPUTER_SET_VALUE_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -879,6 +887,8 @@ export const COMPUTER_TYPE_TEXT_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -906,6 +916,8 @@ export const COMPUTER_PRESS_KEY_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -933,6 +945,8 @@ export const COMPUTER_HOTKEY_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -960,6 +974,8 @@ export const COMPUTER_PASTE_TEXT_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -987,6 +1003,8 @@ export const COMPUTER_SCROLL_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -1031,6 +1049,8 @@ export const COMPUTER_DRAG_TOOL: NativeToolDefinition = {
     parameters: {
       type: "object",
       properties: {
+        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
+        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
           description: "Target application selector.",
@@ -5380,7 +5400,7 @@ export async function executeNativeTool(
   args: Record<string, any>,
   workspacePath: string,
   optionsOrSignal?: AbortSignal | ExecuteToolOptions
-): Promise<{ result: any; isError: boolean }> {
+): Promise<ToolExecutionResult> {
   try {
     const options: ExecuteToolOptions =
       optionsOrSignal instanceof AbortSignal
@@ -5433,7 +5453,7 @@ export async function executeNativeTool(
           isError: true,
         };
       }
-      return await handler(toolName, args);
+      return await handler(toolName, args, { sessionId: options.conversationId ?? options.parentConfig?.conversationId, signal });
     }
 
     // -----------------------------------------------------------------------
@@ -5522,9 +5542,13 @@ export async function executeNativeTool(
         // 2. Image Files
         const imageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp", ".ico"];
         if (imageExtensions.includes(ext)) {
+          if (stat.size > 3 * 1024 * 1024) return { result: "Image exceeds the 3 MiB visual input limit; resize it before reading.", isError: true };
+          const bytes = await fs.readFile(filePath);
+          const mimeType = detectSupportedImageMimeType(bytes);
           return {
-            result: `[Image File: ${path.basename(filePath)} | Format: ${ext.slice(1).toUpperCase()} | Size: ${(stat.size / 1024).toFixed(1)} KB]\nPath: ${filePath}\n(Image file verified on disk).`,
+            result: `[Image File: ${path.basename(filePath)} | Format: ${ext.slice(1).toUpperCase()} | Size: ${(stat.size / 1024).toFixed(1)} KB]\nPath: ${filePath}\n${mimeType && mimeType !== "image/bmp" ? "Image attached as a visual tool observation." : "Visual input unavailable for this format; convert to PNG or JPEG before inspecting."}`,
             isError: false,
+            images: mimeType && mimeType !== "image/bmp" ? [{ data: bytes.toString("base64"), mimeType }] : undefined,
           };
         }
 
