@@ -1,5 +1,5 @@
-import React from "react";
-import { Check, Copy, Pencil } from "lucide-react";
+import React, { useState } from "react";
+import { Check, Copy, Pencil, ThumbsUp, ThumbsDown } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { MarkdownContent } from "./markdown-content";
@@ -7,6 +7,7 @@ import { ExecutionTrace, MutationsSummaryCard } from "./execution-trace";
 import { InlineMessageEditor } from "./inline-message-editor";
 import { useTranslation } from "../../lib/i18n";
 import { AssistantResponse } from "../intelligence-ui/assistant-response";
+import { assistantResponseToText } from "../intelligence-ui/protocol";
 import type { IntelligenceUiState } from "../intelligence-ui/schema";
 
 export interface ChatMessage {
@@ -58,12 +59,26 @@ export interface ChatMessageItemProps {
   isConversationBusy?: boolean;
   onIntelligenceStateChange?: (messageId: string, blockId: string, state: Record<string, unknown>) => void;
   onIntelligenceSubmit?: (prompt: string) => void | Promise<void>;
+  onFeedback?: (id: string, type: "good" | "bad") => void;
+  feedback?: "good" | "bad";
 }
 
 export function formatMessageTimestamp(timestamp?: number): string {
   if (!timestamp) return "";
   const d = new Date(timestamp);
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (isToday) {
+    return timeStr;
+  }
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${month}/${day} ${timeStr}`;
 }
 
 export function ChatMessageItem({
@@ -95,8 +110,13 @@ export function ChatMessageItem({
   isConversationBusy = false,
   onIntelligenceStateChange,
   onIntelligenceSubmit,
+  onFeedback,
+  feedback,
 }: ChatMessageItemProps) {
   const { t } = useTranslation();
+  const [internalCopied, setInternalCopied] = useState(false);
+  const [internalFeedback, setInternalFeedback] = useState<"good" | "bad" | null>(null);
+
   if (!message) return null;
 
   if (message.role === "user") {
@@ -220,6 +240,9 @@ export function ChatMessageItem({
   }
 
   // Assistant message
+  const activeFeedback = feedback !== undefined ? feedback : internalFeedback;
+  const isCopied = copiedId === message.id || internalCopied;
+
   return (
     <div className="w-full flex flex-col gap-2.5 group select-text cursor-text">
       <ExecutionTrace
@@ -265,6 +288,77 @@ export function ChatMessageItem({
           onOpenReview={onOpenReview ? () => onOpenReview(message.mutations) : undefined}
           onOpenFileDiff={onOpenFileDiff}
         />
+      )}
+
+      {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
+      {!isExecuting && message.content && (
+        <div className="flex items-center gap-1.5 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none pointer-events-none group-hover:pointer-events-auto font-sans">
+          <button
+            type="button"
+            onClick={async () => {
+              if (onCopyMessage) {
+                onCopyMessage(message.id, message.content);
+              } else if (message.content) {
+                try {
+                  await navigator.clipboard.writeText(assistantResponseToText(message.content));
+                  setInternalCopied(true);
+                  setTimeout(() => setInternalCopied(false), 2000);
+                } catch {}
+              }
+            }}
+            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+            title={t("workbench.copyResponse")}
+          >
+            {isCopied ? (
+              <Check className="w-3.5 h-3.5 text-[#4ade80]" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (onFeedback) {
+                onFeedback(message.id, "good");
+              } else {
+                setInternalFeedback((prev) => (prev === "good" ? null : "good"));
+              }
+            }}
+            className={cn(
+              "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
+              activeFeedback === "good"
+                ? "text-[#4ade80]"
+                : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+            )}
+            title={t("workbench.goodResponse")}
+          >
+            <ThumbsUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (onFeedback) {
+                onFeedback(message.id, "bad");
+              } else {
+                setInternalFeedback((prev) => (prev === "bad" ? null : "bad"));
+              }
+            }}
+            className={cn(
+              "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
+              activeFeedback === "bad"
+                ? "text-[#ef4444]"
+                : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+            )}
+            title={t("workbench.badResponse")}
+          >
+            <ThumbsDown className="w-3.5 h-3.5" />
+          </button>
+          {message.timestamp && (
+            <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777] ml-1.5">
+              {formatMessageTimestamp(message.timestamp)}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

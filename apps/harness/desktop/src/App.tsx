@@ -4433,7 +4433,7 @@ function AuthenticatedContent({
             >
               <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6 select-text", streamWidthClass)}>
                 {messages.map((msg, idx) => (
-                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col select-text cursor-text">
+                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col group select-text cursor-text">
                     <ChatMessageItem
                       message={msg}
                       isConversationBusy={isExecuting}
@@ -4447,6 +4447,8 @@ function AuthenticatedContent({
                       onToggleExpandUserMessage={(id) => setExpandedUserMessageId(id)}
                       copiedId={copiedId}
                       onCopyMessage={handleCopyMessage}
+                      onFeedback={handleFeedback}
+                      feedback={feedbackMap[msg.id]}
                       isEditing={editingMessageId === msg.id}
                       onStartEdit={handleStartEditMessage}
                       onCancelEdit={handleCancelEditMessage}
@@ -4462,53 +4464,6 @@ function AuthenticatedContent({
                       renderAttachment={renderMessageAttachment}
                       userBubbleWidthClass={userBubbleWidthClass}
                     />
-
-                    {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
-                    {!isExecuting && msg.role === "assistant" && msg.content && (
-                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none pointer-events-none group-hover:pointer-events-auto">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyMessage(msg.id, msg.content)}
-                              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                              title={t("workbench.copyResponse")}
-                            >
-                              {copiedId === msg.id ? (
-                                <Check className="w-3.5 h-3.5 text-[#4ade80]" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleFeedback(msg.id, "good")}
-                              className={cn(
-                                "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
-                                feedbackMap[msg.id] === "good"
-                                  ? "text-[#4ade80]"
-                                  : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                              )}
-                              title={t("workbench.goodResponse")}
-                            >
-                              <ThumbsUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleFeedback(msg.id, "bad")}
-                              className={cn(
-                                "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
-                                feedbackMap[msg.id] === "bad"
-                                  ? "text-[#ef4444]"
-                                  : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                              )}
-                              title={t("workbench.badResponse")}
-                            >
-                              <ThumbsDown className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777] ml-1.5">
-                              {formatMessageTimestamp(msg.timestamp)}
-                            </span>
-                          </div>
-                        )}
                   </div>
                 ))}
                 <div ref={messagesEndRef} />

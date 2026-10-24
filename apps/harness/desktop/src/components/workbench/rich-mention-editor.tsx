@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { cn } from "@const/ui";
+import { ScrollArea, cn } from "@const/ui";
 import { useI18n, translate } from "../../lib/i18n";
 import { pluginIconUrl } from "../../lib/plugins/plugins-service";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
@@ -1030,37 +1030,42 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           </div>
         )}
 
-        <div
-          ref={editorRef}
-          contentEditable={!disabled}
-          suppressContentEditableWarning
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          onCompositionStart={() => {
-            isComposingRef.current = true;
-          }}
-          onCompositionEnd={() => {
-            isComposingRef.current = false;
-            saveSelection();
-            syncContent();
-          }}
-          onInput={() => {
-            if (isComposingRef.current) return;
-            saveSelection();
-            syncContent();
-          }}
-          onKeyUp={saveSelection}
-          onMouseUp={saveSelection}
-          onCopy={handleCopy}
-          onCut={handleCut}
-          onPaste={handlePaste}
-          onKeyDown={handleKeyDownInternal}
-          className={cn(
-            "w-full min-h-[28px] max-h-48 overflow-y-auto outline-none font-sans text-[14px] leading-5 text-[#262626] dark:text-[#d4d4d4] py-0.5 whitespace-pre-wrap break-words cursor-text",
-            className
-          )}
-        />
+        <ScrollArea
+          className="w-full max-h-48"
+          viewportClassName="[&>div[style]]:!block"
+        >
+          <div
+            ref={editorRef}
+            contentEditable={!disabled}
+            suppressContentEditableWarning
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+              saveSelection();
+              syncContent();
+            }}
+            onInput={() => {
+              if (isComposingRef.current) return;
+              saveSelection();
+              syncContent();
+            }}
+            onKeyUp={saveSelection}
+            onMouseUp={saveSelection}
+            onCopy={handleCopy}
+            onCut={handleCut}
+            onPaste={handlePaste}
+            onKeyDown={handleKeyDownInternal}
+            className={cn(
+              "w-full min-h-[28px] outline-none font-sans text-[14px] leading-5 text-[#262626] dark:text-[#d4d4d4] py-0.5 whitespace-pre-wrap break-words cursor-text pr-2",
+              className
+            )}
+          />
+        </ScrollArea>
       </div>
     );
   }
