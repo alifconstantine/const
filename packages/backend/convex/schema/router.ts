@@ -179,6 +179,43 @@ export const routerTables = {
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"]),
+
+  // 7. User Account Balance & API Credits (Pay-As-You-Go / Paid Plan)
+  userCredits: defineTable({
+    userId: v.id("users"),
+    balanceUsd: v.number(),        // Current wallet balance in USD
+    totalDepositedUsd: v.number(), // Lifetime total deposited in USD
+    totalSpentUsd: v.number(),     // Lifetime total spent on API calls in USD
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // 8. Deposit & Credit Transaction History
+  creditTransactions: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("deposit"),
+      v.literal("deduction"),
+      v.literal("bonus"),
+      v.literal("refund")
+    ),
+    amountUsd: v.number(),          // Transaction amount in USD
+    balanceAfterUsd: v.number(),    // Resulting balance in USD
+    paymentMethod: v.string(),      // e.g. "USDT (Solana)", "USDC (Polygon)", "QRIS (IDR)", "System Bonus"
+    token: v.optional(v.string()),  // e.g. "USDT", "USDC", "IDR"
+    network: v.optional(v.string()),// e.g. "Solana", "BNB Chain", "Polygon", "QRIS"
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("failed")
+    ),
+    txHash: v.optional(v.string()),
+    description: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"]),
 };
 
 

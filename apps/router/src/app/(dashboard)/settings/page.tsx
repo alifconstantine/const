@@ -38,6 +38,7 @@ import {
   Activity,
   Zap,
 } from "lucide-react";
+import { BUILTIN_MODELS } from "@/lib/model-specs";
 
 export default function SettingsPage() {
   const { isAuthenticated, signIn, signOut } = useRouterAuth();
@@ -196,11 +197,12 @@ export default function SettingsPage() {
               <SelectTrigger className="h-9 w-full rounded-xl bg-secondary text-xs text-foreground border-none">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl bg-card border-none text-foreground">
-                <SelectItem value="gemini-3.8-flash">gemini-3.8-flash (Recommended)</SelectItem>
-                <SelectItem value="glm-5.3-flash">glm-5.3-flash</SelectItem>
-                <SelectItem value="deepseek-v4.1-flash">deepseek-v4.1-flash</SelectItem>
-                <SelectItem value="qwen-3.8-omni-flash">qwen-3.8-omni-flash</SelectItem>
+              <SelectContent className="rounded-xl bg-card border-none text-foreground max-h-72">
+                {BUILTIN_MODELS.filter((m) => m.category === "llm").map((m) => (
+                  <SelectItem key={m.id} value={m.modelId}>
+                    {m.modelId} ({m.name} · {m.tier === "free" ? "Free" : "Paid"})
+                  </SelectItem>
+                ))}
                 {combos &&
                   combos
                     .filter(

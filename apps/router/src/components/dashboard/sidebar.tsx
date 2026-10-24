@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ExternalLink,
+  Wallet,
 } from "lucide-react";
 
 interface NavItem {
@@ -87,6 +88,11 @@ const navSections: NavSection[] = [
   {
     title: "ACCOUNT",
     items: [
+      {
+        title: "Credits & deposit",
+        href: "/credits",
+        icon: Wallet,
+      },
       {
         title: "Settings & data",
         href: "/settings",

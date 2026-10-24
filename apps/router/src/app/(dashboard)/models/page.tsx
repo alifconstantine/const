@@ -47,6 +47,7 @@ interface ModelItem {
   name: string;
   modelId: string;
   provider: string;
+  tier?: "free" | "paid";
   contextWindow: string;
   maxOutputTokens?: string;
   pricing?: ModelPricing;
@@ -75,6 +76,7 @@ const PROVIDERS_DATA: ProviderGroup[] = [
       name: m.name,
       modelId: m.modelId,
       provider: m.provider,
+      tier: m.tier,
       category: m.category,
       endpoint: m.endpoint,
       contextWindow: m.contextWindow || "1M",
@@ -100,6 +102,7 @@ export default function ModelsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "stt" | "search">("all");
+  const [selectedTier, setSelectedTier] = useState<"all" | "free" | "paid">("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
 
@@ -154,13 +157,19 @@ export default function ModelsPage() {
     }
   };
 
-  // Filter models by category and search query
+  // Filter models by category, tier, and search query
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
     return allProviders.map((provider) => {
       // Filter models inside provider
       const matchedModels = provider.models.filter((model) => {
+        // Tier filter (free vs paid)
+        if (selectedTier !== "all") {
+          const modelTier = model.tier || "paid";
+          if (modelTier !== selectedTier) return false;
+        }
+
         // Modality / Category filter
         if (selectedCategory !== "all") {
           const isAudio = model.category === "stt" || model.inputTypes?.includes("audio") || model.modelId.includes("whisper");
@@ -178,7 +187,7 @@ export default function ModelsPage() {
         return inName || inId;
       });
 
-      if (matchedModels.length === 0 && (query || selectedCategory !== "all")) {
+      if (matchedModels.length === 0 && (query || selectedCategory !== "all" || selectedTier !== "all")) {
         return null;
       }
 
@@ -187,11 +196,21 @@ export default function ModelsPage() {
         models: matchedModels,
       };
     }).filter(Boolean) as ProviderGroup[];
-  }, [allProviders, searchQuery, selectedCategory]);
+  }, [allProviders, searchQuery, selectedCategory, selectedTier]);
 
   // Total available models count across filtered
   const totalAvailableModels = allProviders.reduce(
     (acc, prov) => acc + prov.models.length,
+    0
+  );
+
+  const freeModelsCount = allProviders.reduce(
+    (acc, prov) => acc + prov.models.filter((m) => m.tier === "free").length,
+    0
+  );
+
+  const paidModelsCount = allProviders.reduce(
+    (acc, prov) => acc + prov.models.filter((m) => m.tier === "paid" || !m.tier).length,
     0
   );
 
@@ -224,7 +243,7 @@ export default function ModelsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-8 self-start sm:self-auto pt-1 sm:pt-0">
+            <div className="flex items-center gap-6 self-start sm:self-auto pt-1 sm:pt-0">
               <div className="space-y-0.5 text-left sm:text-right">
                 <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
                   Available
@@ -235,11 +254,20 @@ export default function ModelsPage() {
               </div>
 
               <div className="space-y-0.5 text-left sm:text-right">
-                <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
-                  Locked
+                <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Free Tier
                 </div>
                 <div className="text-sm sm:text-base font-semibold text-foreground font-sans tabular-nums">
-                  0 models
+                  {freeModelsCount} models
+                </div>
+              </div>
+
+              <div className="space-y-0.5 text-left sm:text-right">
+                <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Paid Plan
+                </div>
+                <div className="text-sm sm:text-base font-semibold text-foreground font-sans tabular-nums">
+                  {paidModelsCount} models
                 </div>
               </div>
             </div>
@@ -281,34 +309,61 @@ export default function ModelsPage() {
           </div>
         </Card>
 
-        {/* 4. Controls: Category Filter Pills + Search Model + Provider Selector */}
+        {/* 4. Controls: Tier Filter + Category Filter Pills + Search Model */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {[
-              { id: "all", label: "All Modalities", icon: null },
-              { id: "llm", label: "LLM / Chat", icon: MessageSquare },
-              { id: "stt", label: "Audio / STT", icon: Mic },
-              { id: "search", label: "Search", icon: Search },
-            ].map((cat) => {
-              const Icon = cat.icon;
-              const isActive = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id as any)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-sans transition-all cursor-pointer whitespace-nowrap",
-                    isActive
-                      ? "bg-foreground text-background font-medium shadow-sm"
-                      : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  )}
-                >
-                  {Icon && <Icon className="h-3 w-3" />}
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Tier Selector */}
+            <div className="flex items-center p-0.5 rounded-full bg-secondary/60">
+              {[
+                { id: "all", label: "All Tiers" },
+                { id: "free", label: "Free Tier" },
+                { id: "paid", label: "Paid Plan" },
+              ].map((tier) => {
+                const isActive = selectedTier === tier.id;
+                return (
+                  <button
+                    key={tier.id}
+                    onClick={() => setSelectedTier(tier.id as any)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-sans transition-all cursor-pointer whitespace-nowrap",
+                      isActive
+                        ? "bg-foreground text-background font-medium shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {tier.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+              {[
+                { id: "all", label: "All Modalities", icon: null },
+                { id: "llm", label: "LLM / Chat", icon: MessageSquare },
+                { id: "stt", label: "Audio / STT", icon: Mic },
+                { id: "search", label: "Search", icon: Search },
+              ].map((cat) => {
+                const Icon = cat.icon;
+                const isActive = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id as any)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-sans transition-all cursor-pointer whitespace-nowrap",
+                      isActive
+                        ? "bg-secondary text-foreground font-medium border border-border/60"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                    )}
+                  >
+                    {Icon && <Icon className="h-3 w-3" />}
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-1 sm:justify-end">
@@ -401,12 +456,23 @@ export default function ModelsPage() {
                           key={model.id}
                           className="border-none hover:bg-secondary/20 transition-colors"
                         >
-                          {/* 1. Model Name with Copy Button and Endpoint next to it */}
+                          {/* 1. Model Name with Copy Button, Tier badge and Endpoint next to it */}
                           <TableCell className="py-4 pl-6 pr-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-sm text-foreground font-sans">
                                 {model.name}
                               </span>
+
+                              {/* Tier badge */}
+                              {model.tier === "free" ? (
+                                <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-medium">
+                                  Free Tier
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-medium">
+                                  Paid Plan
+                                </span>
+                              )}
 
                               {/* Copy model identifier */}
                               <Tooltip>

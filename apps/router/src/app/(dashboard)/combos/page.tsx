@@ -39,6 +39,7 @@ import {
   X,
   ShieldCheck,
 } from "lucide-react";
+import { BUILTIN_MODELS } from "@/lib/model-specs";
 
 interface ComboModelEntry {
   modelId: string;
@@ -178,12 +179,13 @@ export default function CombosPage() {
   };
 
   // Available Const Gateway Models for Stage 2
-  const CONST_AVAILABLE_MODELS = [
-    { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash", desc: "Fast frontier multimodal, 1M context" },
-    { modelId: "glm-5.3-flash", name: "GLM 5.3 Flash", desc: "High-speed reasoning, 1M context" },
-    { modelId: "deepseek-v4.1-flash", name: "Deepseek v4.1 Flash", desc: "Advanced coding & math, 1M context" },
-    { modelId: "qwen-3.8-omni-flash", name: "Qwen 3.8 Omni Flash", desc: "Multilingual & vision, 1M context" },
-  ];
+  const CONST_AVAILABLE_MODELS = useMemo(() => {
+    return BUILTIN_MODELS.map((m) => ({
+      modelId: m.modelId,
+      name: m.name,
+      desc: `${m.contextWindow} context • ${m.tier === "free" ? "Free Tier" : "Paid Plan"}`,
+    }));
+  }, []);
 
   // Live Candidate Step
   const builderCandidateStep = useMemo(() => {

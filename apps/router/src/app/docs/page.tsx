@@ -506,6 +506,7 @@ data: [DONE]`}</pre>
                   <thead className="bg-[#1b1b1b] border-b border-[#383838]/60 text-[#969696] font-medium font-sans">
                     <tr>
                       <th className="py-2.5 px-4 font-normal">Model</th>
+                      <th className="py-2.5 px-3 font-normal">Tier</th>
                       <th className="py-2.5 px-3 font-normal">Context</th>
                       <th className="py-2.5 px-3 font-normal">Max Out</th>
                       <th className="py-2.5 px-3 font-normal">Input (/1M)</th>
@@ -515,7 +516,26 @@ data: [DONE]`}</pre>
                   </thead>
                   <tbody className="divide-y divide-[#383838]/40 font-mono text-[#d4d4d4]">
                     <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">DeepSeek v4.1 Flash</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Free Tier</span></td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.0125</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
+                      <td className="py-2.5 px-3 text-white">$0.055</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Qwen 3.8 Omni Flash</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Free Tier</span></td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.0125</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
+                      <td className="py-2.5 px-3 text-white">$0.060</td>
+                    </tr>
+                    <tr>
                       <td className="py-2.5 px-4 font-sans font-medium text-white">GLM 5.3 Flash</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">Free Tier</span></td>
                       <td className="py-2.5 px-3">1M</td>
                       <td className="py-2.5 px-3">128K</td>
                       <td className="py-2.5 px-3 text-white">$0.018</td>
@@ -523,39 +543,89 @@ data: [DONE]`}</pre>
                       <td className="py-2.5 px-3 text-white">$0.065</td>
                     </tr>
                     <tr>
-                      <td className="py-2.5 px-4 font-sans font-medium text-white">Qwen 3.8 Omni Flash</td>
-                      <td className="py-2.5 px-3">1M</td>
-                      <td className="py-2.5 px-3">128K</td>
-                      <td className="py-2.5 px-3 text-white">$0.0125</td>
-                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
-                      <td className="py-2.5 px-3 text-white">$0.06</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-4 font-sans font-medium text-white">Deepseek v4.1 Flash</td>
-                      <td className="py-2.5 px-3">1M</td>
-                      <td className="py-2.5 px-3">128K</td>
-                      <td className="py-2.5 px-3 text-white">$0.0125</td>
-                      <td className="py-2.5 px-3 text-[#969696]">$0.0125</td>
-                      <td className="py-2.5 px-3 text-white">$0.075</td>
-                    </tr>
-                    <tr>
                       <td className="py-2.5 px-4 font-sans font-medium text-white">Gemini 3.8 Flash</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
                       <td className="py-2.5 px-3">1M</td>
                       <td className="py-2.5 px-3">128K</td>
-                      <td className="py-2.5 px-3 text-white">$0.02</td>
-                      <td className="py-2.5 px-3 text-[#969696]">$0.02</td>
-                      <td className="py-2.5 px-3 text-white">$0.08</td>
+                      <td className="py-2.5 px-3 text-white">$0.020</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.020</td>
+                      <td className="py-2.5 px-3 text-white">$0.080</td>
                     </tr>
                     <tr>
-                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT Image 2</td>
-                      <td className="py-2.5 px-3">-</td>
-                      <td className="py-2.5 px-3">-</td>
-                      <td className="py-2.5 px-3 text-[#969696]">-</td>
-                      <td className="py-2.5 px-3 text-[#969696]">-</td>
-                      <td className="py-2.5 px-3 text-white">$0.02 <span className="text-[10px] text-[#969696]">/image</span></td>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GLM 5.3</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">256K</td>
+                      <td className="py-2.5 px-3">64K</td>
+                      <td className="py-2.5 px-3 text-white">$0.035</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.035</td>
+                      <td className="py-2.5 px-3 text-white">$0.110</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">MiniMax M3.1 Flash</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">1M</td>
+                      <td className="py-2.5 px-3">128K</td>
+                      <td className="py-2.5 px-3 text-white">$0.035</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.035</td>
+                      <td className="py-2.5 px-3 text-white">$0.135</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Qwen 3.8 Max</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">256K</td>
+                      <td className="py-2.5 px-3">32K</td>
+                      <td className="py-2.5 px-3 text-white">$0.050</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.050</td>
+                      <td className="py-2.5 px-3 text-white">$0.150</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Claude Haiku 5.5</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">200K</td>
+                      <td className="py-2.5 px-3">8K</td>
+                      <td className="py-2.5 px-3 text-white">$0.110</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.110</td>
+                      <td className="py-2.5 px-3 text-white">$0.550</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Grok 4.7</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">256K</td>
+                      <td className="py-2.5 px-3">32K</td>
+                      <td className="py-2.5 px-3 text-white">$0.140</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.140</td>
+                      <td className="py-2.5 px-3 text-white">$0.450</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT 6.1 Sol</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">256K</td>
+                      <td className="py-2.5 px-3">32K</td>
+                      <td className="py-2.5 px-3 text-white">$0.240</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.240</td>
+                      <td className="py-2.5 px-3 text-white">$1.200</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">GPT 6 Astra</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">256K</td>
+                      <td className="py-2.5 px-3">32K</td>
+                      <td className="py-2.5 px-3 text-white">$0.450</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.450</td>
+                      <td className="py-2.5 px-3 text-white">$2.200</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-4 font-sans font-medium text-white">Claude Sonnet 5.5</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">Paid Plan</span></td>
+                      <td className="py-2.5 px-3">200K</td>
+                      <td className="py-2.5 px-3">8K</td>
+                      <td className="py-2.5 px-3 text-white">$0.790</td>
+                      <td className="py-2.5 px-3 text-[#969696]">$0.790</td>
+                      <td className="py-2.5 px-3 text-white">$3.900</td>
                     </tr>
                     <tr>
                       <td className="py-2.5 px-4 font-sans font-medium text-white">Whisper Large V3 Turbo</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">Utility</span></td>
                       <td className="py-2.5 px-3">-</td>
                       <td className="py-2.5 px-3">-</td>
                       <td className="py-2.5 px-3 text-white">$0.006 <span className="text-[10px] text-[#969696]">/min</span></td>
@@ -564,6 +634,7 @@ data: [DONE]`}</pre>
                     </tr>
                     <tr>
                       <td className="py-2.5 px-4 font-sans font-medium text-white">Const Search</td>
+                      <td className="py-2.5 px-3"><span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">Utility</span></td>
                       <td className="py-2.5 px-3">-</td>
                       <td className="py-2.5 px-3">-</td>
                       <td className="py-2.5 px-3 text-white">$0.005 <span className="text-[10px] text-[#969696]">/search</span></td>

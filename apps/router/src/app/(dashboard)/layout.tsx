@@ -27,6 +27,7 @@ import {
   Loader2,
   Menu,
   Bell,
+  CreditCard,
 } from "lucide-react";
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -38,6 +39,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/models": "Models & Pricing",
   "/generation": "Playground",
   "/integrations": "Integrations",
+  "/credits": "Deposit",
+  "/deposit": "Deposit",
   "/settings": "Settings & data",
   "/docs": "Documentation",
 };
@@ -51,6 +54,10 @@ export default function DashboardLayout({
   const { isAuthenticated, isLoading, isSigningOut, signIn, refreshSession } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
+    isAuthenticated ? {} : "skip"
+  );
+  const credits = useQuery(
+    api.router.credits.getUserCredits,
     isAuthenticated ? {} : "skip"
   );
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -205,7 +212,17 @@ export default function DashboardLayout({
                 <Bell className="h-4 w-4 stroke-[1.75]" />
               </Button>
 
-              {/* Saldo placeholder (deferred by user) */}
+              {/* Credit Balance Pill linking to /credits */}
+              <Link href="/credits">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
+                >
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>${(credits?.balanceUsd ?? 0).toFixed(4)}</span>
+                </Button>
+              </Link>
 
               <Link href="/keys">
                 <Button
