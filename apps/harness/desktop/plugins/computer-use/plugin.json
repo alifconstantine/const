@@ -1,0 +1,13 @@
+{
+  "name": "computer-use",
+  "version": "1.0.0",
+  "description": "Native OS desktop GUI automation, mouse clicking, keyboard typing, window states, accessibility tree inspection, and screenshots in native applications and desktop windows.",
+  "author": { "name": "Const" },
+  "homepage": "https://const.dev",
+  "skills": "./skills/",
+  "entrypoint": "computer-use",
+  "interface": {
+    "displayName": "Computer Use",
+    "icon": "blocks"
+  }
+}

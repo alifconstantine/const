@@ -53,6 +53,7 @@ import {
 import { browserController, type ControlState } from "./browser-controller";
 import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
+import { fetchSkillsCatalog } from "../src/lib/skills/skills-sh-service";
 import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
@@ -853,14 +854,20 @@ app.whenReady().then(() => {
   ipcMain.handle(
     "marketplace:install-skill",
     async (
-      _event,
-      payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }
+      event,
+      payload: { slug: string; source?: string; skillId?: string; scope?: "user" | "workspace"; workspacePath?: string; requestId?: string }
     ) => {
-      const installed = await marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath);
+      const installed = await marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath, payload.source, payload.skillId, payload.requestId, (progress) => {
+        if (!event.sender.isDestroyed()) event.sender.send("marketplace:install-progress", progress);
+      });
       if (installed) capabilitiesChanged();
       return installed;
     }
   );
+
+  ipcMain.handle("marketplace:cancel-skill-install", (_event, requestId: string) => marketplaceService.cancelSkillInstall(requestId));
+  ipcMain.handle("marketplace:search-skills", (_event, query: string) => fetchSkillsCatalog(typeof query === "string" ? query.slice(0, 200) : ""));
+  ipcMain.handle("marketplace:preview-remote-skill", (_event, source: string, skillId: string) => marketplaceService.previewRemoteSkill(source, skillId));
 
   ipcMain.handle(
     "marketplace:uninstall-skill",

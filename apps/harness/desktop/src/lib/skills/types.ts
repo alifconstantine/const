@@ -23,6 +23,9 @@ export interface SkillFileEntry {
 }
 
 export interface LocalSkill {
+  sourceId?: string;
+  source?: string;
+  sourceSkillId?: string;
   id: string;
   slug: string;
   name: string;
@@ -46,6 +49,14 @@ export interface LocalSkill {
   files?: Record<string, string>;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface SkillInstallProgress {
+  requestId: string;
+  phase: "resolving" | "downloading" | "validating" | "complete";
+  completed: number;
+  total: number;
+  file?: string;
 }
 
 export interface LocalSkillBundle {

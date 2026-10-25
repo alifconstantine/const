@@ -285,8 +285,16 @@ contextBridge.exposeInMainWorld("electron", {
     },
     listInstalled: (workspacePath?: string) =>
       ipcRenderer.invoke("marketplace:list-installed", workspacePath),
-    installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) =>
+    installSkill: (payload: { slug: string; source?: string; skillId?: string; scope?: "user" | "workspace"; workspacePath?: string; requestId?: string }) =>
       ipcRenderer.invoke("marketplace:install-skill", payload),
+    cancelSkillInstall: (requestId: string) => ipcRenderer.invoke("marketplace:cancel-skill-install", requestId),
+    searchSkills: (query: string) => ipcRenderer.invoke("marketplace:search-skills", query),
+    previewRemoteSkill: (source: string, skillId: string) => ipcRenderer.invoke("marketplace:preview-remote-skill", source, skillId),
+    onInstallProgress: (callback: (progress: import("../src/lib/skills/types").SkillInstallProgress) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: import("../src/lib/skills/types").SkillInstallProgress) => callback(progress);
+      ipcRenderer.on("marketplace:install-progress", handler);
+      return () => ipcRenderer.removeListener("marketplace:install-progress", handler);
+    },
     uninstallSkill: (payload: { id: string; workspacePath?: string }) =>
       ipcRenderer.invoke("marketplace:uninstall-skill", payload),
     openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) =>

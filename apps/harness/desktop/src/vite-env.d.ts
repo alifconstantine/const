@@ -518,6 +518,9 @@ declare global {
           workspacePath?: string;
           pluginId?: string;
           pluginName?: string;
+          sourceId?: string;
+          source?: string;
+          sourceSkillId?: string;
           slug: string;
           name: string;
           description: string;
@@ -528,12 +531,15 @@ declare global {
           version?: string;
           files?: Record<string, string>;
         }>>;
-        installSkill: (payload: { slug: string; scope?: "user" | "workspace"; workspacePath?: string }) => Promise<{
+        installSkill: (payload: { slug: string; source?: string; skillId?: string; scope?: "user" | "workspace"; workspacePath?: string; requestId?: string }) => Promise<{
           id: string;
           isEnabled: boolean;
           workspacePath?: string;
           pluginId?: string;
           pluginName?: string;
+          sourceId?: string;
+          source?: string;
+          sourceSkillId?: string;
           slug: string;
           name: string;
           description: string;
@@ -544,6 +550,10 @@ declare global {
           version?: string;
           files?: Record<string, string>;
         } | null>;
+        searchSkills: (query: string) => Promise<import("./lib/skills/skills-sh-service").SkillsShItem[]>;
+        previewRemoteSkill: (source: string, skillId: string) => Promise<{ content: string; files: Record<string, string>; name?: string; description?: string; author?: string; version?: string }>;
+        cancelSkillInstall: (requestId: string) => Promise<void>;
+        onInstallProgress: (callback: (progress: import("./lib/skills/types").SkillInstallProgress) => void) => () => void;
         uninstallSkill: (payload: { id: string; workspacePath?: string }) => Promise<boolean>;
         openSkillsFolder: (payload?: { workspacePath?: string; scope?: "user" | "workspace" }) => Promise<string>;
         getSkillContent: (slug: string, workspacePath?: string) => Promise<{

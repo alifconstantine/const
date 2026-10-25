@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Button, Input, ScrollArea, Switch, toast, cn } from "@const/ui";
 import {
-  Button,
-  Input,
-  ScrollArea,
-  Switch,
-  toast,
-  cn,
-} from "@const/ui";
-import {
-  Search,
   PanelLeft,
   Trash2,
   PencilSparkles,
@@ -16,7 +8,6 @@ import {
   X,
   ArrowLeft,
   Copy,
-  Blocks,
   Folder,
   Loader2,
   CheckCircle2,
@@ -24,12 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import JSZip from "jszip";
-import {
-  db,
-  localDb,
-  type LocalSkill,
-  type SkillCategory,
-} from "../../lib/db";
+import { db, localDb, type LocalSkill, type SkillCategory } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import {
   installSkillFromMarketplace,
@@ -38,25 +24,36 @@ import {
   parseSkillMarkdown,
   generateSkillOverview,
   runSecurityScan,
-  MARKETPLACE_CATALOG,
   type MarketplaceSkill,
 } from "../../lib/skills/skills-service";
 import { FileIcon } from "../workbench/file-icon";
 import { PluginsMarketplace } from "./plugins-marketplace";
+import type { SkillsShItem } from "../../lib/skills/skills-sh-service";
+import type { SkillInstallProgress } from "../../lib/skills/types";
+import { SkillsLibrary } from "./skills-library";
 import { useResolvedSkills } from "../../lib/skills/use-skills";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import { MarkdownContent } from "../workbench/markdown-content";
 
 import { highlightCodeLines } from "../../lib/code-highlighter";
 
-function SkillCodeViewer({ code, filename }: { code: string; filename: string }) {
+function SkillCodeViewer({
+  code,
+  filename,
+}: {
+  code: string;
+  filename: string;
+}) {
   const highlightedHtml = useMemo(() => {
     return highlightCodeLines(code, filename);
   }, [code, filename]);
 
   return (
-    <div className="w-full h-full overflow-auto bg-[#161616] rounded-xl p-3 border border-[#2e2e2e]">
-      <div className="table w-full border-collapse font-mono" dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+    <div className="w-full min-h-full bg-[#161616] rounded-xl p-3">
+      <div
+        className="table w-full border-collapse font-mono"
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+      />
     </div>
   );
 }
@@ -81,28 +78,67 @@ export function SkillsSettings({
   const { t } = useI18n();
   const uploadDropzoneInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Live Query of installed skills from Dexie DB
-  const skills = useResolvedSkills(workspacePath).filter((skill) => !skill.pluginId);
+  // The filesystem registry supplies installed skills; Dexie supplies custom drafts.
+  const skills = useResolvedSkills(workspacePath).filter(
+    (skill) => !skill.pluginId,
+  );
   const { catalog: pluginCatalog } = usePluginInventory(workspacePath);
 
   // Marketplace tab: Skills vs Plugins
-  const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(initialTab);
+  const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(
+    initialTab,
+  );
 
   // Navigation state
-  const [viewMode, setViewMode] = useState<"list" | "skill-detail" | "upload">("list");
-  const [selectedSkill, setSelectedSkill] = useState<LocalSkill | MarketplaceSkill | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "skill-detail" | "upload">(
+    "list",
+  );
+  const [selectedSkill, setSelectedSkill] = useState<
+    LocalSkill | MarketplaceSkill | null
+  >(null);
   const [installingSlug, setInstallingSlug] = useState<string | null>(null);
 
   // Detail view state
-  const [skillActiveTab, setSkillActiveTab] = useState<"overview" | "content">("overview");
+  const [skillActiveTab, setSkillActiveTab] = useState<"overview" | "content">(
+    "overview",
+  );
   const [selectedFileName, setSelectedFileName] = useState<string>("");
-  const [contentViewMode, setContentViewMode] = useState<"preview" | "code">("preview");
-
   // List filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedScope, setSelectedScope] = useState<"all" | "user" | "workspace">("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [deleteConfirmSkill, setDeleteConfirmSkill] = useState<LocalSkill | null>(null);
+  const [selectedScope, setSelectedScope] = useState<"user" | "workspace">(
+    "user",
+  );
+  const [deleteConfirmSkill, setDeleteConfirmSkill] =
+    useState<LocalSkill | null>(null);
+
+  const [contentViewMode, setContentViewMode] = useState<"preview" | "code">(
+    "preview",
+  );
+  const [installProgress, setInstallProgress] =
+    useState<SkillInstallProgress | null>(null);
+  const [installFailure, setInstallFailure] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const requestRef = useRef<string | null>(null);
+  const installLock = useRef(false);
+  const lastInstall = useRef<MarketplaceSkill | null>(null);
+  useEffect(
+    () => () => {
+      if (requestRef.current)
+        void window.electron?.marketplace?.cancelSkillInstall(
+          requestRef.current,
+        );
+    },
+    [],
+  );
+  useEffect(
+    () =>
+      window.electron?.marketplace?.onInstallProgress?.((progress) => {
+        if (progress.requestId === requestRef.current)
+          setInstallProgress(progress);
+      }),
+    [],
+  );
 
   // Async loaded detail for real SKILL.md and scripts/files
   const [loadedSkillDetail, setLoadedSkillDetail] = useState<{
@@ -117,24 +153,43 @@ export function SkillsSettings({
   useEffect(() => {
     let cancelled = false;
     setLoadedSkillDetail(null);
+    setDetailError(false);
+    setDetailLoading(!!selectedSkill);
     if (selectedSkill) {
-      fetchSkillContent(selectedSkill.slug, workspacePath, selectedSkill.id).then((res) => {
-        if (!cancelled && res) {
-          const overview = generateSkillOverview(
+      const remote = !("createdAt" in selectedSkill) && selectedSkill.source;
+      const detail = remote
+        ? (window.electron?.marketplace?.previewRemoteSkill(
+            remote,
             selectedSkill.slug,
-            res.content,
-            res.description || selectedSkill.description
+          ) ?? Promise.reject(new Error("previewUnavailable")))
+        : fetchSkillContent(
+            selectedSkill.slug,
+            workspacePath,
+            selectedSkill.id,
           );
-          setLoadedSkillDetail({
-            content: res.content,
-            files: res.files,
-            overview,
-            author: res.author,
-            version: res.version,
-            description: res.description,
-          });
-        }
-      }).catch(() => { if (!cancelled) setLoadedSkillDetail(null); });
+      detail
+        .then((res) => {
+          if (!cancelled && res) {
+            const overview = res.content
+              .replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "")
+              .trim();
+            setLoadedSkillDetail({
+              content: res.content,
+              files: res.files,
+              overview,
+              author: res.author,
+              version: res.version,
+              description: res.description,
+            });
+          }
+          if (!cancelled && !res) setDetailError(true);
+        })
+        .catch(() => {
+          if (!cancelled) setDetailError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setDetailLoading(false);
+        });
     }
     return () => {
       cancelled = true;
@@ -144,57 +199,20 @@ export function SkillsSettings({
   // Update selected skill when db updates
   useEffect(() => {
     if (selectedSkill && "createdAt" in selectedSkill) {
-      const refreshed = skills.find((s) => s.id === (selectedSkill as LocalSkill).id);
+      const refreshed = skills.find(
+        (s) => s.id === (selectedSkill as LocalSkill).id,
+      );
       if (refreshed) setSelectedSkill(refreshed);
     }
   }, [skills]);
 
-  // Set of installed skill slugs (lowercase)
-  const installedSlugs = useMemo(() => {
-    return new Set((skills || []).map((s) => s.slug.toLowerCase().trim()));
-  }, [skills]);
-
-  // Filtered installed skills
-  const filteredInstalledSkills = useMemo(() => {
-    return (skills || []).filter((skill) => {
-      if (selectedScope === "user" && skill.scope === "workspace") return false;
-      if (selectedScope === "workspace" && skill.scope !== "workspace") return false;
-      if (selectedCategory !== "all" && skill.category !== selectedCategory) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = skill.name.toLowerCase().includes(q);
-        const matchesSlug = skill.slug.toLowerCase().includes(q);
-        const matchesDesc = (skill.description || "").toLowerCase().includes(q);
-        const matchesAuthor = (skill.author || "").toLowerCase().includes(q);
-        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
-      }
-      return true;
-    });
-  }, [skills, selectedScope, selectedCategory, searchQuery]);
-
-  // Available marketplace skills (uninstalled)
-  const availableMarketplaceSkills = useMemo(() => {
-    return MARKETPLACE_CATALOG.filter((item) => {
-      if (installedSlugs.has(item.slug.toLowerCase().trim())) return false;
-      if (selectedCategory !== "all" && item.category !== selectedCategory) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = item.name.toLowerCase().includes(q);
-        const matchesSlug = item.slug.toLowerCase().includes(q);
-        const matchesDesc = item.description.toLowerCase().includes(q);
-        const matchesAuthor = item.author.toLowerCase().includes(q);
-        return matchesName || matchesSlug || matchesDesc || matchesAuthor;
-      }
-      return true;
-    });
-  }, [installedSlugs, selectedCategory, searchQuery]);
-
   // Compute file map for skill content tab
   const skillFilesMap: Record<string, string> = useMemo(() => {
     if (!selectedSkill) return {};
-    if (loadedSkillDetail?.files && Object.keys(loadedSkillDetail.files).length > 0) {
+    if (
+      loadedSkillDetail?.files &&
+      Object.keys(loadedSkillDetail.files).length > 0
+    ) {
       return loadedSkillDetail.files;
     }
     if (
@@ -205,21 +223,24 @@ export function SkillsSettings({
     ) {
       return selectedSkill.files as Record<string, string>;
     }
-    const content = loadedSkillDetail?.content || ("content" in selectedSkill ? selectedSkill.content : "");
+    const content =
+      loadedSkillDetail?.content ||
+      ("content" in selectedSkill ? selectedSkill.content : "");
     if (content) {
       return {
         "SKILL.md": content,
       };
     }
-    return {
-      "SKILL.md": `# ${selectedSkill.name}\n\n${selectedSkill.description}`,
-    };
+    return {};
   }, [selectedSkill, loadedSkillDetail]);
 
   useEffect(() => {
     if (viewMode === "skill-detail" && selectedSkill) {
       const keys = Object.keys(skillFilesMap);
-      if (keys.length > 0 && (!selectedFileName || !skillFilesMap[selectedFileName])) {
+      if (
+        keys.length > 0 &&
+        (!selectedFileName || !skillFilesMap[selectedFileName])
+      ) {
         setSelectedFileName(keys[0]!);
       }
     }
@@ -230,8 +251,14 @@ export function SkillsSettings({
     try {
       const skill = skills.find((item) => item.id === id);
       if (skill?.path && window.electron?.marketplace) {
-        await window.electron.marketplace.setEnabled({ id, enabled: isEnabled, workspacePath });
-      } else { await localDb.toggleSkill(id, isEnabled); }
+        await window.electron.marketplace.setEnabled({
+          id,
+          enabled: isEnabled,
+          workspacePath,
+        });
+      } else {
+        await localDb.toggleSkill(id, isEnabled);
+      }
       toast.success(isEnabled ? t("skillEnabled") : t("skillDisabled"));
     } catch {
       toast.error(t("marketplace.failedToUpdateStatus"));
@@ -239,29 +266,86 @@ export function SkillsSettings({
   };
 
   const handleInstallSkill = async (skill: MarketplaceSkill) => {
-    setInstallingSlug(skill.slug);
+    if (installLock.current) return;
+    installLock.current = true;
+    lastInstall.current = skill;
+    const requestId = crypto.randomUUID();
+    requestRef.current = requestId;
+    setInstallingSlug(
+      skill.source ? skill.source + "/" + skill.slug : skill.slug,
+    );
+    setInstallFailure(null);
+    setInstallProgress({
+      requestId,
+      phase: "resolving",
+      completed: 0,
+      total: 0,
+    });
     try {
       const installed = await installSkillFromMarketplace(
         skill.slug,
-        selectedScope === "workspace" ? "workspace" : "user",
-        workspacePath
+        selectedScope,
+        workspacePath,
+        skill.source,
+        skill.slug,
+        requestId,
       );
-      toast.success(t("marketplace.installedSuccess").replace("{name}", skill.name));
-      if (selectedSkill && selectedSkill.slug === skill.slug) {
-        setSelectedSkill(installed);
-      }
-    } catch (err: any) {
-      toast.error(err?.message || t("marketplace.failedToInstall"));
+      toast.success(t("marketplace.installedSuccess", { name: skill.name }));
+      if (selectedSkill?.id === skill.id) setSelectedSkill(installed);
+    } catch (error) {
+      const code =
+        error instanceof Error
+          ? error.message.match(/SKILL_INSTALL_([A-Z_]+)/)?.[1]
+          : undefined;
+      const keys: Record<string, string> = {
+        DOWNLOAD: "installErrorDownload",
+        RATE_LIMIT: "installErrorRateLimit",
+        INVALID: "installErrorInvalid",
+        NOT_FOUND: "installErrorNotFound",
+        TOO_LARGE: "installErrorTooLarge",
+        CONFLICT: "installErrorConflict",
+        BUSY: "installErrorBusy",
+      };
+      if (code === "CANCELLED")
+        toast.success(t("marketplace.installCancelled"));
+      else
+        setInstallFailure(
+          t("marketplace." + (keys[code ?? ""] ?? "failedToInstall")),
+        );
     } finally {
+      installLock.current = false;
+      requestRef.current = null;
       setInstallingSlug(null);
+      setInstallProgress(null);
     }
+  };
+
+  const selectLibraryItem = (item: SkillsShItem | LocalSkill) => {
+    setSelectedSkill(
+      "createdAt" in item
+        ? item
+        : {
+            id: item.id,
+            slug: item.skillId,
+            name: item.name,
+            description: item.description ?? "",
+            category: "custom",
+            author: item.source,
+            version: "",
+            source: item.source,
+          },
+    );
+    setSkillActiveTab("overview");
+    setViewMode("skill-detail");
   };
 
   const handleUninstallSkill = async (skill: LocalSkill) => {
     try {
       const removed = await uninstallSkillFromMarketplace(skill, workspacePath);
       if (!removed) throw new Error(t("marketplace.failedToUninstall"));
-      toast.success(t("marketplace.uninstalledSuccess").replace("{name}", skill.name));
+      toast.success(
+        t("marketplace.uninstalledSuccess").replace("{name}", skill.name),
+      );
       setDeleteConfirmSkill(null);
       if (selectedSkill && (selectedSkill as LocalSkill).id === skill.id) {
         setViewMode("list");
@@ -291,8 +375,12 @@ export function SkillsSettings({
   const [uploadSkillContent, setUploadSkillContent] = useState("");
   const [uploadSkillOverview, setUploadSkillOverview] = useState("");
   const [uploadCategory, setUploadCategory] = useState<SkillCategory>("custom");
-  const [uploadFilesMap, setUploadFilesMap] = useState<Record<string, string>>({});
-  const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "passed" | "failed">("idle");
+  const [uploadFilesMap, setUploadFilesMap] = useState<Record<string, string>>(
+    {},
+  );
+  const [scanStatus, setScanStatus] = useState<
+    "idle" | "scanning" | "passed" | "failed"
+  >("idle");
   const [scanMessage, setScanMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -310,14 +398,19 @@ export function SkillsSettings({
         for (const [relativePath, zipEntry] of Object.entries(zipData.files)) {
           if (!zipEntry.dir) {
             const ext = relativePath.split(".").pop()?.toLowerCase();
-            if (ext && ["md", "txt", "json", "yaml", "yml", "ts", "js", "py"].includes(ext)) {
+            if (
+              ext &&
+              ["md", "txt", "json", "yaml", "yml", "ts", "js", "py"].includes(
+                ext,
+              )
+            ) {
               filesMap[relativePath] = await zipEntry.async("text");
             }
           }
         }
 
         const skillMdKey = Object.keys(filesMap).find(
-          (k) => k.endsWith("SKILL.md") || k === "SKILL.md"
+          (k) => k.endsWith("SKILL.md") || k === "SKILL.md",
         );
         const mainContent = skillMdKey ? filesMap[skillMdKey] || "" : "";
         const parsed = parseSkillMarkdown(mainContent);
@@ -325,17 +418,23 @@ export function SkillsSettings({
         const scan = runSecurityScan(mainContent);
         if (!scan.passed) {
           setScanStatus("failed");
-          setScanMessage(scan.message);
+          setScanMessage(t("scanFailed"));
           return;
         }
 
         setUploadFilesMap(filesMap);
         setUploadSkillContent(mainContent);
         setUploadSkillName(parsed.name || file.name.replace(".zip", ""));
-        setUploadSkillSlug(parsed.slug || file.name.replace(".zip", "").toLowerCase());
+        setUploadSkillSlug(
+          parsed.slug || file.name.replace(".zip", "").toLowerCase(),
+        );
         setUploadSkillDescription(parsed.description || "");
-        setUploadSkillOverview(generateSkillOverview(parsed.slug, mainContent, parsed.description));
-        setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
+        setUploadSkillOverview(
+          generateSkillOverview(parsed.slug, mainContent, parsed.description),
+        );
+        setUploadCategory(
+          (parsed.frontmatter.category as SkillCategory) || "custom",
+        );
         setScanStatus("passed");
         setScanMessage(t("securityScanClean"));
       } else {
@@ -344,23 +443,29 @@ export function SkillsSettings({
         const scan = runSecurityScan(text);
         if (!scan.passed) {
           setScanStatus("failed");
-          setScanMessage(scan.message);
+          setScanMessage(t("scanFailed"));
           return;
         }
 
         setUploadSkillContent(text);
         setUploadSkillName(parsed.name || file.name.replace(/\.[^/.]+$/, ""));
-        setUploadSkillSlug(parsed.slug || file.name.replace(/\.[^/.]+$/, "").toLowerCase());
+        setUploadSkillSlug(
+          parsed.slug || file.name.replace(/\.[^/.]+$/, "").toLowerCase(),
+        );
         setUploadSkillDescription(parsed.description || "");
-        setUploadSkillOverview(generateSkillOverview(parsed.slug, text, parsed.description));
-        setUploadCategory((parsed.frontmatter.category as SkillCategory) || "custom");
+        setUploadSkillOverview(
+          generateSkillOverview(parsed.slug, text, parsed.description),
+        );
+        setUploadCategory(
+          (parsed.frontmatter.category as SkillCategory) || "custom",
+        );
         setUploadFilesMap({ "SKILL.md": text });
         setScanStatus("passed");
         setScanMessage(t("securityScanClean"));
       }
-    } catch (err: any) {
+    } catch {
       setScanStatus("failed");
-      setScanMessage(err?.message || "Failed to process file");
+      setScanMessage(t("marketplace.failedToSaveSkill"));
     }
   };
 
@@ -371,9 +476,17 @@ export function SkillsSettings({
       return;
     }
     try {
-      const id = "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      const id =
+        "skill_" +
+        Math.random().toString(36).substring(2, 9) +
+        Date.now().toString(36);
       const now = Date.now();
-      if (scanStatus !== "passed" || !uploadSkillContent.trim() || (selectedScope === "workspace" && !workspacePath)) throw new Error("Invalid skill upload.");
+      if (
+        scanStatus !== "passed" ||
+        !uploadSkillContent.trim() ||
+        (selectedScope === "workspace" && !workspacePath)
+      )
+        throw new Error("Invalid skill upload.");
       await db.skills.add({
         id,
         slug: uploadSkillSlug.trim().toLowerCase(),
@@ -385,7 +498,8 @@ export function SkillsSettings({
         isBuiltIn: false,
         isEnabled: true,
         scope: selectedScope === "workspace" ? "workspace" : "user",
-        workspacePath: selectedScope === "workspace" ? workspacePath : undefined,
+        workspacePath:
+          selectedScope === "workspace" ? workspacePath : undefined,
         author: "Uploaded",
         version: "1.0.0",
         overview: uploadSkillOverview,
@@ -407,22 +521,141 @@ export function SkillsSettings({
     toast.success(t("marketplace.copiedToClipboard"));
   };
 
-  const CATEGORY_FILTERS: Array<{ id: string; label: string }> = [
-    { id: "all", label: t("marketplace.filterAll") },
-    { id: "coding_dev", label: t("marketplace.filterCoding") },
-    { id: "motion_video", label: t("marketplace.filterCreative") },
-    { id: "finance", label: t("marketplace.filterFinance") },
-    { id: "scraping_research", label: t("marketplace.filterResearch") },
-    { id: "design", label: t("marketplace.filterDesign") },
-    { id: "agent_workflow", label: t("marketplace.filterWorkflow") },
-    { id: "document", label: t("marketplace.filterDocument") },
-  ];
+  const deleteDialog = deleteConfirmSkill && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+      onClick={() => setDeleteConfirmSkill(null)}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="skill-uninstall-title"
+        className="w-[420px] max-w-[95vw] bg-[#222222] border border-[#383838] rounded-2xl p-5 flex flex-col gap-4 text-white shadow-2xl animate-in zoom-in-[0.985] duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+            <Trash2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h3
+              id="skill-uninstall-title"
+              className="text-sm font-semibold text-white"
+            >
+              {t("marketplace.uninstallConfirmTitle")}
+            </h3>
+            <p className="text-xs text-[#969696] mt-1 leading-relaxed">
+              {t("marketplace.uninstallConfirmDesc").replace(
+                "{name}",
+                deleteConfirmSkill.name,
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2e2e2e]">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteConfirmSkill(null)}
+            className="h-8 px-3 rounded-lg text-xs text-[#969696] hover:text-white"
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => handleUninstallSkill(deleteConfirmSkill)}
+            className="h-8 px-3.5 rounded-lg text-xs bg-red-600 hover:bg-red-500 text-white font-medium shadow-none cursor-pointer"
+          >
+            {t("marketplace.uninstall")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+  const progressPanel = installProgress ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className="rounded-2xl bg-[#222222] p-4 space-y-3"
+    >
+      <div className="flex justify-between items-center gap-4">
+        <div className="flex items-center gap-2 text-sm text-white">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span>
+            {t(
+              "marketplace.phase" +
+                installProgress.phase[0]!.toUpperCase() +
+                installProgress.phase.slice(1),
+            )}
+          </span>
+          <span className="text-[#969696]">{lastInstall.current?.name}</span>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            if (requestRef.current)
+              void window.electron?.marketplace?.cancelSkillInstall(
+                requestRef.current,
+              );
+          }}
+        >
+          {t("common.cancel")}
+        </Button>
+      </div>
+      {installProgress.total > 0 && (
+        <>
+          <div
+            role="progressbar"
+            aria-label={t("marketplace.downloadingFiles")}
+            aria-valuenow={installProgress.completed}
+            aria-valuemin={0}
+            aria-valuemax={installProgress.total}
+            className="h-1.5 rounded-full bg-[#383838] overflow-hidden"
+          >
+            <div
+              className="h-full rounded-full bg-white transition-[width]"
+              style={{
+                width:
+                  (installProgress.completed / installProgress.total) * 100 +
+                  "%",
+              }}
+            />
+          </div>
+          <p className="text-xs text-[#969696] truncate">
+            {t("marketplace.filesProgress", {
+              completed: installProgress.completed,
+              total: installProgress.total,
+            })}
+            {installProgress.file && " · " + installProgress.file}
+          </p>
+        </>
+      )}
+    </div>
+  ) : installFailure ? (
+    <div
+      role="alert"
+      className="rounded-2xl bg-[#222222] p-4 flex items-center justify-between gap-4"
+    >
+      <p className="text-sm text-[#d4d4d4]">{installFailure}</p>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => {
+          if (lastInstall.current) void handleInstallSkill(lastInstall.current);
+        }}
+      >
+        {t("marketplace.retry")}
+      </Button>
+    </div>
+  ) : null;
 
   // ---------------------------------------------------------------------------
   // RENDER: VIEW 1 — SKILL DETAIL VIEW
   // ---------------------------------------------------------------------------
   if (viewMode === "skill-detail" && selectedSkill) {
-    const isInstalled = "createdAt" in selectedSkill || installedSlugs.has(selectedSkill.slug.toLowerCase().trim());
+    const isInstalled = "createdAt" in selectedSkill;
     const activeFileContent =
       skillFilesMap[selectedFileName] ||
       loadedSkillDetail?.content ||
@@ -431,7 +664,12 @@ export function SkillsSettings({
     const filesList = Object.keys(skillFilesMap);
 
     return (
-      <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-4 pb-8" : "space-y-6")}>
+      <div
+        className={cn(
+          "w-full flex flex-col font-sans select-none outline-none ring-0",
+          isModal ? "space-y-4 pb-8" : "space-y-6",
+        )}
+      >
         {/* Top Back Navigation Bar */}
         <div className="flex items-center justify-between">
           <Button
@@ -456,6 +694,8 @@ export function SkillsSettings({
           )}
         </div>
 
+        {progressPanel}
+        {deleteDialog}
         {/* Skill Header Strip */}
         <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-[#222222] border border-[#383838]">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -481,14 +721,16 @@ export function SkillsSettings({
                   <span>
                     {t("marketplace.byAuthor").replace(
                       "{author}",
-                      loadedSkillDetail?.author || selectedSkill.author || ""
+                      loadedSkillDetail?.author || selectedSkill.author || "",
                     )}
                   </span>
                 )}
                 {(loadedSkillDetail?.version || selectedSkill.version) && (
                   <>
                     <span>·</span>
-                    <span>v{loadedSkillDetail?.version || selectedSkill.version}</span>
+                    <span>
+                      v{loadedSkillDetail?.version || selectedSkill.version}
+                    </span>
                   </>
                 )}
               </div>
@@ -500,16 +742,25 @@ export function SkillsSettings({
             {isInstalled ? (
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[#969696]">
-                  {(selectedSkill as LocalSkill).isEnabled ? t("marketplace.active") : t("marketplace.disabled")}
+                  {(selectedSkill as LocalSkill).isEnabled
+                    ? t("marketplace.active")
+                    : t("marketplace.disabled")}
                 </span>
                 <Switch
+                  aria-label={t("marketplace.enableSkill", {
+                    name: selectedSkill.name,
+                  })}
                   checked={(selectedSkill as LocalSkill).isEnabled}
-                  onCheckedChange={(checked) => handleToggleSkill((selectedSkill as LocalSkill).id, checked)}
+                  onCheckedChange={(checked) =>
+                    handleToggleSkill((selectedSkill as LocalSkill).id, checked)
+                  }
                 />
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setDeleteConfirmSkill(selectedSkill as LocalSkill)}
+                  onClick={() =>
+                    setDeleteConfirmSkill(selectedSkill as LocalSkill)
+                  }
                   className="h-8 px-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg cursor-pointer"
                   title={t("marketplace.uninstall")}
                 >
@@ -519,11 +770,19 @@ export function SkillsSettings({
             ) : (
               <Button
                 size="sm"
-                onClick={() => handleInstallSkill(selectedSkill as MarketplaceSkill)}
-                disabled={installingSlug === selectedSkill.slug}
+                onClick={() =>
+                  handleInstallSkill(selectedSkill as MarketplaceSkill)
+                }
+                disabled={
+                  installingSlug !== null ||
+                  (selectedScope === "workspace" && !workspacePath)
+                }
                 className="h-8 px-4 rounded-xl text-xs font-medium gap-1.5 bg-white text-black hover:bg-zinc-200 transition-colors shadow-none cursor-pointer"
               >
-                {installingSlug === selectedSkill.slug ? (
+                {installingSlug ===
+                (selectedSkill.source
+                  ? selectedSkill.source + "/" + selectedSkill.slug
+                  : selectedSkill.slug) ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     <span>{t("marketplace.installing")}</span>
@@ -539,6 +798,16 @@ export function SkillsSettings({
           </div>
         </div>
 
+        {detailLoading && (
+          <p role="status" className="text-sm text-[#969696]">
+            {t("marketplace.loadingInstructions")}
+          </p>
+        )}
+        {detailError && (
+          <p role="alert" className="text-sm text-[#d4d4d4]">
+            {t("marketplace.previewUnavailable")}
+          </p>
+        )}
         {/* 2 Tabs Row (Overview, Content · N) */}
         <div className="flex items-center gap-6 text-xs font-medium border-b border-[#2e2e2e]">
           <button
@@ -548,7 +817,7 @@ export function SkillsSettings({
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "overview"
                 ? "border-white text-white font-semibold"
-                : "border-transparent text-[#969696] hover:text-white"
+                : "border-transparent text-[#969696] hover:text-white",
             )}
           >
             {t("tabOverview")}
@@ -560,7 +829,7 @@ export function SkillsSettings({
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "content"
                 ? "border-white text-white font-semibold"
-                : "border-transparent text-[#969696] hover:text-white"
+                : "border-transparent text-[#969696] hover:text-white",
             )}
           >
             {t("tabContent")} · {filesList.length}
@@ -570,9 +839,13 @@ export function SkillsSettings({
         {/* Tab 1: OVERVIEW */}
         {skillActiveTab === "overview" && (
           <div className="max-w-3xl flex flex-col gap-4 pt-2">
-            {(loadedSkillDetail?.overview || selectedSkill.overview) ? (
+            {loadedSkillDetail?.overview || selectedSkill.overview ? (
               <div className="p-5 rounded-2xl bg-[#222222] border border-[#383838] select-text">
-                <MarkdownContent content={loadedSkillDetail?.overview || selectedSkill.overview || ""} />
+                <MarkdownContent
+                  content={
+                    loadedSkillDetail?.overview || selectedSkill.overview || ""
+                  }
+                />
               </div>
             ) : (
               <div className="p-5 rounded-2xl bg-[#222222] border border-[#383838] select-text">
@@ -601,7 +874,7 @@ export function SkillsSettings({
                   className="h-6 px-2 text-[11px] text-[#969696] hover:text-white cursor-pointer"
                 >
                   <Copy className="w-3 h-3 mr-1" />
-                  <span>Copy</span>
+                  <span>{t("common.copy")}</span>
                 </Button>
               </div>
             </div>
@@ -614,7 +887,12 @@ export function SkillsSettings({
             {/* File explorer sidebar */}
             <div className="w-full md:w-60 shrink-0 flex flex-col rounded-2xl bg-[#222222] border border-[#383838] overflow-hidden">
               <div className="px-3.5 py-3 border-b border-[#2e2e2e] flex items-center justify-between text-xs font-medium text-[#d4d4d4]">
-                <span>{t("marketplace.filesList").replace("{count}", String(filesList.length))}</span>
+                <span>
+                  {t("marketplace.filesList").replace(
+                    "{count}",
+                    String(filesList.length),
+                  )}
+                </span>
               </div>
               <ScrollArea className="flex-1 p-2">
                 <div className="flex flex-col gap-1">
@@ -627,10 +905,13 @@ export function SkillsSettings({
                         "w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer truncate",
                         selectedFileName === fName
                           ? "bg-[#2b2b2b] text-white font-medium border border-[#383838]"
-                          : "text-[#969696] hover:bg-[#2b2b2b]/60 hover:text-white"
+                          : "text-[#969696] hover:bg-[#2b2b2b]/60 hover:text-white",
                       )}
                     >
-                      <FileIcon filename={fName} className="w-3.5 h-3.5 shrink-0" />
+                      <FileIcon
+                        filename={fName}
+                        className="w-3.5 h-3.5 shrink-0"
+                      />
                       <span className="truncate">{fName}</span>
                     </button>
                   ))}
@@ -642,7 +923,10 @@ export function SkillsSettings({
             <div className="flex-1 min-w-0 flex flex-col rounded-2xl bg-[#222222] border border-[#383838] overflow-hidden">
               <div className="px-4 py-2.5 border-b border-[#2e2e2e] flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileIcon filename={selectedFileName} className="w-3.5 h-3.5 shrink-0" />
+                  <FileIcon
+                    filename={selectedFileName}
+                    className="w-3.5 h-3.5 shrink-0"
+                  />
                   <span className="text-xs font-medium text-white truncate">
                     {selectedFileName}
                   </span>
@@ -656,7 +940,7 @@ export function SkillsSettings({
                         "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer",
                         contentViewMode === "preview"
                           ? "bg-[#2b2b2b] text-white"
-                          : "text-[#969696] hover:text-white"
+                          : "text-[#969696] hover:text-white",
                       )}
                     >
                       {t("previewMode")}
@@ -668,7 +952,7 @@ export function SkillsSettings({
                         "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer",
                         contentViewMode === "code"
                           ? "bg-[#2b2b2b] text-white"
-                          : "text-[#969696] hover:text-white"
+                          : "text-[#969696] hover:text-white",
                       )}
                     >
                       {t("rawCodeMode")}
@@ -679,7 +963,7 @@ export function SkillsSettings({
                     size="sm"
                     onClick={() => handleCopyContent(activeFileContent)}
                     className="h-7 w-7 p-0 rounded-lg text-[#969696] hover:text-white cursor-pointer"
-                    title={t("copyCode")}
+                    title={t("common.copy")}
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
@@ -687,16 +971,24 @@ export function SkillsSettings({
               </div>
 
               <ScrollArea className="flex-1 p-5">
-                {selectedFileName.endsWith(".md") || selectedFileName === "README.md" || selectedFileName === "SKILL.md" ? (
+                {selectedFileName.endsWith(".md") ||
+                selectedFileName === "README.md" ||
+                selectedFileName === "SKILL.md" ? (
                   contentViewMode === "preview" ? (
                     <div className="p-2 select-text">
                       <MarkdownContent content={activeFileContent} />
                     </div>
                   ) : (
-                    <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
+                    <SkillCodeViewer
+                      code={activeFileContent}
+                      filename={selectedFileName}
+                    />
                   )
                 ) : (
-                  <SkillCodeViewer code={activeFileContent} filename={selectedFileName} />
+                  <SkillCodeViewer
+                    code={activeFileContent}
+                    filename={selectedFileName}
+                  />
                 )}
               </ScrollArea>
             </div>
@@ -711,7 +1003,12 @@ export function SkillsSettings({
   // ---------------------------------------------------------------------------
   if (viewMode === "upload") {
     return (
-      <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-4 pb-8" : "space-y-6")}>
+      <div
+        className={cn(
+          "w-full flex flex-col font-sans select-none outline-none ring-0",
+          isModal ? "space-y-4 pb-8" : "space-y-6",
+        )}
+      >
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
@@ -751,7 +1048,7 @@ export function SkillsSettings({
               "rounded-2xl border-2 border-dashed p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors",
               isDragOver
                 ? "border-white bg-[#2b2b2b]"
-                : "border-[#383838] bg-[#222222] hover:bg-[#2b2b2b]/60"
+                : "border-[#383838] bg-[#222222] hover:bg-[#2b2b2b]/60",
             )}
           >
             <input
@@ -779,14 +1076,23 @@ export function SkillsSettings({
             <div
               className={cn(
                 "p-4 rounded-xl border flex items-center gap-3 text-xs",
-                scanStatus === "scanning" && "bg-blue-500/10 border-blue-500/20 text-blue-300",
-                scanStatus === "passed" && "bg-emerald-500/10 border-emerald-500/20 text-emerald-300",
-                scanStatus === "failed" && "bg-red-500/10 border-red-500/20 text-red-300"
+                scanStatus === "scanning" &&
+                  "bg-blue-500/10 border-blue-500/20 text-blue-300",
+                scanStatus === "passed" &&
+                  "bg-emerald-500/10 border-emerald-500/20 text-emerald-300",
+                scanStatus === "failed" &&
+                  "bg-red-500/10 border-red-500/20 text-red-300",
               )}
             >
-              {scanStatus === "scanning" && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
-              {scanStatus === "passed" && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-              {scanStatus === "failed" && <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />}
+              {scanStatus === "scanning" && (
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              )}
+              {scanStatus === "passed" && (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              )}
+              {scanStatus === "failed" && (
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              )}
               <span>{scanMessage}</span>
             </div>
           )}
@@ -852,426 +1158,131 @@ export function SkillsSettings({
   // RENDER: MAIN MARKETPLACE VIEW
   // ---------------------------------------------------------------------------
   return (
-    <div className={cn("w-full flex flex-col font-sans select-none outline-none ring-0", isModal ? "space-y-5" : "space-y-6")}>
-      {/* 1. Header with Title & Main Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            {!isSidebarOpen && onToggleSidebar && (
-              <button
-                type="button"
-                onClick={onToggleSidebar}
-                className="p-1.5 -ml-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
-                title={t("chat.toggleSidebar")}
-              >
-                <PanelLeft className="w-4 h-4" />
-              </button>
-            )}
-            <h1 className="text-xl sm:text-2xl font-medium tracking-tight text-white">
-              {t("marketplace.title")}
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-sans tabular-nums">
-              {marketplaceTab === "plugins" ? pluginCatalog.length : skills.length + availableMarketplaceSkills.length}
-            </span>
-          </div>
-          <p className="text-xs text-[#969696] mt-0.5">
-            {t("marketplace.subtitle")}
-          </p>
-        </div>
-
-        {/* Search Bar & Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-[#5d5d5d] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <Input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("marketplace.searchPlaceholder")}
-              className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-[#2b2b2b] border-[#383838] text-white placeholder-[#5d5d5d] focus-visible:ring-0 shadow-none outline-none"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#969696] hover:text-white cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <Button
-            size="sm"
-            onClick={handleOpenSkillsFolder}
-            className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-[#222222] border border-[#383838] text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] transition-all cursor-pointer shadow-none"
-            title={t("marketplace.openFolder")}
-          >
-            <Folder className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t("marketplace.openFolder")}</span>
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setViewMode("upload")}
-            className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-white text-black hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
-          >
-            <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
-            <span>{t("uploadBtn")}</span>
-          </Button>
-
-          {onClose && (
+    <div
+      className={cn(
+        "w-full flex flex-col font-sans outline-none ring-0",
+        isModal ? "space-y-5" : "space-y-6",
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-2">
+          {!isSidebarOpen && onToggleSidebar && (
             <button
               type="button"
+              onClick={onToggleSidebar}
+              aria-label={t("topToolbar.toggleSidebar")}
+              className="p-2 rounded-lg text-[#969696] hover:text-white"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-medium tracking-tight text-white">
+              {t("marketplace.title")}
+            </h1>
+            <p className="text-sm text-[#969696] mt-1">
+              {t("marketplace.skillsIntro")}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenSkillsFolder}
+            className="text-[#969696] gap-2"
+          >
+            <Folder className="w-4 h-4" />
+            {t("marketplace.openFolder")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setViewMode("upload")}
+            className="gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            {t("uploadBtn")}
+          </Button>
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t("common.close")}
               onClick={onClose}
-              className="p-1.5 rounded-xl text-[#969696] hover:text-white hover:bg-[#2b2b2b] transition-colors cursor-pointer"
-              title={t("common.close")}
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
       </div>
-
-      {/* 2. Top Segmented Switcher: [ Skills ] [ Plugins ] */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e]">
-          <button
-            type="button"
-            onClick={() => setMarketplaceTab("skills")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-2",
-              marketplaceTab === "skills"
-                ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
-                : "text-[#969696] hover:text-white"
-            )}
-          >
-            <PencilSparkles className="w-3.5 h-3.5 text-white" />
-            <span>{t("marketplace.tabSkills")}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#161616] text-[#969696]">
-              {skills.length + availableMarketplaceSkills.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMarketplaceTab("plugins")}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-2",
-              marketplaceTab === "plugins"
-                ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
-                : "text-[#969696] hover:text-white"
-            )}
-          >
-            <Blocks className="w-3.5 h-3.5 text-[#969696]" />
-            <span>{t("marketplace.tabPlugins")}</span>
-          </button>
-        </div>
-
-        {(
-          <div className="flex items-center p-1 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] ml-auto">
-            <button
-              type="button"
-              onClick={() => setSelectedScope("all")}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-                selectedScope === "all" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
-              )}
-            >
-              {t("allScope") || "All"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedScope("user")}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-                selectedScope === "user" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
-              )}
-            >
-              {t("userScope") || "Personal"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedScope("workspace")}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-                selectedScope === "workspace" ? "bg-[#2b2b2b] text-white font-semibold" : "text-[#969696] hover:text-white"
-              )}
-            >
-              {t("workspaceScope") || "Workspace"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {marketplaceTab === "plugins" && <PluginsMarketplace workspacePath={workspacePath} scope={selectedScope} search={searchQuery} />}
-
-      {/* 4. TAB CONTENT: SKILLS */}
-      {marketplaceTab === "skills" && (
-        <div className="space-y-6">
-          {/* Category Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {CATEGORY_FILTERS.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                className={cn(
-                  "px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
-                  selectedCategory === cat.id
-                    ? "bg-white text-black font-semibold"
-                    : "bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] hover:text-white hover:bg-[#252528]"
-                )}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* ================================================================= */}
-          {/* SECTION A: INSTALLED SKILLS (ON TOP)                              */}
-          {/* ================================================================= */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
-                  {t("marketplace.installedSection")}
-                </h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-mono">
-                  {filteredInstalledSkills.length}
-                </span>
-              </div>
-            </div>
-
-            {filteredInstalledSkills.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#383838] bg-[#1b1b1b]/50 p-6 flex flex-col items-center justify-center text-center gap-1.5">
-                <p className="text-xs font-medium text-[#d4d4d4]">
-                  {t("marketplace.noInstalledTitle")}
-                </p>
-                <p className="text-[11px] text-[#969696] max-w-sm leading-relaxed">
-                  {t("marketplace.noInstalledDesc")}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredInstalledSkills.map((skill) => (
-                  <div
-                    key={skill.id}
-                    onClick={() => {
-                      setSelectedSkill(skill);
-                      setSkillActiveTab("overview");
-                      setViewMode("skill-detail");
-                    }}
-                    className="rounded-xl bg-[#222222] border border-[#2e2e2e] hover:border-[#383838] p-4 flex flex-col justify-between transition-all group cursor-pointer"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0 group-hover:border-primary/40 transition-colors">
-                            <PencilSparkles className="w-4 h-4 text-white" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-semibold text-white group-hover:text-primary transition-colors truncate">
-                                {skill.name}
-                              </span>
-                              <span className="text-[11px] font-mono text-[#969696]">
-                                /{skill.slug}
-                              </span>
-                            </div>
-                            {skill.author && (
-                              <p className="text-[10px] text-[#969696] mt-0.5">
-                                by @{skill.author}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Right: Switch & Uninstall */}
-                        <div
-                          className="flex items-center gap-2.5 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Switch
-                            checked={skill.isEnabled}
-                            onCheckedChange={(checked) => handleToggleSkill(skill.id, checked)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmSkill(skill)}
-                            className="p-1 rounded-lg text-[#969696] hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title={t("marketplace.uninstall")}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {skill.description && (
-                        <p className="text-xs text-[#969696] line-clamp-2 mt-2 leading-relaxed">
-                          {skill.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#2e2e2e]/50 text-[10px]">
-                      <span className="px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] capitalize">
-                        {skill.category.replace(/_/g, " ")}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696]">
-                        {skill.scope === "workspace" ? t("marketplace.workspaceScope") : t("marketplace.globalScope")}
-                      </span>
-                      <div className="ml-auto flex items-center gap-1.5 text-[#969696]">
-                        <span className={cn("w-1.5 h-1.5 rounded-full", skill.isEnabled ? "bg-emerald-400" : "bg-[#5d5d5d]")} />
-                        <span>{skill.isEnabled ? t("marketplace.active") : t("marketplace.disabled")}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ================================================================= */}
-          {/* SECTION B: AVAILABLE IN MARKETPLACE (BELOW)                       */}
-          {/* ================================================================= */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
-                  {t("marketplace.availableSection")}
-                </h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] font-mono">
-                  {availableMarketplaceSkills.length}
-                </span>
-              </div>
-            </div>
-
-            {availableMarketplaceSkills.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#383838] bg-[#1b1b1b]/50 p-6 flex flex-col items-center justify-center text-center gap-1.5">
-                <p className="text-xs font-medium text-[#d4d4d4]">
-                  {t("marketplace.noAvailableTitle")}
-                </p>
-                <p className="text-[11px] text-[#969696] max-w-sm leading-relaxed">
-                  {t("marketplace.noAvailableDesc")}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {availableMarketplaceSkills.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setSelectedSkill(item);
-                      setSkillActiveTab("overview");
-                      setViewMode("skill-detail");
-                    }}
-                    className="rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] hover:border-[#383838] p-4 flex flex-col justify-between transition-all group cursor-pointer"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-[#222222] border border-[#2e2e2e] flex items-center justify-center text-[#d4d4d4] shrink-0 group-hover:border-primary/40 transition-colors">
-                            <PencilSparkles className="w-4 h-4 text-[#d4d4d4]" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-semibold text-white group-hover:text-primary transition-colors truncate">
-                                {item.name}
-                              </span>
-                              <span className="text-[11px] font-mono text-[#969696]">
-                                /{item.slug}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-[#969696] mt-0.5">
-                              by @{item.author}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Install Button */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            onClick={() => handleInstallSkill(item)}
-                            disabled={installingSlug === item.slug}
-                            className="h-7 px-3.5 rounded-lg text-xs font-medium bg-white text-black hover:bg-zinc-200 transition-colors shadow-none cursor-pointer"
-                          >
-                            {installingSlug === item.slug ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <span>{t("marketplace.install")}</span>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-[#969696] line-clamp-2 mt-2 leading-relaxed">
-                        {item.description}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#2e2e2e]/40 text-[10px]">
-                      <span className="px-2 py-0.5 rounded-md bg-[#222222] border border-[#2e2e2e] text-[#969696] capitalize">
-                        {item.category.replace(/_/g, " ")}
-                      </span>
-                      <span className="text-[#5d5d5d] ml-auto">
-                        v{item.version}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Delete / Uninstall Confirmation Dialog */}
-      {deleteConfirmSkill && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => setDeleteConfirmSkill(null)}
+      <div className="flex items-center gap-5 text-sm">
+        <button
+          type="button"
+          onClick={() => setMarketplaceTab("skills")}
+          className={cn(
+            "py-2",
+            marketplaceTab === "skills" ? "text-white" : "text-[#969696]",
+          )}
         >
-          <div
-            className="w-[420px] max-w-[95vw] bg-[#222222] border border-[#383838] rounded-2xl p-5 flex flex-col gap-4 text-white shadow-2xl animate-in zoom-in-[0.985] duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  {t("marketplace.uninstallConfirmTitle")}
-                </h3>
-                <p className="text-xs text-[#969696] mt-1 leading-relaxed">
-                  {t("marketplace.uninstallConfirmDesc").replace("{name}", deleteConfirmSkill.name)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2e2e2e]">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteConfirmSkill(null)}
-                className="h-8 px-3 rounded-lg text-xs text-[#969696] hover:text-white"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleUninstallSkill(deleteConfirmSkill)}
-                className="h-8 px-3.5 rounded-lg text-xs bg-red-600 hover:bg-red-500 text-white font-medium shadow-none cursor-pointer"
-              >
-                {t("marketplace.uninstall")}
-              </Button>
-            </div>
-          </div>
-        </div>
+          {t("marketplace.tabSkills")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMarketplaceTab("plugins")}
+          className={cn(
+            "py-2",
+            marketplaceTab === "plugins" ? "text-white" : "text-[#969696]",
+          )}
+        >
+          {t("marketplace.tabPlugins")}{" "}
+          <span className="text-[#969696]">{pluginCatalog.length}</span>
+        </button>
+      </div>
+      {progressPanel}
+      {marketplaceTab === "skills" ? (
+        <SkillsLibrary
+          skills={skills}
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          scope={selectedScope}
+          onScopeChange={setSelectedScope}
+          workspacePath={workspacePath}
+          installing={installingSlug !== null}
+          onInstall={(item) =>
+            void handleInstallSkill({
+              id: item.id,
+              slug: item.skillId,
+              name: item.name,
+              description: item.description ?? "",
+              category: "custom",
+              author: item.source,
+              version: "",
+              source: item.source,
+            })
+          }
+          onSelect={selectLibraryItem}
+          onToggle={(skill, enabled) =>
+            void handleToggleSkill(skill.id, enabled)
+          }
+          onUninstall={setDeleteConfirmSkill}
+        />
+      ) : (
+        <>
+          <Input
+            aria-label={t("marketplace.searchPlaceholder")}
+            placeholder={t("marketplace.searchPlaceholder")}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <PluginsMarketplace
+            workspacePath={workspacePath}
+            scope="all"
+            search={searchQuery}
+          />
+        </>
       )}
-
+      {deleteDialog}
     </div>
   );
 }

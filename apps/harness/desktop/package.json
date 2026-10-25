@@ -7,6 +7,7 @@
     "dev": "node scripts/build-computer-use-macos.cjs && vite",
     "build": "node scripts/build-computer-use-macos.cjs && tsc && vite build",
     "check-types": "tsc --noEmit",
+    "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:browser": "node scripts/test-browser.cjs",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
@@ -40,6 +41,7 @@
     "motion": "^13.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "yaml": "^2.9.0",
     "zod": "4.3.6"
   },
   "devDependencies": {

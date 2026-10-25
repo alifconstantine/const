@@ -272,6 +272,8 @@ export interface MarketplaceSkill {
   icon?: string;
   overview?: string;
   files?: string[];
+  installs?: number;
+  source?: string;
 }
 
 export const MARKETPLACE_CATALOG: MarketplaceSkill[] = ${JSON.stringify(catalog, null, 2)};
@@ -281,7 +283,7 @@ fs.writeFileSync(catalogFile, catalogCode, 'utf8');
 console.log(`Generated skills-catalog.ts with ${catalog.length} skills.`);
 
 // 2. Build default-skills.ts with pre-installed docx, pdf, pptx
-const defaultSlugs = ['docx', 'pdf', 'pptx'];
+const defaultSlugs = []; // Skills are installed explicitly by the user.
 const defaultSkills = [];
 
 for (const slug of defaultSlugs) {
@@ -333,8 +335,7 @@ for (const slug of defaultSlugs) {
 const defaultSkillsCode = `import type { LocalSkill } from "./types";
 
 /**
- * Pre-installed default skills (docx, pdf, pptx) with their complete, genuine markdown instructions
- * and scripts from skills.sh.
+ * Optional bundled defaults. Skills are installed explicitly by the user.
  */
 export const DEFAULT_INSTALLED_SKILLS: LocalSkill[] = ${JSON.stringify(defaultSkills, null, 2)};
 

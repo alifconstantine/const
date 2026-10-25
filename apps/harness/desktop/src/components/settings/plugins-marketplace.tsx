@@ -72,15 +72,9 @@ export function PluginsMarketplace({
       className="rounded-2xl bg-[#222222] p-5 space-y-4"
     >
       <div className="flex items-start gap-3">
-        {pluginIconUrl(plugin.name) ? (
-          <img
-            src={pluginIconUrl(plugin.name)}
-            alt=""
-            className="w-11 h-11 rounded-xl shrink-0"
-          />
-        ) : (
-          <Blocks className="w-11 h-11 text-white" />
-        )}
+        <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white">
+          <Blocks className="w-6 h-6" />
+        </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-white">
             {plugin.interface.displayName}

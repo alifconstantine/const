@@ -2,10 +2,16 @@ import { app, shell } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { installRemoteSkill, resolveRemoteSkill, installError } from "./skill-installer";
+import type { SkillSource, ResolvedRemoteSkill } from "./skill-installer";
+import type { SkillInstallProgress } from "../src/lib/skills/types";
 import { resolveSkillRegistry, readPluginManifest, installPluginFromDirectory, setCapabilityEnabled, uninstallRegisteredSkill, uninstallPlugin as removePlugin } from "@const/agent";
 import type { PluginInventory } from "../src/lib/plugins/types";
 
 export interface InstalledSkillRecord {
+  sourceId?: string;
+  source?: string;
+  sourceSkillId?: string;
   id: string;
   isEnabled: boolean;
   workspacePath?: string;
@@ -63,8 +69,8 @@ export class MarketplaceService {
         console.error("[MarketplaceService] Failed to create global skills dir:", err);
       }
     }
-    // Automatically ensure default essential skills (docx, pdf, pptx) are pre-installed
-    void this.ensureDefaultSkillsInstalled();
+    // Native computer automation remains a bundled system plugin.
+    void this.ensureDefaultPluginsInstalled();
   }
 
   public getBundledSkillsDir(): string {
@@ -154,19 +160,42 @@ export class MarketplaceService {
     return false;
   }
 
-  public async ensureDefaultSkillsInstalled(): Promise<void> {
-    const defaultSlugs = ["docx", "pdf", "pptx", "computer-use"];
-    for (const slug of defaultSlugs) {
-      const destDir = path.join(this.globalSkillsDir, slug);
-      const skillMd = path.join(destDir, "SKILL.md");
-      if (!fs.existsSync(destDir) || !fs.existsSync(skillMd)) {
-        try {
-          await this.installSkill(slug, "user");
-          console.log(`[MarketplaceService] Pre-installed default skill: ${slug}`);
-        } catch (err) {
-          console.warn(`[MarketplaceService] Failed to pre-install default skill ${slug}:`, err);
-        }
+  private activeInstalls = new Map<string, AbortController>();
+  private activeDestinations = new Set<string>();
+  private resolvedSkills = new Map<string, { expires: number; skill: ResolvedRemoteSkill }>();
+
+  private async resolveRemote(source: string, skillId: string, signal?: AbortSignal) {
+    const key = `${source}/${skillId}`;
+    const cached = this.resolvedSkills.get(key);
+    if (cached && cached.expires > Date.now()) return cached.skill;
+    const skill = await resolveRemoteSkill(source, skillId, signal);
+    if (this.resolvedSkills.size >= 30) this.resolvedSkills.delete(this.resolvedSkills.keys().next().value!);
+    this.resolvedSkills.set(key, { skill, expires: Date.now() + 5 * 60_000 });
+    return skill;
+  }
+
+  public cancelSkillInstall(requestId: string): void {
+    this.activeInstalls.get(requestId)?.abort();
+  }
+
+  public async previewRemoteSkill(source: string, skillId: string) {
+    const skill = await this.resolveRemote(source, skillId);
+    const parsed = this.parseFrontmatter(skill.content);
+    return { ...parsed, content: skill.content, files: { "SKILL.md": skill.content } };
+  }
+
+  public async ensureDefaultPluginsInstalled(): Promise<void> {
+    try {
+      const inventory = this.listPlugins();
+      if (
+        inventory.catalog.some((p) => p.name === "computer-use") &&
+        !inventory.installed.some((p) => p.name === "computer-use")
+      ) {
+        this.installPlugin("computer-use", "user");
+        console.log("[MarketplaceService] Pre-installed default plugin: computer-use");
       }
+    } catch (err) {
+      console.warn("[MarketplaceService] Failed to pre-install computer-use plugin:", err);
     }
   }
 
@@ -185,13 +214,26 @@ export class MarketplaceService {
   }
 
   public listInstalledSkills(workspacePath?: string): InstalledSkillRecord[] {
-    return resolveSkillRegistry(workspacePath).skills.map((skill) => ({ ...skill, files: undefined }));
+    return resolveSkillRegistry(workspacePath).skills.map((skill) => {
+      let source: Partial<SkillSource> = {};
+      try { source = JSON.parse(fs.readFileSync(path.join(skill.path, ".const-source.json"), "utf8")); } catch {}
+      return { ...skill, sourceId: source.sourceId, source: source.source, sourceSkillId: source.sourceSkillId, files: undefined };
+    });
   }
 
   private getBundledPluginsDir(): string {
-    const candidates = [path.join(process.resourcesPath, "plugins"), path.join(app.getAppPath(), "plugins"),
-      path.join(__dirname, "..", "plugins"), path.join(process.cwd(), "apps", "harness", "desktop", "plugins")];
-    const root = candidates.find((candidate) => fs.existsSync(candidate) && fs.readdirSync(candidate, { withFileTypes: true }).some((entry) => entry.isDirectory() && fs.existsSync(path.join(candidate, entry.name, "plugin.json"))));
+    const candidates = [
+      path.join(process.resourcesPath, "plugins"),
+      path.join(app.getAppPath(), "plugins"),
+      path.join(__dirname, "..", "plugins"),
+      path.join(process.cwd(), "apps", "harness", "desktop", "plugins"),
+    ];
+    const root = candidates.find((candidate) =>
+      fs.existsSync(candidate) &&
+      fs.readdirSync(candidate, { withFileTypes: true }).some(
+        (entry) => entry.isDirectory() && fs.existsSync(path.join(candidate, entry.name, "plugin.json"))
+      )
+    );
     if (!root) throw new Error("Bundled plugins are unavailable.");
     return root;
   }
@@ -230,15 +272,14 @@ export class MarketplaceService {
     const cleanSlug = slug.toLowerCase().trim();
     const registered = resolveSkillRegistry(workspacePath).skills.find((skill) => skill.slug === cleanSlug);
     if (registered) return this.loadSkillDetailsFromDir(registered.path, cleanSlug, true, registered.scope);
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) throw new Error("Invalid skill name.");
 
-    // 4. Bundled repository / catalog source
+    // Bundled repository / catalog source
     const bundledDir = path.join(this.getBundledSkillsDir(), cleanSlug);
     if (fs.existsSync(path.join(bundledDir, "SKILL.md"))) {
       return this.loadSkillDetailsFromDir(bundledDir, cleanSlug, false);
     }
 
-    // 5. Remote fetch fallback
+    // Remote fetch fallback
     try {
       const baseUrl = this.getRemoteRegistryBaseUrl();
       const skillMdUrl = `${baseUrl}/${cleanSlug}/SKILL.md`;
@@ -289,27 +330,34 @@ export class MarketplaceService {
   public async installSkill(
     slug: string,
     targetScope: "user" | "workspace" = "user",
-    workspacePath?: string
+    workspacePath?: string,
+    sourceRepo?: string,
+    skillSubId?: string,
+    requestId?: string,
+    onProgress?: (progress: SkillInstallProgress) => void
   ): Promise<InstalledSkillRecord | null> {
-    const cleanSlug = slug.toLowerCase().trim();
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) throw new Error("Invalid skill name.");
-    if (!this.getManifest()?.skills.some((skill) => skill.slug === cleanSlug)) throw new Error("Skill is not in the standalone catalog.");
+    let cleanSlug = slug.toLowerCase().trim();
+    let effectiveSource = sourceRepo;
+    let effectiveSkillId = skillSubId;
 
-    // Check candidate sources for real skill files locally
-    const candidates = [
-      path.join(this.getBundledSkillsDir(), cleanSlug),
-      path.join(process.cwd(), ".agents", "skills", cleanSlug),
-      path.join(os.homedir(), ".agents", "skills", cleanSlug),
-    ];
-    let sourceDir: string | null = null;
-    for (const c of candidates) {
-      if (fs.existsSync(c) && fs.existsSync(path.join(c, "SKILL.md"))) {
-        sourceDir = c;
-        break;
+    // Detect if slug is a composite GitHub identifier (e.g., "anthropics/skills/pdf" or "prisma/skills/prisma-cli")
+    if (cleanSlug.includes("/") && !effectiveSource) {
+      const parts = cleanSlug.split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        effectiveSource = `${parts[0]}/${parts[1]}`;
+        effectiveSkillId = parts[2] || parts[1];
+        cleanSlug = effectiveSkillId || parts[1] || "skill";
       }
     }
 
-    if (targetScope === "workspace" && (!workspacePath || workspacePath === "Outside Project")) throw new Error("Workspace is required.");
+    // Clean destination directory name
+    cleanSlug = cleanSlug.replace(/[^a-z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
+    if (!cleanSlug) cleanSlug = "custom-skill";
+
+    // Destination path
+    if (targetScope === "workspace" && (!workspacePath || workspacePath === "Outside Project" || !path.isAbsolute(workspacePath))) {
+      throw new Error("Workspace is required.");
+    }
     const targetBaseDir =
       targetScope === "workspace" && workspacePath && workspacePath !== "Outside Project"
         ? path.join(workspacePath, ".agents", "skills")
@@ -321,17 +369,56 @@ export class MarketplaceService {
 
     const destDir = path.join(targetBaseDir, cleanSlug);
 
-    if (sourceDir && fs.existsSync(sourceDir)) {
-      // Copy directory recursively with all real files
-      this.copyDirRecursive(sourceDir, destDir);
+    if (effectiveSource) {
+      const key = path.resolve(targetBaseDir, effectiveSkillId || cleanSlug).toLowerCase();
+      if (this.activeDestinations.has(key) || (requestId && this.activeInstalls.has(requestId))) throw installError("busy");
+      const controller = new AbortController();
+      this.activeDestinations.add(key);
+      if (requestId) this.activeInstalls.set(requestId, controller);
+      const report = (progress: Omit<SkillInstallProgress, "requestId">) => {
+        if (requestId) onProgress?.({ ...progress, requestId });
+      };
+      try {
+        report({ phase: "resolving", completed: 0, total: 0 });
+        const resolved = await this.resolveRemote(effectiveSource, effectiveSkillId || cleanSlug, controller.signal);
+        const installedPath = await installRemoteSkill(resolved, targetBaseDir, report, controller.signal);
+        const record = this.listInstalledSkills(targetScope === "workspace" ? workspacePath : undefined).find(skill => path.resolve(skill.path).toLowerCase() === path.resolve(installedPath).toLowerCase());
+        if (!record) throw installError("invalid");
+        return { ...record, files: this.readSkillFiles(installedPath) };
+      } catch (error) {
+        if (controller.signal.aborted) throw installError("cancelled");
+        throw error;
+      } finally {
+        this.activeDestinations.delete(key);
+        if (requestId) this.activeInstalls.delete(requestId);
+      }
     } else {
-      console.log(`[MarketplaceService] Local source not found for '${cleanSlug}', downloading from registry...`);
-      const downloaded = await this.downloadSkillFromRemote(cleanSlug, destDir);
-      if (!downloaded) {
-        console.error(
-          `[MarketplaceService] Cannot install '${cleanSlug}': source directory not found locally and remote download failed`
-        );
-        return null;
+      // 2. Check candidate local sources
+      const candidates = [
+        path.join(this.getBundledSkillsDir(), cleanSlug),
+        path.join(process.cwd(), ".agents", "skills", cleanSlug),
+        path.join(os.homedir(), ".agents", "skills", cleanSlug),
+      ];
+      let sourceDir: string | null = null;
+      for (const c of candidates) {
+        if (fs.existsSync(c) && fs.existsSync(path.join(c, "SKILL.md"))) {
+          sourceDir = c;
+          break;
+        }
+      }
+
+      if (sourceDir && fs.existsSync(sourceDir)) {
+        this.copyDirRecursive(sourceDir, destDir);
+      } else {
+        // 3. Fallback: try download from remote registry
+        console.log(`[MarketplaceService] Local source not found for '${cleanSlug}', downloading from registry...`);
+        const downloaded = await this.downloadSkillFromRemote(cleanSlug, destDir);
+        if (!downloaded) {
+          console.error(
+            `[MarketplaceService] Cannot install '${cleanSlug}': source directory not found locally and remote download failed`
+          );
+          return null;
+        }
       }
     }
 
@@ -340,7 +427,9 @@ export class MarketplaceService {
 
     const files = this.readSkillFiles(destDir);
 
-    const record = this.listInstalledSkills(targetScope === "workspace" ? workspacePath : undefined).find((skill) => skill.path === destDir);
+    const record = this.listInstalledSkills(targetScope === "workspace" ? workspacePath : undefined).find(
+      (skill) => skill.path === destDir
+    );
     return record ? { ...record, files } : null;
   }
 
@@ -354,6 +443,7 @@ export class MarketplaceService {
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
+        if (entry.name === ".const-source.json") continue;
         const fullPath = path.join(dir, entry.name);
         const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {

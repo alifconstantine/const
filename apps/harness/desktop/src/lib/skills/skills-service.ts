@@ -14,6 +14,7 @@ export async function loadInstalledSkills(workspacePath?: string): Promise<Local
   const records: LocalSkill[] = installed.map((item) => {
     const catalog = MARKETPLACE_CATALOG.find((skill) => skill.slug === item.slug);
     return {
+      sourceId: item.sourceId, source: item.source, sourceSkillId: item.sourceSkillId,
       id: item.id, slug: item.slug, name: item.name, description: item.description,
       content: item.content, path: item.path, workspacePath: item.workspacePath,
       pluginId: item.pluginId, pluginName: item.pluginName,
@@ -96,13 +97,23 @@ export async function fetchSkillContent(
 export async function installSkillFromMarketplace(
   slug: string,
   scope: "user" | "workspace" = "user",
-  workspacePath?: string
+  workspacePath?: string,
+  source?: string,
+  skillId?: string,
+  requestId?: string
 ): Promise<LocalSkill> {
   if (!window.electron?.marketplace) {
     throw new Error("Marketplace electron bridge is unavailable");
   }
 
-  const installed = await window.electron.marketplace.installSkill({ slug, scope, workspacePath });
+  const installed = await window.electron.marketplace.installSkill({
+    slug,
+    scope,
+    workspacePath,
+    source,
+    skillId,
+    requestId,
+  });
   if (!installed) {
     throw new Error(`Failed to install skill '${slug}'`);
   }
@@ -111,6 +122,7 @@ export async function installSkillFromMarketplace(
   const category: SkillCategory = catalogMatch?.category || "custom";
 
   const localSkill: LocalSkill = {
+    sourceId: installed.sourceId, source: installed.source, sourceSkillId: installed.sourceSkillId,
     id: installed.id,
     slug: installed.slug,
     name: installed.name,
@@ -125,9 +137,9 @@ export async function installSkillFromMarketplace(
     workspacePath: installed.workspacePath,
     pluginId: installed.pluginId,
     pluginName: installed.pluginName,
-    author: installed.author || catalogMatch?.author || "User",
+    author: installed.author || source?.split("/")[0] || catalogMatch?.author,
     version: installed.version || catalogMatch?.version || "1.0.0",
-    overview: generateSkillOverview(installed.slug, installed.content, installed.description),
+    overview: installed.content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, "").trim(),
     files: installed.files,
     createdAt: Date.now(),
     updatedAt: Date.now(),
