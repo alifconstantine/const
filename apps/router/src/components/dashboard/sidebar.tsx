@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useQueries } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { AccountMenu } from "./account-menu";
@@ -128,15 +129,23 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { isAuthenticated } = useRouterAuth();
-  const quota = useQuery(
-    api.router.quotas.getUserQuota,
-    isAuthenticated ? {} : "skip",
+  // Sidebar data is optional. useQueries returns failures as values so a
+  // temporarily unavailable backend cannot take down navigation or the page.
+  const results = useQueries(
+    isAuthenticated
+      ? {
+          quota: { query: api.router.quotas.getUserQuota, args: {} },
+          settings: { query: api.router.settings.getSettings, args: {} },
+        }
+      : {},
   );
-
-  const settings = useQuery(
-    api.router.settings.getSettings,
-    isAuthenticated ? {} : "skip",
-  );
+  const quotaFailed = results.quota instanceof Error;
+  const quota:
+    FunctionReturnType<typeof api.router.quotas.getUserQuota> | undefined =
+    quotaFailed ? undefined : results.quota;
+  const settings:
+    FunctionReturnType<typeof api.router.settings.getSettings> | undefined =
+    results.settings instanceof Error ? undefined : results.settings;
   const metrics = useMemo(() => {
     return calculateQuotaMetrics(quota);
   }, [quota]);
@@ -314,43 +323,65 @@ export function Sidebar({
       {/* 3. Mini Free usage Quota Indicator in Sidebar */}
       {!isCollapsed && isAuthenticated && (
         <div className="px-2 pt-2">
-          <Link
-            href="/dashboard"
-            onClick={onNavigate}
-            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} free tokens`}
-            className="block p-3 rounded-xl bg-card hover:bg-card/90 border border-border transition-all font-mono group"
-          >
-            <div className="flex items-center justify-between text-xs text-foreground mb-2">
-              <span className="font-semibold uppercase tracking-wider text-foreground">
-                Free usage
-              </span>
-              <span className="tabular-nums font-bold text-foreground">
-                {quota ? `${metrics.percentRemaining.toFixed(0)}%` : "..."}
-              </span>
+          {quotaFailed ? (
+            <div
+              role="status"
+              className="p-3 rounded-xl bg-card border border-border text-xs space-y-2"
+            >
+              <p className="text-muted-foreground">Free usage unavailable</p>
+              <button
+                type="button"
+                className="underline underline-offset-4 cursor-pointer"
+                onClick={() => window.location.reload()}
+              >
+                Retry connection
+              </button>
             </div>
+          ) : (
+            <Link
+              href="/dashboard"
+              onClick={onNavigate}
+              title={
+                quota
+                  ? `${metrics.formattedUsed} used of ${metrics.formattedLimit} free tokens`
+                  : "Loading free usage"
+              }
+              className="block p-3 rounded-xl bg-card hover:bg-card/90 border border-border transition-all font-mono group"
+            >
+              <div className="flex items-center justify-between text-xs text-foreground mb-2">
+                <span className="font-semibold uppercase tracking-wider text-foreground">
+                  Free usage
+                </span>
+                <span className="tabular-nums font-bold text-foreground">
+                  {quota ? `${metrics.percentRemaining.toFixed(0)}%` : "..."}
+                </span>
+              </div>
 
-            {/* Full-width Graphical Progress Bar */}
-            <div className="w-full h-2 rounded-full bg-secondary overflow-hidden mb-2">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-500 ease-out",
-                  metrics.barColor,
-                )}
-                style={{ width: `${metrics.percentRemaining}%` }}
-              />
-            </div>
+              {/* Full-width Graphical Progress Bar */}
+              <div className="w-full h-2 rounded-full bg-secondary overflow-hidden mb-2">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500 ease-out",
+                    metrics.barColor,
+                  )}
+                  style={{ width: `${quota ? metrics.percentRemaining : 0}%` }}
+                />
+              </div>
 
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="tabular-nums font-medium text-foreground/90">
-                {quota
-                  ? `${metrics.formattedRemaining} free tokens`
-                  : "7M free tokens"}
-              </span>
-              <span className="uppercase text-muted-foreground">
-                {metrics.resetsInText ? `reset in ${metrics.resetsInText}` : ""}
-              </span>
-            </div>
-          </Link>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="tabular-nums font-medium text-foreground/90">
+                  {quota
+                    ? `${metrics.formattedRemaining} free tokens`
+                    : "Loading free usage…"}
+                </span>
+                <span className="uppercase text-muted-foreground">
+                  {quota && metrics.resetsInText
+                    ? `reset in ${metrics.resetsInText}`
+                    : ""}
+                </span>
+              </div>
+            </Link>
+          )}
         </div>
       )}
 

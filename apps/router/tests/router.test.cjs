@@ -141,6 +141,74 @@ const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
+function sidebarFixture(results, authenticated = true) {
+  const React = appRequire("react");
+  const { renderToStaticMarkup } = appRequire("react-dom/server");
+  let subscriptions;
+  const sidebarLoad = sourceLoader({
+    "convex/react": {
+      useQueries: (queries) => {
+        subscriptions = queries;
+        return results;
+      },
+    },
+    "next/navigation": { usePathname: () => "/models" },
+    "next/link": ({ children, ...props }) =>
+      React.createElement("a", props, children),
+    "@const/backend/_generated/api": { api },
+    "@/components/providers/convex-client-provider": {
+      useRouterAuth: () => ({ isAuthenticated: authenticated }),
+    },
+    "./account-menu": {
+      AccountMenu: () => React.createElement("div", null, "Account"),
+    },
+    "@const/ui": {
+      Button: ({ children, variant, size, ...props }) =>
+        React.createElement("button", props, children),
+      ConstLogoIcon: () => null,
+      cn: (...names) => names.filter(Boolean).join(" "),
+    },
+  });
+  const { Sidebar } = sidebarLoad(
+    "apps/router/src/components/dashboard/sidebar.tsx",
+  );
+  return {
+    html: renderToStaticMarkup(React.createElement(Sidebar)),
+    subscriptions,
+  };
+}
+test("sidebar remains usable when production settings or quota queries fail", () => {
+  const quota = { weeklyLimitTokens: 7_000_000, remainingTokens: 700_000 };
+  const settingsMissing = sidebarFixture({
+    quota,
+    settings: new Error("Missing function"),
+  });
+  assert.match(settingsMissing.html, /Models &amp; pricing/);
+  assert.match(settingsMissing.html, /700k free tokens/);
+  assert.doesNotMatch(settingsMissing.html, /Less than 15%/);
+  const bothMissing = sidebarFixture({
+    quota: new Error("Quota unavailable"),
+    settings: new Error("Settings unavailable"),
+  });
+  assert.match(bothMissing.html, /Free usage unavailable/);
+  assert.match(bothMissing.html, /Retry connection/);
+  assert.match(bothMissing.html, /href="\/models"/);
+  assert.doesNotMatch(
+    bothMissing.html,
+    /7M free tokens|Quota unavailable|Settings unavailable/,
+  );
+  const recovered = sidebarFixture({
+    quota,
+    settings: { notifyLowQuota: true },
+  });
+  assert.match(recovered.html, /Less than 15%/);
+});
+test("sidebar skips protected subscriptions before authentication", () => {
+  const { html, subscriptions } = sidebarFixture({}, false);
+  assert.deepEqual(subscriptions, {});
+  assert.match(html, /href="\/models"/);
+  assert.doesNotMatch(html, /Free usage unavailable|7M free tokens/);
+});
 const secret = "router-test-secret-32-characters-minimum";
 process.env.ROUTER_GATEWAY_SECRET = secret;
 process.env.NEXT_PUBLIC_CONVEX_URL = "https://router-test.invalid";

@@ -36,14 +36,6 @@ export default function GlobalError({
           </div>
         </div>
 
-        {error?.message && (
-          <div className="p-3 rounded-xl bg-secondary border border-border text-left">
-            <p className="text-[11px] font-mono text-muted-foreground break-all line-clamp-3">
-              {error.message}
-            </p>
-          </div>
-        )}
-
         <div className="flex items-center gap-3 pt-2">
           <Button
             onClick={() => reset()}

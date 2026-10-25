@@ -2,6 +2,14 @@
 
 Implemented 25 October 2026. This document describes the source changes; it does not indicate that production has been deployed.
 
+## Production incident: missing backend deployment
+
+On 25 October 2026, production logs reported `Could not find public function` for `router/settings:getSettings`, `router/credits:getUserCredits`, and `router/gateway:authenticate`. The published Router correctly used `earnest-hawk-132`, but its Convex functions/schema had not been deployed. A Git/Vercel frontend deployment does not deploy Convex by itself.
+
+The backend was deployed to `earnest-hawk-132` after a successful dry run confirmed schema compatibility and no deleted indexes. Authenticated administrative read checks then succeeded for settings, credits, and quota. The sidebar now consumes optional Convex results without throwing on settings/quota errors, preserves navigation, and shows an unavailable state rather than an invented quota. Regression tests cover failure, recovery, and pre-authentication subscription behavior. The global fallback keeps detailed errors in the console instead of printing backend internals to users.
+
+For future Router changes that add backend functions or tables, complete the backend deployment before publishing the dependent frontend, then verify those functions on the production deployment.
+
 ## Model IDs and billing
 
 The server catalog is `packages/backend/convex/router/modelCatalog.ts`, re-exported by Router. The free allowlist contains exactly:
