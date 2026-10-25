@@ -1,4 +1,13 @@
 import type { WebContents } from "electron";
+import {
+  MAX_HOST_CONSOLE_TEXT_CHARS,
+  sanitizeBodyPreview,
+  sanitizeConsoleLocation,
+  sanitizeConsoleText,
+  sanitizeNetworkStatusText,
+  sanitizeStack,
+  sanitizeUrl,
+} from "./console-sanitizer.js";
 
 export type BrowserConsoleLevel = "log" | "info" | "warn" | "error" | "debug";
 
@@ -22,6 +31,44 @@ export interface BrowserNetworkRecord {
   statusText: string;
   durationMs: number;
   bodyPreview?: string;
+}
+
+/** Redact every model-visible field of a console entry. */
+function sanitizeConsoleEntry(entry: unknown): BrowserConsoleEntry {
+  const source = (entry && typeof entry === "object" ? entry : {}) as Partial<BrowserConsoleEntry>;
+  const sanitized: BrowserConsoleEntry = {
+    seq: Number(source.seq) || 0,
+    ts: Number(source.ts) || 0,
+    type: source.type === "pageerror" || source.type === "requestfailed" ? source.type : "console",
+    level: ["log", "info", "warn", "error", "debug"].includes(source.level || "") ? source.level! : "log",
+    text: sanitizeConsoleText(source.text ?? ""),
+  };
+  if (typeof source.location === "string") {
+    sanitized.location = sanitizeConsoleLocation(source.location);
+  }
+  if (typeof source.stack === "string") {
+    sanitized.stack = sanitizeStack(source.stack);
+  }
+  return sanitized;
+}
+
+/** Redact every model-visible field of a network record. */
+function sanitizeNetworkRecord(record: unknown): BrowserNetworkRecord {
+  const source = (record && typeof record === "object" ? record : {}) as Partial<BrowserNetworkRecord>;
+  const sanitized: BrowserNetworkRecord = {
+    id: Number(source.id) || 0,
+    ts: Number(source.ts) || 0,
+    method: String(source.method || "GET").replace(/[^A-Za-z]/g, "").slice(0, 16),
+    resourceType: source.resourceType === "xhr" || source.resourceType === "navigation" ? source.resourceType : "fetch",
+    status: Number(source.status) || 0,
+    durationMs: Number(source.durationMs) || 0,
+    url: sanitizeUrl(source.url ?? ""),
+    statusText: sanitizeNetworkStatusText(source.statusText ?? ""),
+  };
+  if (typeof source.bodyPreview === "string") {
+    sanitized.bodyPreview = sanitizeBodyPreview(source.bodyPreview);
+  }
+  return sanitized;
 }
 
 /** Page-side console & uncaught error capture hook ported from oh-my-pi. */
@@ -173,14 +220,15 @@ export class TabTelemetryBuffer {
     }
     this.attachedContentsId = contents.id;
 
-    contents.on("console-message", (_event, level, message, line, sourceId) => {
+    contents.on("console-message", (event) => {
+      const { message, level, lineNumber: line, sourceId } = event;
       if (!message || message.startsWith("__HARNESS_ELEMENT_")) return;
       const mappedLevel: BrowserConsoleLevel =
-        level === 3 ? "error" : level === 2 ? "warn" : level === 0 ? "debug" : "log";
+        level === "error" ? "error" : level === "warning" ? "warn" : level === "debug" ? "debug" : "info";
       this.pushHostEntry({
         type: "console",
         level: mappedLevel,
-        text: message.slice(0, 4096),
+        text: message.slice(0, MAX_HOST_CONSOLE_TEXT_CHARS),
         location: sourceId ? `${sourceId}:${line}` : undefined,
       });
     });
@@ -201,6 +249,9 @@ export class TabTelemetryBuffer {
       seq: this.seq++,
       ts: Date.now(),
       ...entry,
+      text: sanitizeConsoleText(entry.text),
+      location: entry.location ? sanitizeConsoleLocation(entry.location) : entry.location,
+      stack: entry.stack ? sanitizeStack(entry.stack) : entry.stack,
     });
     if (this.hostEntries.length > 300) {
       this.hostEntries.shift();
@@ -247,10 +298,10 @@ export class TabTelemetryBuffer {
           return out;
         })()`);
         if (pageData && Array.isArray(pageData.consoleEntries)) {
-          pageConsole = pageData.consoleEntries;
+          pageConsole = pageData.consoleEntries.map((entry: unknown) => sanitizeConsoleEntry(entry));
         }
         if (pageData && Array.isArray(pageData.networkRecords)) {
-          networkRecords = pageData.networkRecords;
+          networkRecords = pageData.networkRecords.map((record: unknown) => sanitizeNetworkRecord(record));
         }
       } catch {}
     }
@@ -292,9 +343,10 @@ export class TabTelemetryBuffer {
       })
       .slice(-limit);
 
+    // Sanitize centrally so no capture path (host hooks or page-side merge) can bypass redaction.
     return {
-      consoleEntries: filteredConsole,
-      networkRecords: filteredNetwork,
+      consoleEntries: filteredConsole.map((entry) => sanitizeConsoleEntry(entry)),
+      networkRecords: filteredNetwork.map((record) => sanitizeNetworkRecord(record)),
     };
   }
 }

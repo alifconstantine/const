@@ -18,6 +18,7 @@ import {
   ZoomIn,
   ZoomOut,
   ShieldAlert,
+  KeyRound,
 } from "lucide-react";
 import type { RightPaneTab, BrowserSelectedElement } from "./types";
 import { useTranslation } from "../../lib/i18n";
@@ -44,6 +45,22 @@ const RESPONSIVE_PRESETS: PresetConfig[] = [
   { id: "tablet", label: "Tablet (768 × 1024)", width: 768 },
   { id: "desktop", label: "Desktop (1024 × 768)", width: 1024 },
 ];
+
+/**
+ * The embedded browser only ever loads web pages. Local files are served
+ * through the app's own file APIs, never rendered by the browser, so a page
+ * (or a popup) cannot turn the browser into a local-file reader.
+ */
+const ALLOWED_BROWSER_SCHEMES = ["http:", "https:"];
+
+function isAllowedBrowserUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_BROWSER_SCHEMES.includes(parsed.protocol.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 function normalizeUrl(input: any): string {
   if (typeof input !== "string" || !input.trim() || input === "[object Object]") {
@@ -111,11 +128,20 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     reason?: string;
     secretWanted?: string;
     secretRef?: string;
+    secretTabId?: string;
   }>({
     holder: "bot",
     since: new Date().toISOString(),
     requested: false,
   });
+  const [secretInput, setSecretInput] = useState<string>("");
+  const [isSubmittingSecret, setIsSubmittingSecret] = useState<boolean>(false);
+  const [secretError, setSecretError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSecretInput("");
+    setSecretError(null);
+  }, [controlState.secretWanted, controlState.since]);
 
 
   const webviewRef = useRef<any>(null);
@@ -170,6 +196,26 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     }
   };
 
+  // Secret handoff: the value is injected straight into the page by the main
+  // process, so it never travels through the agent or the model context.
+  const handleSupplySecret = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secretInput.length || isSubmittingSecret) return;
+    const browserApi = window.electron?.browser;
+    if (!browserApi) return;
+    setIsSubmittingSecret(true);
+    setSecretError(null);
+    try {
+      await browserApi.supplySecret(secretInput);
+      setSecretInput("");
+    } catch {
+      setSecretInput("");
+      setSecretError(t("rightPane.browserSecretError"));
+    } finally {
+      setIsSubmittingSecret(false);
+    }
+  };
+
   // Sync audio muting with tab.isMuted
   useEffect(() => {
     if (webviewRef.current && typeof tab.isMuted === "boolean") {
@@ -221,6 +267,16 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   // Webview navigation helpers
   const handleNavigate = (targetUrl: string) => {
     const resolved = normalizeUrl(targetUrl);
+    if (!isAllowedBrowserUrl(resolved)) {
+      // Refuse anything that is not an http(s) page (file:, data:, blob:, ...).
+      setLoadError({
+        code: -300,
+        desc: t("rightPane.browserBlockedScheme"),
+        url: String(targetUrl || ""),
+      });
+      setAddressBarInput(currentUrl);
+      return;
+    }
     setAddressBarInput(resolved);
     setCurrentUrl(resolved);
     setLoadError(null);
@@ -598,9 +654,13 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
     const handleNewWindow = (e: any) => {
       e.preventDefault();
-      if (e.url) {
-        handleNavigate(e.url);
+      // A page-triggered popup must never be able to steer the embedded browser
+      // into a local file or another non-web scheme.
+      if (!e.url || !isAllowedBrowserUrl(String(e.url))) {
+        console.warn("[BrowserTab] Blocked popup navigation to a non-web URL:", e?.url);
+        return;
       }
+      handleNavigate(e.url);
     };
 
     const handleMediaStartedPlaying = () => {
@@ -921,6 +981,46 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
         </div>
       )}
 
+      {/* Secret handoff form (password / OTP the assistant must not see) */}
+      {controlState.secretWanted && controlState.secretTabId === tab.id && (
+        <form
+          onSubmit={handleSupplySecret}
+          className="bg-[#222222] px-4 py-3 flex items-center gap-2.5 text-xs text-[#d4d4d4] shrink-0 z-10"
+        >
+          <div className="w-6 h-6 rounded-lg bg-[#2b2b2b] flex items-center justify-center text-white shrink-0">
+            <KeyRound className="w-3.5 h-3.5" />
+          </div>
+          <span className="font-medium shrink-0">{controlState.secretWanted}:</span>
+          <input
+            type="password"
+            value={secretInput}
+            onChange={(e) => {
+              setSecretInput(e.target.value);
+              if (secretError) setSecretError(null);
+            }}
+            placeholder={t("rightPane.browserSecretPlaceholder")}
+            aria-label={t("rightPane.browserSecretPlaceholder")}
+            className="flex-1 min-w-0 bg-[#2b2b2b] rounded-xl px-3 py-2 text-xs text-white outline-none focus:outline-none focus-visible:outline-none ring-0 placeholder:text-[#969696]"
+            autoFocus
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={!secretInput.length || isSubmittingSecret}
+            className="px-3 py-2 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] disabled:opacity-50 text-white text-xs font-medium transition-colors shrink-0 cursor-pointer outline-none focus-visible:outline-none ring-0"
+          >
+            {isSubmittingSecret ? t("rightPane.browserSecretSending") : t("rightPane.browserSecretSupply")}
+          </button>
+        </form>
+      )}
+
+      {secretError && (
+        <div role="alert" className="bg-[#222222] px-4 py-2 text-[11px] text-[#d4d4d4] shrink-0 z-10">
+          {secretError}
+        </div>
+      )}
+
       {/* 2. Web Viewport Area */}
       <div className="flex-1 w-full h-full min-h-0 relative overflow-hidden bg-[#121212] flex flex-col">
         {/* Friendly Error / Offline Localhost Overlay (keeps <webview> mounted underneath) */}
@@ -978,7 +1078,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             ref={webviewRef}
             src={initialUrlRef.current || currentUrl}
             partition="persist:const_browser"
-            allowpopups={true}
+            allowpopups={false}
             webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
             className="w-full h-full border-none block flex-1"
             style={{

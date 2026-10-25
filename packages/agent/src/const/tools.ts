@@ -709,6 +709,192 @@ export const BROWSER_REQUEST_HELP_TOOL: NativeToolDefinition = {
   },
 };
 
+export const BROWSER_WAIT_FOR_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_wait_for",
+    description:
+      "Wait until a condition becomes true in the active browser tab. Waits for an element to become visible/hidden/attached/detached, for visible text to appear, for the URL to contain a substring, or for a fixed duration. Returns once the condition is satisfied and reports the elapsed time.",
+    parameters: {
+      type: "object",
+      properties: {
+        selector: {
+          type: "string",
+          description:
+            "Element selector to wait for. Accepts CSS or oh-my-pi query prefixes ('text/...', 'role/button[name=\"...\"]', 'label/...', 'placeholder/...', 'testid/...', 'xpath/...', 'pierce/...').",
+        },
+        ref: {
+          type: "string",
+          description: "Element ref ID from browser_snapshot (e.g. 'e7').",
+        },
+        state: {
+          type: "string",
+          enum: ["visible", "hidden", "attached", "detached"],
+          description:
+            "Expected element state (default: 'visible'). 'hidden' resolves when the element is absent or not visible, 'detached' when the node is removed from the DOM.",
+        },
+        text: {
+          type: "string",
+          description: "Wait until this text is present in the visible page text.",
+        },
+        url: {
+          type: "string",
+          description: "Wait until the current page URL contains this substring (e.g. '/dashboard').",
+        },
+        timeMs: {
+          type: "number",
+          description:
+            "Wait for a fixed number of milliseconds. Useful after an action that triggers a reload or redirect.",
+        },
+        timeoutMs: {
+          type: "number",
+          description: "Maximum time to wait in milliseconds (default: 5000, max: 60000).",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_VERIFY_TEXT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_verify_text",
+    description:
+      "Assert that specific text is present or absent in the active browser tab. Use 'state: visible' (default) to assert the text is rendered on the page, or 'state: absent' to assert it is gone. Optionally scope the assertion to a subtree with a selector.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The exact text to look for (case-insensitive by default).",
+        },
+        selector: {
+          type: "string",
+          description:
+            "Optional CSS or semantic selector to scope the assertion to a subtree (e.g. '#results', 'role/alert').",
+        },
+        state: {
+          type: "string",
+          enum: ["visible", "absent"],
+          description:
+            "Expected outcome (default: 'visible'). 'absent' succeeds when the text is NOT found anywhere on the page.",
+        },
+        caseSensitive: {
+          type: "boolean",
+          description: "Match the text case-sensitively (default: false).",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+      required: ["text"],
+    },
+  },
+};
+
+export const BROWSER_FIND_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_find",
+    description:
+      "Search the active browser tab for text and return the matching elements with their snapshot refs ([e1]) and on-screen coordinates. Use it to locate a control by its visible wording when you do not know its ref, then act on the returned ref.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The visible text to look for (case-insensitive, substring match).",
+        },
+        selector: {
+          type: "string",
+          description:
+            "Optional CSS or semantic selector to scope the search to a subtree (e.g. '#results', 'role/table').",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of matches to return (default: 20, max: 50).",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+      required: ["text"],
+    },
+  },
+};
+
+export const BROWSER_HOVER_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_hover",
+    description:
+      "Hover over an element by its ref (e.g. 'e4' from browser_snapshot) or by selector (e.g. 'text/User menu'). Required for dropdown menus, tooltips and hover-revealed actions. Waits for the element to appear before hovering.",
+    parameters: {
+      type: "object",
+      properties: {
+        ref: {
+          type: "string",
+          description: "The element ref ID from browser_snapshot (e.g. 'e4').",
+        },
+        selector: {
+          type: "string",
+          description:
+            "Alternative selector: CSS selector or oh-my-pi query prefix ('text/...', 'role/button[name=\"...\"]', 'label/...', 'placeholder/...', 'testid/...').",
+        },
+        x: {
+          type: "number",
+          description: "Optional absolute X pixel coordinate to hover instead of an element.",
+        },
+        y: {
+          type: "number",
+          description: "Optional absolute Y pixel coordinate to hover instead of an element.",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_PASTE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_paste",
+    description:
+      "Paste text into an input, textarea or contenteditable element by its ref or selector, or into the currently focused element. Unlike browser_type this does not simulate keystrokes, so it is much faster for long strings and works with pages that block synthetic key events.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The text to paste into the field.",
+        },
+        ref: {
+          type: "string",
+          description: "The target element ref ID from browser_snapshot (e.g. 'e2').",
+        },
+        selector: {
+          type: "string",
+          description: "Optional CSS or semantic selector (e.g. 'placeholder/Email', '#email').",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+      required: ["text"],
+    },
+  },
+};
+
 export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
   BROWSER_NAVIGATE_TOOL,
   BROWSER_SNAPSHOT_TOOL,
@@ -721,6 +907,11 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
   BROWSER_EVALUATE_TOOL,
   BROWSER_TABS_TOOL,
   BROWSER_REQUEST_HELP_TOOL,
+  BROWSER_WAIT_FOR_TOOL,
+  BROWSER_VERIFY_TEXT_TOOL,
+  BROWSER_FIND_TOOL,
+  BROWSER_HOVER_TOOL,
+  BROWSER_PASTE_TOOL,
 ];
 
 // ---------------------------------------------------------------------------

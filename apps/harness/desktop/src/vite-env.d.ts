@@ -478,6 +478,13 @@ declare global {
         screenshot: (args?: any) => Promise<any>;
         console?: (args?: any) => Promise<any>;
         evaluate?: (args: any) => Promise<any>;
+        waitFor?: (args: any) => Promise<any>;
+        verifyText?: (args: any) => Promise<any>;
+        find?: (args: any) => Promise<any>;
+        hover?: (args: any) => Promise<any>;
+        paste?: (args: any) => Promise<any>;
+        getAllowedDomains?: () => Promise<string[]>;
+        setAllowedDomains?: (domains: string[]) => Promise<string[]>;
         onControlChanged: (callback: (state: any) => void) => () => void;
         onAiAction: (callback: (action: any) => void) => () => void;
         onOpenTabRequest?: (

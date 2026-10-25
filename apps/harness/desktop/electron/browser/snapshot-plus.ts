@@ -43,6 +43,11 @@ export interface AriaSnapshotOptions extends SnapshotPostProcessOptions {
   diff?: boolean;
   /** Optional root CSS selector to scope snapshot. */
   selector?: string;
+  /**
+   * Selectors or ARIA refs whose current value must be masked in the returned
+   * payload. Used while a human is handing a password / OTP back to the agent.
+   */
+  maskValues?: string[];
 }
 
 export type AriaHrefMap = Readonly<Record<string, string>>;
@@ -270,24 +275,54 @@ export function buildEnhancedSnapshotScript(
 ): string {
   const request = { depth: options.depth ?? 14, boxes: options.boxes ?? false };
   const sel = options.selector ? JSON.stringify(options.selector) : "null";
+  const maskRefs = JSON.stringify(options.maskValues ?? []);
 
   return `(function() {
     var snapshotId = ${snapshotId};
     var module = { exports: {} };
     ${ARIA_SNAPSHOT_BUNDLE}
     var __sel = ${sel};
+    var __maskRefs = ${maskRefs};
     var __root = __sel ? document.querySelector(__sel) : null;
     if (__sel && !__root) {
       throw new Error("browser_snapshot: selector " + __sel + " matched no element");
     }
 
+    // Resolve old refs before the ARIA bundle regenerates them. Keep the DOM
+    // values unchanged: temporary own getters only affect synchronous reads by
+    // the serializer, and are restored before any page callback can run.
+    var maskedElements = new Set();
+    var secretValues = [];
+    var valueDescriptors = [];
+    function collectSecrets(root) {
+      for (var el of Array.from(root.querySelectorAll('*'))) {
+        if (isMaskedField(el)) {
+          maskedElements.add(el);
+          var secret = 'value' in el ? String(el.value || '') : String(el.textContent || '');
+          if (secret) secretValues.push(secret);
+          if ('value' in el) {
+            valueDescriptors.push([el, Object.getOwnPropertyDescriptor(el, 'value')]);
+          }
+        }
+        if (el.shadowRoot) collectSecrets(el.shadowRoot);
+      }
+    }
+    collectSecrets(document);
     window.__constElementMap = {};
     var ariaYaml = "";
     var hrefs = {};
     try {
+      for (var entry of valueDescriptors) {
+        Object.defineProperty(entry[0], 'value', { configurable: true, get: function() { return '[REDACTED]'; } });
+      }
       ariaYaml = module.exports.ariaSnapshot(__root, ${JSON.stringify(request)}) || "";
     } catch (e) {
       ariaYaml = "";
+    } finally {
+      for (var entry of valueDescriptors) {
+        if (entry[1]) Object.defineProperty(entry[0], 'value', entry[1]);
+        else delete entry[0].value;
+      }
     }
 
     var elements = [];
@@ -299,6 +334,47 @@ export function buildEnhancedSnapshotScript(
       if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
       var rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
+    }
+
+    /**
+     * Credential-bearing fields must never expose their value to the model.
+     * This covers password inputs, one-time-code inputs and fields explicitly
+     * marked as secret by the page.
+     */
+    function isSecretField(el) {
+      if (!el) return false;
+      var type = String((el.type || "")).toLowerCase();
+      if (type === "password") return true;
+      var autocomplete = String((el.getAttribute && el.getAttribute("autocomplete")) || "").toLowerCase();
+      if (autocomplete.indexOf("password") !== -1) return true;
+      if (autocomplete.indexOf("one-time-code") !== -1) return true;
+      if (autocomplete.indexOf("current-password") !== -1) return true;
+      if (autocomplete.indexOf("new-password") !== -1) return true;
+      try {
+        if (el.getAttribute && (el.getAttribute("data-secret") === "true" || el.getAttribute("data-const-secret") === "true")) return true;
+      } catch (e) {}
+      return false;
+    }
+
+    /** True when the element is a credential field or an explicitly masked target. */
+    function isMaskedField(el) {
+      if (maskedElements && maskedElements.has(el)) return true;
+      if (isSecretField(el)) return true;
+      if (!__maskRefs || !__maskRefs.length) return false;
+      for (var i = 0; i < __maskRefs.length; i++) {
+        var ref = __maskRefs[i];
+        if (!ref) continue;
+        try {
+          if (el.matches && el.matches(ref)) return true;
+        } catch (e) {}
+        try {
+          if (el._ariaRef && el._ariaRef.ref === ref) return true;
+        } catch (e) {}
+        try {
+          if (window.__constElementMap && window.__constElementMap[ref] === el) return true;
+        } catch (e) {}
+      }
+      return false;
     }
 
     function getAccessibleName(el) {
@@ -319,8 +395,8 @@ export function buildEnhancedSnapshotScript(
         (el.getAttribute && el.getAttribute("title")) ||
         (el.getAttribute && el.getAttribute("placeholder")) ||
         (el.getAttribute && el.getAttribute("alt")) ||
-        el.innerText ||
-        el.value ||
+        (isMaskedField(el) ? "" : el.innerText) ||
+        (isMaskedField(el) ? "" : el.value) ||
         ""
       ).trim().replace(/\\s+/g, " ").slice(0, 100);
     }
@@ -347,7 +423,7 @@ export function buildEnhancedSnapshotScript(
         name: name,
         type: el.type || undefined,
         placeholder: el.placeholder || undefined,
-        value: el.value ? String(el.value).slice(0, 80) : undefined,
+        value: isMaskedField(el) ? undefined : (el.value ? String(el.value).slice(0, 80) : undefined),
         checked: typeof el.checked === "boolean" ? el.checked : undefined,
         disabled: Boolean(el.disabled || (el.getAttribute && el.getAttribute("aria-disabled") === "true")) || undefined,
         rect: {
@@ -412,7 +488,23 @@ export function buildEnhancedSnapshotScript(
       readableText = (readableRoot.innerText || "").replace(/\\n{3,}/g, "\\n\\n").trim().slice(0, 4500);
     }
 
-    return {
+    function redactSnapshot(value) {
+      if (typeof value === 'string') {
+        for (var secret of secretValues) {
+          value = value.split(secret).join('[REDACTED]');
+          var escaped = JSON.stringify(secret).slice(1, -1);
+          if (escaped !== secret) value = value.split(escaped).join('[REDACTED]');
+        }
+        return value;
+      }
+      if (Array.isArray(value)) return value.map(redactSnapshot);
+      if (value && typeof value === 'object') {
+        for (var key of Object.keys(value)) value[key] = redactSnapshot(value[key]);
+      }
+      return value;
+    }
+
+    return redactSnapshot({
       snapshotId: snapshotId,
       url: window.location.href,
       title: document.title,
@@ -428,6 +520,6 @@ export function buildEnhancedSnapshotScript(
       hrefs: hrefs,
       elements: elements,
       readableText: readableText
-    };
+    });
   })();`;
 }

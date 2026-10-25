@@ -203,6 +203,11 @@ const VALID_FALLBACK_TOOLS = new Set([
   "browser_evaluate",
   "browser_tabs",
   "browser_request_help",
+  "browser_wait_for",
+  "browser_verify_text",
+  "browser_find",
+  "browser_hover",
+  "browser_paste",
 ]);
 
 export function extractFallbackToolCalls(content: string): ToolCall[] {
@@ -487,6 +492,11 @@ Available tools:
 - browser_screenshot: Capture an annotated Set-of-Mark screenshot ([e1], [e2] overlays) of the active browser viewport and save to disk.
 - browser_console: Read captured browser console logs, uncaught page exceptions, and fetch/XHR network requests.
 - browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
+- browser_wait_for: Wait until a condition holds (element visible/hidden/attached/detached, text present, URL matched, or a fixed delay) instead of guessing with sleeps. Use it after any action that triggers a re-render or a redirect.
+- browser_verify_text: Assert that specific text is present ('state: visible', default) or absent ('state: absent') on the page. The call fails when the expectation does not hold, so use it to confirm a result instead of re-reading snapshots.
+- browser_find: Search the page for visible text and return the matching elements with their snapshot refs and coordinates. Use it to locate a control by wording when you do not know its ref.
+- browser_hover: Hover an element by ref or selector. Required for dropdown menus, tooltips and hover-revealed actions.
+- browser_paste: Paste a long string into an input by ref or selector without simulating keystrokes.
 - browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
 - browser_request_help: Hand over control to the human user for CAPTCHAs, 2FA/OTP verification, or masked password/secret entry, pausing until the user hands control back.
 Computer actions report input delivery separately from verified outcomes. Never claim a message was sent or a task completed from a successful input call alone. Inspect the returned screenshot/tree for evidence. For messaging, verify the intended recipient in the open chat header (including the self-chat label when requested) before submitting. If vision is unavailable and the tree is insufficient, report the outcome as unverified. After a timeout, input may already have occurred: inspect before retrying to avoid duplicate actions.
@@ -652,6 +662,11 @@ Available tools:
 - browser_screenshot: Capture an annotated Set-of-Mark screenshot ([e1], [e2] overlays) of the active browser viewport and save to disk.
 - browser_console: Read captured browser console logs, uncaught page exceptions, and fetch/XHR network requests.
 - browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
+- browser_wait_for: Wait until a condition holds (element visible/hidden/attached/detached, text present, URL matched, or a fixed delay) instead of guessing with sleeps. Use it after any action that triggers a re-render or a redirect.
+- browser_verify_text: Assert that specific text is present ('state: visible', default) or absent ('state: absent') on the page. The call fails when the expectation does not hold, so use it to confirm a result instead of re-reading snapshots.
+- browser_find: Search the page for visible text and return the matching elements with their snapshot refs and coordinates. Use it to locate a control by wording when you do not know its ref.
+- browser_hover: Hover an element by ref or selector. Required for dropdown menus, tooltips and hover-revealed actions.
+- browser_paste: Paste a long string into an input by ref or selector without simulating keystrokes.
 - browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
 - browser_request_help: Hand over control to the student/user for CAPTCHAs, login/2FA, or masked password/secret entry, pausing until the student hands control back.
 

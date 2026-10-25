@@ -239,6 +239,20 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("browser:console", args),
     evaluate: (args: any) =>
       ipcRenderer.invoke("browser:evaluate", args),
+    waitFor: (args: any) =>
+      ipcRenderer.invoke("browser:wait-for", args),
+    verifyText: (args: any) =>
+      ipcRenderer.invoke("browser:verify-text", args),
+    find: (args: any) =>
+      ipcRenderer.invoke("browser:find", args),
+    hover: (args: any) =>
+      ipcRenderer.invoke("browser:hover", args),
+    paste: (args: any) =>
+      ipcRenderer.invoke("browser:paste", args),
+    getAllowedDomains: () =>
+      ipcRenderer.invoke("browser:get-allowed-domains"),
+    setAllowedDomains: (domains: string[]) =>
+      ipcRenderer.invoke("browser:set-allowed-domains", domains),
     onControlChanged: (callback: (state: any) => void) => {
       const handler = (_event: any, state: any) => callback(state);
       ipcRenderer.on("browser:control-changed", handler);

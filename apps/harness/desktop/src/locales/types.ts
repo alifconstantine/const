@@ -368,6 +368,11 @@ export interface TranslationDictionary {
     browserZoomIn: string;
     browserZoomOut: string;
     browserResetZoom: string;
+    browserSecretPlaceholder: string;
+    browserSecretSending: string;
+    browserSecretSupply: string;
+    browserSecretError: string;
+    browserBlockedScheme: string;
     noContentToCompare: string;
     collapseContext: string;
     expandAllLines: string;

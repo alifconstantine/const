@@ -184,6 +184,11 @@ const MUTATING_OR_SUBAGENT_TOOLS_DENY_FOR_READONLY = new Set([
   "browser_key",
   "browser_scroll",
   "browser_evaluate",
+  "browser_wait_for",
+  "browser_verify_text",
+  "browser_find",
+  "browser_hover",
+  "browser_paste",
 ]);
 
 const SUBAGENT_ORCHESTRATION_TOOLS = new Set([

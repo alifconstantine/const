@@ -167,11 +167,11 @@ const accessibleName = element => {
     textOf(element)
   ).trim();
 };
-const semanticElements = spec => {
+const semanticElements = (spec, includeHidden = false) => {
   if (!["label", "placeholder", "testid", "alt", "title", "role"].includes(spec.kind)) return null;
   const wanted = (spec.value || "").trim().toLowerCase();
   return allElements().filter(element => {
-    if (!isVisible(element)) return false;
+    if (!includeHidden && !isVisible(element)) return false;
     if (spec.kind === "label") return accessibleName(element).toLowerCase().includes(wanted);
     if (spec.kind === "placeholder") return (element.getAttribute("placeholder") || "").toLowerCase().includes(wanted);
     if (spec.kind === "testid") return element.getAttribute("data-testid") === spec.value.trim();
@@ -186,7 +186,7 @@ const semanticElements = spec => {
     return spec.exact ? name === spec.name.toLowerCase() : name.includes(spec.name.toLowerCase());
   });
 };
-const findElement = spec => {
+const findElement = (spec, includeHidden = false) => {
   if (!spec) return null;
   if (spec.kind === "aria-ref") {
     const wanted = spec.value;
@@ -206,7 +206,7 @@ const findElement = spec => {
     }
     return null;
   }
-  const semantic = semanticElements(spec);
+  const semantic = semanticElements(spec, includeHidden);
   if (semantic && semantic.length > 0) return semantic[0];
   if (spec.kind === "css") {
     return pierceQuery(document, spec.value);
@@ -224,14 +224,15 @@ const findElement = spec => {
   }
   if (spec.kind === "text") {
     const wanted = spec.value.trim().toLowerCase();
-    return allElements().find(element => isVisible(element) && textOf(element).toLowerCase().includes(wanted)) || null;
+    const matches = allElements().filter(element => (includeHidden || isVisible(element)) && textOf(element).toLowerCase().includes(wanted));
+    return matches.find(element => !matches.some(other => other !== element && element.contains(other))) || null;
   }
   if (spec.kind === "aria") {
     const wanted = (spec.name || spec.value).trim().toLowerCase();
     const role = (spec.role || "").toLowerCase();
     return (
       allElements().find(element => {
-        if (!isVisible(element)) return false;
+        if (!includeHidden && !isVisible(element)) return false;
         if (role && (element.getAttribute("role") || "").toLowerCase() !== role) return false;
         const name = accessibleName(element).toLowerCase();
         return name === wanted || name.includes(wanted);

@@ -1,4 +1,5 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage, protocol, net } from "electron";
+import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "./browser/guest-policy";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage, protocol, net, session } from "electron";
 import { pathToFileURL } from "node:url";
 
 // Register custom protocol scheme for safe local file serving (images/attachments in brain)
@@ -593,14 +594,14 @@ function createWindow() {
 }
 
 app.on("web-contents-created", (_event, contents) => {
-  contents.on("will-attach-webview", (_waEvent, webPreferences) => {
-    delete webPreferences.preload;
-    webPreferences.nodeIntegration = false;
-    webPreferences.contextIsolation = true;
-  });
+  applyBrowserContentsPolicy(contents, (url) => browserController.assertNavigationAllowed(url));
 });
 
 app.whenReady().then(() => {
+  // Default-deny permission policy for the embedded browser partition.
+  // Registered here (ready-scoped) because session.fromPartition() throws before app ready.
+  applyBrowserSessionPolicy(session.fromPartition(BROWSER_PARTITION), (url) => browserController.assertNavigationAllowed(url));
+
   // Register const-file:// protocol handler for rendering local media & brain attachments safely
   protocol.handle("const-file", (request) => {
     try {
@@ -2543,6 +2544,35 @@ app.whenReady().then(() => {
 
   ipcMain.handle("browser:evaluate", async (_event, args: any) => {
     return await browserController.evaluate(args);
+  });
+
+  ipcMain.handle("browser:wait-for", async (_event, args: any) => {
+    return await browserController.waitFor(args);
+  });
+
+  ipcMain.handle("browser:verify-text", async (_event, args: any) => {
+    return await browserController.verifyText(args);
+  });
+
+  ipcMain.handle("browser:find", async (_event, args: any) => {
+    return await browserController.find(args);
+  });
+
+  ipcMain.handle("browser:hover", async (_event, args: any) => {
+    return await browserController.hover(args);
+  });
+
+  ipcMain.handle("browser:paste", async (_event, args: any) => {
+    return await browserController.paste(args);
+  });
+
+  ipcMain.handle("browser:get-allowed-domains", async () => {
+    return browserController.getAllowedDomains();
+  });
+
+  ipcMain.handle("browser:set-allowed-domains", async (_event, domains: string[]) => {
+    browserController.setAllowedDomains(Array.isArray(domains) ? domains : []);
+    return browserController.getAllowedDomains();
   });
 
   createWindow();
