@@ -371,6 +371,7 @@ export const BUILTIN_MODELS: ModelSpec[] = [
   ...CATALOG_MODELS.filter((m) => m.tier === "free").map((m) => ({
     ...m,
     id: m.id + ":free",
+    name: m.name + ":free",
     modelId: m.modelId + ":free",
     pricing: { input: "$0", cache: "$0", output: "$0", unit: "/ 1M tokens" },
   })),

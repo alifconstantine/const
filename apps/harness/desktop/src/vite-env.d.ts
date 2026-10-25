@@ -294,6 +294,7 @@ declare global {
       }) => Promise<{
         success: boolean;
         aborted?: boolean;
+        errorReported?: boolean;
         messages?: any[];
         workspacePath?: string;
         isOutsideProject?: boolean;

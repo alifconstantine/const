@@ -24,6 +24,7 @@ import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
+import { shouldNotifyAgentFailure } from "./lib/agent-errors";
 import { Sidebar } from "./components/sidebar";
 import { TopToolbar } from "./components/workbench/top-toolbar";
 import {
@@ -2038,7 +2039,7 @@ function AuthenticatedContent({
         });
 
         if (!res.success && res.error) {
-          if (!res.aborted && !res.error.toLowerCase().includes("cancelled") && !res.error.toLowerCase().includes("abort")) {
+          if (shouldNotifyAgentFailure(res)) {
             toast.error(res.error);
           }
           setRunningConvoIds((prev) => {
@@ -2188,8 +2189,8 @@ function AuthenticatedContent({
 
     // 1. Always record this as the global last-used model for future new chats
     try {
-      if (modelItem.name) {
-        localStorage.setItem("const_harness_active_model", modelItem.name);
+      if (modelItem.id) {
+        localStorage.setItem("const_harness_active_model", modelItem.id);
       }
       if (modelItem.id) {
         localStorage.setItem("const_llm_active_model", modelItem.id);
@@ -3206,7 +3207,7 @@ function AuthenticatedContent({
         if (isUserCancelled) {
           // Handled without error notification
         } else {
-          toast.error(event.error || "Agent execution error");
+          toast.error(event.error || t("toast.agentExecutionError"));
         }
       }
     });
@@ -3334,7 +3335,7 @@ function AuthenticatedContent({
         });
 
         if (!res.success && res.error) {
-          if (!res.aborted && !res.error.toLowerCase().includes("cancelled") && !res.error.toLowerCase().includes("abort")) {
+          if (shouldNotifyAgentFailure(res)) {
             toast.error(res.error);
           }
           setRunningConvoIds((prev) => {

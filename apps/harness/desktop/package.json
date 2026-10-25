@@ -8,6 +8,7 @@
     "build": "node scripts/build-computer-use-macos.cjs && tsc && vite build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
+    "test:models": "tsx --test src/lib/models.test.ts",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "node scripts/test-browser.cjs",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",

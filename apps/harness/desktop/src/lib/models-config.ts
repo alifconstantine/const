@@ -1,3 +1,6 @@
+import { ROUTER_DEFAULT_MODELS } from "./router-models";
+import { modelDisplayName } from "./model-identity";
+import { formatContextWindow, formatTokenDisplay } from "@const/backend/router/modelCatalog";
 /**
  * Unified Models & Multi-modal Configuration for Const Harness Desktop.
  * Mirrors the clean architecture from Const Learn (components/home/views/models-view.tsx) for:
@@ -50,84 +53,15 @@ export interface LlmProvider {
 /**
  * Authentic default models served by the Const Router gateway
  */
-export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    inputTypes: ["text", "image", "audio", "video"],
-    description: "Advanced frontier reasoning model with 1M context and multimodal tool calling. Included in free weekly quota.",
-  },
-  {
-    id: "glm-5.3-flash",
-    name: "GLM 5.3 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "Ultra-fast response model optimized for real-time coding, tool execution, and natural dialogue.",
-    inputTypes: ["text", "image", "video"],
-  },
-  {
-    id: "deepseek-v4.1-flash",
-    name: "Deepseek v4.1 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "High-performance MoE reasoning model specializing in algorithmic coding, math, and code refactoring.",
-    inputTypes: ["text", "image"],
-  },
-  {
-    id: "qwen-3.8-omni-flash",
-    name: "Qwen 3.8 Omni Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "Native omni-modal foundation model strong across multilingual tasks, code, vision, and audio.",
-    inputTypes: ["text", "image", "audio", "video"],
-  },
-  {
-    id: "gpt-6-luna",
-    name: "GPT 6 Luna",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "Frontier reasoning powerhouse with 272K context, nuanced writing, and high-fidelity problem solving.",
-    inputTypes: ["text", "image"],
-  },
-  {
-    id: "combo/coding",
-    name: "combo/coding",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "Priority failover coding chain: GLM 5.3 Flash -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> Qwen Omni -> GPT 6 Luna.",
-  },
-  {
-    id: "combo/auto",
-    name: "combo/auto",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    description: "Balanced reasoning router: GPT 6 Luna -> Deepseek v4.1 Flash -> Gemini 3.8 Flash -> Qwen Omni -> GLM 5.3 Flash.",
-  },
-  {
-    id: "combo/fast",
-    name: "combo/fast",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: false,
-    description: "Low-latency sub-second chain: GPT 6 Luna -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> GLM 5.3 Flash -> Qwen Omni.",
-  },
-];
+export const CONST_ROUTER_LLM_MODELS: LlmModel[] = ROUTER_DEFAULT_MODELS.map((model) => ({
+  id: model.id,
+  name: model.displayName,
+  contextWindow: formatContextWindow(model.contextWindow),
+  maxOutput: formatTokenDisplay(model.maxOutputTokens),
+  supportsThinking: model.supportsThinking,
+  thinkingLevels: model.thinkingLevels,
+  inputTypes: model.inputTypes,
+}));
 
 export const CONST_LLM_PROVIDER: LlmProvider = {
   id: "const-router",
@@ -623,12 +557,14 @@ export function saveLlmConfig(cfg: MultiModalLlmConfig): void {
   localStorage.setItem(STORAGE_KEYS.LLM_PROVIDERS, JSON.stringify(cfg.providers));
   localStorage.setItem(STORAGE_KEYS.LLM_ACTIVE_PROVIDER, cfg.activeProviderId);
   localStorage.setItem(STORAGE_KEYS.LLM_ACTIVE_MODEL, cfg.activeModelId);
+  localStorage.setItem("const_harness_active_model", cfg.activeModelId);
 
   syncToElectron({
     llmProviders: cfg.providers,
     activeModel: cfg.activeModelId,
-    activeProvider: cfg.activeProviderId,
+    activeProvider: cfg.activeProviderId === "const-router" ? "const" : cfg.activeProviderId,
   });
+  window.dispatchEvent(new CustomEvent("const:active-model-changed", { detail: { modelId: cfg.activeModelId } }));
 }
 
 export function saveSpeechConfig(cfg: MultiModalSpeechConfig): void {
@@ -672,9 +608,9 @@ export function saveVideoConfig(cfg: MultiModalVideoConfig): void {
 }
 
 function syncToElectron(payload: Record<string, any>) {
-  if (typeof window !== "undefined" && (window as any).electron?.config?.save) {
+  if (typeof window !== "undefined" && window.electron?.saveConfig) {
     try {
-      (window as any).electron.config.save(payload).catch(() => {});
+      window.electron.saveConfig(payload).catch(() => {});
     } catch {}
   }
 }
@@ -792,7 +728,7 @@ export async function fetchRemoteModels(
       .filter((m) => m && (m.id || m.name))
       .map((m) => ({
         id: String(m.id || m.name),
-        name: String(m.name || m.id),
+        name: modelDisplayName(String(m.id || m.name), String(m.name || m.id)),
       }))
       .slice(0, 50);
 

@@ -16,6 +16,10 @@ The initial sidebar error handling passed a newly allocated query map to `useQue
 
 ## Model IDs and billing
 
+Harness Desktop now derives its fallback chat catalog from this same pure model catalog. Free display names carry `:free`; paid variants retain separate unsuffixed IDs. Selection, workspace/conversation persistence, Settings-to-Electron sync, and request dispatch retain canonical IDs. Catalog deduplication uses IDs rather than names. A fresh catalog response preserves any newer user selection. Only combos returned by authenticated discovery appear; fallback lists no longer invent preset combos.
+
+Desktop errors carry an `errorReported` flag when already delivered through the agent stream, so the IPC result does not issue a second toast. Default-model changes also have a single success notification. These Desktop changes require running an updated Desktop build. Billing remains enforced server-side: free variants consume the weekly quota; unfunded paid variants return 402.
+
 The server catalog is `packages/backend/convex/router/modelCatalog.ts`, re-exported by Router. The free allowlist contains exactly:
 
 - `deepseek-v4.1-flash:free`

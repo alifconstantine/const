@@ -22,7 +22,6 @@ import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   createConstAgent,
-  DEFAULT_MODELS,
   rollbackFileMutation,
   globalTaskManager,
   globalSubAgentManager,
@@ -56,6 +55,9 @@ import { marketplaceService } from "./marketplace-service";
 import { fetchSkillsCatalog } from "../src/lib/skills/skills-sh-service";
 import { WINDOWS_APP_ID, loadWindowBranding, applyWindowBranding } from "./window-branding";
 import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
+import { ROUTER_DEFAULT_MODELS as DEFAULT_MODELS, DEFAULT_ROUTER_MODEL_ID } from "../src/lib/router-models";
+import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/model-identity";
+import { createAgentEventForwarder } from "../src/lib/agent-errors";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -137,7 +139,7 @@ export interface UserConfig {
 }
 
 const defaultUserConfig: UserConfig = {
-  activeModel: "gemini-3.8-flash",
+  activeModel: DEFAULT_ROUTER_MODEL_ID,
   activeProvider: "const",
   workspaceMemoryEnabled: true,
   enableComputerUse: true,
@@ -896,7 +898,7 @@ app.whenReady().then(() => {
             );
             return {
               id: m.id,
-              displayName: m.display_name || m.name || m.id,
+              displayName: modelDisplayName(m.id, m.display_name || m.name),
               provider: m.provider || "const",
               providerName: m.provider_name || (m.provider === "const" ? "Const" : "Custom"),
               baseUrl: routerBaseUrl,
@@ -942,12 +944,10 @@ app.whenReady().then(() => {
       };
     });
 
-    const seenIds = new Set<string>();
-    const seenNames = new Set<string>();
     const combined: any[] = [];
     for (const m of [...baseModels, ...custom]) {
       const rawId = m.id || "";
-      let displayName = m.displayName || m.name || rawId;
+      let displayName = modelDisplayName(rawId, m.displayName || m.name);
 
       // Align combo display names and thinking properties with official router definitions
       let supportsThinking = m.supportsThinking;
@@ -978,17 +978,9 @@ app.whenReady().then(() => {
         defaultThinkingLevel,
       };
 
-      const normId = rawId.toLowerCase().replace(/\s+/g, "-").trim();
-      const normName = displayName.toLowerCase().trim();
-
-      if (!normId) continue;
-      if (!seenIds.has(normId) && !seenNames.has(normName)) {
-        seenIds.add(normId);
-        seenNames.add(normName);
-        combined.push(item);
-      }
+      combined.push(item);
     }
-    return combined;
+    return uniqueModelsById(combined);
   });
 
   // Dedicated lightweight title generation that never conflicts with activeAgent
@@ -1177,10 +1169,9 @@ app.whenReady().then(() => {
       }
     ) => {
       const config = loadUserConfig();
-      const model = payload.model || config.activeModel || "gemini-3.8-flash";
-
       // Match model to provider
       const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
+      const model = resolveModelId(payload.model || config.activeModel || DEFAULT_ROUTER_MODEL_ID, allModels);
       const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
       const providerKey = modelDef?.provider || config.activeProvider || "const";
       const providerCfg = config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
@@ -1290,13 +1281,16 @@ app.whenReady().then(() => {
         win.webContents.send("agent:session-started", { conversationId: convoId });
       }
 
+      const eventForwarder = createAgentEventForwarder((agentEvent) => {
+        if (!win || win.isDestroyed()) return false;
+        win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId });
+        return true;
+      });
       try {
         const updatedMessages = await agent.run(
           payload.messages,
           (agentEvent: any) => {
-            if (win && !win.isDestroyed()) {
-              win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId });
-            }
+            eventForwarder.forward(agentEvent);
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
         );
@@ -1344,7 +1338,7 @@ app.whenReady().then(() => {
           isOutsideProject: !payload.workspacePath || payload.workspacePath === "Outside Project",
         };
       } catch (err: any) {
-        return { success: false, error: err.message };
+        return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
         computerController.releaseSession(convoId);
         activeSessions.delete(convoId);

@@ -1,3 +1,4 @@
+import { CONST_ROUTER_LLM_MODELS } from "../lib/models-config";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Avatar,
@@ -100,80 +101,7 @@ export interface SettingsViewProps {
 
 export const CONST_ROUTER_DEFAULT_URL = "https://router.const.web.id/v1";
 
-export const BUILTIN_CONST_MODELS = [
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    isDefault: true,
-    desc: "Advanced frontier thinking with 1M context, extended reasoning depth, and multimodal vision. Included in free weekly quota.",
-  },
-  {
-    id: "glm-5.3-flash",
-    name: "GLM 5.3 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Ultra-fast response model optimized for real-time coding, tool execution, and responsive natural dialogue.",
-  },
-  {
-    id: "deepseek-v4.1-flash",
-    name: "Deepseek v4.1 Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "High-performance MoE reasoning model specializing in complex algorithmic coding, mathematics, and architectural refactoring.",
-  },
-  {
-    id: "qwen-3.8-omni-flash",
-    name: "Qwen 3.8 Omni Flash",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Native omni-modal foundation model strong across multilingual tasks, software engineering, vision, and audio.",
-  },
-  {
-    id: "gpt-6-luna",
-    name: "GPT 6 Luna",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Frontier reasoning powerhouse with 272K context, nuanced writing, and high-fidelity problem solving.",
-  },
-  {
-    id: "combo/coding",
-    name: "combo/coding",
-    contextWindow: "1M Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Priority failover coding chain: GLM 5.3 Flash -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> Qwen Omni -> GPT 6 Luna.",
-  },
-  {
-    id: "combo/auto",
-    name: "combo/auto",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Balanced reasoning router: GPT 6 Luna -> Deepseek v4.1 Flash -> Gemini 3.8 Flash -> Qwen Omni -> GLM 5.3 Flash.",
-  },
-  {
-    id: "combo/fast",
-    name: "combo/fast",
-    contextWindow: "272K Context",
-    maxOutput: "128K Output",
-    supportsThinking: false,
-    desc: "Low-latency sub-second chain: GPT 6 Luna -> Gemini 3.8 Flash -> Deepseek v4.1 Flash -> GLM 5.3 Flash -> Qwen Omni.",
-  },
-];
+export const BUILTIN_CONST_MODELS = CONST_ROUTER_LLM_MODELS;
 
 export const AVATAR_PRESETS = [
   {
@@ -676,13 +604,7 @@ export function SettingsView({
 
   const handleSelectActiveModel = (modelId: string) => {
     setActiveModel(modelId);
-    const found = BUILTIN_CONST_MODELS.find((m) => m.id === modelId);
-    const displayName = found?.name || modelId;
-    localStorage.setItem("const_harness_active_model", displayName);
-    if (window.electron?.saveConfig) {
-      window.electron.saveConfig({ activeModel: modelId }).catch(() => {});
-    }
-    toast.success(t("toast.activeModelSet", { model: displayName }));
+    localStorage.setItem("const_harness_active_model", modelId);
   };
 
   // Keyboard Shortcuts state & definitions matching ZCode

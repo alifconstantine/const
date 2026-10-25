@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "../../lib/i18n";
+import { modelDisplayName } from "../../lib/model-identity";
 import {
   toast,
   cn,
@@ -169,7 +170,7 @@ export function ModelSettings({
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
       onActiveModelChanged?.(modelId);
-      toast.success(`Default LLM model set to ${modelId}`);
+      toast.success(t("toast.activeModelSet"));
     } else if (activeCategory === "speech") {
       const updated = {
         ...config.speech,
@@ -178,7 +179,7 @@ export function ModelSettings({
       };
       setConfig((prev) => ({ ...prev, speech: updated }));
       saveSpeechConfig(updated);
-      toast.success(`Default speech model set to ${modelId}`);
+      toast.success(t("toast.activeModelSet"));
     } else if (activeCategory === "image") {
       const updated = {
         ...config.image,
@@ -187,7 +188,7 @@ export function ModelSettings({
       };
       setConfig((prev) => ({ ...prev, image: updated }));
       saveImageConfig(updated);
-      toast.success(`Default image model set to ${modelId}`);
+      toast.success(t("toast.activeModelSet"));
     } else if (activeCategory === "video") {
       const updated = {
         ...config.video,
@@ -196,7 +197,7 @@ export function ModelSettings({
       };
       setConfig((prev) => ({ ...prev, video: updated }));
       saveVideoConfig(updated);
-      toast.success(`Default video model set to ${modelId}`);
+      toast.success(t("toast.activeModelSet"));
     }
   };
 
@@ -1237,9 +1238,14 @@ export function ModelSettings({
                               )}
                             >
                               <div className="min-w-0 flex items-center gap-3">
-                                <span className="text-xs font-semibold text-foreground truncate">
-                                  {model.name || model.id}
-                                </span>
+                                <div className="min-w-0">
+                                  <span className="block text-xs font-semibold text-foreground truncate">
+                                    {modelDisplayName(model.id, model.name)}
+                                  </span>
+                                  <span className="block text-[11px] text-muted-foreground truncate mt-1">
+                                    {model.id}
+                                  </span>
+                                </div>
                                 {model.contextWindow && (
                                   <span className="text-[11px] text-muted-foreground font-sans px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 shrink-0">
                                     {model.contextWindow}

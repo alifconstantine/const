@@ -1,3 +1,5 @@
+import { ROUTER_DEFAULT_MODELS } from "../../lib/router-models";
+import { modelDisplayName, uniqueModelsById, resolveModelId } from "../../lib/model-identity";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Folder,
@@ -339,138 +341,7 @@ export function getModelContextLimit(modelId?: string, fallback?: number): numbe
   return fallback && fallback > 0 ? fallback : 1_000_000;
 }
 
-export const INITIAL_DEFAULT_MODELS: ModelItem[] = [
-  {
-    id: "deepseek-v4-flash",
-    name: "DeepSeek-V4-Flash",
-    desc: "Frontier speed & reasoning",
-    provider: "deepseek",
-    providerName: "DeepSeek",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "deepseek-v4-pro",
-    name: "DeepSeek-V4-Pro",
-    desc: "Advanced reasoning & deep code generation",
-    provider: "deepseek",
-    providerName: "DeepSeek",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "high",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "deepseek-v4-flash-vision-exp",
-    name: "DeepSeek-V4-Flash-Vision-Exp",
-    desc: "Multimodal frontier reasoning",
-    provider: "deepseek",
-    providerName: "DeepSeek",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    desc: "Advanced frontier thinking & reasoning depth",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1048576,
-  },
-  {
-    id: "glm-5.3-flash",
-    name: "GLM 5.3 Flash",
-    desc: "Ultra-fast response model optimized for real-time coding and execution",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "deepseek-v4.1-flash",
-    name: "Deepseek v4.1 Flash",
-    desc: "High-performance MoE reasoning model specializing in algorithmic coding",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "qwen-3.8-omni-flash",
-    name: "Qwen 3.8 Omni Flash",
-    desc: "Native omni-modal foundation model strong across multilingual tasks and code",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "gpt-6-luna",
-    name: "GPT 6 Luna",
-    desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 272000,
-  },
-  {
-    id: "combo/auto",
-    name: "combo/auto",
-    desc: "Virtual Combo auto router with dynamic reasoning",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "medium",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "combo/fast",
-    name: "combo/fast",
-    desc: "Virtual Combo fast chain optimized for sub-second latency",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: false,
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-  {
-    id: "combo/coding",
-    name: "combo/coding",
-    desc: "Virtual Combo coding chain optimized for high-depth reasoning",
-    provider: "const",
-    providerName: "ConstRouter",
-    supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    defaultThinkingLevel: "high",
-    maxOutputTokens: 128000,
-    contextWindow: 1000000,
-  },
-];
+export const INITIAL_DEFAULT_MODELS: ModelItem[] = ROUTER_DEFAULT_MODELS.map((model) => ({ ...model, name: model.displayName }));
 
 let globalCachedModels: ModelItem[] | null = null;
 
@@ -924,22 +795,10 @@ export function ChatCard({
       .filter((group) => group.items.length > 0);
   }, [groupedModels, searchModelQuery]);
 
-  // Normalize a raw model id/name to the canonical display name used in this component
+  // Persist canonical IDs; display names must never select a billing tier.
   const normalizeModelKey = (raw: string | null | undefined): string | null => {
     if (!raw || raw === "Const" || raw.includes("(Const Router)") || raw.includes("(Native)")) return null;
-    const clean = raw.trim();
-    if (clean === "gemini-3.8-flash") return "Gemini 3.8 Flash";
-    if (clean === "glm-5.3-flash") return "GLM 5.3 Flash";
-    if (clean === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
-    if (clean === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
-    if (clean === "gpt-6-luna") return "GPT 6 Luna";
-    if (clean === "deepseek-v4-flash") return "DeepSeek-V4-Flash";
-    if (clean === "deepseek-v4-pro") return "DeepSeek-V4-Pro";
-    if (clean === "deepseek-v4-flash-vision-exp") return "DeepSeek-V4-Flash-Vision-Exp";
-    if (clean === "Auto Router" || clean === "Auto (Best Available)" || clean === "combo/auto") return "combo/auto";
-    if (clean === "Low-Latency Fast Chain" || clean === "Fast (Low Latency)" || clean === "combo/fast") return "combo/fast";
-    if (clean === "Coding Agent Chain" || clean === "Coding & Reasoning" || clean === "combo/coding") return "combo/coding";
-    return clean;
+    return resolveModelId(raw, models);
   };
 
   /**
@@ -974,6 +833,15 @@ export function ChatCard({
   const [selectedModel, setSelectedModel] = useState<string | null>(() => {
     return getInitialResolvedModel(initialModel, initialProject);
   });
+
+  useEffect(() => {
+    const onModelChanged = (event: Event) => {
+      const modelId = (event as CustomEvent<{ modelId: string }>).detail?.modelId;
+      if (modelId) setSelectedModel(modelId);
+    };
+    window.addEventListener("const:active-model-changed", onModelChanged);
+    return () => window.removeEventListener("const:active-model-changed", onModelChanged);
+  }, []);
 
   // When switching conversations or projects, restore the appropriate model
   useEffect(() => {
@@ -1126,7 +994,7 @@ export function ChatCard({
                   : m.supportsThinking !== undefined
                   ? Boolean(m.supportsThinking)
                   : true;
-              let name = m.displayName || m.name || m.id;
+              let name = modelDisplayName(m.id, m.displayName || m.name);
               let defaultThinkingLevel = m.defaultThinkingLevel || m.default_thinking_level || "medium";
 
               if (m.id === "combo/auto" || name === "Auto Router" || name === "Auto (Best Available)") {
@@ -1163,61 +1031,16 @@ export function ChatCard({
               };
             });
 
-            // Deduplicate items defensively so neither same normalized ID nor same name appears twice
-            const seenIds = new Set<string>();
-            const seenNames = new Set<string>();
-            const deduped: ModelItem[] = [];
-            for (const item of mapped) {
-              const normId = item.id.toLowerCase().replace(/\s+/g, "-").trim();
-              const normName = item.name.toLowerCase().trim();
-              if (normId && !seenIds.has(normId) && normName && !seenNames.has(normName)) {
-                seenIds.add(normId);
-                seenNames.add(normName);
-                deduped.push(item);
-              }
-            }
+            const deduped: ModelItem[] = uniqueModelsById(mapped);
             globalCachedModels = deduped;
             setModels(deduped);
 
-            // Normalize selectedModel with freshly loaded models
+            // An in-flight catalog refresh must preserve a newer user selection.
             setSelectedModel((prev) => {
-              // Priority 1: initialModel (for this specific conversation)
-              if (initialModel) {
-                const normProp = normalizeModelKey(initialModel);
-                const found = deduped.find((m) => m.id === normProp || m.name === normProp);
-                return found ? found.name : normProp || initialModel;
-              }
-              // Priority 2: project-specific saved model
-              if (initialProject && initialProject !== "Outside Project" && initialProject !== "[object Object]") {
-                try {
-                  const wsModel = localStorage.getItem(`const_harness_workspace_model_${initialProject}`);
-                  const normWs = normalizeModelKey(wsModel);
-                  if (normWs) {
-                    const found = deduped.find((m) => m.id === normWs || m.name === normWs);
-                    return found ? found.name : normWs;
-                  }
-                } catch {}
-              }
-              // Priority 3: prev or saved last-used model (for new chat)
-              const savedKey =
-                prev ||
-                localStorage.getItem("const_harness_active_model") ||
-                localStorage.getItem("const_llm_active_model");
-              const current = normalizeModelKey(savedKey) || savedKey;
-              if (current) {
-                const found = deduped.find((m) => m.id === current || m.name === current);
-                if (found) {
-                  localStorage.setItem("const_harness_active_model", found.name);
-                  return found.name;
-                }
-                return current;
-              }
-              // Priority 4: Fallback to first available model from provider on initial cold launch
-              const fallback = deduped[0]?.name || deduped[0]?.id || null;
-              if (fallback) {
-                localStorage.setItem("const_harness_active_model", fallback);
-              }
-              return fallback;
+              const requested = prev || getInitialResolvedModel(initialModel, initialProject);
+              const modelId = requested ? resolveModelId(requested, deduped) : deduped[0]?.id || null;
+              if (modelId) localStorage.setItem("const_harness_active_model", modelId);
+              return modelId;
             });
           }
         })
@@ -1233,20 +1056,7 @@ export function ChatCard({
     ) {
       window.electron.getConfig().then((cfg) => {
         if (cfg?.activeModel) {
-          const raw = cfg.activeModel;
-          let modelName = raw;
-          if (raw === "gemini-3.8-flash") modelName = "Gemini 3.8 Flash";
-          else if (raw === "glm-5.3-flash") modelName = "GLM 5.3 Flash";
-          else if (raw === "deepseek-v4.1-flash") modelName = "Deepseek v4.1 Flash";
-          else if (raw === "qwen-3.8-omni-flash" || raw === "qwen-3.8-27b") modelName = "Qwen 3.8 Omni Flash";
-          else if (raw === "gpt-6-luna") modelName = "GPT 6 Luna";
-          else if (raw === "combo/auto" || raw === "Auto Router" || raw === "Auto (Best Available)") modelName = "combo/auto";
-          else if (raw === "combo/fast" || raw === "Low-Latency Fast Chain" || raw === "Fast (Low Latency)") modelName = "combo/fast";
-          else if (raw === "combo/coding" || raw === "Coding Agent Chain" || raw === "Coding & Reasoning") modelName = "combo/coding";
-          else {
-            const found = models.find((m) => m.id === raw || m.name === raw);
-            if (found) modelName = found.name;
-          }
+          const modelName = resolveModelId(cfg.activeModel, models);
           setSelectedModel((prev) => prev || modelName);
           localStorage.setItem("const_harness_active_model", modelName);
         }
@@ -2222,8 +2032,8 @@ export function ChatCard({
                                           key={m.id}
                                           type="button"
                                           onClick={() => {
-                                            setSelectedModel(m.name);
-                                            localStorage.setItem("const_harness_active_model", m.name);
+                                            setSelectedModel(m.id);
+                                            localStorage.setItem("const_harness_active_model", m.id);
                                             localStorage.setItem("const_llm_active_model", m.id);
                                             window.electron?.saveConfig?.({ activeModel: m.id });
                                             if (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]") {

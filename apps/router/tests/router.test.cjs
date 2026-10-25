@@ -616,6 +616,8 @@ test("discovery retains both free and paid variants and authenticates combo disc
   const data = await response.json();
   assert(data.data.some((m) => m.id === free));
   assert(data.data.some((m) => m.id === "deepseek-v4.1-flash"));
+  assert(data.data.find((m) => m.id === free).display_name.endsWith(":free"));
+  assert(!data.data.find((m) => m.id === "deepseek-v4.1-flash").display_name.endsWith(":free"));
   assert(data.data.some((m) => m.id === "combo/coding"));
 });
 test("saved defaults and privacy settings affect requests", async () => {
