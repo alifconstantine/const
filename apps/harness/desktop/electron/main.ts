@@ -1,5 +1,5 @@
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "./browser/guest-policy";
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage, protocol, net, session } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, protocol, net, session } from "electron";
 import { pathToFileURL } from "node:url";
 
 // Register custom protocol scheme for safe local file serving (images/attachments in brain)
@@ -54,6 +54,7 @@ import { browserController, type ControlState } from "./browser-controller";
 import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
 import { fetchSkillsCatalog } from "../src/lib/skills/skills-sh-service";
+import { WINDOWS_APP_ID, loadWindowBranding, applyWindowBranding } from "./window-branding";
 import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
@@ -315,7 +316,6 @@ try {
 }
 
 // Explicitly set app name, AUMID and userData
-const APP_USER_MODEL_ID = "id.web.const.harness.desktop";
 app.setName("Const Harness");
 // Windows identifies taskbar/pinned/jump-list entries by AppUserModelID, not by the
 // window icon. Unpackaged Electron inherits its identity from electron.exe, so the
@@ -323,7 +323,7 @@ app.setName("Const Harness");
 // Electron logo). Use a stable identity here and explicit taskbar/relaunch
 // properties on each window below.
 if (process.platform === "win32") {
-  app.setAppUserModelId(APP_USER_MODEL_ID);
+  app.setAppUserModelId(WINDOWS_APP_ID);
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
 app.setPath("userData", userDataPath);
@@ -470,26 +470,11 @@ app.on("open-url", (event, url) => {
 
 function createWindow() {
   const isDark = nativeTheme.shouldUseDarkColors;
-  // The Windows shell cannot read relaunch icons from app.asar. Packaged builds
-  // ship a real file under resources/branding; dev builds use the app's build dir.
-  const iconDirectories = [
-    path.join(process.resourcesPath, "branding"),
-    path.join(app.getAppPath(), "build"),
-    path.resolve(__dirname, "../build"),
-    path.join(app.getAppPath(), "public"),
-  ];
-  const iconNames = process.platform === "win32" ? ["icon.ico", "icon.png"] : ["icon.png"];
-  const appIconPath = iconDirectories.flatMap(directory => iconNames.map(name => path.join(directory, name))).find(candidate => {
-    if (!fs.existsSync(candidate)) return false;
-    try {
-      return !nativeImage.createFromPath(candidate).isEmpty();
-    } catch { return false; }
-  });
-  if (!appIconPath) console.warn("[Branding] No usable application icon found.");
+  const branding = loadWindowBranding();
 
   win = new BrowserWindow({
     title: "Const Harness",
-    icon: appIconPath,
+    icon: branding.windowIcon,
     width: 1280,
     height: 800,
     minWidth: 480,
@@ -505,16 +490,7 @@ function createWindow() {
     },
   });
 
-  if (process.platform === "win32" && appIconPath) {
-    win.setAppDetails({
-      appId: APP_USER_MODEL_ID,
-      appIconPath,
-      appIconIndex: 0,
-      relaunchCommand: [process.execPath, ...(app.isPackaged ? [] : [app.getAppPath()])]
-        .map(argument => `"${path.resolve(argument)}"`).join(" "),
-      relaunchDisplayName: app.getName(),
-    });
-  }
+  applyWindowBranding(win, branding);
   // Publish the taskbar button only after its branding has been configured.
   win.show();
 
