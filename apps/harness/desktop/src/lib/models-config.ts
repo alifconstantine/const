@@ -58,7 +58,6 @@ export const CONST_ROUTER_LLM_MODELS: LlmModel[] = [
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    isDefault: true,
     inputTypes: ["text", "image", "audio", "video"],
     description: "Advanced frontier reasoning model with 1M context and multimodal tool calling. Included in free weekly quota.",
   },
@@ -463,7 +462,7 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
       llm: {
         providers: [CONST_LLM_PROVIDER],
         activeProviderId: CONST_LLM_PROVIDER.id,
-        activeModelId: CONST_ROUTER_LLM_MODELS[0]?.id || "gemini-3.8-flash",
+        activeModelId: CONST_ROUTER_LLM_MODELS[0]?.id || "",
       },
       speech: {
         providers: [],
@@ -502,9 +501,10 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
     localStorage.getItem(STORAGE_KEYS.LLM_ACTIVE_PROVIDER) || CONST_LLM_PROVIDER.id;
   const llmActiveModel =
     localStorage.getItem(STORAGE_KEYS.LLM_ACTIVE_MODEL) ||
+    localStorage.getItem("const_harness_active_model") ||
     llmProviders.find((p) => p.id === llmActiveProvider)?.models[0]?.id ||
     CONST_ROUTER_LLM_MODELS[0]?.id ||
-    "gemini-3.8-flash";
+    "";
 
   // Load Speech (Empty by default unless user adds one)
   let speechProviders: SpeechProvider[] = [];

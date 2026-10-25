@@ -31,6 +31,7 @@ import {
   type ConversationMetrics,
   type ContextUsageData,
   type ModelItem,
+  getModelContextLimit,
   type AttachedFile,
   formatFileSize,
   cleanAttachmentsForPersistence,
@@ -564,15 +565,31 @@ function AuthenticatedContent({
   }, []);
 
   const setSafeCurrentProject = useCallback((newProject: any) => {
-    if (typeof newProject === "string" && newProject.trim() && newProject !== "[object Object]") {
-      setCurrentProject(newProject);
+    const validProject =
+      typeof newProject === "string" && newProject.trim() && newProject !== "[object Object]"
+        ? newProject
+        : "Outside Project";
+
+    setCurrentProject(validProject);
+    try {
+      localStorage.setItem("const_harness_current_project", validProject);
+    } catch {}
+
+    // If on a fresh new chat and the newly selected workspace has a remembered model, switch to it
+    if (validProject !== "Outside Project") {
       try {
-        localStorage.setItem("const_harness_current_project", newProject);
-      } catch {}
-    } else {
-      setCurrentProject("Outside Project");
-      try {
-        localStorage.setItem("const_harness_current_project", "Outside Project");
+        const wsModel = localStorage.getItem(`const_harness_workspace_model_${validProject}`);
+        if (wsModel && messagesRef.current.length === 0) {
+          const limit = getModelContextLimit(wsModel);
+          setActiveModelItem({
+            id: wsModel,
+            name: wsModel,
+            provider: "const",
+            providerName: "ConstRouter",
+            supportsThinking: true,
+            contextWindow: limit,
+          });
+        }
       } catch {}
     }
   }, []);
@@ -613,7 +630,38 @@ function AuthenticatedContent({
     }
   };
 
-  const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(null);
+  const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(() => {
+    try {
+      const savedProj = localStorage.getItem("const_harness_current_project");
+      if (savedProj && savedProj !== "Outside Project" && savedProj !== "[object Object]") {
+        const wsModel = localStorage.getItem(`const_harness_workspace_model_${savedProj}`);
+        if (wsModel) {
+          return {
+            id: wsModel,
+            name: wsModel,
+            provider: "const",
+            providerName: "ConstRouter",
+            supportsThinking: true,
+            contextWindow: getModelContextLimit(wsModel),
+          };
+        }
+      }
+      const saved =
+        localStorage.getItem("const_harness_active_model") ||
+        localStorage.getItem("const_llm_active_model");
+      if (saved) {
+        return {
+          id: saved,
+          name: saved,
+          provider: "const",
+          providerName: "ConstRouter",
+          supportsThinking: true,
+          contextWindow: getModelContextLimit(saved),
+        };
+      }
+    } catch {}
+    return null;
+  });
   const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
     promptTokens: number;
     completionTokens: number;
@@ -1169,7 +1217,11 @@ function AuthenticatedContent({
       project: currentProject,
       conversationId,
       parentConversationId: conversationId,
-      model: activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash",
+      model:
+        activeModelItem?.id ||
+        activeModelItem?.name ||
+        conversations.find((c) => c.id === conversationId)?.model ||
+        undefined,
     };
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
@@ -1961,6 +2013,9 @@ function AuthenticatedContent({
     if (target) {
       target.messages = newStreamMessages;
       target.updatedAt = Date.now();
+      if (!target.model && (activeModelItem?.id || activeModelItem?.name)) {
+        target.model = activeModelItem.id || activeModelItem.name;
+      }
       saveConversation(target);
       setConversations(loadConversations());
     }
@@ -1969,11 +2024,12 @@ function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = newStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, activeModelItem?.id || activeModelItem?.name));
+        const effectiveModel = target?.model || activeModelItem?.id || activeModelItem?.name;
+        const payloadMessages = newStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, effectiveModel));
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
-          model: activeModelItem?.id || activeModelItem?.name,
+          model: effectiveModel,
           thinkingLevel: undefined,
           workspacePath: currentProject === "Outside Project" ? undefined : currentProject,
           mode: currentMode,
@@ -2080,7 +2136,13 @@ function AuthenticatedContent({
       }, 0)
     );
 
-    const modelLimit = activeModelItem?.contextWindow || backendContextBreakdown?.totalTokens || 1_048_576;
+    const modelLimit =
+      activeModelItem?.contextWindow && activeModelItem.contextWindow >= 200_000
+        ? activeModelItem.contextWindow
+        : getModelContextLimit(
+            activeModelItem?.id || activeModelItem?.name,
+            backendContextBreakdown?.totalTokens ?? 1_000_000
+          );
     const totalTokens = modelLimit;
 
     // If we have verified ground-truth usage from the LLM provider API:
@@ -2111,6 +2173,57 @@ function AuthenticatedContent({
   useEffect(() => {
     activeModelItemRef.current = activeModelItem;
   }, [activeModelItem]);
+
+  const handleModelChange = useCallback((modelItem: ModelItem) => {
+    const limit =
+      modelItem.contextWindow && modelItem.contextWindow >= 200_000
+        ? modelItem.contextWindow
+        : getModelContextLimit(modelItem.id || modelItem.name);
+    const enrichedItem: ModelItem = {
+      ...modelItem,
+      contextWindow: limit,
+    };
+    setActiveModelItem(enrichedItem);
+    activeModelItemRef.current = enrichedItem;
+
+    // 1. Always record this as the global last-used model for future new chats
+    try {
+      if (modelItem.name) {
+        localStorage.setItem("const_harness_active_model", modelItem.name);
+      }
+      if (modelItem.id) {
+        localStorage.setItem("const_llm_active_model", modelItem.id);
+        window.electron?.saveConfig?.({ activeModel: modelItem.id });
+      }
+    } catch {}
+
+    // 2. Persist to current workspace if inside an active project
+    const currentProj = currentProjectRef.current;
+    if (currentProj && currentProj !== "Outside Project" && currentProj !== "[object Object]" && (modelItem.id || modelItem.name)) {
+      try {
+        localStorage.setItem(`const_harness_workspace_model_${currentProj}`, modelItem.id || modelItem.name);
+      } catch {}
+    }
+
+    // 3. If currently viewing an existing conversation, persist this model change to that conversation
+    const currentId = conversationIdRef.current;
+    if (currentId) {
+      const stored = loadConversations();
+      const target = stored.find((c) => c.id === currentId);
+      const chosenId = modelItem.id || modelItem.name;
+      const isAlreadySameModel =
+        target &&
+        (target.model === modelItem.id ||
+          target.model === modelItem.name ||
+          (target.model && modelItem.name && target.model.toLowerCase() === modelItem.name.toLowerCase()));
+      if (target && chosenId && !isAlreadySameModel) {
+        target.model = chosenId;
+        // Keep target.updatedAt untouched so changing the model does NOT bump/reorder history!
+        saveConversation(target);
+        setConversations(loadConversations());
+      }
+    }
+  }, []);
 
   // Dynamic Conversation Metrics for footer bar (Image 2)
   const conversationMetrics = useMemo<ConversationMetrics | undefined>(() => {
@@ -2677,7 +2790,11 @@ function AuthenticatedContent({
           // Record LLM request directly to local desktop Dexie database
           localDb.recordRequestLog({
             requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            model: target?.model || activeModelItemRef.current?.name || "agy/gemini-3.8-flash-tiered",
+            model:
+              target?.model ||
+              activeModelItemRef.current?.id ||
+              activeModelItemRef.current?.name ||
+              "default",
             conversationId: targetConvoId,
             promptTokens,
             completionTokens,
@@ -3185,6 +3302,7 @@ function AuthenticatedContent({
     }
 
     const effectiveMode = mode || currentMode;
+    const chosenModel = model || activeModelItem?.id || activeModelItem?.name;
     const updatedConvo: ConversationItem = {
       id: conversationId,
       title: titleToUse || "New task",
@@ -3194,6 +3312,7 @@ function AuthenticatedContent({
       messages: currentStreamMessages,
       contextUsage: contextUsage,
       mode: effectiveMode,
+      model: chosenModel,
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -3585,15 +3704,35 @@ function AuthenticatedContent({
     setBottomPanelTabs([]);
     setActiveBottomTabId(null);
 
+    let resolvedProject = currentProject;
     // Only update project if targetProject is a valid string, not a MouseEvent or "[object Object]"
     if (
       typeof targetProject === "string" &&
       targetProject.trim() &&
       targetProject !== "[object Object]"
     ) {
+      resolvedProject = targetProject;
       setCurrentProject(targetProject);
       try {
         localStorage.setItem("const_harness_current_project", targetProject);
+      } catch {}
+    }
+
+    // Restore workspace model if this project has one
+    if (resolvedProject && resolvedProject !== "Outside Project" && resolvedProject !== "[object Object]") {
+      try {
+        const wsSaved = localStorage.getItem(`const_harness_workspace_model_${resolvedProject}`);
+        if (wsSaved) {
+          const limit = getModelContextLimit(wsSaved);
+          setActiveModelItem({
+            id: wsSaved,
+            name: wsSaved,
+            provider: "const",
+            providerName: "ConstRouter",
+            supportsThinking: true,
+            contextWindow: limit,
+          });
+        }
       } catch {}
     }
   };
@@ -3617,6 +3756,28 @@ function AuthenticatedContent({
       setCurrentProject(target?.project || "Outside Project");
       if (target?.mode) {
         setCurrentMode(target.mode);
+      }
+      let effectiveModel = target?.model;
+      if (!effectiveModel && target?.project && target.project !== "Outside Project" && target.project !== "[object Object]") {
+        try {
+          const wsModel = localStorage.getItem(`const_harness_workspace_model_${target.project}`);
+          if (wsModel) effectiveModel = wsModel;
+        } catch {}
+      }
+      if (effectiveModel) {
+        const limit = getModelContextLimit(effectiveModel);
+        setActiveModelItem((prev) => ({
+          id: effectiveModel!,
+          name: effectiveModel!,
+          provider: prev?.provider || "const",
+          providerName: prev?.providerName || "ConstRouter",
+          contextWindow: limit,
+        }));
+        if (target?.project && target.project !== "Outside Project" && target.project !== "[object Object]") {
+          try {
+            localStorage.setItem(`const_harness_workspace_model_${target.project}`, effectiveModel);
+          } catch {}
+        }
       }
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
@@ -3657,6 +3818,28 @@ function AuthenticatedContent({
       setCurrentProject(target.project || "Outside Project");
       if (target.mode) {
         setCurrentMode(target.mode);
+      }
+      let effectiveModel = target.model;
+      if (!effectiveModel && target.project && target.project !== "Outside Project" && target.project !== "[object Object]") {
+        try {
+          const wsModel = localStorage.getItem(`const_harness_workspace_model_${target.project}`);
+          if (wsModel) effectiveModel = wsModel;
+        } catch {}
+      }
+      if (effectiveModel) {
+        const limit = getModelContextLimit(effectiveModel);
+        setActiveModelItem((prev) => ({
+          id: effectiveModel!,
+          name: effectiveModel!,
+          provider: prev?.provider || "const",
+          providerName: prev?.providerName || "ConstRouter",
+          contextWindow: limit,
+        }));
+        if (target.project && target.project !== "Outside Project" && target.project !== "[object Object]") {
+          try {
+            localStorage.setItem(`const_harness_workspace_model_${target.project}`, effectiveModel);
+          } catch {}
+        }
       }
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
@@ -4251,6 +4434,14 @@ function AuthenticatedContent({
                 <ChatCard
                   key={conversationId}
                   conversationId={conversationId}
+                  initialModel={
+                    conversations.find((c) => c.id === conversationId)?.model ||
+                    (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]"
+                      ? localStorage.getItem(`const_harness_workspace_model_${currentProject}`) || undefined
+                      : undefined) ||
+                    activeModelItem?.name ||
+                    activeModelItem?.id
+                  }
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
@@ -4259,7 +4450,7 @@ function AuthenticatedContent({
                   onProjectChange={setSafeCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
-                  onModelChange={setActiveModelItem}
+                  onModelChange={handleModelChange}
                   runningTasks={runningTasks}
                   onSelectTask={handleSelectRunningTask}
                   onStopTask={handleStopBackgroundTask}
@@ -4475,7 +4666,15 @@ function AuthenticatedContent({
                   ) : (
                     <ChatCard
                       key={conversationId}
-                      conversationId={conversationId}
+                  conversationId={conversationId}
+                  initialModel={
+                        conversations.find((c) => c.id === conversationId)?.model ||
+                        (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]"
+                          ? localStorage.getItem(`const_harness_workspace_model_${currentProject}`) || undefined
+                          : undefined) ||
+                        activeModelItem?.name ||
+                        activeModelItem?.id
+                      }
                       compact
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
@@ -4487,7 +4686,7 @@ function AuthenticatedContent({
                       onProjectChange={setSafeCurrentProject}
                       onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                       initialPrompt={editingPrompt}
-                      onModelChange={setActiveModelItem}
+                      onModelChange={handleModelChange}
                       runningTasks={runningTasks}
                       onSelectTask={handleSelectRunningTask}
                       onStopTask={handleStopBackgroundTask}
@@ -4622,7 +4821,12 @@ function AuthenticatedContent({
                   parentMessages={messages}
                   parentConversationTitle={conversationTitle}
                   parentConversationId={conversationId}
-                  defaultModel={activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash"}
+                  defaultModel={
+                    activeModelItem?.id ||
+                    activeModelItem?.name ||
+                    conversations.find((c) => c.id === conversationId)?.model ||
+                    undefined
+                  }
                   onOpenFilePreview={handleOpenFilePreview}
                   onOpenTrajectory={handleOpenTrajectory}
                   conversations={conversations}

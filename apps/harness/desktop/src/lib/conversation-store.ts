@@ -334,7 +334,11 @@ export function saveConversation(conversation: ConversationItem): void {
   try {
     const list = loadConversations();
     const index = list.findIndex((c) => c.id === conversation.id);
-    const updatedConvo = { ...conversation, updatedAt: Date.now() };
+    const existing = index >= 0 ? list[index] : null;
+    const updatedConvo = {
+      ...conversation,
+      updatedAt: conversation.updatedAt || existing?.updatedAt || Date.now(),
+    };
 
     if (index >= 0) {
       list[index] = updatedConvo;

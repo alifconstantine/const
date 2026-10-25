@@ -921,7 +921,16 @@ app.whenReady().then(() => {
               thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
-              contextWindow: m.context_length || m.contextLength || m.context_window || m.contextWindow || (m.id.includes("gemini") ? 1048576 : 128000),
+              contextWindow:
+                m.context_length ||
+                m.contextLength ||
+                m.context_window ||
+                m.contextWindow ||
+                (m.id?.toLowerCase().includes("luna")
+                  ? 272000
+                  : m.id?.toLowerCase().includes("gemini")
+                  ? 1048576
+                  : 1000000),
             };
           });
         }

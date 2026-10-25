@@ -320,6 +320,160 @@ export interface ModelItem {
   contextWindow?: number;
 }
 
+export function getModelContextLimit(modelId?: string, fallback?: number): number {
+  if (!modelId) return fallback && fallback > 0 ? fallback : 1_000_000;
+  const id = modelId.toLowerCase().trim();
+  if (id.includes("luna") || id === "gpt-6-luna" || id === "combo/auto" || id === "combo/fast") return 272_000;
+  if (id.includes("gemini")) return 1_048_576;
+  if (
+    id.includes("glm") ||
+    id.includes("deepseek") ||
+    id.includes("qwen") ||
+    id.includes("coding") ||
+    id.startsWith("combo")
+  ) {
+    return 1_000_000;
+  }
+  if (id.includes("claude")) return 200_000;
+  if (id.includes("gpt-4") || id.includes("gpt-3.5")) return 128_000;
+  return fallback && fallback > 0 ? fallback : 1_000_000;
+}
+
+export const INITIAL_DEFAULT_MODELS: ModelItem[] = [
+  {
+    id: "deepseek-v4-flash",
+    name: "DeepSeek-V4-Flash",
+    desc: "Frontier speed & reasoning",
+    provider: "deepseek",
+    providerName: "DeepSeek",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "deepseek-v4-pro",
+    name: "DeepSeek-V4-Pro",
+    desc: "Advanced reasoning & deep code generation",
+    provider: "deepseek",
+    providerName: "DeepSeek",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "high",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "deepseek-v4-flash-vision-exp",
+    name: "DeepSeek-V4-Flash-Vision-Exp",
+    desc: "Multimodal frontier reasoning",
+    provider: "deepseek",
+    providerName: "DeepSeek",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    desc: "Advanced frontier thinking & reasoning depth",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1048576,
+  },
+  {
+    id: "glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    desc: "Ultra-fast response model optimized for real-time coding and execution",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek v4.1 Flash",
+    desc: "High-performance MoE reasoning model specializing in algorithmic coding",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "qwen-3.8-omni-flash",
+    name: "Qwen 3.8 Omni Flash",
+    desc: "Native omni-modal foundation model strong across multilingual tasks and code",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 272000,
+  },
+  {
+    id: "combo/auto",
+    name: "combo/auto",
+    desc: "Virtual Combo auto router with dynamic reasoning",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "combo/fast",
+    name: "combo/fast",
+    desc: "Virtual Combo fast chain optimized for sub-second latency",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: false,
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+  {
+    id: "combo/coding",
+    name: "combo/coding",
+    desc: "Virtual Combo coding chain optimized for high-depth reasoning",
+    provider: "const",
+    providerName: "ConstRouter",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "high",
+    maxOutputTokens: 128000,
+    contextWindow: 1000000,
+  },
+];
+
+let globalCachedModels: ModelItem[] | null = null;
+
 interface ChatCardProps {
   conversationId?: string;
   onSendMessage?: (payload: {
@@ -342,6 +496,8 @@ interface ChatCardProps {
   onModelChange?: (model: ModelItem) => void;
   onOpenSettings?: (tab?: string) => void;
   initialPrompt?: string;
+  /** Model ID or name to restore when switching to an existing conversation. */
+  initialModel?: string;
   runningTasks?: BackgroundTaskItem[];
   onSelectTask?: (task: BackgroundTaskItem) => void;
   onStopTask?: (taskId: string) => void;
@@ -385,6 +541,7 @@ export function ChatCard({
   onModelChange,
   onOpenSettings,
   initialPrompt,
+  initialModel,
   runningTasks,
   onSelectTask,
   onStopTask,
@@ -723,138 +880,12 @@ export function ChatCard({
     );
   };
 
-  const [models, setModels] = useState<ModelItem[]>([
-    {
-      id: "deepseek-v4-flash",
-      name: "DeepSeek-V4-Flash",
-      desc: "Frontier speed & reasoning",
-      provider: "deepseek",
-      providerName: "DeepSeek",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 128000,
-    },
-    {
-      id: "deepseek-v4-pro",
-      name: "DeepSeek-V4-Pro",
-      desc: "Advanced reasoning & deep code generation",
-      provider: "deepseek",
-      providerName: "DeepSeek",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "high",
-      maxOutputTokens: 128000,
-      contextWindow: 128000,
-    },
-    {
-      id: "deepseek-v4-flash-vision-exp",
-      name: "DeepSeek-V4-Flash-Vision-Exp",
-      desc: "Multimodal frontier reasoning",
-      provider: "deepseek",
-      providerName: "DeepSeek",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 128000,
-    },
-    {
-      id: "gemini-3.8-flash",
-      name: "Gemini 3.8 Flash",
-      desc: "Advanced frontier thinking & reasoning depth",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 1048576,
-    },
-    {
-      id: "glm-5.3-flash",
-      name: "GLM 5.3 Flash",
-      desc: "Ultra-fast response model optimized for real-time coding and execution",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-    {
-      id: "deepseek-v4.1-flash",
-      name: "Deepseek v4.1 Flash",
-      desc: "High-performance MoE reasoning model specializing in algorithmic coding",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-    {
-      id: "qwen-3.8-omni-flash",
-      name: "Qwen 3.8 Omni Flash",
-      desc: "Native omni-modal foundation model strong across multilingual tasks and code",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-    {
-      id: "gpt-6-luna",
-      name: "GPT 6 Luna",
-      desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 272000,
-    },
-    {
-      id: "combo/auto",
-      name: "combo/auto",
-      desc: "Virtual Combo auto router with dynamic reasoning",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "medium",
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-    {
-      id: "combo/fast",
-      name: "combo/fast",
-      desc: "Virtual Combo fast chain optimized for sub-second latency",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: false,
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-    {
-      id: "combo/coding",
-      name: "combo/coding",
-      desc: "Virtual Combo coding chain optimized for high-depth reasoning",
-      provider: "const",
-      providerName: "ConstRouter",
-      supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      defaultThinkingLevel: "high",
-      maxOutputTokens: 128000,
-      contextWindow: 1000000,
-    },
-  ]);
+  const [models, setModels] = useState<ModelItem[]>(() => {
+    if (globalCachedModels && globalCachedModels.length > 0) {
+      return globalCachedModels;
+    }
+    return INITIAL_DEFAULT_MODELS;
+  });
 
   const [searchModelQuery, setSearchModelQuery] = useState("");
 
@@ -893,32 +924,121 @@ export function ChatCard({
       .filter((group) => group.items.length > 0);
   }, [groupedModels, searchModelQuery]);
 
-  const [selectedModel, setSelectedModel] = useState<string | null>(() => {
-    const saved = localStorage.getItem("const_harness_active_model");
-    if (!saved || saved === "Const" || saved.includes("(Const Router)") || saved.includes("(Native)")) {
-      return "Gemini 3.8 Flash";
+  // Normalize a raw model id/name to the canonical display name used in this component
+  const normalizeModelKey = (raw: string | null | undefined): string | null => {
+    if (!raw || raw === "Const" || raw.includes("(Const Router)") || raw.includes("(Native)")) return null;
+    const clean = raw.trim();
+    if (clean === "gemini-3.8-flash") return "Gemini 3.8 Flash";
+    if (clean === "glm-5.3-flash") return "GLM 5.3 Flash";
+    if (clean === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
+    if (clean === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
+    if (clean === "gpt-6-luna") return "GPT 6 Luna";
+    if (clean === "deepseek-v4-flash") return "DeepSeek-V4-Flash";
+    if (clean === "deepseek-v4-pro") return "DeepSeek-V4-Pro";
+    if (clean === "deepseek-v4-flash-vision-exp") return "DeepSeek-V4-Flash-Vision-Exp";
+    if (clean === "Auto Router" || clean === "Auto (Best Available)" || clean === "combo/auto") return "combo/auto";
+    if (clean === "Low-Latency Fast Chain" || clean === "Fast (Low Latency)" || clean === "combo/fast") return "combo/fast";
+    if (clean === "Coding Agent Chain" || clean === "Coding & Reasoning" || clean === "combo/coding") return "combo/coding";
+    return clean;
+  };
+
+  /**
+   * Helper to resolve the initial model for a conversation or workspace:
+   * 1. initialModel prop (per-conversation override when switching chats)
+   * 2. per-workspace model if in an active project (localStorage)
+   * 3. last-used model globally (localStorage)
+   */
+  const getInitialResolvedModel = (fromPropVal?: string, projectVal?: string): string | null => {
+    const fromProp = normalizeModelKey(fromPropVal);
+    if (fromProp) return fromProp;
+
+    if (projectVal && projectVal !== "Outside Project" && projectVal !== "[object Object]") {
+      try {
+        const wsSaved = localStorage.getItem(`const_harness_workspace_model_${projectVal}`);
+        const normWs = normalizeModelKey(wsSaved);
+        if (normWs) return normWs;
+      } catch {}
     }
-    if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
-    if (saved === "glm-5.3-flash") return "GLM 5.3 Flash";
-    if (saved === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
-    if (saved === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
-    if (saved === "gpt-6-luna") return "GPT 6 Luna";
-    if (saved === "Auto Router" || saved === "Auto (Best Available)" || saved === "combo/auto") return "combo/auto";
-    if (saved === "Low-Latency Fast Chain" || saved === "Fast (Low Latency)" || saved === "combo/fast") return "combo/fast";
-    if (saved === "Coding Agent Chain" || saved === "Coding & Reasoning" || saved === "combo/coding") return "combo/coding";
-    return saved;
+
+    try {
+      const saved =
+        localStorage.getItem("const_harness_active_model") ||
+        localStorage.getItem("const_llm_active_model");
+      const normalized = normalizeModelKey(saved);
+      if (normalized) return normalized;
+    } catch {}
+
+    return null;
+  };
+
+  const [selectedModel, setSelectedModel] = useState<string | null>(() => {
+    return getInitialResolvedModel(initialModel, initialProject);
   });
+
+  // When switching conversations or projects, restore the appropriate model
+  useEffect(() => {
+    if (initialModel !== undefined && initialModel !== null && initialModel !== "") {
+      const normalized = normalizeModelKey(initialModel);
+      if (normalized) {
+        setSelectedModel(normalized);
+      }
+    } else if (initialProject && initialProject !== "Outside Project" && initialProject !== "[object Object]") {
+      // New chat in project: check project's saved model first
+      try {
+        const wsModel = localStorage.getItem(`const_harness_workspace_model_${initialProject}`);
+        const normWs = normalizeModelKey(wsModel);
+        if (normWs) {
+          setSelectedModel(normWs);
+          return;
+        }
+      } catch {}
+      // Fallback to global last-used
+      const saved =
+        localStorage.getItem("const_harness_active_model") ||
+        localStorage.getItem("const_llm_active_model");
+      const normalized = normalizeModelKey(saved);
+      if (normalized) {
+        setSelectedModel(normalized);
+      }
+    } else {
+      // New chat outside project -> inherit last used model
+      const saved =
+        localStorage.getItem("const_harness_active_model") ||
+        localStorage.getItem("const_llm_active_model");
+      const normalized = normalizeModelKey(saved);
+      if (normalized) {
+        setSelectedModel(normalized);
+      }
+    }
+  }, [initialModel, initialProject]);
+
   const [isModelOpen, setIsModelOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
   // Active Model Object & Dynamic Thinking Level Support
   const currentModelItem = useMemo(() => {
-    return (
-      models.find((m) => m.name === selectedModel || m.id === selectedModel) ||
-      models.find((m) => m.id === "gemini-3.8-flash") ||
-      models.find((m) => m.name === "Gemini 3.8 Flash") ||
-      models[0]
+    if (!selectedModel) return models[0] ?? null;
+    const clean = selectedModel.toLowerCase().trim();
+    const matched = models.find(
+      (m) =>
+        m.name === selectedModel ||
+        m.id === selectedModel ||
+        m.name.toLowerCase() === clean ||
+        m.id.toLowerCase() === clean
     );
+    if (matched) return matched;
+
+    // CRITICAL: NEVER fall back to models[0] if selectedModel is set!
+    // Synthesize an immediate ModelItem with the selectedModel name/id so it never flashes models[0]
+    const displayName = normalizeModelKey(selectedModel) || selectedModel;
+    return {
+      id: selectedModel,
+      name: displayName,
+      provider: "const",
+      providerName: "ConstRouter",
+      supportsThinking: true,
+      contextWindow: getModelContextLimit(selectedModel),
+    };
   }, [models, selectedModel]);
 
   useEffect(() => {
@@ -1039,9 +1159,7 @@ export function ChatCard({
                 defaultThinkingLevel,
                 maxOutputTokens: m.maxOutputTokens ?? m.max_output_tokens ?? (isConst ? 128000 : 65536),
                 contextWindow:
-                  m.contextWindow ??
-                  m.context_window ??
-                  (m.id?.includes("gemini") ? 1048576 : (m.id?.includes("combo") ? 1000000 : 128000)),
+                  getModelContextLimit(m.id, m.contextWindow ?? m.context_window),
               };
             });
 
@@ -1058,30 +1176,61 @@ export function ChatCard({
                 deduped.push(item);
               }
             }
+            globalCachedModels = deduped;
             setModels(deduped);
 
             // Normalize selectedModel with freshly loaded models
             setSelectedModel((prev) => {
-              const current = prev || localStorage.getItem("const_harness_active_model");
-              if (!current || current === "gemini-3.8-flash") {
-                const foundDefault = deduped.find((m) => m.id === "gemini-3.8-flash");
-                const defaultName = foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
-                localStorage.setItem("const_harness_active_model", defaultName);
-                return defaultName;
+              // Priority 1: initialModel (for this specific conversation)
+              if (initialModel) {
+                const normProp = normalizeModelKey(initialModel);
+                const found = deduped.find((m) => m.id === normProp || m.name === normProp);
+                return found ? found.name : normProp || initialModel;
               }
-              const found = deduped.find((m) => m.id === current || m.name === current);
-              if (found) {
-                localStorage.setItem("const_harness_active_model", found.name);
-                return found.name;
+              // Priority 2: project-specific saved model
+              if (initialProject && initialProject !== "Outside Project" && initialProject !== "[object Object]") {
+                try {
+                  const wsModel = localStorage.getItem(`const_harness_workspace_model_${initialProject}`);
+                  const normWs = normalizeModelKey(wsModel);
+                  if (normWs) {
+                    const found = deduped.find((m) => m.id === normWs || m.name === normWs);
+                    return found ? found.name : normWs;
+                  }
+                } catch {}
               }
-              return current;
+              // Priority 3: prev or saved last-used model (for new chat)
+              const savedKey =
+                prev ||
+                localStorage.getItem("const_harness_active_model") ||
+                localStorage.getItem("const_llm_active_model");
+              const current = normalizeModelKey(savedKey) || savedKey;
+              if (current) {
+                const found = deduped.find((m) => m.id === current || m.name === current);
+                if (found) {
+                  localStorage.setItem("const_harness_active_model", found.name);
+                  return found.name;
+                }
+                return current;
+              }
+              // Priority 4: Fallback to first available model from provider on initial cold launch
+              const fallback = deduped[0]?.name || deduped[0]?.id || null;
+              if (fallback) {
+                localStorage.setItem("const_harness_active_model", fallback);
+              }
+              return fallback;
             });
           }
         })
         .catch(() => {});
     }
 
-    if (window.electron?.getConfig) {
+    // Only query electron config on first launch if there is no initialModel AND no saved model in localStorage
+    if (
+      !initialModel &&
+      !localStorage.getItem("const_harness_active_model") &&
+      !localStorage.getItem("const_llm_active_model") &&
+      window.electron?.getConfig
+    ) {
       window.electron.getConfig().then((cfg) => {
         if (cfg?.activeModel) {
           const raw = cfg.activeModel;
@@ -1098,7 +1247,7 @@ export function ChatCard({
             const found = models.find((m) => m.id === raw || m.name === raw);
             if (found) modelName = found.name;
           }
-          setSelectedModel(modelName);
+          setSelectedModel((prev) => prev || modelName);
           localStorage.setItem("const_harness_active_model", modelName);
         }
       }).catch(() => {});
@@ -1205,7 +1354,7 @@ export function ChatCard({
       prompt: finalPrompt,
       project: currentProject,
       mode,
-      model: matchedModel?.id || currentModelItem?.id || "gemini-3.8-flash",
+      model: matchedModel?.id || currentModelItem?.id || models[0]?.id || "",
       thinkingLevel: isThinkingSupported ? thinkingLevel : undefined,
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
       maxOutputTokens: matchedModel?.maxOutputTokens || currentModelItem?.maxOutputTokens,
@@ -1265,15 +1414,12 @@ export function ChatCard({
   }, [prompt, attachments]);
 
   const modelContextLimit = useMemo(() => {
-    if (currentModelItem?.contextWindow && currentModelItem.contextWindow > 0) {
-      return currentModelItem.contextWindow;
+    const modelId = currentModelItem?.id || selectedModel || "";
+    const explicitLimit = currentModelItem?.contextWindow;
+    if (explicitLimit && explicitLimit >= 200_000) {
+      return explicitLimit;
     }
-    const id = (currentModelItem?.id || selectedModel || "").toLowerCase();
-    if (id.includes("luna") || id === "gpt-6-luna" || id === "combo/auto" || id === "combo/fast") return 272_000;
-    if (id.includes("gemini") || id.includes("glm") || id.includes("deepseek") || id.includes("qwen") || id === "combo/coding") return 1_000_000;
-    if (id.includes("claude")) return 200_000;
-    if (id.includes("gpt-4")) return 128_000;
-    return contextUsage?.totalTokens ?? 1_000_000;
+    return getModelContextLimit(modelId, contextUsage?.totalTokens ?? 1_000_000);
   }, [currentModelItem, selectedModel, contextUsage?.totalTokens]);
 
   const totalTokens = modelContextLimit > 0 ? modelContextLimit : 1_000_000;
@@ -1374,6 +1520,15 @@ export function ChatCard({
                                   setCurrentProject(ws);
                                   onProjectChange?.(ws);
                                   localStorage.setItem("const_harness_current_project", ws);
+                                  if (!initialModel && ws && ws !== "Outside Project" && ws !== "[object Object]") {
+                                    try {
+                                      const wsModel = localStorage.getItem(`const_harness_workspace_model_${ws}`);
+                                      const normWs = normalizeModelKey(wsModel);
+                                      if (normWs) {
+                                        setSelectedModel(normWs);
+                                      }
+                                    } catch {}
+                                  }
                                   setIsProjectOpen(false);
                                 }}
                                 className="w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
@@ -1989,7 +2144,7 @@ export function ChatCard({
 
             {/* Right Actions: Model Selector, Send Button */}
             <div className="flex items-center gap-1 sm:gap-2 shrink min-w-0 ml-auto">
-              {/* Model Selector Dropdown (Const ∨) */}
+              {/* Model Selector Dropdown */}
               <div className="relative min-w-0 shrink" ref={modelMenuRef}>
                 <button
                   type="button"
@@ -2005,13 +2160,13 @@ export function ChatCard({
                       ? "w-7 h-7 justify-center rounded-md"
                       : "gap-1 px-1.5 py-1 rounded-md min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
                   )}
-                  title={`Model: ${currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}`}
+                  title={`Model: ${currentModelItem?.name || selectedModel || "Select Model"}`}
                 >
                   {isNarrow ? (
                     <Box className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
                   ) : (
                     <>
-                      <span className="truncate min-w-0">{currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}</span>
+                      <span className="truncate min-w-0">{currentModelItem?.name || selectedModel || "Select Model"}</span>
                       <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
                     </>
                   )}
@@ -2069,7 +2224,13 @@ export function ChatCard({
                                           onClick={() => {
                                             setSelectedModel(m.name);
                                             localStorage.setItem("const_harness_active_model", m.name);
+                                            localStorage.setItem("const_llm_active_model", m.id);
                                             window.electron?.saveConfig?.({ activeModel: m.id });
+                                            if (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]") {
+                                              try {
+                                                localStorage.setItem(`const_harness_workspace_model_${currentProject}`, m.id || m.name);
+                                              } catch {}
+                                            }
                                             // Retain user's current thinking level if supported by the newly selected model
                                             const targetLevels = m.thinkingLevels && m.thinkingLevels.length > 0
                                               ? m.thinkingLevels
@@ -2297,7 +2458,7 @@ export function ChatCard({
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>
-                        {metrics.turns} {metrics.turns === 1 ? "turn" : "turns"} · {metrics.steps} steps · {metrics.tokPerSec} tok/s
+                        {metrics.turns} {metrics.turns === 1 ? "turn" : "turns"} &middot; {metrics.steps} steps &middot; {metrics.tokPerSec} tok/s
                       </span>
                     </button>
                   </PopoverTrigger>
@@ -2516,7 +2677,7 @@ export function ChatCard({
                     >
                       <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>
-                        {formatTokenDisplay(convTokens)} tok · Cache hit {metrics.cacheHitRate}%
+                        {formatTokenDisplay(convTokens)} tok &middot; Cache hit {metrics.cacheHitRate}%
                       </span>
                     </button>
                   </PopoverTrigger>
