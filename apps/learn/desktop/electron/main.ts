@@ -434,6 +434,9 @@ try {
 
 // Explicitly set app name and userData so ALL instances share the EXACT SAME lock directory
 app.setName("Const Learn");
+if (process.platform === "win32") {
+  app.setAppUserModelId("id.web.const.learn.desktop");
+}
 const userDataPath = path.join(app.getPath("appData"), "Const Learn");
 app.setPath("userData", userDataPath);
 

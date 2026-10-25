@@ -18,8 +18,8 @@ export const metadata: Metadata = {
   description: 'Actionable AI Research, Native Learning Agent & Interactive Learning Hub',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/const-logo-dark.png', type: 'image/png', sizes: '256x256' },
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },

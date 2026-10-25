@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: "Const Harness — Local-first agentic workbench for developers",
   description: en["meta.description"],
   applicationName: "Const Harness",
+  icons: {
+    icon: { url: "/const-logo-dark.png", type: "image/png", sizes: "256x256" },
+    shortcut: "/favicon.ico",
+    apple: { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
+  },
   openGraph: {
     title: "Const Harness — Local-first agentic workbench for developers",
     description: en["meta.description"],

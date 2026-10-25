@@ -2,23 +2,41 @@
 
 import React from "react";
 
-interface ConstLogoProps {
+export type ConstLogoVariant =
+  | "auto"
+  | "transparent"
+  | "solid"
+  | "dark"
+  | "light"
+  | "dark-transparent"
+  | "light-transparent";
+
+export const CONST_BRAND_LOGOS = {
+  light: "const-logo-light.png",
+  lightTransparent: "const-logo-light-transparent.png",
+  dark: "const-logo-dark.png",
+  darkTransparent: "const-logo-dark-transparent.png",
+} as const;
+
+export interface ConstLogoProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
   showText?: boolean;
   className?: string;
   textClassName?: string;
   iconClassName?: string;
   color?: string;
+  variant?: ConstLogoVariant;
 }
 
 export function ConstLogoIcon({
   size = "md",
   className = "",
-  color = "currentColor",
+  variant = "transparent",
 }: {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
   className?: string;
   color?: string;
+  variant?: ConstLogoVariant;
 }) {
   let sizeClass = "w-8 h-8";
   if (size === "xs") sizeClass = "w-5 h-5";
@@ -26,38 +44,149 @@ export function ConstLogoIcon({
   if (size === "md") sizeClass = "w-8 h-8";
   if (size === "lg") sizeClass = "w-10 h-10";
   if (size === "xl") sizeClass = "w-12 h-12";
-  if (typeof size === "number") sizeClass = `w-[${size}px] h-[${size}px]`;
+  if (typeof size === "number") sizeClass = "";
 
+  // Packaged Electron pages load assets beside index.html through file://.
+  const assetBase = typeof window !== "undefined" && window.location.protocol === "file:"
+    ? "./"
+    : "/";
+
+  if (variant === "dark") {
+    return (
+      <span
+        aria-hidden="true"
+        style={typeof size === "number" ? { width: size, height: size } : undefined}
+        className={`${sizeClass} inline-flex shrink-0 ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-dark.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="h-full w-full object-contain"
+        />
+      </span>
+    );
+  }
+
+  if (variant === "light") {
+    return (
+      <span
+        aria-hidden="true"
+        style={typeof size === "number" ? { width: size, height: size } : undefined}
+        className={`${sizeClass} inline-flex shrink-0 ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-light.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="h-full w-full object-contain"
+        />
+      </span>
+    );
+  }
+
+  if (variant === "dark-transparent") {
+    return (
+      <span
+        aria-hidden="true"
+        style={typeof size === "number" ? { width: size, height: size } : undefined}
+        className={`${sizeClass} inline-flex shrink-0 ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-dark-transparent.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="h-full w-full object-contain"
+        />
+      </span>
+    );
+  }
+
+  if (variant === "light-transparent") {
+    return (
+      <span
+        aria-hidden="true"
+        style={typeof size === "number" ? { width: size, height: size } : undefined}
+        className={`${sizeClass} inline-flex shrink-0 ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-light-transparent.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="h-full w-full object-contain"
+        />
+      </span>
+    );
+  }
+
+  if (variant === "solid") {
+    return (
+      <span
+        aria-hidden="true"
+        style={typeof size === "number" ? { width: size, height: size } : undefined}
+        className={`${sizeClass} inline-flex shrink-0 ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-light.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="h-full w-full object-contain dark:hidden"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${assetBase}const-logo-dark.png`}
+          alt=""
+          draggable={false}
+          width={48}
+          height={48}
+          className="hidden h-full w-full object-contain dark:block"
+        />
+      </span>
+    );
+  }
+
+  // Default: variant === "transparent" || variant === "auto"
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 512 512"
-      className={`${sizeClass} shrink-0 ${className}`}
-      fill="none"
+    <span
+      aria-hidden="true"
+      style={typeof size === "number" ? { width: size, height: size } : undefined}
+      className={`${sizeClass} inline-flex shrink-0 ${className}`}
     >
-      <defs>
-        <clipPath id="const-logo-clip-clean">
-          <path
-            fillRule="evenodd"
-            d="M432 72C250 36 40 136 40 256C40 376 250 476 432 440C320 384 180 320 180 256C180 192 320 128 432 72Z"
-          />
-        </clipPath>
-      </defs>
-      <g transform="translate(256 256) scale(0.80) translate(-256 -256) translate(23 -35.5)">
-        <g
-          transform="translate(512 0) scale(-1 1) rotate(32 256 256)"
-          clipPath="url(#const-logo-clip-clean)"
-          fill={color === "currentColor" ? "currentColor" : color}
-        >
-          <rect x="-60" y="38" width="632" height="60" />
-          <rect x="-60" y="113" width="632" height="60" />
-          <rect x="-60" y="188" width="632" height="60" />
-          <rect x="-60" y="264" width="632" height="60" />
-          <rect x="-60" y="339" width="632" height="60" />
-          <rect x="-60" y="414" width="632" height="60" />
-        </g>
-      </g>
-    </svg>
+      {/* CSS follows the selected theme without waiting for client hydration. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`${assetBase}const-logo-light-transparent.png`}
+        alt=""
+        draggable={false}
+        width={48}
+        height={48}
+        className="h-full w-full object-contain dark:hidden"
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`${assetBase}const-logo-dark-transparent.png`}
+        alt=""
+        draggable={false}
+        width={48}
+        height={48}
+        className="hidden h-full w-full object-contain dark:block"
+      />
+    </span>
   );
 }
 
@@ -68,10 +197,11 @@ export function ConstLogo({
   textClassName = "",
   iconClassName = "",
   color = "currentColor",
+  variant = "transparent",
 }: ConstLogoProps) {
   return (
     <div className={`flex items-center gap-3 select-none ${className}`}>
-      <ConstLogoIcon size={size} className={iconClassName} color={color} />
+      <ConstLogoIcon size={size} className={iconClassName} color={color} variant={variant} />
       {showText && (
         <span
           className={`font-serif font-normal tracking-tight text-foreground ${

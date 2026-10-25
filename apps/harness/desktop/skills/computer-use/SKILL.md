@@ -1,6 +1,7 @@
 ---
 name: computer-use
-description: Drives the GUI of visible local desktop applications through native computer-use tools: accessibility tree, clicks, typing, menus, dialogs, and screenshots in native apps and external windows (Chrome, Edge, Spotify, VS Code, Office, Settings, etc.). Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task. Use only when a visible window needs GUI control those cannot reach.
+description: >-
+  Drives the GUI of visible local desktop applications through native computer-use tools: accessibility tree, clicks, typing, menus, dialogs, and screenshots in native apps and external windows (Chrome, Edge, Spotify, VS Code, Office, Settings, etc.). Prefer a programmatic path (shell, filesystem, git, HTTP, existing CLIs) whenever it can complete the task. Use only when a visible window needs GUI control those cannot reach.
 ---
 
 # Computer Use (Desktop GUI Automation)

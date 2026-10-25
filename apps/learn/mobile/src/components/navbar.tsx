@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   useTheme,
   cn,
+  ConstLogoIcon,
 } from "@const/ui";
 import {
   Settings,
@@ -98,6 +99,7 @@ export function Navbar({
     <header className="sticky top-0 w-full h-16 sm:h-20 bg-background/95 backdrop-blur-md px-5 flex items-center justify-between select-none z-40">
       {/* Left: Const Learn Brand Title */}
       <div className="flex items-center gap-2 select-none py-1">
+        <ConstLogoIcon size="sm" />
         <span className="font-serif text-2xl font-medium tracking-tight text-foreground">
           Const
         </span>

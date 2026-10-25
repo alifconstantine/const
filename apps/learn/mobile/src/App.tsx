@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { LogIn, Globe } from "lucide-react";
-import { Button } from "@const/ui";
+import { Button, ConstLogoIcon } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { Capacitor } from "@capacitor/core";
@@ -323,6 +323,7 @@ export default function App() {
       {/* Top Header & Brand */}
       <div className="flex items-center justify-between">
         <div className="flex items-center select-none py-1">
+          <ConstLogoIcon size="sm" className="mr-2" />
           <span className="font-serif text-[22px] font-medium tracking-tight text-foreground">
             Const
           </span>

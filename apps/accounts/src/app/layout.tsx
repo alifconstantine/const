@@ -22,8 +22,9 @@ export const metadata: Metadata = {
   description:
     "Centralized Identity Provider and Single Sign-On Hub for the Const Platform Ecosystem.",
   icons: {
-    icon: "/logo.svg",
-    shortcut: "/logo.svg",
+    icon: { url: "/const-logo-dark.png", type: "image/png", sizes: "256x256" },
+    shortcut: "/favicon.ico",
+    apple: { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
   },
 };
 

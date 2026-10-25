@@ -643,7 +643,7 @@ export function MobileSettingsView({
                         <div className="flex items-center gap-3 shrink-0 text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696]">
                           <span>{m.requests} req</span>
                           <span className="font-medium text-[#262626] dark:text-white">
-                            {formatTokens(m.totalTokens)} tok
+                            {formatTokens(m.tokens)} tok
                           </span>
                         </div>
                       </div>
