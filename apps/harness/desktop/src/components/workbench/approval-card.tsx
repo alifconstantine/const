@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { PenLine, Terminal, Info } from "lucide-react";
-import { cn } from "@const/ui";
+import { PenLine, Terminal, Info, Copy, Check } from "lucide-react";
+import { cn, ScrollArea } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import { FileIcon } from "./file-icon";
@@ -42,6 +42,7 @@ export function ApprovalCard({
   const { t } = useTranslation();
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState("");
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 1. Detect if this approval is for a file mutation or command
@@ -94,25 +95,48 @@ export function ApprovalCard({
     (typeof request.args === "string"
       ? request.args
       : request.args?.command || request.args?.cmd || JSON.stringify(request.args || ""));
-  const firstLineCmd = (
-    (typeof rawCommand === "string" ? rawCommand : "").split("\n")[0] || ""
-  ).trim();
+
+  const rawCommandStr = typeof rawCommand === "string" ? rawCommand : "";
+  const commandLines = rawCommandStr
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // Skip leading comment lines (e.g. #, //, rem, ::) to find the first meaningful command
+  const firstExecutableLine =
+    commandLines.find((l) => !/^([#/]|rem\b|::)/i.test(l)) ||
+    commandLines[0] ||
+    "";
+  const firstLineCmd = firstExecutableLine.trim();
   const truncatedCmd =
     firstLineCmd.length > 55 ? `${firstLineCmd.slice(0, 52)}...` : firstLineCmd;
-  const cmdFirstWord = (
+  const rawFirstWord = (
     firstLineCmd.split(/\s+/)[0] || ""
   ).toLowerCase().replace(/\.exe$/, "");
+  const cmdFirstWord = /^[a-zA-Z0-9_$-]+$/.test(rawFirstWord) ? rawFirstWord : "";
   const cwdRel = request.cwd
     ? request.cwd.replace(/\\/g, "/").split("/").slice(-2).join("/")
     : "";
 
-  // Title derivation inspired by Image 2:
+  const handleCopyCommand = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!rawCommand) return;
+    try {
+      await navigator.clipboard.writeText(rawCommand);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Title derivation:
   // e.g. "Allow running whoami?" or "Allow modifying App.tsx?"
   const actionTitle = isMutation
     ? targetFileName && targetFileName !== "file"
       ? t("workbench.allowModifyingNamedFile").replace("{name}", targetFileName)
       : t("workbench.allowModifyingFile")
-    : firstLineCmd.length > 0 && firstLineCmd.length <= 32 && !firstLineCmd.includes("&&")
+    : firstLineCmd.length > 0 && firstLineCmd.length <= 32 && !firstLineCmd.includes("&&") && !firstLineCmd.startsWith("#")
     ? t("workbench.allowRunningNamedCommand").replace("{command}", firstLineCmd)
     : cmdFirstWord
     ? t("workbench.allowRunningNamedCommand").replace("{command}", cmdFirstWord)
@@ -282,12 +306,34 @@ export function ApprovalCard({
           )}
         </div>
       ) : (
-        <div className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl px-3 py-2 mb-2.5 flex flex-col gap-0.5 min-w-0">
-          <pre className="font-mono text-xs text-[#e5c07b] whitespace-pre-wrap break-all select-text leading-relaxed">
-            {rawCommand || "command"}
-          </pre>
+        <div className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl p-3 mb-2.5 flex flex-col min-w-0 relative group">
+          {rawCommand && (
+            <button
+              type="button"
+              onClick={handleCopyCommand}
+              className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 text-[#888888] hover:text-[#ffffff] bg-[#222222]/90 hover:bg-[#2b2b2b] border border-[#383838] rounded-md shadow-sm cursor-pointer"
+              title={copied ? t("common.copied") : t("common.copy")}
+              aria-label={t("common.copy")}
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-[#4ade80]" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+
+          <ScrollArea
+            className="w-full max-h-48 sm:max-h-56 pr-1"
+            thumbClassName="bg-white/20 hover:bg-white/30"
+          >
+            <pre className="font-mono text-xs text-[#e5c07b] whitespace-pre-wrap break-words select-text leading-relaxed pr-2">
+              {rawCommand || "command"}
+            </pre>
+          </ScrollArea>
+
           {cwdRel && (
-            <div className="flex items-center gap-1.5 pt-1 mt-0.5 text-[11px] text-[#969696] font-mono border-t border-[#262626]">
+            <div className="flex items-center gap-1.5 pt-1.5 mt-2 text-[11px] text-[#969696] font-mono border-t border-[#262626] shrink-0">
               <span className="text-[#5d5d5d]">cwd:</span>
               <span className="truncate">{cwdRel}</span>
             </div>
