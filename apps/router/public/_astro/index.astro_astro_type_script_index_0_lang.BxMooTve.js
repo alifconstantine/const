@@ -1,0 +1,8 @@
+import{t as e}from"./deviceInfo.CrIc9Qvc.js";import{t}from"./gsap.DWxn8li7.js";import{t as n}from"./ScrollTrigger.DBzICErp.js";t.registerPlugin(n),(document.readyState==="complete"||document.readyState==="interactive"?setTimeout:document.addEventListener.bind(document,"DOMContentLoaded"))(()=>{let n=document.querySelector(`[data-welcome-section]`);if(!n)return;let r=n.querySelector(`[data-logo]`),i=n.querySelector(`[data-welcome-header]`),a=n.querySelector(`[data-cta]`),o=n.querySelector(`[data-hero-particles]`),s=n.querySelector(`[data-os-cta-container]`);if(s){let t=e.operatingSystem;s.innerHTML=`
+        <a class="call-to-action button button-primary" href="/download" data-analytics-event="download-cta" data-module-name="home_hero" data-page-position="hero">
+          <span style="display: flex; align-items: center; gap: 8px;">
+            ${t.name===`unknown`?``:`<span class="symbol" style="font-size: 20px;">${t.name===`mac`?`desktop_mac`:t.name===`windows`?`desktop_windows`:`terminal`}</span>`}
+            Download${t.buttonText}
+          </span>
+        </a>
+      `}let c=t.timeline();i&&i.helper&&(i.helper.initialize(),i.helper.startTyping(c));r&&c.from(r,{opacity:0,y:`1em`,duration:2,ease:`power2.out`});a&&c.from(a,{opacity:0,y:50,duration:2,ease:`power2.out`},r?`<`:void 0);o&&c.from(o,{opacity:0,duration:4,ease:`power2.out`},`<`);o&&t.to(o,{scrollTrigger:{trigger:n,start:`center top`,end:`bottom top`,scrub:!0,onUpdate:e=>{o.style.opacity=String(1-e.progress)}},opacity:0,ease:`power2.out`})});

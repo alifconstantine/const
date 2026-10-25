@@ -1,241 +1,932 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
-import { useQuery } from "convex/react";
-import { api } from "@const/backend/_generated/api";
-import {
-  ConstLogoIcon,
-  Button,
-  Badge,
-} from "@const/ui";
-import {
-  ArrowRight,
-  Cpu,
-  Layers,
-  ShieldCheck,
-  Zap,
-  Radio,
-  User,
-  Loader2,
-} from "lucide-react";
+import { LandingNavbar } from "@/components/landing/LandingNavbar";
+import { LandingFooter } from "@/components/landing/LandingFooter";
+import { ArrowRight, Copy, Check, ExternalLink, Zap, ShieldCheck, Terminal, Cpu } from "lucide-react";
+import "./landing.css";
+
+interface CatalogItem {
+  id: string;
+  name: string;
+  contextWindow: string;
+  input: string;
+  officialInput: string;
+  cache?: string;
+  output: string;
+  officialOutput: string;
+  savePercent: string;
+}
+
+const CATALOG_MODELS: CatalogItem[] = [
+  {
+    id: "deepseek-v4.1-flash",
+    name: "DeepSeek v4.1 Flash",
+    contextWindow: "1M",
+    input: "$0.0125",
+    officialInput: "$0.140",
+    cache: "$0.0125",
+    output: "$0.060",
+    officialOutput: "$0.280",
+    savePercent: "91.1%",
+  },
+  {
+    id: "qwen-3.8-omni-flash",
+    name: "Qwen 3.8 Omni Flash",
+    contextWindow: "1M",
+    input: "$0.0125",
+    officialInput: "$0.140",
+    cache: "$0.0125",
+    output: "$0.055",
+    officialOutput: "$0.280",
+    savePercent: "91.1%",
+  },
+  {
+    id: "glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    contextWindow: "1M",
+    input: "$0.0125",
+    officialInput: "$0.100",
+    cache: "$0.0125",
+    output: "$0.055",
+    officialOutput: "$0.200",
+    savePercent: "87.5%",
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    contextWindow: "1M",
+    input: "$0.020",
+    officialInput: "$0.075",
+    cache: "$0.020",
+    output: "$0.080",
+    officialOutput: "$0.300",
+    savePercent: "73.3%",
+  },
+  {
+    id: "glm-5.3",
+    name: "GLM 5.3",
+    contextWindow: "1M",
+    input: "$0.035",
+    officialInput: "$0.200",
+    cache: "$0.035",
+    output: "$0.110",
+    officialOutput: "$0.600",
+    savePercent: "82.5%",
+  },
+  {
+    id: "minimax-m3.1-flash",
+    name: "MiniMax M3.1 Flash",
+    contextWindow: "1M",
+    input: "$0.035",
+    officialInput: "$0.200",
+    cache: "$0.035",
+    output: "$0.135",
+    officialOutput: "$0.600",
+    savePercent: "82.5%",
+  },
+  {
+    id: "qwen-3.8-max",
+    name: "Qwen 3.8 Max",
+    contextWindow: "1M",
+    input: "$0.050",
+    officialInput: "$0.400",
+    cache: "$0.050",
+    output: "$0.150",
+    officialOutput: "$1.200",
+    savePercent: "87.5%",
+  },
+  {
+    id: "gpt-6.1-sol",
+    name: "GPT 6.1 Sol",
+    contextWindow: "500K",
+    input: "$0.240",
+    officialInput: "$1.500",
+    cache: "$0.050",
+    output: "$1.200",
+    officialOutput: "$6.000",
+    savePercent: "84.0%",
+  },
+  {
+    id: "gpt-6-astra",
+    name: "GPT 6 Astra",
+    contextWindow: "272K",
+    input: "$0.450",
+    officialInput: "$2.500",
+    cache: "$0.090",
+    output: "$2.200",
+    officialOutput: "$10.000",
+    savePercent: "82.0%",
+  },
+  {
+    id: "claude-haiku-5.5",
+    name: "Claude Haiku 5.5",
+    contextWindow: "1M",
+    input: "$0.110",
+    officialInput: "$0.800",
+    cache: "$0.025",
+    output: "$0.550",
+    officialOutput: "$4.000",
+    savePercent: "86.3%",
+  },
+  {
+    id: "claude-sonnet-5.5",
+    name: "Claude Sonnet 5.5",
+    contextWindow: "1M",
+    input: "$0.790",
+    officialInput: "$3.000",
+    cache: "$0.150",
+    output: "$3.900",
+    officialOutput: "$15.000",
+    savePercent: "73.7%",
+  },
+  {
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    contextWindow: "500K",
+    input: "$0.140",
+    officialInput: "$1.000",
+    cache: "$0.035",
+    output: "$0.450",
+    officialOutput: "$3.000",
+    savePercent: "86.0%",
+  },
+];
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, signIn } = useRouterAuth();
-  const user = useQuery(
-    api.auth.queries.currentUser,
-    isAuthenticated ? {} : "skip"
-  );
+  const { isAuthenticated, signIn } = useRouterAuth();
 
   useEffect(() => {
-    document.title = "Const Router - Universal AI Gateway";
+    document.title = "Const Router — Universal AI Gateway for Frontier Models";
   }, []);
 
+  // --- Particle Canvas Backdrop Loader (identical to apps/learn/web) ---
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
-    }
-  }, [isLoading, isAuthenticated, router]);
+    const existing = document.querySelector('script[src*="MainParticlesComponent"]');
+    if (!existing) {
+      const initScript = document.createElement("script");
+      initScript.type = "module";
+      initScript.src = "/_astro/MainParticlesComponent.astro_astro_type_script_index_0_lang.ZV8AJEPG.js?v=4";
+      initScript.onload = () => {
+        setTimeout(() => {
+          if (typeof (window as any).setAllParticlesTheme === "function") {
+            (window as any).setAllParticlesTheme("dark");
+          }
+        }, 30);
+      };
+      document.body.appendChild(initScript);
 
-  if (isLoading || isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
-          <p className="text-xs font-mono text-muted-foreground">
-            {isAuthenticated ? "Redirecting to Dashboard..." : "Checking session..."}
-          </p>
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
-        </div>
-      </div>
-    );
-  }
+      const welcomeScript = document.createElement("script");
+      welcomeScript.type = "module";
+      welcomeScript.src = "/_astro/index.astro_astro_type_script_index_0_lang.BxMooTve.js";
+      document.body.appendChild(welcomeScript);
+    }
+  }, []);
+
+  // Copy helper command
+  const [helperCopied, setHelperCopied] = useState(false);
+  const handleCopyHelper = () => {
+    navigator.clipboard.writeText('export OPENAI_BASE_URL="https://router.const.web.id/v1"');
+    setHelperCopied(true);
+    setTimeout(() => setHelperCopied(false), 2000);
+  };
+
+  // Integration tabs
+  const [activeTab, setActiveTab] = useState(0);
+  const [tabCopied, setTabCopied] = useState(false);
+
+  const integrationTabs = [
+    {
+      id: "cli",
+      label: "cURL / CLI",
+      filename: "test-gateway.sh",
+      note: "Standard OpenAI request format. Test connectivity and model inference:",
+      lang: "bash",
+      code: `export OPENAI_BASE_URL="https://router.const.web.id/v1"
+export OPENAI_API_KEY="const_live_xxxxxxxxxxxx"
+
+curl $OPENAI_BASE_URL/chat/completions \\
+  -H "Authorization: Bearer $OPENAI_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "deepseek-v4.1-flash",
+    "messages": [{"role": "user", "content": "Explain Virtual Combos in 2 sentences."}]
+  }'`,
+    },
+    {
+      id: "python",
+      label: "Python (OpenAI SDK)",
+      filename: "client.py",
+      note: "Drop-in replacement with the standard OpenAI Python library:",
+      lang: "python",
+      code: `from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://router.const.web.id/v1",
+    api_key="const_live_xxxxxxxxxxxx",
+)
+
+response = client.chat.completions.create(
+    model="deepseek-v4.1-flash",
+    messages=[{"role": "user", "content": "Optimize this Python snippet."}],
+)
+
+print(response.choices[0].message.content)`,
+    },
+    {
+      id: "typescript",
+      label: "TypeScript / Node",
+      filename: "router.ts",
+      note: "Universal Node.js client with full streaming & tool execution support:",
+      lang: "typescript",
+      code: `import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://router.const.web.id/v1",
+  apiKey: process.env.CONST_ROUTER_API_KEY,
+});
+
+const completion = await client.chat.completions.create({
+  model: "claude-sonnet-5.5",
+  messages: [{ role: "user", content: "Review this pull request diff." }],
+});
+
+console.log(completion.choices[0].message.content);`,
+    },
+    {
+      id: "claude",
+      label: "Claude Code (Anthropic Spec)",
+      filename: "claude-code.sh",
+      note: "Launch Anthropic Claude Code backed directly by Const Router:",
+      lang: "bash",
+      code: `# Point Claude Code CLI to Const Router's Anthropic Messages endpoint:
+export ANTHROPIC_BASE_URL="https://router.const.web.id"
+export ANTHROPIC_API_KEY="const_live_xxxxxxxxxxxx"
+
+# Run Claude Code with full tool calling:
+claude`,
+    },
+    {
+      id: "streaming",
+      label: "SSE Streaming",
+      filename: "stream.py",
+      note: "Direct edge stream passthrough with token telemetry on the final frame:",
+      lang: "python",
+      code: `stream = client.chat.completions.create(
+    model="qwen-3.8-omni-flash",
+    messages=[{"role": "user", "content": "Stream markdown breakdown."}],
+    stream=True,
+)
+
+for chunk in stream:
+    delta = chunk.choices[0].delta.content if chunk.choices else None
+    if delta:
+        print(delta, end="", flush=True)
+
+# Final stream frame delivers exact server telemetry:
+# {"usage": {"prompt_tokens": 14, "completion_tokens": 86}}
+# No character estimates. Exact tokens reported by upstream.`,
+    },
+  ];
+
+  const handleCopyCode = () => {
+    const code = integrationTabs[activeTab]?.code ?? "";
+    navigator.clipboard.writeText(code);
+    setTabCopied(true);
+    setTimeout(() => setTabCopied(false), 2000);
+  };
 
   return (
-    <>
-      <title>Const Router - Universal AI Gateway</title>
-      <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      {/* Floating Stadium Navigation Pill (Mobbin nav-pill pattern) */}
-      <div className="fixed top-5 inset-x-4 z-50 flex justify-center pointer-events-none">
-        <header className="pointer-events-auto w-full max-w-4xl h-14 rounded-full bg-card/85 border border-border/70 backdrop-blur-xl px-5 sm:px-6 flex items-center justify-between shadow-none transition-all">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <ConstLogoIcon
-              size="md"
-              className="w-7 h-7 text-foreground transition-transform duration-300 group-hover:scale-105"
-            />
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
-                Const
-              </span>
-              <span className="text-[11px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
-                Router
-              </span>
-            </div>
-          </Link>
+    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] font-sans selection:bg-[#0066ff]/25 selection:text-white">
+      {/* 1. STICKY NAVBAR */}
+      <LandingNavbar />
 
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0066ff] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0066ff]" />
-              </span>
-              <span>Gateway Live</span>
+      {/* 2. HERO SECTION WITH FULL-SCREEN PARTICLE BACKDROP */}
+      <section className="atmo-home-hero">
+        {/* Dynamic WebGL Particle Canvas (identical to apps/learn/web) */}
+        <div className="hero-video-wrapper">
+          <div className="hero-video-container" data-hero-particles="">
+            <div
+              className="main-particles-component-section"
+              data-main-particles-component=""
+              data-sync-theme="true"
+              data-theme="dark"
+              data-ring-width="0.006"
+              data-ring-width2="0.107"
+              data-ring-displacement="0.62"
+              data-density="230"
+              data-particles-scale="0.59"
+              data-color1="#0066ff"
+              data-color2="#38bdf8"
+              data-color3="#60a5fa"
+            >
+              <div className="main-particles-container" data-container=""></div>
             </div>
-
-            {isLoading ? (
-              <div className="h-9 w-24 rounded-full bg-secondary/80 animate-pulse flex items-center justify-center">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              </div>
-            ) : isAuthenticated ? (
-              <Link href="/dashboard">
-                <Button size="sm" className="rounded-full gap-2 px-4 cursor-pointer text-xs font-medium">
-                  {user?.image ? (
-                    <Image
-                      src={user.image}
-                      alt={user.name ?? "Profile"}
-                      width={18}
-                      height={18}
-                      className="rounded-full object-cover"
-                    />
-                  ) : (
-                    <User className="h-3.5 w-3.5" />
-                  )}
-                  <span>Dashboard</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => signIn("/dashboard")}
-                className="rounded-full gap-2 px-4 cursor-pointer text-xs font-medium"
-              >
-                <span>Sign In</span>
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-            )}
           </div>
-        </header>
-      </div>
+        </div>
 
-      {/* Hero Section */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pt-36 sm:pt-48 pb-20">
-        <div className="container mx-auto max-w-4xl text-center space-y-8">
-          {/* Eyebrow Stadium Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/60 bg-secondary/60 text-xs font-sans text-muted-foreground">
-            <Radio className="h-3 w-3 text-[#0066ff] animate-pulse" />
+        {/* Hero Foreground Content */}
+        <div className="home-container home-hero-content">
+          <div className="hero-tag-pill">
+            <span className="hero-tag-dot" />
             <span>Universal AI Gateway &amp; Smart Routing Tier</span>
           </div>
 
-          {/* Lora Serif Heading with period cadence */}
-          <div className="space-y-4">
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-serif font-normal tracking-tight text-foreground leading-[1.06]">
-              One endpoint. Infinite models. <br />
-              <span className="italic text-muted-foreground font-serif">Zero downtime.</span>
-            </h1>
-            <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground font-sans font-light leading-relaxed pt-2">
-              Const Router delivers unified Pay-As-You-Go access to frontier AI models behind a single OpenAI-compatible API.
-              Transparent token metering, zero-buffering SSE streaming, and custom failover combos.
-            </p>
+          <h1 className="hero-headline">
+            The Universal Gateway<br />
+            for <span className="hero-headline-accent">Frontier AI</span>
+          </h1>
+
+          <p className="home-hero-description">
+            14 frontier models behind a single OpenAI-compatible API. Multi-model failover, native SSE streaming, and transparent per-token metering with zero commitments.
+          </p>
+
+          <div className="home-helper">
+            <div className="atmo-helper-command">
+              <span className="atmo-headline-accent font-mono">$</span>
+              <code className="text-xs sm:text-sm whitespace-nowrap">
+                export OPENAI_BASE_URL="https://router.const.web.id/v1"
+              </code>
+              <button
+                type="button"
+                aria-label="Copy helper command"
+                className="atmo-command-copy"
+                onClick={handleCopyHelper}
+              >
+                {helperCopied ? (
+                  <Check className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Stadium Pill CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
+          <div className="home-hero-actions">
             {isAuthenticated ? (
-              <Link href="/dashboard" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto rounded-full gap-2 text-sm font-medium px-8 cursor-pointer">
-                  <span>Enter Dashboard</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+              <Link href="/dashboard" className="home-button home-button-primary">
+                <span>Enter Dashboard</span>
+                <ArrowRight className="h-4 w-4" />
               </Link>
             ) : (
-              <Button
-                size="lg"
+              <button
+                type="button"
                 onClick={() => signIn("/dashboard")}
-                className="w-full sm:w-auto rounded-full gap-2 text-sm font-medium px-8 cursor-pointer"
+                className="home-button home-button-primary"
               >
-                <span>Get Started with Const</span>
+                <span>Get Started Free</span>
                 <ArrowRight className="h-4 w-4" />
-              </Button>
+              </button>
             )}
 
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => {
-                if (isAuthenticated) {
-                  window.location.href = "/dashboard";
-                } else {
-                  signIn("/dashboard");
-                }
-              }}
-              className="w-full sm:w-auto rounded-full gap-2 text-sm font-medium px-7 border-border/70 text-foreground hover:bg-secondary cursor-pointer"
-            >
-              <Cpu className="h-4 w-4 text-muted-foreground" />
-              <span>Explore Architecture</span>
-            </Button>
+            <a href="#models" className="home-button home-button-secondary">
+              <Cpu className="h-4 w-4 text-[#969696]" />
+              <span>Explore Models &amp; Pricing</span>
+            </a>
           </div>
 
-          {/* Architecture Cards Grid (24px Mobbin Geometry) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-16 text-left">
-            {/* Pay-As-You-Go Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
-              {/* 30% iOS Squircle Icon Frame */}
-              <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
-                <Layers className="h-5 w-5 stroke-[1.75]" />
-              </div>
-              <h2 className="text-lg font-medium text-foreground tracking-tight">Pay-As-You-Go Metering</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground font-light leading-relaxed">
-                Metered billing with transparent token usage. One unified key across all frontier models with no external provider setup required.
-              </p>
-            </div>
-
-            {/* Smart Combos Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
-              <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
-                <ShieldCheck className="h-5 w-5 stroke-[1.75]" />
-              </div>
-              <h2 className="text-lg font-medium text-foreground tracking-tight">Custom Virtual Combos</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground font-light leading-relaxed">
-                Build custom multi-model failover chains with automatic cascading, priority routing, and instant anti-429 circuit breakers.
-              </p>
-            </div>
-
-            {/* SSE Streaming Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
-              <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
-                <Zap className="h-5 w-5 stroke-[1.75]" />
-              </div>
-              <h2 className="text-lg font-medium text-foreground tracking-tight">Zero-Buffering SSE</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground font-light leading-relaxed">
-                Direct edge stream passthrough with telemetry tracking headers: <code className="text-xs font-mono bg-muted/80 px-1.5 py-0.5 rounded-full">X-Const-Served-By</code>.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Polarity Inversion Footer (Mobbin Pattern) */}
-      <footer className="w-full bg-[#141414] text-white rounded-t-[36px] border-t border-white/10 mt-16 py-12 px-6 sm:px-10">
-        <div className="container mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <ConstLogoIcon size="md" className="w-6 h-6 text-white" />
-            <span className="font-serif text-xl font-normal tracking-tight text-white">
-              Const.
-            </span>
-          </div>
-
-
-          <p className="text-xs text-neutral-500 font-sans">
-            &copy; {new Date().getFullYear()} Const Platform Ecosystem.
+          <p className="home-hero-footnote">
+            OpenAI-compatible &bull; Anthropic Messages spec &bull; Pay per token &bull;{" "}
+            <Link href="/docs">Explore the docs &rarr;</Link>
           </p>
         </div>
-      </footer>
+      </section>
+
+      {/* 3. SECTION: ONE API. A LOT LESS IN YOUR WAY (CUSTOM ASYMMETRIC BENTO) */}
+      <section id="features" className="home-container home-section">
+        <div className="home-section-heading">
+          <h2>One API.<br />A lot less in your way.</h2>
+          <p>
+            Architected specifically for autonomous coding agents, developer tooling, and production workflows that cannot afford dropped connections or unpredictable billing.
+          </p>
+        </div>
+
+        <div className="features-grid-custom">
+          {/* Top Row: Asymmetrical 2 Cards */}
+          <div className="features-top-row">
+            {/* Anchor Card: Virtual Combos */}
+            <article className="feature-card">
+              <span className="feature-tag">01 / Intelligent Routing</span>
+              <h3>Virtual Combos &amp; Automatic Failover</h3>
+              <p>
+                Construct custom multi-model failover chains. If a provider returns 429 rate limits, 503 capacity errors, or latency spikes, Const Router automatically routes to the next healthy model without dropping your client connection.
+              </p>
+
+              <div className="router-visual-flow">
+                <div className="router-flow-step active">
+                  <div className="flex items-center gap-2">
+                    <span className="step-label">1. Primary Target</span>
+                    <span className="step-val">DeepSeek v4.1 Flash</span>
+                  </div>
+                  <span className="step-status green">Active / 184ms</span>
+                </div>
+
+                <div className="router-flow-step">
+                  <div className="flex items-center gap-2">
+                    <span className="step-label">2. Failover Chain</span>
+                    <span className="step-val">Qwen 3.8 Omni Flash</span>
+                  </div>
+                  <span className="step-status blue">Ready (Standby)</span>
+                </div>
+
+                <div className="router-flow-step">
+                  <div className="flex items-center gap-2">
+                    <span className="step-label">3. Fallback Tier</span>
+                    <span className="step-val">Claude Sonnet 5.5</span>
+                  </div>
+                  <span className="text-[11px] text-[#737373]">High-Tier Backup</span>
+                </div>
+              </div>
+            </article>
+
+            {/* Card 2: One Key */}
+            <article className="feature-card">
+              <span className="feature-tag">02 / Unified Access</span>
+              <h3>One Key, All Models</h3>
+              <p>
+                Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">const_live_</code> key.
+              </p>
+
+              <div className="key-clients-visual">
+                <div className="key-client-item">
+                  <span>Python SDK</span>
+                  <code>base_url="https://router.const.web.id/v1"</code>
+                </div>
+                <div className="key-client-item">
+                  <span>TypeScript / Node</span>
+                  <code>baseURL: "https://router.const.web.id/v1"</code>
+                </div>
+                <div className="key-client-item">
+                  <span>Claude Code CLI</span>
+                  <code>ANTHROPIC_BASE_URL="https://router.const.web.id"</code>
+                </div>
+                <div className="key-client-item">
+                  <span>Cursor / Cline</span>
+                  <code>OpenAI Compatible Endpoint</code>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          {/* Bottom Row: 3 Distinct Columns */}
+          <div className="features-bottom-row">
+            {/* Card 3: Stream */}
+            <article className="feature-card">
+              <span className="feature-tag">03 / Stream</span>
+              <div className="mini-symbol-bars" aria-hidden="true">
+                <span></span> <span></span> <span></span> <span></span> <span></span>
+              </div>
+              <h3>Zero-Buffering SSE</h3>
+              <p>
+                Direct edge stream passthrough without buffering delays. Exact token usage reports delivered reliably in the stream terminator chunk. Stop the stream, stop paying.
+              </p>
+              <div className="mini-telemetry-badge">
+                <Zap className="h-3.5 w-3.5 text-emerald-400" />
+                <span>184ms TTFT &bull; Live Passthrough</span>
+              </div>
+            </article>
+
+            {/* Card 4: Guardrails */}
+            <article className="feature-card">
+              <span className="feature-tag">04 / Guardrails</span>
+              <ShieldCheck className="h-6 w-6 text-[#0066ff] my-1" />
+              <h3>Keys with Spend Limits</h3>
+              <p>
+                Create unlimited developer keys for team members or autonomous agent loops. Configure individual daily spend caps and allowed model lists to prevent runaway costs.
+              </p>
+              <div className="mini-telemetry-badge">
+                <span>Daily Spend Caps &bull; Allowlist</span>
+              </div>
+            </article>
+
+            {/* Card 5: Audit */}
+            <article className="feature-card">
+              <span className="feature-tag">05 / Audit</span>
+              <Terminal className="h-6 w-6 text-[#0066ff] my-1" />
+              <h3>Usage You Can Audit</h3>
+              <p>
+                Every request logged with prompt tokens, completion tokens, latency, and exact micro-cost. Filter by model or time window, export the raw data anytime.
+              </p>
+              <div className="mini-telemetry-badge">
+                <span>Exact Tokens &bull; Zero Estimates</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. SECTION: INTERACTIVE INTEGRATION WORKSPACE */}
+      <section id="start" className="home-container home-section">
+        <div className="home-section-heading">
+          <h2>Keep your code.<br />Change the endpoint.</h2>
+          <p>
+            Connect any tool, SDK, or coding agent in under 60 seconds by pointing the base URL to Const Router.
+          </p>
+        </div>
+
+        <div className="hp-workspace">
+          <div className="hp-workspace-bar">
+            <div className="flex items-center">
+              <div className="workspace-window-controls">
+                <span className="window-dot" />
+                <span className="window-dot" />
+                <span className="window-dot" />
+              </div>
+              <div className="hp-tabs" role="tablist">
+                {integrationTabs.map((tab, idx) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={idx === activeTab}
+                    onClick={() => setActiveTab(idx)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              className="hp-copy"
+              type="button"
+              aria-label="Copy snippet"
+              onClick={handleCopyCode}
+            >
+              {tabCopied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-[#969696]" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="hp-code-panel">
+            <div className="hp-code-note">
+              <span>{integrationTabs[activeTab]?.note ?? ""}</span>
+              <span>{integrationTabs[activeTab]?.lang ?? ""}</span>
+            </div>
+            <pre>
+              <code>{integrationTabs[activeTab]?.code ?? ""}</code>
+            </pre>
+          </div>
+        </div>
+
+        {/* 3-Part Reference Specs */}
+        <div className="hp-reference">
+          <div>
+            <span className="ref-label">OpenAI Base URL</span>
+            <code>https://router.const.web.id/v1</code>
+            <p>Universal OpenAI-compatible host for all chat, completion, and embedding endpoints.</p>
+          </div>
+          <div>
+            <span className="ref-label">Anthropic Base URL</span>
+            <code>https://router.const.web.id</code>
+            <p>Direct Anthropic Messages spec passthrough for Claude Code and Anthropic clients.</p>
+          </div>
+          <div>
+            <span className="ref-label">Telemetry Header</span>
+            <code>X-Const-Cost</code>
+            <p>Exact micro-cost deducted in USD and latency returned in every response header.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. SECTION: MODELS CATALOG TABLE (CLEAN, DIRECT CONTEXT & YOU SAVE %) */}
+      <section id="models" className="home-container home-section">
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
+              Model Catalog &amp; Live Rates
+            </h2>
+            <p className="text-sm text-[#969696] pt-1">
+              14 frontier models with transparent per-token pricing and instant routing.
+            </p>
+          </div>
+          <Link href="/dashboard" className="home-text-link">
+            <span>Explore full catalog in Dashboard</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        <div className="clean-catalog-table">
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th className="text-left">Model</th>
+                  <th className="text-center">Context Window</th>
+                  <th className="text-right">Input / 1M Tokens</th>
+                  <th className="text-right">Output / 1M Tokens</th>
+                  <th className="text-center">You Save</th>
+                  <th className="text-right">Playground</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CATALOG_MODELS.map((model) => (
+                  <tr key={model.id}>
+                    <td>
+                      <code>{model.id}</code>
+                      <span className="text-xs text-[#737373] block pt-0.5">{model.name}</span>
+                    </td>
+                    <td className="text-center font-mono text-xs text-[#a3a3a3]">
+                      {model.contextWindow}
+                    </td>
+                    <td className="text-right font-mono">
+                      <strong className="text-white font-medium">{model.input}</strong>
+                      <s>{model.officialInput}</s>
+                      {model.cache && <small>cache {model.cache}</small>}
+                    </td>
+                    <td className="text-right font-mono">
+                      <strong className="text-white font-medium">{model.output}</strong>
+                      <s>{model.officialOutput}</s>
+                    </td>
+                    <td className="text-center">
+                      <span className="save-percent-pill">
+                        Save {model.savePercent}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <Link
+                        href="/dashboard"
+                        className="inline-flex items-center gap-1 text-xs text-[#0066ff] hover:underline"
+                      >
+                        <span>Test</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. SECTION: SIMPLE, USAGE-BASED PRICING */}
+      <section id="pricing" className="home-container home-section">
+        <div className="home-section-heading text-center items-center">
+          <h2>Simple, usage-based pricing</h2>
+          <p className="text-center">
+            Pay strictly for tokens consumed. No subscriptions, no tiers, no recurring card lock-in.
+          </p>
+        </div>
+
+        <div className="clean-pricing-grid">
+          {/* Card 1: Pay As You Go */}
+          <article className="pricing-card featured">
+            <span className="pricing-badge">Zero Subscription Lock-In</span>
+            <div className="pricing-amount">$0 / month</div>
+            <p className="pricing-desc">
+              Deposit credits using QRIS (instant IDR) or USDC on Solana. Balance drains purely per token consumed down to fractions of a cent.
+            </p>
+
+            <ul className="pricing-features-list">
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>One key for all 14 supported frontier models</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Input and output metered strictly from provider reports</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Prompt caching billed at up to 90% discount</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Unlimited API keys with custom daily spend limits</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Balance never expires &bull; zero recurring card charges</span>
+              </li>
+            </ul>
+
+            <button
+              type="button"
+              onClick={() => signIn("/dashboard")}
+              className="home-button home-button-primary w-full mt-auto"
+            >
+              Get Started with Free Tier
+            </button>
+          </article>
+
+          {/* Card 2: Production Studios */}
+          <article className="pricing-card">
+            <span className="pricing-badge">Production Grade</span>
+            <div className="pricing-amount">Usage-Based</div>
+            <p className="pricing-desc">
+              Engineered for long-running autonomous agent loops, multi-agent workspaces, and high-concurrency coding studios.
+            </p>
+
+            <ul className="pricing-features-list">
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Automated multi-model Virtual Combos with instant failover</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>SSE streaming with token usage on final frames</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Per-key daily rate limits &amp; custom model allowlists</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Response latency &amp; cost headers on every request</span>
+              </li>
+              <li>
+                <Check className="h-4 w-4 text-[#0066ff]" />
+                <span>Webhook alerts for balance threshold notifications</span>
+              </li>
+            </ul>
+
+            <Link href="/dashboard" className="home-button home-button-secondary w-full mt-auto">
+              Configure Virtual Combos
+            </Link>
+          </article>
+        </div>
+
+        {/* Value Strip */}
+        <div className="pricing-value-strip">
+          <p>
+            <strong>What does $1 get you?</strong> With <code className="text-white font-mono font-medium">deepseek-v4.1-flash</code>, $1 routes over <strong>80,000,000 tokens</strong> &mdash; enough to analyze an entire large codebase dozens of times.
+          </p>
+          <Link href="/docs" className="text-xs text-[#0066ff] hover:underline whitespace-nowrap">
+            Token Calculator &rarr;
+          </Link>
+        </div>
+      </section>
+
+      {/* 7. SECTION: QUICKSTART FLOW */}
+      <section className="home-container home-section">
+        <div className="home-section-heading">
+          <h2>From account to first request</h2>
+          <p>Start calling frontier models in four straightforward steps.</p>
+        </div>
+
+        <div className="home-flow-grid">
+          <article>
+            <span>01</span>
+            <h3>Create Account</h3>
+            <p>Sign in with your email or Const account. Nothing else required to explore the catalog.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Add Balance</h3>
+            <p>Deposit USDC on Solana or top up with QRIS. Balance drains per token, never per month.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Generate a Key</h3>
+            <p>Create a const_live_ key, configure daily spend ceilings and allowed models.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>Start Calling</h3>
+            <p>Point any OpenAI or Anthropic tool to router.const.web.id/v1.</p>
+          </article>
+        </div>
+      </section>
+
+      {/* 8. SECTION: BILLING METERING & LEDGER */}
+      <section id="billing" className="home-container home-section home-billing-layout">
+        <div className="home-billing-intro">
+          <h2>How your usage is billed</h2>
+          <p>
+            Metering comes directly from upstream provider usage reports, so the number you are charged reflects the exact tokens returned by the model &mdash; never a character estimate.
+          </p>
+          <h3>What you get</h3>
+          <ul>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              One key for the OpenAI and Anthropic compatible endpoints
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              14 frontier models across all major families
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Real-time balance deduction per request down to 0.0001&cent;
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Full SSE streaming with token usage on the final frame
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Per-key daily rate limits and model restrictions
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Usage dashboard with cost and latency breakdown
+            </li>
+          </ul>
+        </div>
+
+        <article className="home-billing-ledger">
+          <div className="home-ledger-header">
+            <span>How billing works</span>
+            <span className="text-xs text-[#969696] font-mono">Unit: USD / 1M</span>
+          </div>
+          <ol>
+            <li>
+              <span>01</span>
+              <p>Deposit USDC on Solana, or top up with QRIS (instant IDR)</p>
+            </li>
+            <li>
+              <span>02</span>
+              <p>Input and output tokens counted separately at transparent rates</p>
+            </li>
+            <li>
+              <span>03</span>
+              <p>Cached input tokens billed at up to 90% discount</p>
+            </li>
+            <li>
+              <span>04</span>
+              <p className="home-formula">
+                cost = ((in &minus; cached) &times; input_price + cached &times; input_price &times; 0.10 + out &times; output_price) / 1M
+              </p>
+            </li>
+            <li>
+              <span>05</span>
+              <p>Balance deducted the moment a request settles</p>
+            </li>
+            <li>
+              <span>06</span>
+              <p>A failed upstream request is never billed</p>
+            </li>
+            <li>
+              <span>07</span>
+              <p>Empty balance blocks new calls, never overdraws or charges a card</p>
+            </li>
+          </ol>
+        </article>
+      </section>
+
+      {/* 9. SECTION: CLOSING CTA & COMMUNITY */}
+      <section className="home-container home-section home-closing-grid">
+        <div className="home-closing-cta">
+          <p>Create an account, grab a key, and call 14 frontier models in minutes.</p>
+          <button
+            type="button"
+            onClick={() => signIn("/dashboard")}
+            className="home-price-action"
+          >
+            <span>Create Free Account</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="home-community">
+          <h3>A direct line<br />to Const Router.</h3>
+          <p>Get integration help, request models, and follow service updates directly from the engineers.</p>
+          <ul>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Integration help from us directly
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Model requests and pricing feedback
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Incident and maintenance notices
+            </li>
+            <li>
+              <Check className="h-4 w-4 text-[#0066ff]" />
+              Early access to new features
+            </li>
+          </ul>
+          <a
+            href="https://discord.gg/EmBACq2xED"
+            target="_blank"
+            rel="noreferrer"
+            className="home-text-link pt-2"
+          >
+            <span>Join the Discord</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </section>
+
+      {/* 10. STUDIO FOOTER (FROM apps/learn/web) */}
+      <LandingFooter />
     </div>
-  </>
-);
+  );
 }
