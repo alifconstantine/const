@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import { ScrollArea, cn } from "@const/ui";
 import { useI18n, translate } from "../../lib/i18n";
-import { pluginIconUrl } from "../../lib/plugins/plugins-service";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
 
 function escapeMentionHtml(value: string): string {
@@ -74,8 +73,7 @@ export function getMentionIconMarkup({
   fileType?: string;
 }): string {
   if (kind === "plugin") {
-    const icon = pluginIconUrl(title.toLowerCase());
-    return icon ? `<img src="${icon}" alt="" width="16" height="16" class="rounded shrink-0 inline-block" />` : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 inline-block"><path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>`;
   }
   if (kind === "skill") {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><path d="m18 2 4 4-10 10H8v-4L18 2Z"/><path d="m14 6 4 4"/><path d="M4 12v8a2 2 0 0 0 2 2h8"/><path d="m21.5 13-1.5-1.5-1.5 1.5 1.5 1.5Z"/><path d="m3 3 1.5 1.5L3 6l-1.5-1.5Z"/></svg>`;

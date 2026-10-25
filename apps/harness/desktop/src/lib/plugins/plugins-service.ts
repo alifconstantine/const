@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PluginInventory } from "./types";
-import hyperframesIcon from "../../../plugins/hyperframes/assets/icon.svg";
 
-export const pluginIconUrl = (name: string): string | undefined =>
-  name === "hyperframes" ? hyperframesIcon : undefined;
+export const pluginIconUrl = (_name: string): string | undefined => undefined;
 export function usePluginInventory(workspacePath?: string) {
   const [snapshot, setSnapshot] = useState<{ workspacePath?: string; inventory: PluginInventory; error: boolean }>();
   const [revision, setRevision] = useState(0);

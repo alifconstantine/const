@@ -3,7 +3,6 @@ import { Blocks, ChevronDown, Loader2, Trash2 } from "lucide-react";
 import { Button, Switch, toast } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
 import {
-  pluginIconUrl,
   usePluginInventory,
 } from "../../lib/plugins/plugins-service";
 import type {

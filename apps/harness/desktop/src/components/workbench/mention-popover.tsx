@@ -10,7 +10,6 @@ import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { useTranslation } from "../../lib/i18n";
 import type { MentionCandidate } from "../../lib/mention-search";
-import { pluginIconUrl } from "../../lib/plugins/plugins-service";
 
 export interface MentionPopoverProps {
   candidates: MentionCandidate[];
@@ -23,8 +22,7 @@ export interface MentionPopoverProps {
 
 function CandidateIcon({ candidate }: { candidate: MentionCandidate }) {
   if (candidate.kind === "plugin") {
-    const icon = pluginIconUrl(candidate.fullPath?.replace("plugin://", "") ?? "");
-    return icon ? <img src={icon} alt="" className="w-5 h-5 rounded shrink-0" /> : <Blocks className="w-4 h-4 shrink-0" />;
+    return <Blocks className="w-4 h-4 shrink-0" />;
   }
   if (candidate.kind === "directory") {
     return <Folder className="w-4 h-4 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />;
