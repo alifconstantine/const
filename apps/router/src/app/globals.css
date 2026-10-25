@@ -1,95 +1,95 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap');
 @import "@const/ui/globals.css";
 
-/* Const Router Design System: Minimalist Theme inspired by AtmoRouter and Command Code */
+/* Const Router Design System: Studio Obsidian Monochrome (Aligned with DESIGN.md & landing.css) */
 :root {
-  /* Level 0: Clean White / Minimal Off-White Base (#fafafa) */
-  --background: 0 0% 98.5%;
-  /* Primary Ink (#111111) */
-  --foreground: 0 0% 7%;
+  /* Level 0: Soft Warm Studio Paper Canvas */
+  --background: 240 5% 97.5%;
+  /* Primary Ink: Deep Charcoal (#141416) */
+  --foreground: 240 6% 9%;
 
-  /* Level 1: Flat Card Surface (#ffffff) */
+  /* Level 1: Floating Crisp White Card Surface (#ffffff) */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 7%;
+  --card-foreground: 240 6% 9%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 7%;
+  --popover-foreground: 240 6% 9%;
 
-  /* Primary Solid Button (#111111 with #ffffff text) */
-  --primary: 0 0% 7%;
+  /* Primary Solid Action Button (#141416 with #ffffff text) */
+  --primary: 240 6% 9%;
   --primary-foreground: 0 0% 100%;
 
-  /* Level 2: Secondary Fills & Controls (#f4f4f5) */
-  --secondary: 0 0% 96%;
-  --secondary-foreground: 0 0% 7%;
+  /* Level 2: Secondary Tactile Fills & Controls (#f0f0f3) */
+  --secondary: 240 4% 93.5%;
+  --secondary-foreground: 240 6% 9%;
 
-  /* Level 3: Muted & Utility Ink (#71717a) */
-  --muted: 0 0% 93%;
-  --muted-foreground: 0 0% 45%;
+  /* Level 3: Muted Tracks & Hover (#e8e8ed) */
+  --muted: 240 4% 90.5%;
+  --muted-foreground: 240 4% 45%;
 
-  --accent: 0 0% 92%;
-  --accent-foreground: 0 0% 7%;
+  --accent: 240 4% 91%;
+  --accent-foreground: 240 6% 9%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Hairlines & Flat Borders (#e4e4e7) */
-  --border: 0 0% 89%;
-  --input: 0 0% 94%;
-  --ring: 0 0% 17%;
+  /* Hairlines & Flat Borders (#dfdfe4) */
+  --border: 240 3% 86.5%;
+  --input: 240 4% 93%;
+  --ring: 240 6% 9%;
 
   /* Sidebar Tokens (Light) */
-  --sidebar-background: 0 0% 97.5%;
-  --sidebar-foreground: 0 0% 7%;
-  --sidebar-primary: 0 0% 7%;
+  --sidebar-background: 240 4% 95.5%;
+  --sidebar-foreground: 240 5% 25%;
+  --sidebar-primary: 240 6% 9%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 93%;
-  --sidebar-accent-foreground: 0 0% 7%;
-  --sidebar-border: 0 0% 89%;
-  --sidebar-ring: 0 0% 17%;
+  --sidebar-accent: 240 4% 91%;
+  --sidebar-accent-foreground: 240 6% 9%;
+  --sidebar-border: 240 3% 87%;
+  --sidebar-ring: 240 6% 9%;
 }
 
 .dark {
-  /* Level 0: Deep Neutral Canvas Base (#0d0e10 - AtmoRouter & Command Code minimalism) */
-  --background: 220 10% 5%;
-  /* Primary Crisp White Ink (#eeeeee) */
-  --foreground: 0 0% 93%;
+  /* Level 0: Deep Obsidian Canvas (#0a0a0a - Matches Landing & Const Platform) */
+  --background: 0 0% 4.2%;
+  /* Primary Crisp Reading Ink (#f2f2f2) */
+  --foreground: 0 0% 95%;
 
-  /* Level 1: Flat Card Surface (#131417) */
-  --card: 220 10% 7.8%;
-  --card-foreground: 0 0% 93%;
-  --popover: 220 10% 7.8%;
-  --popover-foreground: 0 0% 93%;
+  /* Level 1: Elevated Studio Card Panel (#141414) */
+  --card: 0 0% 8%;
+  --card-foreground: 0 0% 95%;
+  --popover: 0 0% 8.5%;
+  --popover-foreground: 0 0% 95%;
 
-  /* Primary Button: Solid White with Dark Ink */
-  --primary: 0 0% 100%;
-  --primary-foreground: 220 10% 5%;
+  /* Primary Button: Solid Pure White with Jet Dark Ink */
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 5%;
 
-  /* Level 2: Subtle Elevated Controls & Inputs (#1a1b1f) */
-  --secondary: 220 10% 11%;
-  --secondary-foreground: 0 0% 93%;
+  /* Level 2: Tactile Elevated Controls, Pills, & Inputs (#1c1c1c) */
+  --secondary: 0 0% 11.5%;
+  --secondary-foreground: 0 0% 95%;
 
-  /* Level 3: Muted Ink (#8e8e93) */
-  --muted: 220 8% 13%;
-  --muted-foreground: 0 0% 56%;
+  /* Level 3: Muted / Track / Hover (#242424) */
+  --muted: 0 0% 14.5%;
+  --muted-foreground: 0 0% 60%;
 
-  --accent: 220 10% 13%;
+  --accent: 0 0% 14%;
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 62.8% 45%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Hairline Crisp 1px Borders (#24252a) */
-  --border: 220 8% 15.5%;
-  --input: 220 10% 11%;
-  --ring: 0 0% 100%;
+  /* Hairline Crisp 1px Borders (#262626 - perfectly defined against #0a0a0a & #141414) */
+  --border: 0 0% 15.5%;
+  --input: 0 0% 11.5%;
+  --ring: 0 0% 98%;
 
-  /* Sidebar Tokens (Dark) */
-  --sidebar-background: 220 10% 6%;
-  --sidebar-foreground: 0 0% 90%;
-  --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 220 10% 5%;
-  --sidebar-accent: 220 10% 11%;
+  /* Sidebar Tokens (Dark - #0f0f0f grounded sidebar) */
+  --sidebar-background: 0 0% 6%;
+  --sidebar-foreground: 0 0% 80%;
+  --sidebar-primary: 0 0% 98%;
+  --sidebar-primary-foreground: 0 0% 5%;
+  --sidebar-accent: 0 0% 11.5%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 220 8% 14.5%;
-  --sidebar-ring: 0 0% 100%;
+  --sidebar-border: 0 0% 13.5%;
+  --sidebar-ring: 0 0% 98%;
 }
