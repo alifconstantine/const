@@ -97,9 +97,9 @@ function Overview() {
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
       {/* Header */}
       <header className="flex flex-wrap justify-between gap-4 items-start">
-        <div>
-          <h1 className="text-3xl font-medium tracking-tight">Overview</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Overview</h1>
+          <p className="text-sm text-muted-foreground">
             Requests, free allowance, and paid usage in one place.
           </p>
         </div>

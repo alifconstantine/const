@@ -49,7 +49,7 @@ export function CreditsView({
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-medium tracking-tight">Credits & balance</h1>
+        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Credits & balance</h1>
         <p className="text-sm text-muted-foreground">
           Paid model balance, reserved credit, and transaction settlement ledger.
         </p>

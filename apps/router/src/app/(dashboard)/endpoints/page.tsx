@@ -24,18 +24,20 @@ export default function EndpointsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-medium tracking-tight">Endpoints</h1>
+      <header className="space-y-1">
+        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
+          Endpoints
+        </h1>
         <p className="text-sm text-muted-foreground">
           Available APIs on Const Router. All execution endpoints require an active key or session.
         </p>
       </header>
 
       <div className="relative max-w-md">
-        <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           aria-label="Search endpoints"
-          className="pl-9 rounded-xl bg-card border-border/60"
+          className="pl-9 h-9 text-xs rounded-xl bg-card border-border/60"
           placeholder="Filter by name, path, or description"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

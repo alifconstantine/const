@@ -238,8 +238,8 @@ function ConnectedCatalog() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-7 pb-12">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-medium tracking-tight">Models & pricing</h1>
+      <header className="space-y-1">
+        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Models & pricing</h1>
         <p className="text-sm text-muted-foreground">
           Call frontier models with wholesale rates or weekly free allowance. Copy the exact model ID into your SDK or agent config.
         </p>

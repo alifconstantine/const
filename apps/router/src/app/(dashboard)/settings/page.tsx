@@ -51,45 +51,51 @@ function Settings() {
     }
   }
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      <header className="flex flex-wrap justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-medium tracking-tight">
+    <div className="max-w-6xl mx-auto space-y-7 pb-12">
+      <header className="flex flex-wrap justify-between gap-4 items-start">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
             Settings & data
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground">
             Defaults and privacy settings applied to your account across
             clients.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            size="sm"
             disabled={saving || !settings}
             onClick={() => persist(DEFAULT_SETTINGS)}
+            className="rounded-lg text-xs h-8 px-3 border-border/60 hover:bg-secondary cursor-pointer transition-colors"
           >
             Reset defaults
           </Button>
           <Button
+            size="sm"
             disabled={saving || !settings || !dirty}
             onClick={() => persist()}
+            className="rounded-lg text-xs h-8 px-3.5 bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs cursor-pointer"
           >
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </header>
-      <section className="rounded-2xl bg-card p-6 space-y-5">
-        <h2 className="font-medium">Gateway defaults</h2>
+      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+        <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
+          Gateway defaults
+        </h2>
         <p className="text-xs text-muted-foreground">
           Applied when an API request omits the corresponding parameter. The
           Playground uses the model and controls you select.
         </p>
         <div className="grid sm:grid-cols-2 gap-5">
           <label className="text-sm space-y-2 block">
-            <span>Default model</span>
+            <span className="text-xs font-medium text-foreground">Default model</span>
             <select
               disabled={!settings}
-              className="block w-full rounded-xl bg-secondary p-3 text-xs font-mono"
+              className="block w-full rounded-xl bg-secondary/50 border border-border/60 p-2.5 text-xs font-mono text-foreground focus:outline-none focus:border-border transition-colors"
               value={draft.defaultModel}
               onChange={(e) => change("defaultModel", e.target.value)}
             >
@@ -121,13 +127,14 @@ function Settings() {
             </select>
           </label>
           <label className="text-sm space-y-2 block">
-            <span>Temperature</span>
+            <span className="text-xs font-medium text-foreground">Temperature</span>
             <Input
               disabled={!settings}
               type="number"
               min={0}
               max={2}
               step={0.05}
+              className="rounded-xl bg-secondary/50 border border-border/60 h-9 text-xs font-mono"
               value={draft.defaultTemperature}
               onChange={(e) =>
                 change("defaultTemperature", Number(e.target.value))
@@ -143,8 +150,10 @@ function Settings() {
           change={(value) => change("enableStreaming", value)}
         />
       </section>
-      <section className="rounded-2xl bg-card p-6 space-y-5">
-        <h2 className="font-medium">Privacy & request history</h2>
+      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+        <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
+          Privacy & request history
+        </h2>
         <SettingToggle
           title="Save prompt excerpts in usage logs"
           description="Keep up to 4,000 characters of user prompt text. Usage counts and costs are always recorded. Playground chat history is saved separately."
@@ -164,8 +173,10 @@ function Settings() {
           prompt retention applies to future requests.
         </p>
       </section>
-      <section className="rounded-2xl bg-card p-6 space-y-5">
-        <h2 className="font-medium">Notifications</h2>
+      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+        <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
+          Notifications
+        </h2>
         <SettingToggle
           title="Low free-quota warning"
           description="Show a sidebar warning when less than 15% of your weekly free token allowance remains."
@@ -174,19 +185,28 @@ function Settings() {
           change={(value) => change("notifyLowQuota", value)}
         />
       </section>
-      <section className="rounded-2xl bg-card p-6 space-y-5">
-        <h2 className="font-medium">Account</h2>
+      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+        <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
+          Account
+        </h2>
         <p className="text-sm text-muted-foreground">
           Authentication is managed by Const Accounts.
         </p>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Button
             variant="outline"
+            size="sm"
+            className="rounded-lg text-xs h-8 px-3 border-border/60 hover:bg-secondary cursor-pointer transition-colors"
             onClick={() => signIn("/settings", { switchAccount: true })}
           >
             Switch account
           </Button>
-          <Button variant="outline" onClick={() => signOut("/")}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg text-xs h-8 px-3 border-border/60 hover:bg-secondary cursor-pointer transition-colors"
+            onClick={() => signOut("/")}
+          >
             Sign out
           </Button>
         </div>
@@ -208,10 +228,10 @@ function SettingToggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center justify-between gap-6 rounded-xl bg-secondary/30 p-4 cursor-pointer">
+    <label className="flex items-center justify-between gap-6 rounded-xl bg-secondary/30 border border-border/40 p-4 cursor-pointer hover:bg-secondary/50 transition-colors">
       <span>
-        <span className="block text-sm">{title}</span>
-        <span className="block text-xs text-muted-foreground mt-1 max-w-xl leading-relaxed">
+        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="block text-xs text-muted-foreground mt-0.5 max-w-xl leading-relaxed">
           {description}
         </span>
       </span>

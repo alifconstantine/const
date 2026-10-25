@@ -72,7 +72,7 @@ function Logs() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-medium tracking-tight">Usage logs</h1>
+        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Usage logs</h1>
         <p className="text-sm text-muted-foreground">
           Detailed request telemetry, token consumption, and settled micro-costs.
         </p>

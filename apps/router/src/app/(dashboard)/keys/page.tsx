@@ -235,29 +235,29 @@ export default function KeysPage() {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-7 pb-12">
-        {/* 1. Heading (Lora serif, declarative sentence with period per DESIGN.md) */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
-            API Keys.
+      <div className="max-w-6xl mx-auto space-y-7 pb-12">
+        {/* 1. Heading */}
+        <header className="space-y-1">
+          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
+            API Keys
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground font-light">
+          <p className="text-sm text-muted-foreground">
             Manage your gateway access keys, inspect usage tokens, and configure
             rate caps.
           </p>
-        </div>
+        </header>
 
         {/* 4. Controls: Search + Create Key Button */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               placeholder="Search keys by name or prefix..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border border-border text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full pl-9 pr-4 h-9 rounded-xl bg-card border border-border/60 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-border transition-colors"
             />
           </div>
 
@@ -265,15 +265,17 @@ export default function KeysPage() {
           {isAuthenticated ? (
             <Button
               onClick={() => setIsCreateOpen(true)}
-              className="rounded-full gap-2 text-xs font-medium cursor-pointer h-10 px-5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
+              size="sm"
+              className="h-9 rounded-lg gap-2 text-xs font-medium cursor-pointer px-4 bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>Create new secret key</span>
+              <span>Create secret key</span>
             </Button>
           ) : (
             <Button
               onClick={() => signIn("/keys")}
-              className="rounded-full gap-2 text-xs font-medium cursor-pointer h-10 px-5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
+              size="sm"
+              className="h-9 rounded-lg gap-2 text-xs font-medium cursor-pointer px-4 bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs shrink-0"
             >
               <Lock className="h-3.5 w-3.5" />
               <span>Sign in to manage keys</span>
@@ -282,7 +284,7 @@ export default function KeysPage() {
         </div>
 
         {/* 5. Keys Table Card */}
-        <Card className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-none transition-all">
+        <Card className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-none transition-colors">
           {!isAuthenticated ? (
             <div className="p-12 text-center space-y-3">
               <Key className="h-8 w-8 mx-auto text-muted-foreground/60 stroke-[1.5]" />
@@ -296,7 +298,7 @@ export default function KeysPage() {
               <Button
                 onClick={() => signIn("/keys")}
                 size="sm"
-                className="rounded-full text-xs h-8 px-4 mt-2"
+                className="rounded-lg text-xs h-8 px-4 mt-2 bg-foreground text-background hover:bg-foreground/90"
               >
                 Sign In
               </Button>
@@ -307,10 +309,10 @@ export default function KeysPage() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-secondary/30 border border-border/50 gap-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border/40 gap-4"
                 >
                   <div className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-2xl shrink-0" />
+                    <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
                     <div className="space-y-1.5">
                       <Skeleton className="h-4 w-32 rounded" />
                       <Skeleton className="h-3 w-48 rounded" />
@@ -350,7 +352,7 @@ export default function KeysPage() {
                 <Button
                   onClick={() => setIsCreateOpen(true)}
                   size="sm"
-                  className="rounded-full text-xs h-8 px-4 mt-4"
+                  className="rounded-lg text-xs h-8 px-4 mt-4 bg-foreground text-background hover:bg-foreground/90"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Create Secret Key
@@ -361,21 +363,21 @@ export default function KeysPage() {
             /* Table of Keys */
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-secondary/20">
-                  <TableRow className="border-border/60 hover:bg-transparent">
-                    <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-sans font-medium text-muted-foreground">
+                <TableHeader className="bg-secondary/30 border-b border-border/40">
+                  <TableRow className="border-border/40 hover:bg-transparent">
+                    <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-sans font-normal text-muted-foreground">
                       Name
                     </TableHead>
-                    <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-sans font-medium text-muted-foreground">
+                    <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-sans font-normal text-muted-foreground">
                       Secret Key
                     </TableHead>
-                    <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-sans font-medium text-muted-foreground">
+                    <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-sans font-normal text-muted-foreground">
                       Created
                     </TableHead>
-                    <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
+                    <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-sans font-normal text-muted-foreground">
                       Status
                     </TableHead>
-                    <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-sans font-medium text-muted-foreground">
+                    <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-sans font-normal text-muted-foreground">
                       Action
                     </TableHead>
                   </TableRow>
@@ -388,7 +390,7 @@ export default function KeysPage() {
                     return (
                       <TableRow
                         key={keyItem._id}
-                        className="border-border/50 hover:bg-secondary/20 transition-colors"
+                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
                       >
                         {/* 1. Name */}
                         <TableCell className="py-4 pl-6 pr-4 font-medium text-sm text-foreground font-sans">
@@ -538,9 +540,9 @@ export default function KeysPage() {
         {/* DIALOG 1: CREATE NEW SECRET KEY MODAL                     */}
         {/* ========================================================= */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="rounded-2xl border-none bg-card max-w-md p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-xl border border-border/60 bg-card max-w-md p-6 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
-              <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
+              <DialogTitle className="text-lg font-serif font-normal text-foreground tracking-tight">
                 Create new secret key
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
@@ -561,7 +563,7 @@ export default function KeysPage() {
                   onChange={(e) => setNewKeyName(e.target.value)}
                   autoFocus
                   required
-                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
+                  className="w-full h-9 px-3 rounded-xl bg-secondary/50 border border-border/60 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-border transition-colors"
                 />
               </div>
 
@@ -580,7 +582,7 @@ export default function KeysPage() {
                   value={newKeyDailyLimit}
                   onChange={(e) => setNewKeyDailyLimit(e.target.value)}
                   min={1}
-                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
+                  className="w-full h-9 px-3 rounded-xl bg-secondary/50 border border-border/60 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-border transition-colors"
                 />
                 <p className="text-[11px] text-muted-foreground font-light">
                   Optionally limit total tokens consumed per day through this
@@ -588,14 +590,14 @@ export default function KeysPage() {
                 </p>
               </div>
 
-              <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-5">
+              <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-2 sm:space-x-0 mt-4">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setIsCreateOpen(false)}
                   disabled={isSubmitting}
-                  className="rounded-full text-xs h-9 px-4 border-none bg-secondary/40 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shadow-none"
+                  className="rounded-lg text-xs h-9 px-3.5 border-border/60 hover:bg-secondary text-foreground cursor-pointer transition-colors shadow-none"
                 >
                   Cancel
                 </Button>
@@ -603,7 +605,7 @@ export default function KeysPage() {
                   type="submit"
                   size="sm"
                   disabled={isSubmitting || !newKeyName.trim()}
-                  className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-none gap-1.5 cursor-pointer transition-all"
+                  className="rounded-lg text-xs h-9 px-4 bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs gap-1.5 cursor-pointer transition-colors"
                 >
                   {isSubmitting ? (
                     <>
@@ -632,9 +634,9 @@ export default function KeysPage() {
             }
           }}
         >
-          <DialogContent className="rounded-2xl border-none bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-xl border border-border/60 bg-card max-w-lg p-6 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
-              <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
+              <DialogTitle className="text-lg font-serif font-normal text-foreground tracking-tight">
                 Save your secret key
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
@@ -654,7 +656,7 @@ export default function KeysPage() {
                       Secret Key
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border-none text-xs font-mono w-full min-w-0">
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border border-border/50 text-xs font-mono w-full min-w-0">
                     <span className="text-foreground select-all break-all min-w-0 flex-1 font-mono text-xs font-normal leading-relaxed pr-1">
                       {showPlainKey
                         ? revealKey.rawKey
@@ -685,7 +687,7 @@ export default function KeysPage() {
                           toast.success("Secret key copied to clipboard");
                           setTimeout(() => setCopiedRevealKey(false), 2000);
                         }}
-                        className="rounded-full h-8 px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer border-none"
+                        className="rounded-lg h-8 px-3 text-xs gap-1.5 shrink-0 bg-foreground text-background hover:bg-foreground/90 shadow-xs cursor-pointer"
                       >
                         {copiedRevealKey ? (
                           <>
@@ -704,7 +706,7 @@ export default function KeysPage() {
                 </div>
 
                 {/* Warning callout */}
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border-none text-amber-600 dark:text-amber-400 flex items-start gap-2.5 text-xs w-full min-w-0">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-start gap-2.5 text-xs w-full min-w-0">
                   <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="font-light leading-relaxed">
                     Store this key securely in your password manager or{" "}
@@ -717,7 +719,7 @@ export default function KeysPage() {
               </div>
             )}
 
-            <div className="pt-4 mt-4 w-full">
+            <div className="pt-3 mt-4 w-full">
               <Button
                 type="button"
                 onClick={() => {
@@ -725,7 +727,7 @@ export default function KeysPage() {
                   setCopiedRevealKey(false);
                   setShowPlainKey(true);
                 }}
-                className="w-full rounded-full text-xs h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-none cursor-pointer"
+                className="w-full rounded-lg text-xs h-9 bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs cursor-pointer"
               >
                 Done
               </Button>

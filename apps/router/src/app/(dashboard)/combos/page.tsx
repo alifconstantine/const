@@ -13,7 +13,9 @@ import {
   ScrollArea,
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   Select,
   SelectTrigger,
@@ -378,14 +380,14 @@ export default function CombosPage() {
   }, [combos, searchQuery]);
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto space-y-7 pb-12">
       {/* 1. Header with Editorial Title & Create Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl sm:text-4xl font-serif font-normal text-foreground tracking-tight">
-            Virtual Combos.
+          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
+            Virtual Combos
           </h1>
-          <p className="text-sm text-muted-foreground font-light">
+          <p className="text-sm text-muted-foreground">
             Resilient multi-model chains with automatic failover, priority
             routing, and load balancing across Const models.
           </p>
@@ -393,17 +395,18 @@ export default function CombosPage() {
 
         <Button
           onClick={openCreateWizard}
-          className="rounded-full gap-2 px-5 font-sans text-xs font-medium cursor-pointer shadow-sm self-start sm:self-auto bg-primary text-primary-foreground hover:bg-primary/90"
+          size="sm"
+          className="rounded-lg gap-2 px-4 h-9 font-sans text-xs font-medium cursor-pointer shadow-xs self-start sm:self-auto bg-foreground text-background hover:bg-foreground/90 transition-colors shrink-0"
         >
           <Plus className="h-4 w-4" />
           <span>Create Combo</span>
         </Button>
-      </div>
+      </header>
 
       {/* 2. Filter Bar & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-medium px-3 py-1 rounded-full bg-secondary/80 text-foreground">
+          <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-secondary/60 text-muted-foreground border border-border/50">
             {combos
               ? `${combos.length} Custom Combo${combos.length === 1 ? "" : "s"}`
               : "Loading..."}
@@ -413,7 +416,7 @@ export default function CombosPage() {
               variant="ghost"
               size="sm"
               onClick={() => setIsClearAllOpen(true)}
-              className="rounded-full text-xs font-sans h-7 px-3 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10 transition-colors"
+              className="rounded-lg text-xs font-sans h-7 px-2.5 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10 transition-colors"
             >
               <Trash2 className="h-3 w-3 mr-1.5" />
               <span>Clear all</span>
@@ -428,18 +431,18 @@ export default function CombosPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search combos or models..."
-            className="pl-9 h-9 text-xs font-sans bg-secondary/30 rounded-xl border-none"
+            className="pl-9 h-9 text-xs font-sans bg-card rounded-xl border border-border/60 text-foreground placeholder:text-muted-foreground focus:border-border transition-colors"
           />
         </div>
       </div>
 
-      {/* 3. Combos Grid List — BORDERLESS CONSISTENT CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* 3. Combos Grid List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {combos === undefined ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="h-[340px] rounded-3xl border-none bg-secondary/35 p-6 flex flex-col justify-between"
+              className="min-h-[340px] rounded-xl border border-border/60 bg-card p-5 flex flex-col justify-between"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
@@ -460,12 +463,12 @@ export default function CombosPage() {
                 </div>
               </div>
               <div className="pt-2">
-                <Skeleton className="h-9 w-full rounded-full" />
+                <Skeleton className="h-9 w-full rounded-lg" />
               </div>
             </div>
           ))
         ) : filteredCombos.length === 0 ? (
-          <div className="col-span-full text-center py-24 bg-secondary/15 rounded-3xl p-8 space-y-2 border border-border/30">
+          <div className="col-span-full text-center py-20 bg-card rounded-xl p-8 space-y-2 border border-border/60">
             <p className="text-base font-medium text-foreground">
               {searchQuery ? "No matching combos found" : "No combos yet"}
             </p>
@@ -483,14 +486,14 @@ export default function CombosPage() {
             return (
               <div
                 key={combo._id}
-                className="h-[340px] rounded-3xl border-none bg-secondary/35 hover:bg-secondary/50 p-6 flex flex-col justify-between transition-all"
+                className="min-h-[340px] rounded-xl border border-border/60 bg-card hover:border-border p-5 flex flex-col justify-between transition-colors"
               >
                 <div className="space-y-3">
                   {/* Header Tag + Name */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1 flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground bg-secondary/60 px-2 py-0.5 rounded border border-border/40">
                           FAILOVER ROUTE
                         </span>
                       </div>
@@ -508,12 +511,12 @@ export default function CombosPage() {
                           "Model Identifier",
                         )
                       }
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/70 text-xs font-mono text-foreground hover:bg-foreground hover:text-background transition-colors cursor-pointer shrink-0"
+                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-secondary/80 border border-border/50 text-[11px] font-mono text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
                       title="Click to copy model identifier"
                     >
                       <span>{modelIdKey}</span>
                       {isCopied ? (
-                        <Check className="h-3 w-3" />
+                        <Check className="h-3 w-3 text-foreground" />
                       ) : (
                         <Copy className="h-3 w-3 text-muted-foreground" />
                       )}
@@ -527,15 +530,15 @@ export default function CombosPage() {
                   </p>
 
                   {/* Meta Badges */}
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                    <span className="px-2 py-0.5 rounded-md bg-background/50 text-foreground">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-muted-foreground">
+                    <span className="px-2 py-0.5 rounded-md bg-secondary/50 border border-border/40 text-foreground text-[10px]">
                       {formatTokens(combo.contextLength)} context
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-background/50 uppercase">
+                    <span className="px-2 py-0.5 rounded-md bg-secondary/50 border border-border/40 uppercase text-[10px]">
                       {combo.strategy} fallback
                     </span>
                     {combo.systemMessage && (
-                      <span className="px-2 py-0.5 rounded-md bg-background/50 text-foreground font-sans">
+                      <span className="px-2 py-0.5 rounded-md bg-secondary/50 border border-border/40 text-foreground font-sans text-[10px]">
                         Custom Persona
                       </span>
                     )}
@@ -553,7 +556,7 @@ export default function CombosPage() {
                         {combo.models.map((m, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between p-2 rounded-xl bg-background/50 text-xs font-sans"
+                            className="flex items-center justify-between p-2 rounded-lg bg-secondary/40 border border-border/30 text-xs font-sans"
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <span
@@ -581,15 +584,15 @@ export default function CombosPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="pt-2 flex items-center justify-between gap-2">
+                <div className="pt-2 flex items-center justify-between gap-2 border-t border-border/30">
                   <Link
                     href={`/generation?model=${encodeURIComponent(modelIdKey)}`}
                     className="flex-1"
                   >
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="w-full rounded-full gap-2 text-xs font-sans h-9 bg-background/70 hover:bg-background text-foreground cursor-pointer shadow-none"
+                      className="w-full rounded-lg gap-2 text-xs font-sans h-8 border-border/60 hover:bg-secondary text-foreground cursor-pointer shadow-none transition-colors"
                     >
                       <Play className="h-3.5 w-3.5" />
                       <span>Test in Playground</span>
@@ -601,7 +604,7 @@ export default function CombosPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditWizard(combo)}
-                      className="rounded-full h-9 px-3 text-xs font-sans cursor-pointer hover:bg-background/80"
+                      className="rounded-lg h-8 px-2.5 text-xs font-sans cursor-pointer hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <span>Edit</span>
                     </Button>
@@ -611,7 +614,7 @@ export default function CombosPage() {
                       onClick={() =>
                         setDeletingId(combo._id as Id<"routerCombos">)
                       }
-                      className="rounded-full h-9 w-9 p-0 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10"
+                      className="rounded-lg h-8 w-8 p-0 text-muted-foreground hover:text-destructive cursor-pointer hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -625,11 +628,11 @@ export default function CombosPage() {
 
       {/* 4. Multi-Step Creation Wizard Modal (OmniRoute 4-Stage Reference) */}
       <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-3xl border-none bg-card shadow-2xl">
+        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-xl">
           {/* Top Modal Header: Clean Title + Built-in Close */}
           <div className="px-6 pt-5 pb-3 bg-secondary/30">
             <div className="flex items-center justify-between pr-8">
-              <DialogTitle className="text-base font-semibold font-sans text-foreground">
+              <DialogTitle className="text-base font-serif font-normal text-foreground">
                 {editingComboId ? "Edit Combo" : "Create Combo"}
               </DialogTitle>
             </div>
@@ -1188,23 +1191,23 @@ export default function CombosPage() {
         open={deletingId !== null}
         onOpenChange={(open) => !open && setDeletingId(null)}
       >
-        <DialogContent className="max-w-md rounded-3xl border-none bg-card p-6 space-y-4">
-          <div className="space-y-1.5">
-            <h3 className="text-base font-semibold text-foreground font-sans">
+        <DialogContent className="max-w-md rounded-xl border border-border/60 bg-card p-6 space-y-4 shadow-xl">
+          <DialogHeader className="space-y-1.5 text-left">
+            <DialogTitle className="text-base font-serif font-normal text-foreground">
               Delete Virtual Combo?
-            </h3>
-            <p className="text-xs text-muted-foreground font-light">
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
               Are you sure you want to delete this combo? Any client calls
               referencing this combo model ID will return a 404 error.
-            </p>
-          </div>
+            </DialogDescription>
+          </DialogHeader>
 
           <DialogFooter className="flex items-center justify-end gap-2 pt-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setDeletingId(null)}
-              className="rounded-full text-xs cursor-pointer font-sans border-none bg-secondary hover:bg-secondary/80"
+              className="rounded-lg text-xs cursor-pointer font-sans border-border/60 hover:bg-secondary text-foreground transition-colors"
             >
               Cancel
             </Button>
@@ -1212,7 +1215,7 @@ export default function CombosPage() {
               variant="destructive"
               size="sm"
               onClick={() => deletingId && handleDeleteCombo(deletingId)}
-              className="rounded-full text-xs cursor-pointer font-sans"
+              className="rounded-lg text-xs cursor-pointer font-sans"
             >
               Delete Combo
             </Button>
@@ -1222,17 +1225,17 @@ export default function CombosPage() {
 
       {/* 6. Clear All Confirmation Dialog */}
       <Dialog open={isClearAllOpen} onOpenChange={setIsClearAllOpen}>
-        <DialogContent className="max-w-md rounded-3xl border-none bg-card p-6 space-y-4">
-          <div className="space-y-1.5">
-            <h3 className="text-base font-semibold text-foreground font-sans">
+        <DialogContent className="max-w-md rounded-xl border border-border/60 bg-card p-6 space-y-4 shadow-xl">
+          <DialogHeader className="space-y-1.5 text-left">
+            <DialogTitle className="text-base font-serif font-normal text-foreground">
               Delete All Virtual Combos?
-            </h3>
-            <p className="text-xs text-muted-foreground font-light">
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground font-light leading-relaxed">
               Are you sure you want to delete all {combos?.length || 0} custom
               combos? Your account will be reset to an empty state with no
               pre-configured virtual models.
-            </p>
-          </div>
+            </DialogDescription>
+          </DialogHeader>
 
           <DialogFooter className="flex items-center justify-end gap-2 pt-2">
             <Button
@@ -1240,7 +1243,7 @@ export default function CombosPage() {
               size="sm"
               disabled={isClearingAll}
               onClick={() => setIsClearAllOpen(false)}
-              className="rounded-full text-xs cursor-pointer font-sans border-none bg-secondary hover:bg-secondary/80"
+              className="rounded-lg text-xs cursor-pointer font-sans border-border/60 hover:bg-secondary text-foreground transition-colors"
             >
               Cancel
             </Button>
@@ -1249,7 +1252,7 @@ export default function CombosPage() {
               size="sm"
               disabled={isClearingAll}
               onClick={handleClearAll}
-              className="rounded-full text-xs cursor-pointer font-sans"
+              className="rounded-lg text-xs cursor-pointer font-sans"
             >
               {isClearingAll ? "Deleting..." : "Delete All Combos"}
             </Button>
