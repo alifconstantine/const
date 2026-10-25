@@ -10,6 +10,10 @@ The backend was deployed to `earnest-hawk-132` after a successful dry run confir
 
 For future Router changes that add backend functions or tables, complete the backend deployment before publishing the dependent frontend, then verify those functions on the production deployment.
 
+## Follow-up: React error 301 in the sidebar
+
+The initial sidebar error handling passed a newly allocated query map to `useQueries` on every render, including an empty map before authentication. Convex 1.45 tracks that map by identity; changing it during a follow-up render schedules another immediate render, causing React error 301. Memoizing the map by authentication state fixes the loop while retaining query error handling. A regression test uses the real Convex hook and React renderer with a controlled follow-up render for loading, success, and error results, both before and after authentication. It reproduced `Too many re-renders` before the fix and settles in two renders afterward. The previous tests stubbed the subscription hook and missed this interaction.
+
 ## Model IDs and billing
 
 The server catalog is `packages/backend/convex/router/modelCatalog.ts`, re-exported by Router. The free allowlist contains exactly:

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useQueries } from "convex/react";
+import { useQueries, type RequestForQueries } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
@@ -131,14 +131,16 @@ export function Sidebar({
   const { isAuthenticated } = useRouterAuth();
   // Sidebar data is optional. useQueries returns failures as values so a
   // temporarily unavailable backend cannot take down navigation or the page.
-  const results = useQueries(
-    isAuthenticated
-      ? {
-          quota: { query: api.router.quotas.getUserQuota, args: {} },
-          settings: { query: api.router.settings.getSettings, args: {} },
-        }
-      : {},
-  );
+  // Convex's subscription hook tracks this object's identity. Keep it stable
+  // across rerenders, including the empty pre-authentication subscription set.
+  const queries = useMemo((): RequestForQueries => {
+    if (!isAuthenticated) return {};
+    return {
+      quota: { query: api.router.quotas.getUserQuota, args: {} },
+      settings: { query: api.router.settings.getSettings, args: {} },
+    };
+  }, [isAuthenticated]);
+  const results = useQueries(queries);
   const quotaFailed = results.quota instanceof Error;
   const quota:
     FunctionReturnType<typeof api.router.quotas.getUserQuota> | undefined =

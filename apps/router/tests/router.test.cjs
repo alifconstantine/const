@@ -141,21 +141,39 @@ const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
-function sidebarFixture(results, authenticated = true) {
+function sidebarFixture(
+  results,
+  authenticated = true,
+  exerciseSubscription = false,
+) {
   const React = appRequire("react");
   const { renderToStaticMarkup } = appRequire("react-dom/server");
+  const { useQueries, ConvexProvider } = appRequire("convex/react");
+  const { anyApi, getFunctionName } = appRequire("convex/server");
   let subscriptions;
+  let renders = 0;
   const sidebarLoad = sourceLoader({
     "convex/react": {
       useQueries: (queries) => {
         subscriptions = queries;
+        renders++;
+        if (exerciseSubscription) {
+          const values = useQueries(queries);
+          // A single follow-up render exercises the actual Convex subscription
+          // hook's identity checks, which a stubbed hook cannot catch.
+          const [rerendered, setRerendered] = React.useState(false);
+          if (!rerendered) setRerendered(true);
+          return values;
+        }
         return results;
       },
     },
     "next/navigation": { usePathname: () => "/models" },
     "next/link": ({ children, ...props }) =>
       React.createElement("a", props, children),
-    "@const/backend/_generated/api": { api },
+    "@const/backend/_generated/api": {
+      api: exerciseSubscription ? anyApi : api,
+    },
     "@/components/providers/convex-client-provider": {
       useRouterAuth: () => ({ isAuthenticated: authenticated }),
     },
@@ -172,11 +190,46 @@ function sidebarFixture(results, authenticated = true) {
   const { Sidebar } = sidebarLoad(
     "apps/router/src/components/dashboard/sidebar.tsx",
   );
+  const client = {
+    watchQuery: (query) => ({
+      localQueryResult: () => {
+        const value = getFunctionName(query).endsWith(":getSettings")
+          ? results.settings
+          : results.quota;
+        if (value instanceof Error) throw value;
+        return value;
+      },
+      onUpdate: () => () => {},
+    }),
+  };
   return {
-    html: renderToStaticMarkup(React.createElement(Sidebar)),
+    html: renderToStaticMarkup(
+      React.createElement(
+        ConvexProvider,
+        { client },
+        React.createElement(Sidebar),
+      ),
+    ),
     subscriptions,
+    renders,
   };
 }
+test("sidebar rerenders settle with the real Convex subscription hook", () => {
+  for (const authenticated of [false, true]) {
+    for (const results of [
+      {},
+      {
+        quota: { remainingTokens: 700_000 },
+        settings: { notifyLowQuota: true },
+      },
+      { quota: new Error("Unavailable"), settings: new Error("Unavailable") },
+    ]) {
+      const { html, renders } = sidebarFixture(results, authenticated, true);
+      assert.match(html, /href="\/models"/);
+      assert.equal(renders, 2);
+    }
+  }
+});
 test("sidebar remains usable when production settings or quota queries fail", () => {
   const quota = { weeklyLimitTokens: 7_000_000, remainingTokens: 700_000 };
   const settingsMissing = sidebarFixture({
