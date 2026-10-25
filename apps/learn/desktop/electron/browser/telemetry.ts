@@ -1,4 +1,12 @@
 import type { WebContents } from "electron";
+import {
+  sanitizeBodyPreview,
+  sanitizeConsoleLocation,
+  sanitizeConsoleText,
+  sanitizeNetworkStatusText,
+  sanitizeStack,
+  sanitizeUrl,
+} from "./console-sanitizer.js";
 
 export type BrowserConsoleLevel = "log" | "info" | "warn" | "error" | "debug";
 
@@ -22,6 +30,36 @@ export interface BrowserNetworkRecord {
   statusText: string;
   durationMs: number;
   bodyPreview?: string;
+}
+
+/** Redact every model-visible field of a console entry. */
+function sanitizeConsoleEntry(entry: unknown): BrowserConsoleEntry {
+  const source = (entry && typeof entry === "object" ? entry : {}) as Partial<BrowserConsoleEntry>;
+  const sanitized: BrowserConsoleEntry = {
+    ...(source as BrowserConsoleEntry),
+    text: sanitizeConsoleText(source.text ?? ""),
+  };
+  if (typeof source.location === "string") {
+    sanitized.location = sanitizeConsoleLocation(source.location);
+  }
+  if (typeof source.stack === "string") {
+    sanitized.stack = sanitizeStack(source.stack);
+  }
+  return sanitized;
+}
+
+/** Redact every model-visible field of a network record. */
+function sanitizeNetworkRecord(record: unknown): BrowserNetworkRecord {
+  const source = (record && typeof record === "object" ? record : {}) as Partial<BrowserNetworkRecord>;
+  const sanitized: BrowserNetworkRecord = {
+    ...(source as BrowserNetworkRecord),
+    url: sanitizeUrl(source.url ?? ""),
+    statusText: sanitizeNetworkStatusText(source.statusText ?? ""),
+  };
+  if (typeof source.bodyPreview === "string") {
+    sanitized.bodyPreview = sanitizeBodyPreview(source.bodyPreview);
+  }
+  return sanitized;
 }
 
 /** Page-side console & uncaught error capture hook ported from oh-my-pi. */
@@ -201,6 +239,9 @@ export class TabTelemetryBuffer {
       seq: this.seq++,
       ts: Date.now(),
       ...entry,
+      text: sanitizeConsoleText(entry.text),
+      location: entry.location ? sanitizeConsoleLocation(entry.location) : entry.location,
+      stack: entry.stack ? sanitizeStack(entry.stack) : entry.stack,
     });
     if (this.hostEntries.length > 300) {
       this.hostEntries.shift();
@@ -247,10 +288,10 @@ export class TabTelemetryBuffer {
           return out;
         })()`);
         if (pageData && Array.isArray(pageData.consoleEntries)) {
-          pageConsole = pageData.consoleEntries;
+          pageConsole = pageData.consoleEntries.map((entry: unknown) => sanitizeConsoleEntry(entry));
         }
         if (pageData && Array.isArray(pageData.networkRecords)) {
-          networkRecords = pageData.networkRecords;
+          networkRecords = pageData.networkRecords.map((record: unknown) => sanitizeNetworkRecord(record));
         }
       } catch {}
     }
@@ -292,9 +333,10 @@ export class TabTelemetryBuffer {
       })
       .slice(-limit);
 
+    // Sanitize centrally so no capture path (host hooks or page-side merge) can bypass redaction.
     return {
-      consoleEntries: filteredConsole,
-      networkRecords: filteredNetwork,
+      consoleEntries: filteredConsole.map((entry) => sanitizeConsoleEntry(entry)),
+      networkRecords: filteredNetwork.map((record) => sanitizeNetworkRecord(record)),
     };
   }
 }

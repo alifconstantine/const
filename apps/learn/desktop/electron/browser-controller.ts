@@ -13,6 +13,7 @@ import {
 } from "./browser/snapshot-plus.js";
 import {
   type ScreenshotAnnotationTarget,
+  type SelectorSpec,
   buildInstallAnnotationOverlayScript,
   buildRemoveAnnotationOverlayScript,
   formatScreenshotLegend,
@@ -135,6 +136,30 @@ interface RegisteredTab {
 
 export const HELP_REQUEST_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+/** Default timeout used when an element must be resolved before an action runs. */
+export const DEFAULT_WAIT_TIMEOUT_MS = 5_000;
+/** Maximum timeout accepted by browser_wait_for. */
+export const MAX_WAIT_TIMEOUT_MS = 60_000;
+/** Poll interval used while waiting for a condition to become true. */
+const WAIT_POLL_INTERVAL_MS = 100;
+/** How long captured browser screenshots are kept on disk. */
+const SCREENSHOT_RETENTION_MS = 30 * 60 * 1000;
+const SCREENSHOT_FILE_PREFIX = "const-browser-shot-";
+/**
+ * Navigation is restricted to web schemes. Local files are intentionally not
+ * reachable from the browser: they are served through the sandboxed file tools
+ * so the workspace boundary cannot be bypassed through a page render.
+ */
+const ALLOWED_NAVIGATION_SCHEMES = new Set(["http:", "https:"]);
+
+function parseAllowedDomains(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return String(raw)
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 export class BrowserController {
   private controlState: ControlState = {
     holder: "bot",
@@ -146,6 +171,9 @@ export class BrowserController {
   private registeredTabs = new Map<string, RegisteredTab>();
   private activeTabId: string | null = null;
   private snapshotCounter = 0;
+  private lastScreenshotPruneAt = 0;
+  /** Optional host allowlist. When empty every http(s) host stays reachable. */
+  private allowedDomains: string[] = [];
 
   private registerWaiters: Array<(tab: RegisteredTab) => void> = [];
   private helpResolutionWaiters: Array<(info: { status: "resolved"; message: string }) => void> = [];
@@ -170,6 +198,7 @@ export class BrowserController {
     if (options?.onStateChange) this.onStateChangeCallback = options.onStateChange;
     if (options?.onAiAction) this.onAiActionCallback = options.onAiAction;
     if (options?.onTabOpenRequest) this.onTabOpenRequestCallback = options.onTabOpenRequest;
+    this.setAllowedDomains(parseAllowedDomains(process.env.CONST_BROWSER_ALLOWED_DOMAINS));
   }
 
   public setCallbacks(callbacks: {
@@ -694,32 +723,59 @@ export class BrowserController {
     const secretRef = this.controlState.secretRef;
     const spec = secretRef ? parseSelectorSpec(secretRef) : null;
 
-    await target.executeJavaScript(`
+    const writeOutcome = await target
+      .executeJavaScript(`
       (function() {
         const spec = ${JSON.stringify(spec)};
+        const secret = ${JSON.stringify(text)};
         ${PAGE_SELECTOR_HELPERS}
+        const isSecretish = (el) => {
+          if (!el) return false;
+          const type = String(el.type || "").toLowerCase();
+          if (type === "password") return true;
+          const autocomplete = String((el.getAttribute && el.getAttribute("autocomplete")) || "").toLowerCase();
+          return autocomplete.indexOf("password") !== -1 || autocomplete.indexOf("one-time-code") !== -1;
+        };
         let targetEl = spec ? findElement(spec) : null;
         if (!targetEl) {
-          targetEl = document.activeElement && document.activeElement !== document.body
-            ? document.activeElement
-            : document.querySelector('input[type="password"], input:not([type="hidden"]), textarea');
-        }
-        if (targetEl) {
-          targetEl.focus();
-          const proto = Object.getPrototypeOf(targetEl);
-          const setValue = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-          if (setValue) {
-            setValue.call(targetEl, ${JSON.stringify(text)});
-          } else if ('value' in targetEl) {
-            targetEl.value = ${JSON.stringify(text)};
-          } else if (targetEl.isContentEditable) {
-            targetEl.textContent = ${JSON.stringify(text)};
+          const active = document.activeElement;
+          const passwordField = document.querySelector('input[type="password"]');
+          if (isSecretish(active)) {
+            targetEl = active;
+          } else if (passwordField) {
+            targetEl = passwordField;
           }
-          targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-          targetEl.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        if (!targetEl) {
+          return { written: false, reason: "no-target" };
+        }
+        targetEl.focus();
+        const proto = Object.getPrototypeOf(targetEl);
+        const setValue = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setValue) {
+          setValue.call(targetEl, secret);
+        } else if ('value' in targetEl) {
+          targetEl.value = secret;
+        } else if (targetEl.isContentEditable) {
+          targetEl.textContent = secret;
+        } else {
+          return { written: false, reason: "not-editable" };
+        }
+        targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+        targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+        const current = ('value' in targetEl) ? String(targetEl.value || "") : String(targetEl.textContent || "");
+        return { written: current.length === secret.length, reason: current.length === secret.length ? null : "length-mismatch" };
       })();
-    `);
+    `)
+      .catch(() => ({ written: false, reason: "script-error" }));
+
+    if (!writeOutcome?.written) {
+      throw new Error(
+        `Failed to write the secret into the page (${writeOutcome?.reason || "unknown"}). ` +
+          `The secret was NOT entered and is NOT recoverable by the agent. ` +
+          `Ask the user to type it directly into the field in the browser pane, or request the secret again with an explicit 'ref' pointing at the target field.`
+      );
+    }
 
     const charCount = text.length;
     this.updateControl({
@@ -758,10 +814,58 @@ export class BrowserController {
     if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/.*)?$/i.test(trimmed)) {
       return `http://${trimmed}`;
     }
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//i.test(trimmed)) {
-      return trimmed;
+    const candidate = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+    let parsed: URL;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      throw new Error(`Invalid URL for browser_navigate: '${trimmed}'`);
     }
-    return `https://${trimmed}`;
+    if (!ALLOWED_NAVIGATION_SCHEMES.has(parsed.protocol)) {
+      throw new Error(
+        `Blocked navigation to '${parsed.protocol}//' URLs. The browser only loads http:// and https:// pages. ` +
+          `Read local files with the read tool (workspace-scoped) instead of rendering them in the browser, ` +
+          `and use the 'computer_*' tools for desktop applications.`
+      );
+    }
+    return candidate;
+  }
+
+  /**
+   * Restrict which hosts the agent may navigate to. When the list is empty
+   * every http(s) host stays reachable.
+   */
+  public setAllowedDomains(domains: string[]): void {
+    this.allowedDomains = parseAllowedDomains(domains.join(","));
+  }
+
+  public getAllowedDomains(): string[] {
+    return [...this.allowedDomains];
+  }
+
+  private assertHostAllowed(url: string): void {
+    if (this.allowedDomains.length === 0) return;
+    let host: string;
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      return;
+    }
+    const allowed = this.allowedDomains.some((entry) => {
+      if (entry === "*") return true;
+      if (entry.startsWith("*.")) {
+        const suffix = entry.slice(1);
+        return host === entry.slice(2) || host.endsWith(suffix);
+      }
+      return host === entry;
+    });
+    if (!allowed) {
+      throw new Error(
+        `Navigation to '${host}' is blocked by the browser domain allowlist (${this.allowedDomains.join(", ")}).`
+      );
+    }
   }
 
   public async navigate(
@@ -771,6 +875,7 @@ export class BrowserController {
     this.assertBotMayAct();
 
     const cleanUrl = this.normalizeUrl(url);
+    this.assertHostAllowed(cleanUrl);
     const tab = await this.ensureTargetTab({
       url: cleanUrl,
       tabId: options?.tabId,
@@ -834,7 +939,10 @@ export class BrowserController {
     this.snapshotCounter++;
     this.injectRuntimeHelpers(tab);
 
-    const script = buildEnhancedSnapshotScript(this.snapshotCounter, options);
+    // While a human is handing a secret back to the agent, never surface the
+    // value of the field that receives it.
+    const maskValues = this.controlState.secretRef ? [this.controlState.secretRef] : [];
+    const script = buildEnhancedSnapshotScript(this.snapshotCounter, { ...options, maskValues });
     const raw = await target.executeJavaScript(script);
 
     const processedAria = postProcessAriaSnapshot(
@@ -978,28 +1086,10 @@ export class BrowserController {
 
     if (rawTarget) {
       const spec = parseSelectorSpec(rawTarget);
-      const getPosScript = `
-        (function() {
-          const spec = ${JSON.stringify(spec)};
-          ${PAGE_SELECTOR_HELPERS}
-          const el = findElement(spec);
-          if (!el) return null;
-          el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
-          const rect = el.getBoundingClientRect();
-          if (window.__constHighlightElement) {
-            window.__constHighlightElement(el);
-          }
-          return {
-            x: Math.round(rect.left + rect.width / 2),
-            y: Math.round(rect.top + rect.height / 2),
-            tag: (el.tagName || '').toLowerCase()
-          };
-        })();
-      `;
-      const pos = await target.executeJavaScript(getPosScript);
+      const pos = await this.resolveElementBox(target, spec);
       if (!pos) {
         throw new Error(
-          `Element '${rawTarget}' not found on page. Call browser_snapshot to inspect current refs.`
+          `Element '${rawTarget}' not found after waiting ${DEFAULT_WAIT_TIMEOUT_MS}ms. Call browser_snapshot to inspect current refs.`
         );
       }
       targetX = pos.x;
@@ -1124,44 +1214,10 @@ export class BrowserController {
 
     if (rawTarget) {
       const spec = parseSelectorSpec(rawTarget);
-      const focusScript = `
-        (function() {
-          const spec = ${JSON.stringify(spec)};
-          ${PAGE_SELECTOR_HELPERS}
-          const el = findElement(spec);
-          if (!el) return null;
-          el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
-          el.focus();
-          if (${clearFirst}) {
-            if ('value' in el) {
-              const proto = Object.getPrototypeOf(el);
-              const setValue = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-              if (setValue) {
-                setValue.call(el, '');
-              } else {
-                el.value = '';
-              }
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            } else if (el.isContentEditable) {
-              el.textContent = '';
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          }
-          if (window.__constHighlightElement) {
-            window.__constHighlightElement(el);
-          }
-          const rect = el.getBoundingClientRect();
-          return {
-            x: Math.round(rect.left + rect.width / 2),
-            y: Math.round(rect.top + rect.height / 2)
-          };
-        })();
-      `;
-      const focused = await target.executeJavaScript(focusScript);
+      const focused = await this.focusElement(target, spec, { clearFirst });
       if (!focused) {
         throw new Error(
-          `Element '${rawTarget}' not found on page. Call browser_snapshot to get updated element refs.`
+          `Element '${rawTarget}' not found after waiting ${DEFAULT_WAIT_TIMEOUT_MS}ms. Call browser_snapshot to get updated element refs.`
         );
       }
       await target
@@ -1261,6 +1317,518 @@ export class BrowserController {
       ref: rawTarget,
       characters: params.text.length,
       submitted: Boolean(params.submit),
+      url: target.getURL(),
+    };
+  }
+
+  /**
+   * Poll an in-page probe until it returns a truthy value or the timeout
+   * elapses. Replaces fixed sleeps with a real readiness check.
+   */
+  private async pollUntil<T>(
+    probe: () => Promise<T | null | undefined>,
+    timeoutMs: number
+  ): Promise<T | null> {
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    for (;;) {
+      let result: T | null | undefined = null;
+      try {
+        result = await probe();
+      } catch {
+        result = null;
+      }
+      if (result) return result;
+      if (Date.now() >= deadline) return null;
+      await new Promise((r) => setTimeout(r, WAIT_POLL_INTERVAL_MS));
+    }
+  }
+
+  /** Resolve an element to viewport coordinates, waiting for it to appear. */
+  private async resolveElementBox(
+    target: WebContents,
+    spec: SelectorSpec,
+    options?: { timeoutMs?: number }
+  ): Promise<{ x: number; y: number; tag: string } | null> {
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+    const script = `
+      (function() {
+        const spec = ${JSON.stringify(spec)};
+        ${PAGE_SELECTOR_HELPERS}
+        const el = findElement(spec);
+        if (!el) return null;
+        el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        const rect = el.getBoundingClientRect();
+        if (window.__constHighlightElement) {
+          window.__constHighlightElement(el);
+        }
+        return {
+          x: Math.round(rect.left + rect.width / 2),
+          y: Math.round(rect.top + rect.height / 2),
+          tag: (el.tagName || '').toLowerCase()
+        };
+      })();
+    `;
+    return this.pollUntil(async () => {
+      const pos = await target.executeJavaScript(script).catch(() => null);
+      return pos && typeof pos.x === "number" && typeof pos.y === "number" ? pos : null;
+    }, timeoutMs);
+  }
+
+  /** Focus an element (and optionally clear it), waiting for it to appear. */
+  private async focusElement(
+    target: WebContents,
+    spec: SelectorSpec,
+    options?: { clearFirst?: boolean; timeoutMs?: number }
+  ): Promise<{ x: number; y: number } | null> {
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS;
+    const clearFirst = options?.clearFirst !== false;
+    const script = `
+      (function() {
+        const spec = ${JSON.stringify(spec)};
+        ${PAGE_SELECTOR_HELPERS}
+        const el = findElement(spec);
+        if (!el) return null;
+        el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+        el.focus();
+        ${clearFirst ? `
+        if ('value' in el) {
+          const proto = Object.getPrototypeOf(el);
+          const setValue = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+          if (setValue) {
+            setValue.call(el, '');
+          } else {
+            el.value = '';
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (el.isContentEditable) {
+          el.textContent = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }` : ""}
+        if (window.__constHighlightElement) {
+          window.__constHighlightElement(el);
+        }
+        const rect = el.getBoundingClientRect();
+        return {
+          x: Math.round(rect.left + rect.width / 2),
+          y: Math.round(rect.top + rect.height / 2)
+        };
+      })();
+    `;
+    return this.pollUntil(async () => {
+      const focused = await target.executeJavaScript(script).catch(() => null);
+      return focused && typeof focused.x === "number" ? focused : null;
+    }, timeoutMs);
+  }
+
+  public async waitFor(params: {
+    selector?: string;
+    ref?: string;
+    state?: "visible" | "hidden" | "attached" | "detached";
+    text?: string;
+    url?: string;
+    timeMs?: number;
+    timeoutMs?: number;
+    tabId?: string;
+  }): Promise<{
+    action: string;
+    tabId: string;
+    matched: boolean;
+    elapsedMs: number;
+    description: string;
+    url: string;
+  }> {
+    this.assertBotMayAct();
+    const tab = await this.ensureTargetTab({ tabId: params.tabId });
+    const target = tab.contents;
+    tab.lastUsedAt = Date.now();
+    const startedAt = Date.now();
+
+    const timeoutMs = Math.min(
+      MAX_WAIT_TIMEOUT_MS,
+      Math.max(0, typeof params.timeoutMs === "number" ? params.timeoutMs : DEFAULT_WAIT_TIMEOUT_MS)
+    );
+    const state = params.state || "visible";
+    const rawTarget = params.ref || params.selector;
+
+    if (typeof params.timeMs === "number" && !rawTarget && !params.text && !params.url) {
+      const sleepMs = Math.min(MAX_WAIT_TIMEOUT_MS, Math.max(0, params.timeMs));
+      await new Promise((r) => setTimeout(r, sleepMs));
+      return {
+        action: "wait_for",
+        tabId: tab.tabId,
+        matched: true,
+        elapsedMs: Date.now() - startedAt,
+        description: `Waited ${sleepMs}ms`,
+        url: target.getURL(),
+      };
+    }
+
+    const spec = rawTarget ? parseSelectorSpec(rawTarget) : null;
+    const description = rawTarget
+      ? `element '${rawTarget}' to be ${state}`
+      : params.text
+        ? `text '${params.text}' to appear`
+        : `URL to contain '${params.url}'`;
+
+    const matched = await this.pollUntil(async () => {
+      if (spec) {
+        const stateOk = await target
+          .executeJavaScript(`
+            (function() {
+              const spec = ${JSON.stringify(spec)};
+              ${PAGE_SELECTOR_HELPERS}
+              const el = findElement(spec);
+              const wanted = ${JSON.stringify(state)};
+              if (wanted === "detached") return !el || el.isConnected === false;
+              if (!el) return wanted === "hidden";
+              if (wanted === "attached") return el.isConnected !== false;
+              if (wanted === "hidden") return !isVisible(el);
+              return isVisible(el);
+            })();
+          `)
+          .catch(() => false);
+        return stateOk ? true : null;
+      }
+      if (typeof params.text === "string") {
+        const found = await target
+          .executeJavaScript(`
+            (function() {
+              const wanted = ${JSON.stringify(params.text)}.toLowerCase();
+              const body = (document.body && (document.body.innerText || document.body.textContent)) || "";
+              return body.toLowerCase().indexOf(wanted) !== -1;
+            })();
+          `)
+          .catch(() => false);
+        return found ? true : null;
+      }
+      if (typeof params.url === "string") {
+        return target.getURL().indexOf(params.url) !== -1 ? true : null;
+      }
+      return null;
+    }, timeoutMs);
+
+    if (matched === null) {
+      throw new Error(
+        `browser_wait_for timed out after ${timeoutMs}ms waiting for ${description}. Current URL: ${target.getURL()}`
+      );
+    }
+
+    return {
+      action: "wait_for",
+      tabId: tab.tabId,
+      matched: true,
+      elapsedMs: Date.now() - startedAt,
+      description: `Waited for ${description}`,
+      url: target.getURL(),
+    };
+  }
+
+  public async verifyText(params: {
+    text: string;
+    selector?: string;
+    state?: "visible" | "absent";
+    caseSensitive?: boolean;
+    tabId?: string;
+  }): Promise<{
+    action: string;
+    tabId: string;
+    found: boolean;
+    matched: boolean;
+    occurrences: number;
+    url: string;
+  }> {
+    this.assertBotMayAct();
+    const tab = await this.ensureTargetTab({ tabId: params.tabId });
+    const target = tab.contents;
+    tab.lastUsedAt = Date.now();
+
+    const scope = params.selector ? parseSelectorSpec(params.selector) : null;
+    const result = await target
+      .executeJavaScript(`
+        (function() {
+          const spec = ${JSON.stringify(scope)};
+          ${PAGE_SELECTOR_HELPERS}
+          const wanted = ${JSON.stringify(params.text)};
+          const caseSensitive = ${Boolean(params.caseSensitive)};
+          const needle = caseSensitive ? wanted : wanted.toLowerCase();
+          let root = document;
+          if (spec) {
+            const el = findElement(spec);
+            if (!el) return { found: false, occurrences: 0, scopeMissing: true };
+            root = el;
+          }
+          const source = root === document ? (document.body || document.documentElement) : root;
+          const haystack = (source.innerText || source.textContent || "");
+          const hay = caseSensitive ? haystack : haystack.toLowerCase();
+          let occurrences = 0;
+          let idx = hay.indexOf(needle);
+          while (idx !== -1) {
+            occurrences++;
+            idx = hay.indexOf(needle, idx + Math.max(1, needle.length));
+          }
+          return { found: occurrences > 0, occurrences: occurrences, scopeMissing: false };
+        })();
+      `)
+      .catch(() => ({ found: false, occurrences: 0, scopeMissing: false }));
+
+    const expectAbsent = params.state === "absent";
+    const matched = expectAbsent ? !result.found : result.found;
+    return {
+      action: "verify_text",
+      tabId: tab.tabId,
+      found: result.found,
+      matched,
+      occurrences: result.occurrences,
+      url: target.getURL(),
+    };
+  }
+
+  public async find(params: {
+    text: string;
+    selector?: string;
+    limit?: number;
+    tabId?: string;
+  }): Promise<{
+    action: string;
+    tabId: string;
+    query: string;
+    totalMatches: number;
+    matches: Array<{
+      ref?: string;
+      role?: string;
+      tag?: string;
+      name?: string;
+      rect?: { x: number; y: number; width: number; height: number };
+    }>;
+    url: string;
+  }> {
+    this.assertBotMayAct();
+    const tab = await this.ensureTargetTab({ tabId: params.tabId });
+    const target = tab.contents;
+    tab.lastUsedAt = Date.now();
+
+    const scope = params.selector ? parseSelectorSpec(params.selector) : null;
+    const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 20)));
+
+    const result = await target
+      .executeJavaScript(`
+        (function() {
+          const spec = ${JSON.stringify(scope)};
+          const needle = ${JSON.stringify(params.text)}.trim().toLowerCase();
+          ${PAGE_SELECTOR_HELPERS}
+          if (!needle) return { matches: [], total: 0 };
+
+          const refByElement = new Map();
+          const elementMap = window.__constElementMap || {};
+          for (const ref in elementMap) {
+            try { refByElement.set(elementMap[ref], ref); } catch (e) {}
+          }
+
+          const scopeRoot = spec ? findElement(spec) : document.body;
+          if (!scopeRoot) return { matches: [], total: 0 };
+
+          const candidates = [];
+          const collect = (root) => {
+            if (!root || !root.querySelectorAll) return;
+            for (const el of Array.from(root.querySelectorAll("*"))) {
+              candidates.push(el);
+              if (el.shadowRoot) collect(el.shadowRoot);
+            }
+          };
+          collect(scopeRoot);
+
+          const matched = [];
+          for (const el of candidates) {
+            const label = (el.getAttribute("aria-label") || el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim();
+            if (!label) continue;
+            if (label.toLowerCase().indexOf(needle) === -1) continue;
+            const rect = el.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) continue;
+            matched.push(el);
+          }
+
+          // Drop ancestors that matched only because a descendant matched.
+          const leafMatched = matched.filter((el) => !matched.some((other) => other !== el && el.contains(other)));
+
+          const matches = leafMatched.map((el) => {
+            const rect = el.getBoundingClientRect();
+            return {
+              ref: refByElement.get(el) || undefined,
+              role: (el.getAttribute("role") || el.tagName || "").toLowerCase(),
+              tag: (el.tagName || "").toLowerCase(),
+              name: (el.getAttribute("aria-label") || el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 120),
+              rect: {
+                x: Math.round(rect.left),
+                y: Math.round(rect.top),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height)
+              }
+            };
+          });
+
+          return { matches: matches, total: matches.length };
+        })();
+      `)
+      .catch(() => ({ matches: [] as any[], total: 0 }));
+
+    const all = Array.isArray(result?.matches) ? result.matches : [];
+    return {
+      action: "find",
+      tabId: tab.tabId,
+      query: params.text,
+      totalMatches: Number(result?.total ?? all.length),
+      matches: all.slice(0, limit),
+      url: target.getURL(),
+    };
+  }
+
+  public async hover(params: {
+    ref?: string;
+    selector?: string;
+    x?: number;
+    y?: number;
+    tabId?: string;
+  }): Promise<{
+    action: string;
+    tabId: string;
+    ref?: string;
+    selector?: string;
+    x: number;
+    y: number;
+    url: string;
+  }> {
+    this.assertBotMayAct();
+    const tab = await this.ensureTargetTab({ tabId: params.tabId });
+    const target = tab.contents;
+    tab.lastUsedAt = Date.now();
+
+    let targetX = params.x;
+    let targetY = params.y;
+    const rawTarget = params.ref || params.selector;
+
+    if (rawTarget) {
+      const spec = parseSelectorSpec(rawTarget);
+      const pos = await this.resolveElementBox(target, spec);
+      if (!pos) {
+        throw new Error(
+          `Element '${rawTarget}' not found after waiting ${DEFAULT_WAIT_TIMEOUT_MS}ms. Call browser_snapshot to inspect current refs.`
+        );
+      }
+      targetX = pos.x;
+      targetY = pos.y;
+    }
+
+    if (typeof targetX !== "number" || typeof targetY !== "number") {
+      throw new Error(
+        "browser_hover requires an element 'ref' (e.g. 'e1'), a 'selector' (e.g. 'text/User menu'), or 'x' and 'y' coordinates."
+      );
+    }
+
+    this.onAiActionCallback?.({
+      type: "hover",
+      details: { tabId: tab.tabId, ref: rawTarget, x: targetX, y: targetY },
+    });
+
+    await this.ensureCdp(target);
+    if (target.debugger.isAttached()) {
+      await target.debugger
+        .sendCommand("Input.dispatchMouseEvent", { type: "mouseMoved", x: targetX, y: targetY })
+        .catch(() => {});
+    } else {
+      target.sendInputEvent({ type: "mouseMove", x: targetX, y: targetY });
+    }
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    return {
+      action: "hover",
+      tabId: tab.tabId,
+      ref: params.ref,
+      selector: params.selector,
+      x: targetX,
+      y: targetY,
+      url: target.getURL(),
+    };
+  }
+
+  public async paste(params: {
+    text: string;
+    ref?: string;
+    selector?: string;
+    tabId?: string;
+  }): Promise<{
+    action: string;
+    tabId: string;
+    ref?: string;
+    characters: number;
+    url: string;
+  }> {
+    this.assertBotMayAct();
+    const tab = await this.ensureTargetTab({ tabId: params.tabId });
+    const target = tab.contents;
+    tab.lastUsedAt = Date.now();
+
+    const rawTarget = params.ref || params.selector;
+    if (rawTarget) {
+      const spec = parseSelectorSpec(rawTarget);
+      const focused = await this.focusElement(target, spec, { clearFirst: true });
+      if (!focused) {
+        throw new Error(
+          `Element '${rawTarget}' not found after waiting ${DEFAULT_WAIT_TIMEOUT_MS}ms. Call browser_snapshot to inspect current refs.`
+        );
+      }
+    }
+
+    this.onAiActionCallback?.({
+      type: "paste",
+      details: { tabId: tab.tabId, ref: rawTarget, characters: params.text.length },
+    });
+
+    const wrote = await target
+      .executeJavaScript(`
+        (function() {
+          const text = ${JSON.stringify(params.text)};
+          const el = document.activeElement;
+          if (!el || el === document.body) return false;
+          if (el.isContentEditable) {
+            el.textContent = text;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          }
+          if ('value' in el) {
+            const proto = Object.getPrototypeOf(el);
+            const setValue = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+            if (setValue) {
+              setValue.call(el, text);
+            } else {
+              el.value = text;
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+          return false;
+        })();
+      `)
+      .catch(() => false);
+
+    if (!wrote) {
+      await this.ensureCdp(target);
+      if (target.debugger.isAttached()) {
+        await target.debugger.sendCommand("Input.insertText", { text: params.text });
+      } else {
+        for (const char of params.text) {
+          target.sendInputEvent({ type: "char", keyCode: char });
+        }
+      }
+    }
+
+    return {
+      action: "paste",
+      tabId: tab.tabId,
+      ref: params.ref,
+      characters: params.text.length,
       url: target.getURL(),
     };
   }
@@ -1427,6 +1995,29 @@ export class BrowserController {
     };
   }
 
+  /**
+   * Remove stale browser captures so page screenshots do not pile up on disk.
+   * Runs at most once per minute.
+   */
+  private pruneOldScreenshots(): void {
+    const now = Date.now();
+    if (now - this.lastScreenshotPruneAt < 60_000) return;
+    this.lastScreenshotPruneAt = now;
+    try {
+      const tmp = os.tmpdir();
+      for (const entry of fs.readdirSync(tmp)) {
+        if (!entry.startsWith(SCREENSHOT_FILE_PREFIX)) continue;
+        const full = path.join(tmp, entry);
+        try {
+          const stat = fs.statSync(full);
+          if (!stat.isFile()) continue;
+          if (now - stat.mtimeMs < SCREENSHOT_RETENTION_MS) continue;
+          fs.unlinkSync(full);
+        } catch {}
+      }
+    } catch {}
+  }
+
   public async screenshot(params?: {
     annotate?: boolean;
     quality?: number;
@@ -1552,6 +2143,7 @@ export class BrowserController {
       `const-browser-shot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
     );
     await fs.promises.writeFile(filePath, buffer).catch(() => {});
+    this.pruneOldScreenshots();
 
     const legend = formatScreenshotLegend(annotationTargets);
 
@@ -1839,6 +2431,12 @@ export class BrowserController {
 
       if (norm === "browsernavigate") {
         const url = args.url || args.target;
+        if (typeof url === "string" && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//i.test(url) && !/^https?:\/\//i.test(url)) {
+          return {
+            result: "Error: browser_navigate only loads http:// and https:// pages. Local files (file://) and other schemes are blocked so the browser cannot be used to bypass the workspace file sandbox — use the read tool for local files, and the 'computer_*' tools for desktop applications.",
+            isError: true,
+          };
+        }
         if (url === "tabs") {
           return {
             result: JSON.stringify({ activeTabId: this.activeTabId, tabs: this.listTabs() }, null, 2),
@@ -1988,6 +2586,96 @@ export class BrowserController {
         const res = await this.evaluate({
           script: args.script || args.code,
           steps: args.steps,
+          tabId: args.tabId,
+        });
+        return {
+          result: JSON.stringify(res, null, 2),
+          isError: false,
+        };
+      }
+
+      if (norm === "browserwaitfor" || norm === "browserwait") {
+        const res = await this.waitFor({
+          selector: args.selector,
+          ref: args.ref,
+          state: args.state,
+          text: args.text,
+          url: args.url,
+          timeMs: args.timeMs,
+          timeoutMs: args.timeoutMs,
+          tabId: args.tabId,
+        });
+        return {
+          result: JSON.stringify(res, null, 2),
+          isError: false,
+        };
+      }
+
+      if (norm === "browserverifytext" || norm === "browserverify") {
+        const res = await this.verifyText({
+          text: args.text,
+          selector: args.selector,
+          state: args.state,
+          caseSensitive: args.caseSensitive,
+          tabId: args.tabId,
+        });
+        const expectation = res.matched ? "PASS" : "FAIL";
+        const lines = [
+          `### Browser Text Verification — ${expectation}`,
+          `- **Tab**: \`${res.tabId}\``,
+          `- **URL**: ${res.url}`,
+          `- **Text**: ${JSON.stringify(args.text)}`,
+          `- **Expected**: ${args.state === "absent" ? "absent from page" : "visible on page"}`,
+          `- **Occurrences**: ${res.occurrences}`,
+          `- **Result**: ${expectation}`,
+        ];
+        return {
+          result: lines.join("\n"),
+          isError: !res.matched,
+        };
+      }
+
+      if (norm === "browserfind" || norm === "browserfindtext") {
+        const res = await this.find({
+          text: args.text || args.query,
+          selector: args.selector,
+          limit: args.limit,
+          tabId: args.tabId,
+        });
+        const lines = [
+          `### Browser Find — "${res.query}"`,
+          `- **Tab**: \`${res.tabId}\``,
+          `- **URL**: ${res.url}`,
+          `- **Matches**: ${res.totalMatches}${res.totalMatches > res.matches.length ? ` (showing first ${res.matches.length})` : ""}`,
+          ...res.matches.map((m) =>
+            `- ${m.ref ? `[${m.ref}] ` : ""}${m.role}${m.name ? ` "${m.name}"` : ""}${m.rect ? ` @(${m.rect.x},${m.rect.y} ${m.rect.width}x${m.rect.height})` : ""}`
+          ),
+        ];
+        return {
+          result: lines.join("\n"),
+          isError: res.totalMatches === 0,
+        };
+      }
+
+      if (norm === "browserhover") {
+        const res = await this.hover({
+          ref: args.ref,
+          selector: args.selector,
+          x: args.x,
+          y: args.y,
+          tabId: args.tabId,
+        });
+        return {
+          result: JSON.stringify(res, null, 2),
+          isError: false,
+        };
+      }
+
+      if (norm === "browserpaste") {
+        const res = await this.paste({
+          text: args.text,
+          ref: args.ref,
+          selector: args.selector,
           tabId: args.tabId,
         });
         return {

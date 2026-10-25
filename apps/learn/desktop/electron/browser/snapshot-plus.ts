@@ -43,6 +43,11 @@ export interface AriaSnapshotOptions extends SnapshotPostProcessOptions {
   diff?: boolean;
   /** Optional root CSS selector to scope snapshot. */
   selector?: string;
+  /**
+   * Selectors or ARIA refs whose current value must be masked in the returned
+   * payload. Used while a human is handing a password / OTP back to the agent.
+   */
+  maskValues?: string[];
 }
 
 export type AriaHrefMap = Readonly<Record<string, string>>;
@@ -270,12 +275,14 @@ export function buildEnhancedSnapshotScript(
 ): string {
   const request = { depth: options.depth ?? 14, boxes: options.boxes ?? false };
   const sel = options.selector ? JSON.stringify(options.selector) : "null";
+  const maskRefs = JSON.stringify(options.maskValues ?? []);
 
   return `(function() {
     var snapshotId = ${snapshotId};
     var module = { exports: {} };
     ${ARIA_SNAPSHOT_BUNDLE}
     var __sel = ${sel};
+    var __maskRefs = ${maskRefs};
     var __root = __sel ? document.querySelector(__sel) : null;
     if (__sel && !__root) {
       throw new Error("browser_snapshot: selector " + __sel + " matched no element");
@@ -301,6 +308,46 @@ export function buildEnhancedSnapshotScript(
       return rect.width > 0 && rect.height > 0;
     }
 
+    /**
+     * Credential-bearing fields must never expose their value to the model.
+     * This covers password inputs, one-time-code inputs and fields explicitly
+     * marked as secret by the page.
+     */
+    function isSecretField(el) {
+      if (!el) return false;
+      var type = String((el.type || "")).toLowerCase();
+      if (type === "password") return true;
+      var autocomplete = String((el.getAttribute && el.getAttribute("autocomplete")) || "").toLowerCase();
+      if (autocomplete.indexOf("password") !== -1) return true;
+      if (autocomplete.indexOf("one-time-code") !== -1) return true;
+      if (autocomplete.indexOf("current-password") !== -1) return true;
+      if (autocomplete.indexOf("new-password") !== -1) return true;
+      try {
+        if (el.getAttribute && el.getAttribute("data-secret") === "true") return true;
+      } catch (e) {}
+      return false;
+    }
+
+    /** True when the element is a credential field or an explicitly masked target. */
+    function isMaskedField(el) {
+      if (isSecretField(el)) return true;
+      if (!__maskRefs || !__maskRefs.length) return false;
+      for (var i = 0; i < __maskRefs.length; i++) {
+        var ref = __maskRefs[i];
+        if (!ref) continue;
+        try {
+          if (el.matches && el.matches(ref)) return true;
+        } catch (e) {}
+        try {
+          if (el._ariaRef && el._ariaRef.ref === ref) return true;
+        } catch (e) {}
+        try {
+          if (window.__constElementMap && window.__constElementMap[ref] === el) return true;
+        } catch (e) {}
+      }
+      return false;
+    }
+
     function getAccessibleName(el) {
       var labelledBy = el.getAttribute && el.getAttribute("aria-labelledby");
       var referenced = labelledBy
@@ -320,7 +367,7 @@ export function buildEnhancedSnapshotScript(
         (el.getAttribute && el.getAttribute("placeholder")) ||
         (el.getAttribute && el.getAttribute("alt")) ||
         el.innerText ||
-        el.value ||
+        (isMaskedField(el) ? "" : el.value) ||
         ""
       ).trim().replace(/\\s+/g, " ").slice(0, 100);
     }
@@ -347,7 +394,7 @@ export function buildEnhancedSnapshotScript(
         name: name,
         type: el.type || undefined,
         placeholder: el.placeholder || undefined,
-        value: el.value ? String(el.value).slice(0, 80) : undefined,
+        value: isMaskedField(el) ? undefined : (el.value ? String(el.value).slice(0, 80) : undefined),
         checked: typeof el.checked === "boolean" ? el.checked : undefined,
         disabled: Boolean(el.disabled || (el.getAttribute && el.getAttribute("aria-disabled") === "true")) || undefined,
         rect: {

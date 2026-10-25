@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme, protocol, net, session } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme, protocol, net, session, type Session, type WebContents } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -3090,7 +3090,89 @@ app.on("second-instance", (_event, commandLine) => {
     return await browserController.evaluate(args);
   });
 
-  app.whenReady().then(() => {
+// Partition used by the embedded <webview> browser (see right-pane/browser-tab.tsx).
+const BROWSER_PARTITION = "persist:const_browser";
+
+// Permissions the embedded browser is allowed to request. Everything else is denied.
+const ALLOWED_WEB_PERMISSIONS = new Set<string>([
+  "clipboard-write",
+  "clipboard-sanitized-write",
+  "fullscreen",
+]);
+
+// Known-dangerous permissions that are always denied (default-deny covers the rest).
+const DENIED_WEB_PERMISSIONS = new Set<string>([
+  "media",
+  "geolocation",
+  "notifications",
+  "display-capture",
+  "clipboard-read",
+  "midi",
+  "midiSysex",
+  "hid",
+  "serial",
+  "usb",
+  "bluetooth",
+  "pointerLock",
+  "background-sync",
+  "idle-detection",
+]);
+
+// Pages inside the embedded <webview> must never be able to spawn an unmanaged
+// native BrowserWindow (which would bypass the agent's bot/human control guard).
+function denyWebviewPopups(contents: WebContents): void {
+  if (contents.getType() !== "webview") return;
+  contents.setWindowOpenHandler(({ url }) => {
+    console.warn(
+      `[Electron Main] Popup denied by policy (window.open blocked in embedded browser): ${url}`,
+    );
+    return { action: "deny" };
+  });
+}
+
+// Default-deny permission policy for the embedded browser partition.
+function applyBrowserPermissionPolicy(browserSession: Session): void {
+  browserSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    const allowed = ALLOWED_WEB_PERMISSIONS.has(permission);
+    if (!allowed) {
+      const reason = DENIED_WEB_PERMISSIONS.has(permission)
+        ? "denied by policy"
+        : "denied (not in allowlist)";
+      console.warn(
+        `[Electron Main] Permission "${permission}" ${reason} (origin: ${details.requestingUrl})`,
+      );
+    }
+    callback(allowed);
+  });
+
+  // Permission checks happen very frequently, so they are answered silently.
+  browserSession.setPermissionCheckHandler((_webContents, permission) => {
+    return ALLOWED_WEB_PERMISSIONS.has(permission);
+  });
+}
+
+app.on("web-contents-created", (_event, contents) => {
+  // Guest pages of the embedded browser are denied popups.
+  denyWebviewPopups(contents);
+
+  contents.on("will-attach-webview", (_waEvent, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+  });
+
+  // Belt-and-braces: also deny popups on the guest once it is attached.
+  contents.on("did-attach-webview", (_daEvent, guest) => {
+    denyWebviewPopups(guest);
+  });
+});
+
+app.whenReady().then(() => {
+    // Default-deny permission policy for the embedded browser partition.
+    // Registered here (ready-scoped) because session.fromPartition() throws before app ready.
+    applyBrowserPermissionPolicy(session.fromPartition(BROWSER_PARTITION));
+
     // Register protocol handler for streaming local video, audio, pdf, and html artifacts
     protocol.handle("const-media", (request) => {
       try {

@@ -59,6 +59,22 @@ const RESPONSIVE_PRESETS: PresetConfig[] = [
   { id: "desktop", label: "Desktop (1024 × 768)", width: 1024 },
 ];
 
+/**
+ * The embedded browser only ever loads web pages. Local files are served
+ * through the app's own file APIs, never rendered by the browser, so a page
+ * (or a popup) cannot turn the browser into a local-file reader.
+ */
+const ALLOWED_BROWSER_SCHEMES = ["http:", "https:"];
+
+function isAllowedBrowserUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_BROWSER_SCHEMES.includes(parsed.protocol.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 function normalizeUrl(input: any): string {
   if (typeof input !== "string" || !input.trim() || input === "[object Object]") {
     return "https://www.google.com";
@@ -342,6 +358,16 @@ export function BrowserTab({
   // Webview navigation helpers
   const handleNavigate = (targetUrl: string) => {
     const resolved = normalizeUrl(targetUrl);
+    if (!isAllowedBrowserUrl(resolved)) {
+      // Refuse anything that is not an http(s) page (file:, data:, blob:, ...).
+      setLoadError({
+        code: -300,
+        desc: "The embedded browser only loads http:// and https:// pages. Open local files with the file preview or the read tool instead.",
+        url: String(targetUrl || ""),
+      });
+      setAddressBarInput(currentUrlRef.current);
+      return;
+    }
     lastHandledPropUrlRef.current = resolved;
     initialUrlRef.current = resolved;
     currentUrlRef.current = resolved;
@@ -623,9 +649,13 @@ export function BrowserTab({
 
     const handleNewWindow = (e: any) => {
       e.preventDefault();
-      if (e.url) {
-        handleNavigate(e.url);
+      // A page-triggered popup must never be able to steer the embedded browser
+      // into a local file or another non-web scheme.
+      if (!e.url || !isAllowedBrowserUrl(String(e.url))) {
+        console.warn("[BrowserTab] Blocked popup navigation to a non-web URL:", e?.url);
+        return;
       }
+      handleNavigate(e.url);
     };
 
     const handleMediaStartedPlaying = () => {
@@ -1094,7 +1124,7 @@ export function BrowserTab({
             ref={webviewRef}
             src={initialUrlRef.current || currentUrl || "https://www.google.com"}
             partition="persist:const_browser"
-            allowpopups={true}
+            allowpopups={false}
             webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
             className="w-full h-full border-none block flex-1"
             style={{
