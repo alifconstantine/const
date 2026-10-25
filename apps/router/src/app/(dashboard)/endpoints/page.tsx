@@ -1,10 +1,14 @@
 "use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
 import { Button, Input, Badge, toast } from "@const/ui";
+import { Copy, Search, Terminal } from "lucide-react";
+
 export default function EndpointsPage() {
   const [search, setSearch] = useState("");
+
   async function copy(path: string) {
     try {
       await navigator.clipboard.writeText(window.location.origin + path);
@@ -13,57 +17,84 @@ export default function EndpointsPage() {
       toast.error("Could not access clipboard");
     }
   }
+
+  const filtered = ROUTER_ENDPOINTS.filter((e) =>
+    (e.name + e.path + e.description).toLowerCase().includes(search.toLowerCase()),
+  );
+
   return (
-    <div className="max-w-5xl mx-auto space-y-7 pb-12">
-      <header>
+    <div className="max-w-6xl mx-auto space-y-7 pb-12">
+      <header className="space-y-2">
         <h1 className="text-3xl font-medium tracking-tight">Endpoints</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Available APIs on Const Router. All execution endpoints require an
-          active key or session.
+        <p className="text-sm text-muted-foreground">
+          Available APIs on Const Router. All execution endpoints require an active key or session.
         </p>
       </header>
-      <Input
-        aria-label="Search endpoints"
-        className="rounded-xl"
-        placeholder="Search available endpoints"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      <div className="space-y-3">
-        {ROUTER_ENDPOINTS.filter((e) =>
-          (e.name + e.path).toLowerCase().includes(search.toLowerCase()),
-        ).map((endpoint) => (
+
+      <div className="relative max-w-md">
+        <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          aria-label="Search endpoints"
+          className="pl-9 rounded-xl bg-card border-border/60"
+          placeholder="Filter by name, path, or description"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((endpoint) => (
           <div
             key={endpoint.path}
-            className="bg-card rounded-2xl p-5 flex flex-wrap justify-between gap-4 items-center"
+            className="bg-card rounded-xl border border-border/60 p-5 flex flex-col justify-between gap-4 transition-colors hover:border-border"
           >
-            <div className="space-y-2">
-              <h2 className="font-medium">{endpoint.name}</h2>
-              <p className="text-xs text-muted-foreground max-w-xl">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-sm text-foreground">{endpoint.name}</span>
+                <Badge
+                  variant="secondary"
+                  className="font-mono text-[10px] px-2 py-0.5 uppercase tracking-wide"
+                >
+                  {endpoint.method}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
                 {endpoint.description}
               </p>
-              <p className="text-xs font-mono flex gap-3 items-center">
-                <Badge variant="secondary">{endpoint.method}</Badge>
-                {endpoint.path}
-              </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copy(endpoint.path)}
-            >
-              Copy URL
-            </Button>
+
+            <div className="pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+              <code className="text-[11px] font-mono text-muted-foreground truncate" title={endpoint.path}>
+                {endpoint.path}
+              </code>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0 gap-1.5"
+                onClick={() => copy(endpoint.path)}
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>Copy</span>
+              </Button>
+            </div>
           </div>
         ))}
+
+        {filtered.length === 0 && (
+          <div className="col-span-full p-12 text-center text-sm text-muted-foreground bg-card rounded-xl border border-border/60">
+            No endpoints match your search.
+          </div>
+        )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        Responses, Anthropic Messages, embeddings, TTS, image, music, and video
-        generation are not currently available through this Router.
-      </p>
-      <Button asChild variant="outline">
-        <Link href="/docs">Read API documentation</Link>
-      </Button>
+
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/40">
+        <p className="text-xs text-muted-foreground">
+          OpenAI-compatible chat completions and transcription pass through with native telemetry.
+        </p>
+        <Button asChild variant="outline" size="sm" className="rounded-lg">
+          <Link href="/docs">View API documentation</Link>
+        </Button>
+      </div>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { LandingNavbar } from "@/components/landing/LandingNavbar";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-import { ArrowRight, Copy, Check, ExternalLink, Zap, ShieldCheck, Terminal, Cpu } from "lucide-react";
+import { Copy, Check, ShieldCheck, Terminal, Zap } from "lucide-react";
 import "./landing.css";
 
 interface CatalogItem {
@@ -164,7 +164,7 @@ export default function HomePage() {
     document.title = "Const Router — Universal AI Gateway for Frontier Models";
   }, []);
 
-  // --- Particle Canvas Backdrop Loader (identical to apps/learn/web) ---
+  // Particle Canvas Backdrop Loader (monochrome neutral palette, no blue)
   useEffect(() => {
     const existing = document.querySelector('script[src*="MainParticlesComponent"]');
     if (!existing) {
@@ -301,13 +301,13 @@ for chunk in stream:
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] font-sans selection:bg-[#0066ff]/25 selection:text-white">
-      {/* 1. STICKY NAVBAR */}
+    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] font-sans selection:bg-white/20 selection:text-white">
+      {/* 1. NAVBAR */}
       <LandingNavbar />
 
-      {/* 2. HERO SECTION WITH FULL-SCREEN PARTICLE BACKDROP */}
+      {/* 2. HERO SECTION */}
       <section className="atmo-home-hero">
-        {/* Dynamic WebGL Particle Canvas (identical to apps/learn/web) */}
+        {/* Dynamic Canvas Backdrop (monochrome tones) */}
         <div className="hero-video-wrapper">
           <div className="hero-video-container" data-hero-particles="">
             <div
@@ -320,25 +320,20 @@ for chunk in stream:
               data-ring-displacement="0.62"
               data-density="230"
               data-particles-scale="0.59"
-              data-color1="#0066ff"
-              data-color2="#38bdf8"
-              data-color3="#60a5fa"
+              data-color1="#ffffff"
+              data-color2="#a1a1aa"
+              data-color3="#52525b"
             >
               <div className="main-particles-container" data-container=""></div>
             </div>
           </div>
         </div>
 
-        {/* Hero Foreground Content */}
+        {/* Hero Content (Badge removed, Exact headline and subheadline kept) */}
         <div className="home-container home-hero-content">
-          <div className="hero-tag-pill">
-            <span className="hero-tag-dot" />
-            <span>Universal AI Gateway &amp; Smart Routing Tier</span>
-          </div>
-
           <h1 className="hero-headline">
             The Universal Gateway<br />
-            for <span className="hero-headline-accent">Frontier AI</span>
+            for Frontier AI
           </h1>
 
           <p className="home-hero-description">
@@ -347,56 +342,54 @@ for chunk in stream:
 
           <div className="home-helper">
             <div className="atmo-helper-command">
-              <span className="atmo-headline-accent font-mono">$</span>
-              <code className="text-xs sm:text-sm whitespace-nowrap">
+              <span className="text-white/60 font-mono">$</span>
+              <code className="text-xs sm:text-sm whitespace-nowrap text-white">
                 export OPENAI_BASE_URL="https://router.const.web.id/v1"
               </code>
               <button
                 type="button"
                 aria-label="Copy helper command"
-                className="atmo-command-copy"
+                className="atmo-command-copy cursor-pointer"
                 onClick={handleCopyHelper}
               >
                 {helperCopied ? (
                   <Check className="h-4 w-4 text-emerald-400" />
                 ) : (
-                  <Copy className="h-4 w-4" />
+                  <Copy className="h-4 w-4 text-white/60" />
                 )}
               </button>
             </div>
           </div>
 
+          {/* CTA Buttons: Get API Key & Explore Model (without icons!) */}
           <div className="home-hero-actions">
             {isAuthenticated ? (
-              <Link href="/dashboard" className="home-button home-button-primary">
-                <span>Enter Dashboard</span>
-                <ArrowRight className="h-4 w-4" />
+              <Link href="/keys" className="home-button home-button-primary">
+                <span>Get API Key</span>
               </Link>
             ) : (
               <button
                 type="button"
-                onClick={() => signIn("/dashboard")}
-                className="home-button home-button-primary"
+                onClick={() => signIn("/keys")}
+                className="home-button home-button-primary cursor-pointer"
               >
-                <span>Get Started Free</span>
-                <ArrowRight className="h-4 w-4" />
+                <span>Get API Key</span>
               </button>
             )}
 
             <a href="#models" className="home-button home-button-secondary">
-              <Cpu className="h-4 w-4 text-[#969696]" />
-              <span>Explore Models &amp; Pricing</span>
+              <span>Explore Model</span>
             </a>
           </div>
 
           <p className="home-hero-footnote">
             OpenAI-compatible &bull; Anthropic Messages spec &bull; Pay per token &bull;{" "}
-            <Link href="/docs">Explore the docs &rarr;</Link>
+            <Link href="/docs" className="hover:underline">Explore the docs &rarr;</Link>
           </p>
         </div>
       </section>
 
-      {/* 3. SECTION: ONE API. A LOT LESS IN YOUR WAY (CUSTOM ASYMMETRIC BENTO) */}
+      {/* 3. SECTION: ONE API. A LOT LESS IN YOUR WAY */}
       <section id="features" className="home-container home-section">
         <div className="home-section-heading">
           <h2>One API.<br />A lot less in your way.</h2>
@@ -408,9 +401,9 @@ for chunk in stream:
         <div className="features-grid-custom">
           {/* Top Row: Asymmetrical 2 Cards */}
           <div className="features-top-row">
-            {/* Anchor Card: Virtual Combos */}
+            {/* Card 1: Virtual Combos */}
             <article className="feature-card">
-              <span className="feature-tag">01 / Intelligent Routing</span>
+              <span className="feature-tag">Intelligent Routing</span>
               <h3>Virtual Combos &amp; Automatic Failover</h3>
               <p>
                 Construct custom multi-model failover chains. If a provider returns 429 rate limits, 503 capacity errors, or latency spikes, Const Router automatically routes to the next healthy model without dropping your client connection.
@@ -430,7 +423,7 @@ for chunk in stream:
                     <span className="step-label">2. Failover Chain</span>
                     <span className="step-val">Qwen 3.8 Omni Flash</span>
                   </div>
-                  <span className="step-status blue">Ready (Standby)</span>
+                  <span className="step-status">Ready (Standby)</span>
                 </div>
 
                 <div className="router-flow-step">
@@ -445,7 +438,7 @@ for chunk in stream:
 
             {/* Card 2: One Key */}
             <article className="feature-card">
-              <span className="feature-tag">02 / Unified Access</span>
+              <span className="feature-tag">Unified Access</span>
               <h3>One Key, All Models</h3>
               <p>
                 Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">const_live_</code> key.
@@ -472,11 +465,11 @@ for chunk in stream:
             </article>
           </div>
 
-          {/* Bottom Row: 3 Distinct Columns */}
+          {/* Bottom Row: 3 Columns */}
           <div className="features-bottom-row">
             {/* Card 3: Stream */}
             <article className="feature-card">
-              <span className="feature-tag">03 / Stream</span>
+              <span className="feature-tag">Stream</span>
               <div className="mini-symbol-bars" aria-hidden="true">
                 <span></span> <span></span> <span></span> <span></span> <span></span>
               </div>
@@ -492,8 +485,8 @@ for chunk in stream:
 
             {/* Card 4: Guardrails */}
             <article className="feature-card">
-              <span className="feature-tag">04 / Guardrails</span>
-              <ShieldCheck className="h-6 w-6 text-[#0066ff] my-1" />
+              <span className="feature-tag">Guardrails</span>
+              <ShieldCheck className="h-5 w-5 text-white/80 my-1" />
               <h3>Keys with Spend Limits</h3>
               <p>
                 Create unlimited developer keys for team members or autonomous agent loops. Configure individual daily spend caps and allowed model lists to prevent runaway costs.
@@ -505,11 +498,11 @@ for chunk in stream:
 
             {/* Card 5: Audit */}
             <article className="feature-card">
-              <span className="feature-tag">05 / Audit</span>
-              <Terminal className="h-6 w-6 text-[#0066ff] my-1" />
+              <span className="feature-tag">Audit</span>
+              <Terminal className="h-5 w-5 text-white/80 my-1" />
               <h3>Usage You Can Audit</h3>
               <p>
-                Every request logged with prompt tokens, completion tokens, latency, and exact micro-cost. Filter by model or time window, export the raw data anytime.
+                Every request logged with prompt tokens, completion tokens, latency, and exact micro-cost. Filter by model or time window, inspect raw payload anytime.
               </p>
               <div className="mini-telemetry-badge">
                 <span>Exact Tokens &bull; Zero Estimates</span>
@@ -519,7 +512,7 @@ for chunk in stream:
         </div>
       </section>
 
-      {/* 4. SECTION: INTERACTIVE INTEGRATION WORKSPACE */}
+      {/* 4. SECTION: DROP-IN INTEGRATION WORKSPACE */}
       <section id="start" className="home-container home-section">
         <div className="home-section-heading">
           <h2>Keep your code.<br />Change the endpoint.</h2>
@@ -552,7 +545,7 @@ for chunk in stream:
             </div>
 
             <button
-              className="hp-copy"
+              className="hp-copy cursor-pointer"
               type="button"
               aria-label="Copy snippet"
               onClick={handleCopyCode}
@@ -587,7 +580,7 @@ for chunk in stream:
           <div>
             <span className="ref-label">OpenAI Base URL</span>
             <code>https://router.const.web.id/v1</code>
-            <p>Universal OpenAI-compatible host for all chat, completion, and embedding endpoints.</p>
+            <p>Universal OpenAI-compatible host for chat completions and transcription.</p>
           </div>
           <div>
             <span className="ref-label">Anthropic Base URL</span>
@@ -602,7 +595,7 @@ for chunk in stream:
         </div>
       </section>
 
-      {/* 5. SECTION: MODELS CATALOG TABLE (CLEAN, DIRECT CONTEXT & YOU SAVE %) */}
+      {/* 5. SECTION: MODELS CATALOG TABLE (WITH BRAND LOGOS & YOU SAVE %) */}
       <section id="models" className="home-container home-section">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-8">
           <div>
@@ -615,7 +608,7 @@ for chunk in stream:
           </div>
           <Link href="/dashboard" className="home-text-link">
             <span>Explore full catalog in Dashboard</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            <span aria-hidden="true">&rarr;</span>
           </Link>
         </div>
 
@@ -629,44 +622,38 @@ for chunk in stream:
                   <th className="text-right">Input / 1M Tokens</th>
                   <th className="text-right">Output / 1M Tokens</th>
                   <th className="text-center">You Save</th>
-                  <th className="text-right">Playground</th>
                 </tr>
               </thead>
               <tbody>
-                {CATALOG_MODELS.map((model) => (
-                  <tr key={model.id}>
-                    <td>
-                      <code>{model.id}</code>
-                      <span className="text-xs text-[#737373] block pt-0.5">{model.name}</span>
-                    </td>
-                    <td className="text-center font-mono text-xs text-[#a3a3a3]">
-                      {model.contextWindow}
-                    </td>
-                    <td className="text-right font-mono">
-                      <strong className="text-white font-medium">{model.input}</strong>
-                      <s>{model.officialInput}</s>
-                      {model.cache && <small>cache {model.cache}</small>}
-                    </td>
-                    <td className="text-right font-mono">
-                      <strong className="text-white font-medium">{model.output}</strong>
-                      <s>{model.officialOutput}</s>
-                    </td>
-                    <td className="text-center">
-                      <span className="save-percent-pill">
-                        Save {model.savePercent}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <Link
-                        href="/dashboard"
-                        className="inline-flex items-center gap-1 text-xs text-[#0066ff] hover:underline"
-                      >
-                        <span>Test</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {CATALOG_MODELS.map((model) => {
+                  return (
+                    <tr key={model.id}>
+                      <td>
+                        <div>
+                          <code>{model.id}</code>
+                          <span className="text-xs text-[#737373] block pt-0.5">{model.name}</span>
+                        </div>
+                      </td>
+                      <td className="text-center font-mono text-xs text-[#a3a3a3]">
+                        {model.contextWindow}
+                      </td>
+                      <td className="text-right font-mono">
+                        <strong className="text-white font-medium">{model.input}</strong>
+                        <s>{model.officialInput}</s>
+                        {model.cache && <small>cache {model.cache}</small>}
+                      </td>
+                      <td className="text-right font-mono">
+                        <strong className="text-white font-medium">{model.output}</strong>
+                        <s>{model.officialOutput}</s>
+                      </td>
+                      <td className="text-center">
+                        <span className="save-percent-pill">
+                          Save {model.savePercent}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -688,42 +675,42 @@ for chunk in stream:
             <span className="pricing-badge">Zero Subscription Lock-In</span>
             <div className="pricing-amount">$0 / month</div>
             <p className="pricing-desc">
-              Deposit credits using QRIS (instant IDR) or USDC on Solana. Balance drains purely per token consumed down to fractions of a cent.
+              Deposit credits using QRIS or USDC on Solana. Balance drains purely per token consumed down to fractions of a cent.
             </p>
 
             <ul className="pricing-features-list">
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>One key for all 14 supported frontier models</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Input and output metered strictly from provider reports</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Prompt caching billed at up to 90% discount</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Unlimited API keys with custom daily spend limits</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Balance never expires &bull; zero recurring card charges</span>
               </li>
             </ul>
 
             <button
               type="button"
-              onClick={() => signIn("/dashboard")}
-              className="home-button home-button-primary w-full mt-auto"
+              onClick={() => signIn("/keys")}
+              className="home-button home-button-primary w-full mt-auto cursor-pointer"
             >
               Get Started with Free Tier
             </button>
           </article>
 
-          {/* Card 2: Production Studios */}
+          {/* Card 2: Production Workflows */}
           <article className="pricing-card">
             <span className="pricing-badge">Production Grade</span>
             <div className="pricing-amount">Usage-Based</div>
@@ -733,24 +720,24 @@ for chunk in stream:
 
             <ul className="pricing-features-list">
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Automated multi-model Virtual Combos with instant failover</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>SSE streaming with token usage on final frames</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Per-key daily rate limits &amp; custom model allowlists</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Response latency &amp; cost headers on every request</span>
               </li>
               <li>
-                <Check className="h-4 w-4 text-[#0066ff]" />
-                <span>Webhook alerts for balance threshold notifications</span>
+                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>7M weekly free token allowance for eligible models</span>
               </li>
             </ul>
 
@@ -765,8 +752,8 @@ for chunk in stream:
           <p>
             <strong>What does $1 get you?</strong> With <code className="text-white font-mono font-medium">deepseek-v4.1-flash</code>, $1 routes over <strong>80,000,000 tokens</strong> &mdash; enough to analyze an entire large codebase dozens of times.
           </p>
-          <Link href="/docs" className="text-xs text-[#0066ff] hover:underline whitespace-nowrap">
-            Token Calculator &rarr;
+          <Link href="/models" className="text-xs text-white/80 hover:underline whitespace-nowrap">
+            View Live Rates &rarr;
           </Link>
         </div>
       </section>
@@ -780,22 +767,22 @@ for chunk in stream:
 
         <div className="home-flow-grid">
           <article>
-            <span>01</span>
+            <span className="font-mono text-xs text-[#737373]">01</span>
             <h3>Create Account</h3>
             <p>Sign in with your email or Const account. Nothing else required to explore the catalog.</p>
           </article>
           <article>
-            <span>02</span>
+            <span className="font-mono text-xs text-[#737373]">02</span>
             <h3>Add Balance</h3>
             <p>Deposit USDC on Solana or top up with QRIS. Balance drains per token, never per month.</p>
           </article>
           <article>
-            <span>03</span>
+            <span className="font-mono text-xs text-[#737373]">03</span>
             <h3>Generate a Key</h3>
             <p>Create a const_live_ key, configure daily spend ceilings and allowed models.</p>
           </article>
           <article>
-            <span>04</span>
+            <span className="font-mono text-xs text-[#737373]">04</span>
             <h3>Start Calling</h3>
             <p>Point any OpenAI or Anthropic tool to router.const.web.id/v1.</p>
           </article>
@@ -812,27 +799,27 @@ for chunk in stream:
           <h3>What you get</h3>
           <ul>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               One key for the OpenAI and Anthropic compatible endpoints
             </li>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               14 frontier models across all major families
             </li>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               Real-time balance deduction per request down to 0.0001&cent;
             </li>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               Full SSE streaming with token usage on the final frame
             </li>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               Per-key daily rate limits and model restrictions
             </li>
             <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
+              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
               Usage dashboard with cost and latency breakdown
             </li>
           </ul>
@@ -845,87 +832,61 @@ for chunk in stream:
           </div>
           <ol>
             <li>
-              <span>01</span>
+              <span className="font-mono">01</span>
               <p>Deposit USDC on Solana, or top up with QRIS (instant IDR)</p>
             </li>
             <li>
-              <span>02</span>
+              <span className="font-mono">02</span>
               <p>Input and output tokens counted separately at transparent rates</p>
             </li>
             <li>
-              <span>03</span>
+              <span className="font-mono">03</span>
               <p>Cached input tokens billed at up to 90% discount</p>
             </li>
             <li>
-              <span>04</span>
+              <span className="font-mono">04</span>
               <p className="home-formula">
                 cost = ((in &minus; cached) &times; input_price + cached &times; input_price &times; 0.10 + out &times; output_price) / 1M
               </p>
             </li>
             <li>
-              <span>05</span>
+              <span className="font-mono">05</span>
               <p>Balance deducted the moment a request settles</p>
             </li>
             <li>
-              <span>06</span>
+              <span className="font-mono">06</span>
               <p>A failed upstream request is never billed</p>
             </li>
             <li>
-              <span>07</span>
+              <span className="font-mono">07</span>
               <p>Empty balance blocks new calls, never overdraws or charges a card</p>
             </li>
           </ol>
         </article>
       </section>
 
-      {/* 9. SECTION: CLOSING CTA & COMMUNITY */}
-      <section className="home-container home-section home-closing-grid">
-        <div className="home-closing-cta">
-          <p>Create an account, grab a key, and call 14 frontier models in minutes.</p>
-          <button
-            type="button"
-            onClick={() => signIn("/dashboard")}
-            className="home-price-action"
-          >
-            <span>Create Free Account</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="home-community">
-          <h3>A direct line<br />to Const Router.</h3>
-          <p>Get integration help, request models, and follow service updates directly from the engineers.</p>
-          <ul>
-            <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
-              Integration help from us directly
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
-              Model requests and pricing feedback
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
-              Incident and maintenance notices
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-[#0066ff]" />
-              Early access to new features
-            </li>
-          </ul>
-          <a
-            href="https://discord.gg/EmBACq2xED"
-            target="_blank"
-            rel="noreferrer"
-            className="home-text-link pt-2"
-          >
-            <span>Join the Discord</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </a>
+      {/* 9. CLOSING CTA */}
+      <section className="home-container home-section text-center py-20 border-t border-[#262626]">
+        <div className="max-w-xl mx-auto space-y-5">
+          <h2 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
+            Start calling frontier models in minutes
+          </h2>
+          <p className="text-sm text-[#969696]">
+            Create a key, configure your daily ceilings, and connect your favorite coding agent.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => signIn("/keys")}
+              className="home-button home-button-primary cursor-pointer px-6"
+            >
+              <span>Get API Key</span>
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* 10. STUDIO FOOTER (FROM apps/learn/web) */}
+      {/* 10. STUDIO FOOTER */}
       <LandingFooter />
     </div>
   );

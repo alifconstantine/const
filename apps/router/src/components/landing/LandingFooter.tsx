@@ -54,22 +54,20 @@ export function LandingFooter() {
             </ul>
           </div>
 
-          {/* Col 3: Community */}
+          {/* Col 3: Ecosystem */}
           <div className="sub-footer-col">
-            <h5>Community</h5>
+            <h5>Ecosystem</h5>
             <ul>
-              <li>
-                <a href="https://discord.gg/EmBACq2xED" target="_blank" rel="noopener noreferrer">
-                  Discord Server
-                </a>
-              </li>
               <li>
                 <a href="https://github.com/alifconstantine/const" target="_blank" rel="noopener noreferrer">
                   GitHub Repository
                 </a>
               </li>
               <li>
-                <Link href="/docs">Integration Help</Link>
+                <Link href="/docs">API Reference</Link>
+              </li>
+              <li>
+                <Link href="/models">Model Rates</Link>
               </li>
             </ul>
           </div>

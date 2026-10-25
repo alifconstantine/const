@@ -1,6 +1,6 @@
 /* ==================== CONST ROUTER DESIGN SYSTEM LANDING STYLES ==================== */
 /* Sourced directly from apps/learn/web color system */
-/* Canvas: #0a0a0a, Panels: #171717, Fields/Sub-surfaces: #202020, Hover: #2a2a2a, Hairline: #262626, Border-active: #383838, Ink: #ffffff / #d4d4d4, Accent: #0066ff */
+/* Canvas: #0a0a0a, Panels: #171717, Fields/Sub-surfaces: #202020, Hover: #2a2a2a, Hairline: #262626, Border-active: #383838, Ink: #ffffff / #d4d4d4, Accent: #ffffff */
 
 :root {
   --color-canvas: #0a0a0a;
@@ -13,8 +13,8 @@
   --color-ink: #d4d4d4;
   --color-muted: #969696;
   --color-faint: #5d5d5d;
-  --color-accent: #0066ff;
-  --color-accent-subtle: rgba(0, 102, 255, 0.15);
+  --color-accent: #ffffff;
+  --color-accent-subtle: rgba(255, 255, 255, 0.08);
   --color-emerald: #34d399;
 }
 
@@ -149,7 +149,7 @@
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: #0066ff;
+  background: #ffffff;
   box-shadow: 0 0 8px rgba(0, 102, 255, 0.6);
 }
 
@@ -163,7 +163,7 @@
 }
 
 .hero-headline-accent {
-  color: #0066ff;
+  color: #ffffff;
 }
 
 .home-hero-description {
@@ -195,7 +195,7 @@
 }
 
 .atmo-headline-accent {
-  color: #0066ff;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -330,7 +330,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #0066ff;
+  color: #ffffff;
   margin-bottom: 12px;
   display: block;
   font-weight: 600;
@@ -376,7 +376,7 @@
 }
 
 .router-flow-step.active {
-  border-color: #0066ff;
+  border-color: #ffffff;
   background: rgba(0, 102, 255, 0.08);
 }
 
@@ -429,7 +429,7 @@
 }
 
 .key-client-item code {
-  color: #0066ff;
+  color: #ffffff;
   font-family: ui-monospace, monospace;
   font-size: 11px;
 }
@@ -459,7 +459,7 @@
 .mini-symbol-bars span {
   width: 4px;
   border-radius: 2px;
-  background: #0066ff;
+  background: #ffffff;
 }
 
 .mini-symbol-bars span:nth-child(1) { height: 12px; }
@@ -567,7 +567,7 @@
 .hp-code-note span:last-child {
   font-family: ui-monospace, monospace;
   text-transform: uppercase;
-  color: #0066ff;
+  color: #ffffff;
   font-weight: 600;
   font-size: 11px;
 }
@@ -621,7 +621,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #0066ff;
+  color: #ffffff;
   display: block;
   font-weight: 600;
 }
@@ -739,7 +739,7 @@
 }
 
 .pricing-card.featured {
-  border-color: #0066ff;
+  border-color: #ffffff;
   background: linear-gradient(180deg, rgba(0, 102, 255, 0.05) 0%, #171717 100%);
 }
 
@@ -748,7 +748,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #0066ff;
+  color: #ffffff;
   font-weight: 600;
   margin-bottom: 8px;
   display: block;
@@ -787,7 +787,7 @@
 }
 
 .pricing-features-list li svg {
-  color: #0066ff;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
@@ -846,7 +846,7 @@
   font-family: ui-monospace, monospace;
   font-size: 12px;
   font-weight: 600;
-  color: #0066ff;
+  color: #ffffff;
   display: block;
   margin-bottom: 12px;
 }
@@ -925,7 +925,7 @@
 }
 
 .home-billing-intro li svg {
-  color: #0066ff;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
@@ -969,7 +969,7 @@
 
 .home-billing-ledger li > span {
   font: 11px/1.8 ui-monospace, monospace;
-  color: #0066ff;
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -1078,7 +1078,7 @@
 }
 
 .home-community li svg {
-  color: #0066ff;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
@@ -1087,7 +1087,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #0066ff;
+  color: #ffffff;
   text-decoration: none;
   font-weight: 500;
   cursor: pointer;

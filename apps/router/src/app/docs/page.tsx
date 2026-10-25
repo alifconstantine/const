@@ -1,181 +1,522 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
 import { FREE_MODEL_IDS, BUILTIN_MODELS } from "@/lib/model-specs";
-import { Button, Badge, ScrollArea } from "@const/ui";
+import { Button, Badge, ScrollArea, toast, cn } from "@const/ui";
+import { Copy, Check, Terminal, ExternalLink, ArrowLeft, BookOpen, Key, Zap, Shield, Cpu, Layers } from "lucide-react";
+
 export default function DocsPage() {
-  const snippet =
-    'from openai import OpenAI\n\nclient = OpenAI(\n    base_url="https://router.const.web.id/v1",\n    api_key="YOUR_CONST_API_KEY",\n)\n\nstream = client.chat.completions.create(\n    model="deepseek-v4.1-flash:free",\n    messages=[{"role": "user", "content": "Hello"}],\n    stream=True,\n    max_tokens=1024,\n)\nfor event in stream:\n    if event.choices:\n        print(event.choices[0].delta.content or "", end="")';
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyCode = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      toast.success("Snippet copied");
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast.error("Could not copy snippet");
+    }
+  };
+
+  const navGroups = [
+    {
+      title: "Start building",
+      items: [
+        { label: "Quickstart", href: "#quickstart" },
+        { label: "Authentication", href: "#authentication" },
+        { label: "Models & allowance", href: "#models-allowance" },
+        { label: "SDKs & Agent setup", href: "#sdks-agents" },
+      ],
+    },
+    {
+      title: "API Reference",
+      items: [
+        { label: "Chat completions", href: "#chat" },
+        { label: "Reasoning effort", href: "#reasoning-effort" },
+        { label: "Streaming (SSE)", href: "#streaming" },
+        { label: "Tool calling & JSON", href: "#tools-json" },
+        { label: "Virtual Combos", href: "#combos" },
+        { label: "Available endpoints", href: "#endpoints" },
+      ],
+    },
+    {
+      title: "Limits & Governance",
+      items: [
+        { label: "API Keys & guardrails", href: "#keys-guardrails" },
+        { label: "Errors & retries", href: "#errors" },
+        { label: "Per-token metering", href: "#metering" },
+      ],
+    },
+  ];
+
   return (
-    <main className="max-w-4xl mx-auto px-5 py-12 space-y-10">
-      <header className="space-y-4">
-        <Link href="/dashboard" className="text-sm text-muted-foreground">
-          Const Router
-        </Link>
-        <h1 className="text-4xl font-medium tracking-tight">
-          API documentation
-        </h1>
-        <p className="text-muted-foreground">
-          Use the exact model IDs in the catalog. These examples describe the
-          endpoints currently available on this Router.
-        </p>
-        <Button asChild variant="outline">
-          <Link href="/keys">Create an API key</Link>
-        </Button>
-      </header>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Authentication</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Send Authorization: Bearer YOUR_CONST_API_KEY. Keys are revealed once
-          when created. Invalid, revoked, or daily-capped keys are rejected
-          before model execution. The Playground uses your verified account
-          session by default.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          The base URL is <code>https://router.const.web.id/v1</code>. For a
-          local installation, use your Router origin followed by /v1.
-        </p>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Quickstart</h2>
-        <ScrollArea orientation="horizontal" className="rounded-2xl bg-card">
-          <pre className="p-6 text-xs leading-6 font-mono">{snippet}</pre>
-        </ScrollArea>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Free and paid models</h2>
-        <p className="text-sm text-muted-foreground">
-          Free variants share a 7,000,000-token allowance per seven-day cycle.
-          Input, cached input, and output count toward this allowance. Only
-          these IDs are eligible:
-        </p>
-        <ul className="space-y-2">
-          {FREE_MODEL_IDS.map((id) => (
-            <li className="font-mono text-sm" key={id}>
-              {id}
-            </li>
-          ))}
-        </ul>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Other model IDs ending in :free are rejected. The same eligible models
-          without :free are paid variants. All paid chat models debit your
-          credit balance using their input, cached input, and output prices.
-          Search is billed per request; transcription per minute. Unused
-          reserved credit is released when the request ends. Top-ups are not
-          available yet.
-        </p>
-        <Button asChild variant="outline">
-          <Link href="/models">View prices and model IDs</Link>
-        </Button>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Chat request</h2>
-        <p className="text-sm text-muted-foreground">
-          POST /v1/chat/completions accepts messages, model, stream,
-          temperature, max_tokens or max_completion_tokens, tools, tool_choice,
-          response_format, and reasoning_effort. If model, temperature, or
-          stream is omitted, your saved account defaults are applied. Chat
-          supports streaming and JSON responses. The default output reservation
-          is 1,024 tokens; specify max_tokens when you need more.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Use web_search: "research" or "deep-research" to add a billed search
-          before chat. This requires credit even when the chat model is free.
-          Requests reserve their input estimate and output limit; images reserve
-          the model context capacity.
-        </p>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Combos always stream</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Use model: "combo/YOUR_SLUG". Combos always return server-sent events,
-          including when stream is omitted or false. Use stream=True in SDK
-          clients. Each selected target keeps its own free or paid billing mode.
-          A :free target reduces weekly free quota; a paid target debits credit.
-          Disabled combos cannot execute. Failed attempts before generation
-          release their reservation; a stream already producing output is not
-          replayed through another target.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          X-Const-Combo-Selected-Model identifies the executed target. Tool
-          calls and tool result IDs are preserved. Priority, random, and
-          round-robin strategies are resolved by the server.
-        </p>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Available endpoints</h2>
-        <div className="rounded-2xl bg-card divide-y divide-border/40">
-          {ROUTER_ENDPOINTS.map((e) => (
-            <div key={e.path} className="p-4 space-y-2">
-              <p className="font-mono text-xs">
-                <Badge variant="secondary" className="mr-3">
-                  {e.method}
-                </Badge>
-                {e.path}
-              </p>
-              <p className="text-xs text-muted-foreground">{e.description}</p>
-            </div>
-          ))}
+    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      {/* Top Docs Bar */}
+      <div className="border-b border-border/60 bg-card/60 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Dashboard</span>
+          </Link>
+          <span className="text-border">/</span>
+          <span className="text-xs font-medium text-foreground">Documentation</span>
         </div>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Audio, search, and extraction</h2>
-        <p className="text-sm text-muted-foreground">
-          Transcription uses multipart/form-data with file and
-          model="whisper-large-v3-turbo". Upload up to 25 MB of audio. Supported
-          output formats are json, verbose_json and text. A conservative
-          duration is reserved from your balance; actual duration is used when
-          supplied by the engine, otherwise the log is marked estimated.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Search accepts query, mode="research" or "deep-research", and
-          num_results (1–15). Fetch accepts url, crawl_subpages, and max_pages
-          (1–25). Only public HTTP(S) pages are allowed. Transcript accepts a
-          YouTube URL or video ID. These endpoints require authentication.
-        </p>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Usage, privacy, and limits</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Each completed or interrupted request has a unique X-Const-Request-Id.
-          Usage settlement is idempotent. Paid cost is recorded in Usage logs
-          and Transaction history. Free and paid filters show separate usage.
-          Where the engine omits token usage, estimates use generated text and
-          are labelled estimated. Cached tokens remain visible as part of input.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Up to 8 active requests and 60 request attempts per minute are allowed
-          per user. Model attempts have a 180-second deadline. Daily key limits
-          reset at 00:00 UTC. Configure defaults, prompt retention,
-          IP/user-agent anonymization and low-quota alerts in Settings.
-          Disabling prompt retention does not remove previously saved logs or
-          Playground history.
-        </p>
-      </section>
-      <section className="space-y-4">
-        <h2 className="text-xl font-medium">Errors</h2>
-        <div className="text-sm text-muted-foreground space-y-2">
-          {[
-            [400, "Invalid request or unsupported model ID"],
-            [401, "Missing, expired, invalid, or revoked credentials"],
-            [402, "Insufficient available credit"],
-            [413, "Upload or request too large"],
-            [429, "Quota, daily key, concurrency, or request limit reached"],
-            [502, "Upstream model failed"],
-            [503, "Gateway or metering unavailable"],
-            [504, "Request timed out"],
-          ].map(([status, message]) => (
-            <p key={status}>
-              <code className="text-foreground mr-3">{status}</code>
-              {message}
+
+        <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="outline" className="h-8 text-xs rounded-lg">
+            <Link href="/keys">Create API key</Link>
+          </Button>
+          <Button asChild size="sm" className="h-8 text-xs rounded-lg">
+            <Link href="/models">View Pricing</Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Container with Sticky Sidebar and Scrollable Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex gap-12 items-start">
+        {/* Left Sidebar: Fixed / Sticky non-scrolling menu */}
+        <aside className="w-56 shrink-0 hidden md:block sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto pr-4 select-none">
+          <div className="space-y-6">
+            {navGroups.map((group) => (
+              <div key={group.title} className="space-y-2">
+                <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground px-2">
+                  {group.title}
+                </p>
+                <ul className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <a
+                        href={item.href}
+                        className="block px-2.5 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+                      >
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Right Content Area */}
+        <main className="flex-1 min-w-0 max-w-3xl space-y-14 pb-24">
+          {/* Header */}
+          <header className="space-y-3 pb-6 border-b border-border/40">
+            <h1 className="text-3xl sm:text-4xl font-medium tracking-tight">API Documentation</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Const Router is a high-performance universal AI gateway providing drop-in access to 14 frontier models through standard OpenAI and Anthropic API specifications.
             </p>
-          ))}
-        </div>
-      </section>
-      <p className="text-xs text-muted-foreground">
-        {BUILTIN_MODELS.length} model variants are listed. Responses, Anthropic
-        Messages, embeddings, TTS, images, music, and video endpoints are not
-        implemented.
-      </p>
-    </main>
+            <div className="pt-2 flex flex-wrap gap-2 text-xs font-mono text-muted-foreground">
+              <span className="px-2 py-1 bg-secondary/50 rounded border border-border/40">
+                Base URL: https://router.const.web.id/v1
+              </span>
+              <span className="px-2 py-1 bg-secondary/50 rounded border border-border/40">
+                OpenAI Spec: 2024-10
+              </span>
+              <span className="px-2 py-1 bg-secondary/50 rounded border border-border/40">
+                Anthropic Messages Spec
+              </span>
+            </div>
+          </header>
+
+          {/* Quickstart */}
+          <section id="quickstart" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Quickstart</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Calling models through Const Router requires only two changes to standard client code: point the base URL to <code className="text-foreground font-mono">https://router.const.web.id/v1</code> and supply your Const API key.
+            </p>
+
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/30 border-b border-border/40 text-xs">
+                <span className="font-mono text-muted-foreground">Python SDK Example</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyCode(
+                      "qs-py",
+                      `from openai import OpenAI\n\nclient = OpenAI(\n    base_url="https://router.const.web.id/v1",\n    api_key="const_live_YOUR_KEY",\n)\n\nresponse = client.chat.completions.create(\n    model="deepseek-v4.1-flash",\n    messages=[{"role": "user", "content": "Hello"}],\n)\nprint(response.choices[0].message.content)`,
+                    )
+                  }
+                  className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {copiedId === "qs-py" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  <span>{copiedId === "qs-py" ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
+              <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://router.const.web.id/v1",
+    api_key="const_live_YOUR_KEY",
+)
+
+response = client.chat.completions.create(
+    model="deepseek-v4.1-flash",
+    messages=[{"role": "user", "content": "Explain Virtual Combos in two sentences."}],
+)
+print(response.choices[0].message.content)`}
+              </pre>
+            </div>
+          </section>
+
+          {/* Authentication */}
+          <section id="authentication" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Authentication</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Every inference request requires an active API key passed in the <code className="text-foreground font-mono">Authorization</code> header with the <code className="text-foreground font-mono">Bearer</code> prefix, or via <code className="text-foreground font-mono">x-api-key</code>.
+            </p>
+
+            <div className="p-4 rounded-xl bg-secondary/30 border border-border/50 text-xs font-mono space-y-1">
+              <p className="text-muted-foreground"># Header syntax</p>
+              <p className="text-foreground">Authorization: Bearer const_live_xxxxxxxxxxxxxxxxxxxxxxxx</p>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Keys are revealed once upon creation. Invalid, disabled, or daily-capped keys are rejected with HTTP 401/403 before executing upstream model calls.
+            </p>
+          </section>
+
+          {/* Models & Allowance */}
+          <section id="models-allowance" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Models & Free Allowance</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Const Router operates two billing tiers: Free Tier and Paid Wholesale.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="p-5 rounded-xl bg-card border border-border/60 space-y-2">
+                <span className="text-xs font-mono text-muted-foreground uppercase">Weekly Free Allowance</span>
+                <p className="text-2xl font-medium tracking-tight tabular-nums">7,000,000</p>
+                <p className="text-xs text-muted-foreground">
+                  Tokens per 7-day cycle. Applies automatically to models marked <code className="text-foreground font-mono">:free</code>.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-xl bg-card border border-border/60 space-y-2">
+                <span className="text-xs font-mono text-muted-foreground uppercase">Paid Wholesale</span>
+                <p className="text-2xl font-medium tracking-tight">Per-Token</p>
+                <p className="text-xs text-muted-foreground">
+                  Metered down to fractions of a cent with up to 91% discount against official provider rates. No subscriptions.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground">Eligible Free Tier IDs:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {FREE_MODEL_IDS.map((id) => (
+                  <code key={id} className="text-xs font-mono px-2 py-0.5 bg-secondary rounded border border-border/50">
+                    {id}
+                  </code>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* SDKs & Agent Setup */}
+          <section id="sdks-agents" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">SDKs & Agent Setup</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Use Const Router with official developer CLIs and autonomous agent frameworks:
+            </p>
+
+            <div className="space-y-3">
+              <div className="p-4 rounded-xl bg-card border border-border/60 space-y-2">
+                <p className="text-xs font-medium text-foreground">Claude Code CLI (Anthropic Spec)</p>
+                <pre className="text-xs font-mono bg-secondary/30 p-2.5 rounded text-foreground/90 overflow-x-auto">
+{`export ANTHROPIC_BASE_URL="https://router.const.web.id"
+export ANTHROPIC_API_KEY="const_live_YOUR_KEY"
+claude`}
+                </pre>
+              </div>
+
+              <div className="p-4 rounded-xl bg-card border border-border/60 space-y-2">
+                <p className="text-xs font-medium text-foreground">Cursor / Cline / Roo Code / OpenCode</p>
+                <p className="text-xs text-muted-foreground">
+                  Set Provider to <strong className="text-foreground">OpenAI Compatible</strong>, Base URL to <code className="font-mono text-foreground">https://router.const.web.id/v1</code>, and enter your Const API key.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Chat Completions */}
+          <section id="chat" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Chat Completions</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Standard endpoint: <code className="text-foreground font-mono">POST /v1/chat/completions</code>. Supports streaming, function/tool calling, structured JSON output, vision inputs, and reasoning controls.
+            </p>
+
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/30 border-b border-border/40 text-xs">
+                <span className="font-mono text-muted-foreground">cURL Payload</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyCode(
+                      "chat-curl",
+                      `curl https://router.const.web.id/v1/chat/completions \\\n  -H "Authorization: Bearer const_live_YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "deepseek-v4.1-flash",\n    "messages": [{"role": "user", "content": "Analyze complexity"}],\n    "temperature": 0.2\n  }'`,
+                    )
+                  }
+                  className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {copiedId === "chat-curl" ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  <span>{copiedId === "chat-curl" ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
+              <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
+{`curl https://router.const.web.id/v1/chat/completions \\
+  -H "Authorization: Bearer const_live_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "deepseek-v4.1-flash",
+    "messages": [
+      {"role": "system", "content": "You are a concise engineering assistant."},
+      {"role": "user", "content": "Compare quicksort vs mergesort cache locality."}
+    ],
+    "temperature": 0.2,
+    "max_tokens": 1024
+  }'`}
+              </pre>
+            </div>
+          </section>
+
+          {/* Reasoning Effort (Explicitly requested by user) */}
+          <section id="reasoning-effort" className="space-y-4 scroll-mt-24">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-medium tracking-tight">Reasoning Effort</h2>
+              <Badge variant="secondary" className="font-mono text-[10px]">Parameter Guide</Badge>
+            </div>
+
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              For reasoning and thinking models (such as DeepSeek R1, GLM thinking, and OpenAI reasoning architectures), pass the <code className="text-foreground font-mono">reasoning_effort</code> parameter to modulate internal thought token budgets before producing output.
+            </p>
+
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-secondary/40 text-muted-foreground border-b border-border/40">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Level</th>
+                    <th className="px-4 py-3 font-normal">Behavior</th>
+                    <th className="px-4 py-3 font-normal">Recommended For</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40 font-mono">
+                  <tr>
+                    <td className="px-4 py-3 text-foreground font-medium">"low"</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Minimal internal chain-of-thought tokens. Lowest latency.
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Simple code edits, quick lookups, high-concurrency bots
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-foreground font-medium">"medium"</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Balanced reasoning budget (default setting).
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      General debugging, unit test synthesis, refactoring
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-foreground font-medium">"high"</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Extended internal exploration and self-correction cycles.
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Complex algorithmic proofs, architecture planning, multi-file refactors
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-foreground font-medium">"max"</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Maximal thinking depth up to context boundaries.
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">
+                      Mission-critical bug audits and difficult logic puzzles
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-secondary/30 border-b border-border/40 text-xs">
+                <span className="font-mono text-muted-foreground">Reasoning Request Example</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyCode(
+                      "reason-py",
+                      `from openai import OpenAI\n\nclient = OpenAI(base_url="https://router.const.web.id/v1", api_key="const_live_YOUR_KEY")\n\nresponse = client.chat.completions.create(\n    model="deepseek-v4.1-flash",\n    messages=[{"role": "user", "content": "Prove that √2 is irrational."}],\n    reasoning_effort="high",\n)\nprint(response.choices[0].message.content)`,
+                    )
+                  }
+                  className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {copiedId === "reason-py" ? (
+                    <Check className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  <span>{copiedId === "reason-py" ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
+              <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://router.const.web.id/v1",
+    api_key="const_live_YOUR_KEY",
+)
+
+# Pass reasoning_effort parameter directly
+response = client.chat.completions.create(
+    model="deepseek-v4.1-flash",
+    messages=[{"role": "user", "content": "Design an idempotent distributed lock with redis."}],
+    reasoning_effort="high",
+)
+
+print(response.choices[0].message.content)`}
+              </pre>
+            </div>
+          </section>
+
+          {/* Streaming (SSE) */}
+          <section id="streaming" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Streaming (Server-Sent Events)</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Enable SSE by setting <code className="text-foreground font-mono">stream: true</code>. Stream frames are passed through directly from upstream without proxy buffering delays. The final terminal chunk delivers exact token telemetry:
+            </p>
+
+            <pre className="p-4 rounded-xl bg-card border border-border/60 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
+{`data: {"choices": [{"delta": {"content": "..."}}]}
+...
+data: {"usage": {"prompt_tokens": 42, "completion_tokens": 128}}
+data: [DONE]`}
+            </pre>
+          </section>
+
+          {/* Tool Calling & JSON */}
+          <section id="tools-json" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Tool Calling & JSON Mode</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Const Router supports OpenAI standard function schemas via <code className="text-foreground font-mono">tools</code> and <code className="text-foreground font-mono">tool_choice</code>. For structured JSON outputs without tools, pass:
+            </p>
+
+            <pre className="p-4 rounded-xl bg-card border border-border/60 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
+{`"response_format": { "type": "json_object" }`}
+            </pre>
+          </section>
+
+          {/* Virtual Combos */}
+          <section id="combos" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Virtual Combos & Automatic Failover</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Virtual Combos allow grouping multiple upstream models under a single slug (<code className="text-foreground font-mono">model: "combo/my-coding-stack"</code>). When your primary model returns HTTP 429 (rate limited), 503 (out of capacity), or high latency, Const Router automatically fails over to the next candidate model in the chain before replying to the client.
+            </p>
+
+            <div className="p-4 rounded-xl bg-secondary/30 border border-border/50 text-xs space-y-2">
+              <p className="font-medium text-foreground">Response Header Telemetry:</p>
+              <p className="font-mono text-muted-foreground">
+                <code className="text-foreground">X-Const-Combo-Selected-Model</code> identifies the actual model that generated the completion.
+              </p>
+            </div>
+          </section>
+
+          {/* Available Endpoints */}
+          <section id="endpoints" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Available Endpoints</h2>
+            <div className="rounded-xl bg-card border border-border/60 divide-y divide-border/40 overflow-hidden">
+              {ROUTER_ENDPOINTS.map((e) => (
+                <div key={e.path} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="font-mono text-[10px] uppercase">
+                        {e.method}
+                      </Badge>
+                      <code className="font-mono font-medium text-foreground">{e.path}</code>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] mt-1">{e.description}</p>
+                  </div>
+                  <span className="text-muted-foreground font-mono text-[11px] shrink-0">{e.name}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Errors & Retries */}
+          <section id="errors" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Errors & Retries</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Standard HTTP error codes are preserved:
+            </p>
+
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-secondary/40 text-muted-foreground border-b border-border/40 font-mono">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Code</th>
+                    <th className="px-4 py-3 font-normal">Meaning</th>
+                    <th className="px-4 py-3 font-normal">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40 font-mono">
+                  <tr>
+                    <td className="px-4 py-3 text-destructive font-medium">400</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Malformed request or unsupported parameter</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Check request JSON payload</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-destructive font-medium">401 / 403</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Invalid, revoked, or model-restricted key</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Generate active key in Dashboard &rarr; API Keys</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-amber-500 font-medium">402</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Credit balance depleted or weekly free quota exceeded</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Top up credit or switch to free model</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-amber-500 font-medium">429</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Rate limit reached</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Retry with exponential backoff or use Combos</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-3 text-destructive font-medium">502 / 503</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Upstream provider outage</td>
+                    <td className="px-4 py-3 text-muted-foreground font-sans">Router failover automatically engages</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Metering */}
+          <section id="metering" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-medium tracking-tight">Per-Token Metering & Ledger</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Every settled request emits an <code className="text-foreground font-mono">X-Const-Cost</code> header with the exact micro-cost in USD deducted from your balance. Failed upstream requests are never billed.
+            </p>
+          </section>
+        </main>
+      </div>
+    </div>
   );
 }

@@ -1,97 +1,95 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap');
 @import "@const/ui/globals.css";
 
-/* Const Design System: Light Mode (:root) & Studio Monochrome Dark Mode (.dark) from apps/harness/desktop/DESIGN.md */
+/* Const Router Design System: Minimalist Theme inspired by AtmoRouter and Command Code */
 :root {
-  /* Level 0: Canvas Base (#fafafa) */
-  --background: 0 0% 98%;
-  /* Primary Ink (#171717) */
-  --foreground: 0 0% 9%;
+  /* Level 0: Clean White / Minimal Off-White Base (#fafafa) */
+  --background: 0 0% 98.5%;
+  /* Primary Ink (#111111) */
+  --foreground: 0 0% 7%;
 
-  /* Level 1: Header Well / Card Surface (#ffffff) */
+  /* Level 1: Flat Card Surface (#ffffff) */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 9%;
+  --card-foreground: 0 0% 7%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 9%;
+  --popover-foreground: 0 0% 7%;
 
-  /* Primary Buttons (#171717 with #ffffff text) */
-  --primary: 0 0% 9%;
+  /* Primary Solid Button (#111111 with #ffffff text) */
+  --primary: 0 0% 7%;
   --primary-foreground: 0 0% 100%;
 
-  /* Level 2: Sidebar & Tactile Field Fill (#f4f4f5) */
-  --secondary: 0 0% 95.7%;
-  --secondary-foreground: 0 0% 9%;
+  /* Level 2: Secondary Fills & Controls (#f4f4f5) */
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 7%;
 
-  /* Level 3: Field Hover & Control Tracks (#e4e4e7) */
-  --muted: 0 0% 91%;
-  /* Utility Ink (#737373) */
-  --muted-foreground: 0 0% 45.5%;
+  /* Level 3: Muted & Utility Ink (#71717a) */
+  --muted: 0 0% 93%;
+  --muted-foreground: 0 0% 45%;
 
   --accent: 0 0% 92%;
-  --accent-foreground: 0 0% 9%;
+  --accent-foreground: 0 0% 7%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Hairlines (#e4e4e7) */
-  --border: 0 0% 88.5%;
+  /* Hairlines & Flat Borders (#e4e4e7) */
+  --border: 0 0% 89%;
   --input: 0 0% 94%;
   --ring: 0 0% 17%;
 
-  /* Sidebar tokens Light (#f4f4f5) */
-  --sidebar-background: 0 0% 95.7%;
-  --sidebar-foreground: 0 0% 9%;
-  --sidebar-primary: 0 0% 9%;
+  /* Sidebar Tokens (Light) */
+  --sidebar-background: 0 0% 97.5%;
+  --sidebar-foreground: 0 0% 7%;
+  --sidebar-primary: 0 0% 7%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 91%;
-  --sidebar-accent-foreground: 0 0% 9%;
-  --sidebar-border: 0 0% 88.5%;
+  --sidebar-accent: 0 0% 93%;
+  --sidebar-accent-foreground: 0 0% 7%;
+  --sidebar-border: 0 0% 89%;
   --sidebar-ring: 0 0% 17%;
 }
 
 .dark {
-  /* Level 0: Canvas Base (#161616 from DESIGN.md) */
-  --background: 0 0% 8.6%;
-  /* Primary Ink (#d4d4d4 from DESIGN.md) */
-  --foreground: 0 0% 83.1%;
+  /* Level 0: Deep Neutral Canvas Base (#0d0e10 - AtmoRouter & Command Code minimalism) */
+  --background: 220 10% 5%;
+  /* Primary Crisp White Ink (#eeeeee) */
+  --foreground: 0 0% 93%;
 
-  /* Level 1: Header Well / Card Surface (#222222 from DESIGN.md) */
-  --card: 0 0% 13.3%;
-  --card-foreground: 0 0% 83.1%;
-  --popover: 0 0% 13.3%;
-  --popover-foreground: 0 0% 83.1%;
+  /* Level 1: Flat Card Surface (#131417) */
+  --card: 220 10% 7.8%;
+  --card-foreground: 0 0% 93%;
+  --popover: 220 10% 7.8%;
+  --popover-foreground: 0 0% 93%;
 
-  /* Primary Buttons & Bright Highlights (#ffffff with #161616 text from DESIGN.md) */
+  /* Primary Button: Solid White with Dark Ink */
   --primary: 0 0% 100%;
-  --primary-foreground: 0 0% 8.6%;
+  --primary-foreground: 220 10% 5%;
 
-  /* Level 2: Sidebar & Tactile Field Fill (#2b2b2b from DESIGN.md) */
-  --secondary: 0 0% 16.9%;
-  --secondary-foreground: 0 0% 83.1%;
+  /* Level 2: Subtle Elevated Controls & Inputs (#1a1b1f) */
+  --secondary: 220 10% 11%;
+  --secondary-foreground: 0 0% 93%;
 
-  /* Level 3: Field Hover & Control Tracks (#383838 from DESIGN.md) */
-  --muted: 0 0% 22%;
-  /* Utility Ink (#969696 from DESIGN.md) */
-  --muted-foreground: 0 0% 58.8%;
+  /* Level 3: Muted Ink (#8e8e93) */
+  --muted: 220 8% 13%;
+  --muted-foreground: 0 0% 56%;
 
-  --accent: 0 0% 22%;
+  --accent: 220 10% 13%;
   --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 62.8% 40%;
+  --destructive: 0 62.8% 45%;
   --destructive-foreground: 0 0% 98%;
 
-  /* Hairlines (#383838 from DESIGN.md) */
-  --border: 0 0% 22%;
-  --input: 0 0% 16.9%;
-  --ring: 0 0% 22%;
+  /* Hairline Crisp 1px Borders (#24252a) */
+  --border: 220 8% 15.5%;
+  --input: 220 10% 11%;
+  --ring: 0 0% 100%;
 
-  /* Sidebar tokens matching Harness (#2b2b2b from DESIGN.md) */
-  --sidebar-background: 0 0% 16.9%;
-  --sidebar-foreground: 0 0% 83.1%;
+  /* Sidebar Tokens (Dark) */
+  --sidebar-background: 220 10% 6%;
+  --sidebar-foreground: 0 0% 90%;
   --sidebar-primary: 0 0% 100%;
-  --sidebar-primary-foreground: 0 0% 8.6%;
-  --sidebar-accent: 0 0% 22%;
+  --sidebar-primary-foreground: 220 10% 5%;
+  --sidebar-accent: 220 10% 11%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 0 0% 20%;
-  --sidebar-ring: 0 0% 22%;
+  --sidebar-border: 220 8% 14.5%;
+  --sidebar-ring: 0 0% 100%;
 }
