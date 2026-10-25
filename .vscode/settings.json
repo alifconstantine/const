@@ -1,0 +1,25 @@
+{
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.pnpm-store": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/dist": true,
+    "**/dist-electron": true,
+    "**/release": true,
+    "apps/learn/mobile/android/app/build": true,
+    "apps/learn/mobile/android/.gradle": true,
+    "**/*.tsbuildinfo": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.pnpm-store/**": true,
+    "**/.next/**": true,
+    "**/.turbo/**": true,
+    "**/dist/**": true,
+    "**/release/**": true,
+    "apps/learn/mobile/android/app/build/**": true
+  }
+}
