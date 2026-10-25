@@ -314,7 +314,12 @@ try {
 
 // Explicitly set app name, AUMID and userData
 app.setName("Const Harness");
-if (process.platform === "win32" && app.isPackaged) {
+// Windows identifies taskbar/pinned/jump-list entries by AppUserModelID, not by the
+// window icon. Unpackaged Electron inherits its identity from electron.exe, so the
+// taskbar resolves whatever icon Windows cached for electron.exe (the generic
+// Electron logo) instead of build/icon.ico. Pin the AUMID for dev runs too so the
+// window icon we set below is what Windows actually shows.
+if (process.platform === "win32") {
   app.setAppUserModelId("id.web.const.harness.desktop");
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
