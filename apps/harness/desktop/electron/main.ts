@@ -476,7 +476,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     title: "Const Harness",
-    icon: branding.windowIcon,
+    icon: branding.shellIconPath || branding.windowIcon,
     width: 1280,
     height: 800,
     minWidth: 480,

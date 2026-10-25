@@ -7,9 +7,7 @@ import {
 import fs from "node:fs";
 import path from "node:path";
 
-export const WINDOWS_APP_ID = app.isPackaged
-  ? "id.web.const.harness.desktop"
-  : "id.web.const.harness.desktop.development";
+export const WINDOWS_APP_ID = "id.web.const.harness.desktop";
 
 export interface WindowBranding {
   shellIconPath?: string;
@@ -71,17 +69,15 @@ export function applyWindowBranding(
   window.on("show", applyNativeIcon);
   window.once("ready-to-show", applyNativeIcon);
   if (process.platform === "win32" && branding.shellIconPath) {
-    window.setAppDetails({
+    const details: Parameters<BrowserWindow["setAppDetails"]>[0] = {
       appId: WINDOWS_APP_ID,
       appIconPath: branding.shellIconPath,
       appIconIndex: 0,
-      relaunchCommand: [
-        process.execPath,
-        ...(app.isPackaged ? [] : [app.getAppPath()]),
-      ]
-        .map((argument) => `"${path.resolve(argument)}"`)
-        .join(" "),
       relaunchDisplayName: app.getName(),
-    });
+    };
+    if (app.isPackaged) {
+      details.relaunchCommand = `"${path.resolve(process.execPath)}"`;
+    }
+    window.setAppDetails(details);
   }
 }

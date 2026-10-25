@@ -64,7 +64,7 @@ app
         messages.some((message) => message.kind === 1 && message.handle !== 0n),
         "ICON_BIG must be set on the HWND after construction.",
       );
-      assert.equal(WINDOWS_APP_ID, "id.web.const.harness.desktop.development");
+      assert.equal(WINDOWS_APP_ID, "id.web.const.harness.desktop");
       const beforeShow = messages.length;
       // Exercise the lifecycle handler without displaying a test window.
       window.emit("show");
