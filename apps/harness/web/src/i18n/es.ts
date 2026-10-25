@@ -1,0 +1,201 @@
+import type { Copy } from "./en";
+export const es: Copy = {
+  "builds.unavailable":
+    "No se han podido cargar las descargas publicadas. Consulta las versiones o compila desde el código.",
+  "meta.title": "Const Harness — Workbench agéntico local para desarrolladores",
+  "meta.description":
+    "Un entorno de IA de escritorio para código, investigación y creación. Conecta tu proyecto, elige un modelo y trabaja con terminal, navegador y revisión de archivos.",
+  "nav.product": "Producto",
+  "nav.docs": "Documentación",
+  "nav.changelog": "Novedades",
+  "nav.cta": "Descargar",
+  "nav.menu": "Abrir menú",
+  "nav.skip": "Saltar al contenido",
+  "hero.subtitle":
+    "Desde el código hasta la creación, Const Harness conecta tus archivos locales, herramientas y navegador. Investiga, construye, ejecuta y revisa en un solo espacio de escritorio.",
+  "statement.title":
+    "Const Harness es un entorno de IA de escritorio para desarrolladores, investigadores y creadores. Reúne proyectos, modelos y herramientas para convertir una idea en código funcional, investigación útil y trabajos terminados.",
+  "tasks.title": "Cada tarea, entregada con calidad",
+  "tasks.0.title": "Convierte ideas en presentaciones",
+  "tasks.0.description":
+    "Parte de un encargo, documento o repositorio. Usa habilidades de presentación para organizar el contenido y crear diapositivas que puedas revisar y mejorar.",
+  "tasks.1.title": "Analiza datos y actúa en consecuencia",
+  "tasks.1.description":
+    "Explora datos, ejecuta Python o herramientas de shell y convierte los hallazgos en un informe. Mantén cálculos y archivos junto a la conversación.",
+  "tasks.2.title": "Construye un sitio a partir de cualquier fuente",
+  "tasks.2.description":
+    "Aporta un encargo, imágenes de referencia o un proyecto existente. El agente puede editar el sitio, ejecutarlo localmente y comprobarlo en el navegador integrado.",
+  "tasks.3.title": "Escribe, depura y revisa código",
+  "tasks.3.description":
+    "Busca en el proyecto, localiza errores, edita archivos y ejecuta comprobaciones. Revisa los cambios junto a la conversación y elige el modo de permisos.",
+  "capabilities.title": "Las mejores formas de usar Const Harness",
+  "capabilities.0.title": "Plugins y skills",
+  "capabilities.0.description":
+    "Instala plugins y habilidades reutilizables, conecta servicios MCP y usa las herramientas que necesitas desde la conversación.",
+  "capabilities.1.title": "Uso nativo del escritorio",
+  "capabilities.1.description":
+    "Trabaja también con aplicaciones de escritorio. Los asistentes nativos permiten al agente inspeccionar e interactuar con apps de Windows, macOS y Linux.",
+  "capabilities.2.title": "Control del navegador",
+  "capabilities.2.description":
+    "Investiga, navega y prueba en un navegador real dentro del entorno. Inspecciona páginas, captura pantallas y verifica el sitio mientras lo construyes.",
+  "capabilities.3.title": "Crea imágenes, vídeo y audio",
+  "capabilities.3.description":
+    "Combina habilidades creativas con tus proveedores de imagen, vídeo y voz. Crea presentaciones y proyectos de animación y conserva los resultados con el resto del trabajo.",
+  "capabilities.4.title": "Un terminal para trabajo real",
+  "capabilities.4.description":
+    "Ejecuta comandos, compilaciones y tareas largas sin salir del entorno. Sigue tareas en segundo plano y subagentes, revisa su salida y detenlos cuando sea necesario.",
+  "platform.title": "Usa Const Harness donde trabajes",
+  "platform.0.title": "Escritorio",
+  "platform.0.description":
+    "Un workbench nativo para Windows, macOS y Linux, con el chat, la terminal, el navegador, los diffs y la revisión en una sola ventana.",
+  "platform.1.title": "Terminal",
+  "platform.1.description":
+    "Usa el terminal integrado junto al proyecto, la conversación y la revisión. Conserva tus scripts y herramientas en el mismo flujo de trabajo.",
+  "platform.2.title": "Tareas programadas",
+  "platform.2.description":
+    "Programa investigación, informes y comprobaciones recurrentes. Se ejecutan en tu equipo mientras la app está abierta y guardan los resultados en una conversación.",
+  "comparison.title": "Const Harness frente a trabajar solo con chat",
+  "comparison.rows.0.label": "Contexto",
+  "comparison.rows.1.label": "Herramientas y ejecución",
+  "comparison.rows.2.label": "Revisión y control",
+  "comparison.rows.3.label": "Trabajo recurrente",
+  "comparison.rows.4.label": "Elección de modelo",
+  "comparison.note":
+    "Se comparan dos formas de trabajar, no marcas concretas. Los chats con herramientas de agente también pueden ofrecer ejecución e integraciones.",
+  "getstarted.title": "Empieza con Const Harness",
+  "getstarted.subtitle": "Un entorno. Elige cómo conectar tus modelos.",
+  "getstarted.0.title": "Espacio de escritorio",
+  "getstarted.0.description":
+    "Instala la app, inicia sesión con Const Accounts y abre tu proyecto.",
+  "getstarted.1.title": "Tu propio proveedor",
+  "getstarted.1.description":
+    "Conecta un proveedor compatible y elige tus modelos.",
+  "getstarted.2.title": "Const Router",
+  "getstarted.2.description":
+    "Accede a los modelos disponibles con tu cuenta de Const Router.",
+  "getstarted.primary": "Descargar Const Harness",
+  "getstarted.secondary": "Leer la documentación",
+  "getstarted.note":
+    "La disponibilidad, las cuotas y los cargos dependen de tu configuración y cuenta.",
+  "download.title": "Despega con Const Harness",
+  "download.subtitle":
+    "El workbench agéntico moderno para desarrolladores. Listo para tu flujo de trabajo.",
+  "download.primary": "Descargar para x64",
+  "download.secondary": "Descargar para ARM64",
+  "download.note":
+    "Windows, macOS y Linux · Elige tu versión en la página de descarga",
+  "faq.title": "Preguntas frecuentes",
+  "faq.0.q": "¿Cómo empiezo con Const Harness?",
+  "faq.0.a":
+    "Instala una versión de escritorio o compila el código, inicia sesión con Const Accounts y elige una carpeta. Configura el proveedor, describe la tarea y selecciona el modo de permisos.",
+  "faq.1.q": "¿Const Harness solo sirve para programar?",
+  "faq.1.a":
+    "No. Las habilidades y plugins permiten investigar, analizar datos, crear documentos, presentaciones y contenido. Imagen, vídeo y voz requieren configurar el proveedor o herramienta correspondiente.",
+  "faq.2.q": "¿En qué se diferencian habilidades y plugins?",
+  "faq.2.a":
+    "Una habilidad reúne instrucciones reutilizables para un tipo de trabajo. Un plugin agrupa capacidades y conexiones. MCP da acceso a herramientas de un servidor configurado.",
+  "faq.3.q": "¿Cómo funcionan los permisos y los datos locales?",
+  "faq.3.a":
+    "Tú eliges el modo. Revisión solicita aprobación; consulta antes de cambios permite editar dentro del proyecto y pide permiso para shell y escrituras fuera; acceso completo es más permisivo. El historial se guarda localmente, pero las peticiones y el contexto se envían al proveedor. Las herramientas conectadas también pueden enviar datos a sus servicios.",
+  "faq.4.q": "¿Puede ejecutar tareas programadas?",
+  "faq.4.a":
+    "Sí. Configura instrucciones, proyecto, modelo, permisos y horario. Se guarda el historial y los resultados. La ejecución es local: la app debe permanecer abierta y el equipo despierto.",
+  "faq.5.q": "¿Qué plataformas y modelos admite?",
+  "faq.5.a":
+    "El proyecto permite empaquetar para Windows, macOS y Linux; los binarios dependen de cada publicación. Configura Const Router o proveedores compatibles con OpenAI y Anthropic. La CLI independiente aún es una base; utiliza el terminal integrado.",
+  "footer.col.product": "Producto",
+  "footer.col.ecosystem": "Ecosistema",
+  "footer.col.company": "Compañía",
+  "footer.link.download": "Descargar",
+  "footer.link.desktop": "App de escritorio",
+  "footer.link.cli": "Código de la CLI",
+  "footer.link.docs": "Documentación",
+  "footer.link.changelog": "Novedades",
+  "footer.link.learn": "Const Learn",
+  "footer.link.accounts": "Const Accounts",
+  "footer.link.router": "Const Router",
+  "footer.link.platform": "Const Platform",
+  "footer.link.about": "Sobre nosotros",
+  "footer.link.contact": "Contacto",
+  "footer.copyright": "© 2026 Const",
+  "footer.language": "Idioma",
+  "footer.theme": "Cambiar tema",
+  "nav.start": "Empezar",
+  "nav.features": "Funciones",
+  "nav.terminal": "Terminal",
+  "nav.primary": "Navegación principal",
+  "nav.mobile": "Navegación móvil",
+  "nav.close": "Cerrar menú",
+  "platform.terminalCta": "Explorar el terminal",
+  "platform.scheduleCta": "Cómo funciona",
+  "media.note":
+    "Las ilustraciones incluyen recursos de referencia de MiniMax; los flujos y la disponibilidad descritos corresponden a Const Harness.",
+  "comparison.category": "Tu flujo de trabajo",
+  "comparison.other": "Solo chat",
+  "comparison.0.harness":
+    "Proyecto local, búsqueda de archivos, conversaciones y resultados en un entorno.",
+  "comparison.0.other": "Aportas contexto pegando texto o adjuntando archivos.",
+  "comparison.1.harness":
+    "Terminal, navegador, herramientas de escritorio y conexiones de plugins.",
+  "comparison.1.other":
+    "Trasladas instrucciones a tu terminal, navegador y aplicaciones.",
+  "comparison.2.harness":
+    "Elige revisión, consulta antes de cambios o acceso completo. Revisa diferencias y las acciones de deshacer compatibles.",
+  "comparison.2.other":
+    "Aplicas las sugerencias y verificas los cambios en tu editor y herramientas.",
+  "comparison.3.harness":
+    "Reutiliza habilidades y programa tareas locales con historial.",
+  "comparison.3.other":
+    "Repites la petición y los pasos manuales en cada ejecución.",
+  "comparison.4.harness": "Configura Const Router u otro proveedor compatible.",
+  "comparison.4.other": "Usas los modelos que ofrece tu servicio de chat.",
+  "getstarted.0.highlight": "Empieza aquí",
+  "getstarted.0.cta": "Obtener la app",
+  "getstarted.0.feature0": "Windows, macOS y Linux",
+  "getstarted.0.feature1": "Conversaciones y revisión de archivos",
+  "getstarted.0.feature2": "Terminal y navegador integrados",
+  "getstarted.1.highlight": "Tu clave API",
+  "getstarted.1.cta": "Configurar modelos",
+  "getstarted.1.feature0": "Protocolos OpenAI y Anthropic",
+  "getstarted.1.feature1": "Endpoints compatibles personalizados",
+  "getstarted.1.feature2": "El proveedor factura el uso aparte",
+  "getstarted.2.highlight": "Una pasarela",
+  "getstarted.2.cta": "Abrir Const Router",
+  "getstarted.2.feature0": "Modelos a través de Const Router",
+  "getstarted.2.feature1": "Elige el modelo en el entorno",
+  "getstarted.2.feature2": "Las cuotas dependen de tu cuenta",
+  "faq.short": "Preguntas frecuentes",
+  "footer.col.platforms": "Plataformas",
+  "footer.col.capabilities": "Funciones",
+  "footer.col.resources": "Recursos",
+  "footer.link.source": "Código fuente",
+  "footer.link.releases": "Versiones",
+  "preview.alt":
+    "Ilustración de Const Harness con conversación, comprobaciones de terminal y revisión de archivos.",
+  "preview.new": "Nueva tarea",
+  "preview.projects": "Proyectos",
+  "preview.task": "Crear la página",
+  "preview.mode": "Consultar antes de cambios",
+  "preview.prompt":
+    "Crea una página para este proyecto y compruébala en el navegador.",
+  "preview.inspect": "Revisar archivos y componentes",
+  "preview.response":
+    "La página está lista para revisar. El diseño sigue las referencias y las comprobaciones pasan.",
+  "preview.browser": "Vista del navegador comprobada",
+  "preview.composer": "Pregunta sobre tu proyecto…",
+  "preview.review": "Revisión",
+  "preview.checked": "Comprobaciones superadas.",
+  "preview.schedule": "Comprobación diaria",
+  "preview.daily": "Cada día a las 09:00",
+  "preview.complete": "Última ejecución completada",
+  "builds.title": "Consigue Const Harness",
+  "builds.subtitle":
+    "Elige una versión publicada o compila la aplicación desde el código.",
+  "builds.empty":
+    "No hay un binario compatible en las publicaciones recientes. Consulta todas las versiones o compila desde el código.",
+  "builds.releases": "Ver todas las versiones",
+  "builds.source": "Compilar desde el código",
+  "builds.back": "Volver al inicio",
+  "builds.arch": "Arquitectura",
+  "builds.all": "Todas las versiones",
+};

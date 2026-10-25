@@ -1,0 +1,196 @@
+import type { Copy } from "./en";
+export const ja: Copy = {
+  "builds.unavailable":
+    "公開済みダウンロードを読み込めませんでした。リリースページを確認するか、ソースからビルドしてください。",
+  "meta.title":
+    "Const Harness — 開発者のためのローカルファースト AI エージェントワークベンチ",
+  "meta.description":
+    "コード、調査、制作のためのデスクトップAIワークベンチ。プロジェクトとモデルを選び、ターミナル、ブラウザー、変更レビューを一か所で使えます。",
+  "nav.product": "製品",
+  "nav.docs": "ドキュメント",
+  "nav.changelog": "変更履歴",
+  "nav.cta": "ダウンロード",
+  "nav.menu": "メニューを開く",
+  "nav.skip": "本文へスキップ",
+  "hero.subtitle":
+    "コードからクリエイティブな制作まで。Const Harnessはローカルファイル、ツール、ブラウザーをつなぎ、調査、開発、実行、レビューを一つのデスクトップにまとめます。",
+  "statement.title":
+    "Const Harnessは開発者、研究者、クリエイターのためのデスクトップAIワークベンチです。プロジェクト、モデル、ツールをまとめて、アイデアを動くコード、有用な調査、完成した作品へと変えます。",
+  "tasks.title": "あらゆる課題を、品質とともに届ける",
+  "tasks.0.title": "アイデアをプレゼンに",
+  "tasks.0.description":
+    "概要、資料、リポジトリから始めましょう。プレゼンスキルで構成をまとめ、開いて確認・修正できるスライドを作れます。",
+  "tasks.1.title": "データを解析して次の行動へ",
+  "tasks.1.description":
+    "データを調べ、Pythonやシェルで分析し、結果をレポートにまとめます。計算とファイルを会話の横で確認できます。",
+  "tasks.2.title": "あらゆる情報源からサイトを作る",
+  "tasks.2.description":
+    "概要、参考画像、既存のプロジェクトから、サイトを編集してローカルで実行し、内蔵ブラウザーで確認できます。",
+  "tasks.3.title": "コードを書く・直す・レビューする",
+  "tasks.3.description":
+    "プロジェクトを検索し、不具合を追い、ファイルを編集して検証します。会話の横で差分を確認し、作業の許可モードを選べます。",
+  "capabilities.title": "Const Harness の最良の使い方",
+  "capabilities.0.title": "プラグインとスキル",
+  "capabilities.0.description":
+    "プラグインと再利用できるスキルを追加し、MCPサービスを接続。仕事に必要なツールを会話から使えます。",
+  "capabilities.1.title": "ネイティブのPC操作",
+  "capabilities.1.description":
+    "ブラウザー以外の作業にも対応。ネイティブのコンピューター操作ヘルパーでWindows、macOS、Linuxのアプリを確認・操作できます。",
+  "capabilities.2.title": "ブラウザ操作",
+  "capabilities.2.description":
+    "ワークベンチ内のブラウザーで調査、移動、テストを実行。ページ構造やスクリーンショットを確認しながら開発できます。",
+  "capabilities.3.title": "画像・動画・音声を制作",
+  "capabilities.3.description":
+    "制作スキルと設定した画像・動画・音声プロバイダーを組み合わせ、プレゼンやモーション作品を作成。出力をプロジェクトと一緒に管理できます。",
+  "capabilities.4.title": "実作業のためのターミナル",
+  "capabilities.4.description":
+    "ワークベンチからコマンド、ビルド、長時間のジョブを実行。バックグラウンドタスクとサブエージェントの出力を確認し、必要なら停止できます。",
+  "platform.title": "Const Harness をどこからでも使う",
+  "platform.0.title": "デスクトップ",
+  "platform.0.description":
+    "Windows・macOS・Linux 向けのネイティブワークベンチ。チャット、ターミナル、ブラウザ、差分、レビューを 1 つのウィンドウにまとめます。",
+  "platform.1.title": "ターミナル",
+  "platform.1.description":
+    "プロジェクト、会話、レビューと並べて内蔵ターミナルを使用。既存のスクリプトや開発ツールをそのまま使えます。",
+  "platform.2.title": "スケジュールタスク",
+  "platform.2.description":
+    "調査、レポート、プロジェクト検証を定期実行。アプリが動作中のコンピューターで実行し、結果を会話に保存します。",
+  "comparison.title": "Const Harnessとチャット中心の作業",
+  "comparison.rows.0.label": "作業コンテキスト",
+  "comparison.rows.1.label": "ツールと実行",
+  "comparison.rows.2.label": "レビューと制御",
+  "comparison.rows.3.label": "繰り返す作業",
+  "comparison.rows.4.label": "モデルの選択",
+  "comparison.note":
+    "特定の製品ではなく作業方法の比較です。エージェントツールを備えたチャット製品にも実行・連携機能があります。",
+  "getstarted.title": "Const Harness を始める",
+  "getstarted.subtitle": "一つのワークベンチ。モデルの接続方法を選べます。",
+  "getstarted.0.title": "デスクトップ環境",
+  "getstarted.0.description":
+    "アプリをインストールし、Const Accountsでログインしてプロジェクトを開きます。",
+  "getstarted.1.title": "お使いのプロバイダー",
+  "getstarted.1.description":
+    "対応するプロバイダーを接続し、作業に合うモデルを選択。",
+  "getstarted.2.title": "Const Router",
+  "getstarted.2.description":
+    "Const Routerアカウントで利用可能なモデルにアクセス。",
+  "getstarted.primary": "Const Harness をダウンロード",
+  "getstarted.secondary": "ドキュメントを読む",
+  "getstarted.note":
+    "モデルの利用可否、利用枠、料金は設定とアカウントによって異なります。",
+  "download.title": "Const Harness で離陸する",
+  "download.subtitle":
+    "開発者向けのモダンなエージェントワークベンチ。あなたのワークフローにすぐ当てはまります。",
+  "download.primary": "x64 版をダウンロード",
+  "download.secondary": "ARM64 版をダウンロード",
+  "download.note": "Windows・macOS・Linux · ダウンロードページでビルドを選択",
+  "faq.title": "よくある質問",
+  "faq.0.q": "Const Harnessを始めるには？",
+  "faq.0.a":
+    "デスクトップビルドをインストールするかソースからビルドし、Const Accountsでログインします。プロジェクトフォルダー、モデルプロバイダー、許可モードを選んで作業を依頼してください。",
+  "faq.1.q": "コードを書くためだけのアプリですか？",
+  "faq.1.a":
+    "いいえ。スキルやプラグインで調査、分析、文書、プレゼン、制作にも対応します。画像・動画・音声には対応するプロバイダーやツールの設定が必要です。",
+  "faq.2.q": "スキルとプラグインの違いは？",
+  "faq.2.a":
+    "スキルは作業の手順を再利用できる形にしたものです。プラグインはスキルやサービス接続などをまとめます。MCP接続は設定したサーバーのツールを提供します。",
+  "faq.3.q": "権限とローカルデータの仕組みは？",
+  "faq.3.a":
+    "許可モードを選択できます。レビューでは操作の承認を求め、変更前の確認では作業領域内の編集を許可しつつシェル実行や領域外への書き込みを確認します。フルアクセスはより広い権限です。会話履歴はローカルに保存しますが、プロンプトと関連情報はモデルプロバイダーへ、接続ツールのデータは各サービスへ送信されることがあります。",
+  "faq.4.q": "タスクを定期実行できますか？",
+  "faq.4.a":
+    "はい。指示、作業フォルダー、モデル、権限、定期スケジュールを設定できます。実行履歴と結果を保存します。ローカル実行のため、アプリとコンピューターを起動しておく必要があります。",
+  "faq.5.q": "対応するOSとモデルは？",
+  "faq.5.a":
+    "Windows、macOS、Linux向けのパッケージ設定があります。配布バイナリはリリースによって異なります。Const RouterやOpenAI・Anthropic互換のプロバイダーを設定できます。単体CLIはまだ雛形のため、実行には内蔵ターミナルを利用してください。",
+  "footer.col.product": "製品",
+  "footer.col.ecosystem": "エコシステム",
+  "footer.col.company": "会社",
+  "footer.link.download": "ダウンロード",
+  "footer.link.desktop": "デスクトップアプリ",
+  "footer.link.cli": "CLIソース",
+  "footer.link.docs": "ドキュメント",
+  "footer.link.changelog": "変更履歴",
+  "footer.link.learn": "Const Learn",
+  "footer.link.accounts": "Const Accounts",
+  "footer.link.router": "Const Router",
+  "footer.link.platform": "Const Platform",
+  "footer.link.about": "私たちについて",
+  "footer.link.contact": "お問い合わせ",
+  "footer.copyright": "© 2026 Const",
+  "footer.language": "言語",
+  "footer.theme": "テーマを切り替え",
+  "nav.start": "はじめる",
+  "nav.features": "機能",
+  "nav.terminal": "ターミナル",
+  "nav.primary": "メインナビゲーション",
+  "nav.mobile": "モバイルナビゲーション",
+  "nav.close": "メニューを閉じる",
+  "platform.terminalCta": "ターミナルを見る",
+  "platform.scheduleCta": "定期実行について",
+  "media.note":
+    "一部の画像はMiniMaxの参考素材です。機能と利用条件の説明はConst Harnessのものです。",
+  "comparison.category": "作業の流れ",
+  "comparison.other": "チャットのみ",
+  "comparison.0.harness":
+    "ファイル検索、会話、成果物をローカルプロジェクトに集約。",
+  "comparison.0.other": "テキストを貼り付けたり、選んだファイルを添付。",
+  "comparison.1.harness":
+    "内蔵ターミナル、ブラウザー、デスクトップ操作、プラグイン接続。",
+  "comparison.1.other": "手順を別のターミナル、ブラウザー、アプリで実行。",
+  "comparison.2.harness":
+    "レビュー・変更前の確認・フルアクセスを選択。差分と対応する取り消し操作を確認。",
+  "comparison.2.other": "提案を自分で適用し、エディターやツールで検証。",
+  "comparison.3.harness": "スキルの再利用と実行履歴付きのローカル定期タスク。",
+  "comparison.3.other": "実行のたびにプロンプトと手作業を繰り返す。",
+  "comparison.4.harness": "Const Routerまたは対応するプロバイダーを設定。",
+  "comparison.4.other": "利用するチャットサービスのモデルを使用。",
+  "getstarted.0.highlight": "ここから開始",
+  "getstarted.0.cta": "アプリを入手",
+  "getstarted.0.feature0": "Windows・macOS・Linux",
+  "getstarted.0.feature1": "プロジェクト会話とファイルレビュー",
+  "getstarted.0.feature2": "内蔵ターミナルとブラウザー",
+  "getstarted.1.highlight": "自分のAPIキー",
+  "getstarted.1.cta": "モデル設定を見る",
+  "getstarted.1.feature0": "OpenAI・Anthropicプロトコル",
+  "getstarted.1.feature1": "互換エンドポイントを設定",
+  "getstarted.1.feature2": "利用料はプロバイダーごとに発生",
+  "getstarted.2.highlight": "一つのゲートウェイ",
+  "getstarted.2.cta": "Const Routerを開く",
+  "getstarted.2.feature0": "Const Router経由のモデル",
+  "getstarted.2.feature1": "ワークベンチでモデルを選択",
+  "getstarted.2.feature2": "利用枠はアカウントによって異なる",
+  "faq.short": "よくある質問",
+  "footer.col.platforms": "プラットフォーム",
+  "footer.col.capabilities": "機能",
+  "footer.col.resources": "リソース",
+  "footer.link.source": "ソースコード",
+  "footer.link.releases": "リリース",
+  "preview.alt":
+    "プロジェクト会話、ターミナル検証、ファイルレビューを表示したConst Harnessのイラスト。",
+  "preview.new": "新しいタスク",
+  "preview.projects": "プロジェクト",
+  "preview.task": "ランディングページを作成",
+  "preview.mode": "変更前に確認",
+  "preview.prompt":
+    "このプロジェクトのページを作り、ブラウザーで確認してください。",
+  "preview.inspect": "プロジェクトと既存のコンポーネントを確認",
+  "preview.response":
+    "ページのレビュー準備ができました。参考に沿ったレイアウトで、検証も完了しています。",
+  "preview.browser": "ブラウザープレビュー確認済み",
+  "preview.composer": "プロジェクトについて質問…",
+  "preview.review": "レビュー",
+  "preview.checked": "検証完了。レビューできます。",
+  "preview.schedule": "毎日のプロジェクト検証",
+  "preview.daily": "毎日 09:00",
+  "preview.complete": "前回の実行が完了",
+  "builds.title": "Const Harnessを入手",
+  "builds.subtitle": "公開済みのビルドを選ぶか、ソースからビルドしてください。",
+  "builds.empty":
+    "最近のリリースに対応するバイナリはありません。全リリースを確認するかソースからビルドできます。",
+  "builds.releases": "全リリースを見る",
+  "builds.source": "ソースからビルド",
+  "builds.back": "ホームに戻る",
+  "builds.arch": "アーキテクチャ",
+  "builds.all": "すべて",
+};

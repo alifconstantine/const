@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import "@const/ui/globals.css";
+
+/*
+ * Const Harness landing — design tokens.
+ * Light theme mirrors the MiniMax marketing surface (white canvas, tight type),
+ * dark theme mirrors the Const studio palette used by the desktop workbench.
+ */
+:root {
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --ch-canvas: #ffffff;
+  --ch-canvas-subtle: #fafafa;
+  --ch-surface: #ffffff;
+  --ch-surface-muted: #f4f4f5;
+  --ch-ink: #111827;
+  --ch-ink-muted: #52525b;
+  --ch-ink-faint: #71717a;
+  --ch-line: #e4e4e7;
+  --ch-line-strong: #d4d4d8;
+  --ch-accent: #0066ff;
+  --ch-accent-ink: #ffffff;
+  --ch-shell: #fbfbfd;
+  --ch-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px -12px rgba(16, 24, 40, 0.12);
+}
+
+.dark {
+  --ch-canvas: #0a0a0a;
+  --ch-canvas-subtle: #0d0d0d;
+  --ch-surface: #141414;
+  --ch-surface-muted: #1a1a1a;
+  --ch-ink: #ffffff;
+  --ch-ink-muted: #d4d4d4;
+  --ch-ink-faint: #a1a1a1;
+  --ch-line: #262626;
+  --ch-line-strong: #383838;
+  --ch-accent: #3b82f6;
+  --ch-accent-ink: #0a0a0a;
+  --ch-shell: #101010;
+  --ch-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 48px -20px rgba(0, 0, 0, 0.9);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--ch-canvas);
+  color: var(--ch-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(0, 102, 255, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
