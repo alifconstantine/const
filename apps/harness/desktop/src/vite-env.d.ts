@@ -318,7 +318,8 @@ declare global {
         name: string;
         base64?: string;
         sourcePath?: string;
-      }) => Promise<{ success: boolean; path?: string; error?: string }>;
+      }) => Promise<{ success: boolean; path?: string; filename?: string; error?: string }>;
+      readAsDataUrl?: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
       steerAgent?: (payload: {
         conversationId: string;
         prompt: string;

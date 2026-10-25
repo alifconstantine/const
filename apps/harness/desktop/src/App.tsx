@@ -33,9 +33,11 @@ import {
   type ModelItem,
   type AttachedFile,
   formatFileSize,
+  cleanAttachmentsForPersistence,
 } from "./components/workbench/chat-card";
 import { ChatIndicator } from "./components/workbench/chat-indicator";
 import { ImageLightbox } from "./components/workbench/image-lightbox";
+import { MessageAttachmentItem } from "./components/workbench/message-attachment-item";
 import { FileIcon } from "./components/workbench/file-icon";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
@@ -1466,7 +1468,7 @@ function AuthenticatedContent({
       id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       conversationId,
       prompt: payload.prompt,
-      attachments: payload.attachments,
+      attachments: cleanAttachmentsForPersistence(payload.attachments),
       timestamp: Date.now(),
     };
     setQueuedMessagesByConvo((prev) => ({
@@ -1928,7 +1930,7 @@ function AuthenticatedContent({
       role: "user",
       content: trimmed || (attachments && attachments.length > 0 ? "Please analyze the attached media/file(s)." : ""),
       timestamp: Date.now(),
-      attachments: attachments !== undefined ? attachments : targetMsg?.attachments,
+      attachments: cleanAttachmentsForPersistence(attachments !== undefined ? attachments : targetMsg?.attachments),
     };
 
     const assistantPlaceholder: ChatMessage = {
@@ -2003,63 +2005,12 @@ function AuthenticatedContent({
   };
 
   const renderMessageAttachment = (att: AttachedFile) => {
-    const mediaSrc = att.url || att.base64;
-    if (att.type === "image" && mediaSrc) {
-      return (
-        <div
-          key={att.id}
-          onClick={() => setPreviewMedia(att)}
-          className="group relative rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/30 dark:hover:border-white/30 bg-[#f4f4f6] dark:bg-black/40 max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
-        >
-          <img
-            src={mediaSrc}
-            alt={att.name}
-            className="w-full h-full object-contain max-h-72"
-          />
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white">
-            <p className="truncate font-medium">{att.name}</p>
-            <span className="text-[10px] text-[#a0a0a0] font-sans tabular-nums">
-              {formatFileSize(att.size)}
-            </span>
-          </div>
-        </div>
-      );
-    }
-    if (att.type === "video" && att.url) {
-      return (
-        <div
-          key={att.id}
-          onClick={() => setPreviewMedia(att)}
-          className="group relative rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/30 dark:hover:border-white/30 bg-black max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
-        >
-          <video
-            src={att.url}
-            className="w-full h-full max-h-72 rounded-xl pointer-events-none"
-          />
-          <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white">
-              <Play className="w-5 h-5 fill-white ml-0.5" />
-            </div>
-          </div>
-        </div>
-      );
-    }
     return (
-      <div
+      <MessageAttachmentItem
         key={att.id}
-        onClick={() => setPreviewMedia(att)}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white dark:bg-[#1e1e1e] hover:bg-[#f4f4f6] dark:hover:bg-[#252525] border border-[#e2e2e4] dark:border-[#383838] hover:border-black/20 dark:hover:border-white/20 text-xs text-[#262626] dark:text-[#d4d4d4] shadow-sm cursor-pointer transition-all"
-      >
-        <FileIcon filename={att.name} className="w-4 h-4 shrink-0" />
-        <div className="flex flex-col min-w-0">
-          <span className="font-medium truncate max-w-[200px]" title={att.name}>
-            {att.name}
-          </span>
-          <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] font-sans tabular-nums">
-            {formatFileSize(att.size)}
-          </span>
-        </div>
-      </div>
+        att={att}
+        onPreview={(item) => setPreviewMedia(item)}
+      />
     );
   };
 
@@ -3178,7 +3129,7 @@ function AuthenticatedContent({
       role: "user",
       content: effectivePrompt,
       timestamp: Date.now(),
-      attachments,
+      attachments: cleanAttachmentsForPersistence(attachments),
     };
 
     const assistantPlaceholder: ChatMessage = {
@@ -4299,6 +4250,7 @@ function AuthenticatedContent({
               <div className="w-full max-w-full z-10 min-w-0">
                 <ChatCard
                   key={conversationId}
+                  conversationId={conversationId}
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
@@ -4523,6 +4475,7 @@ function AuthenticatedContent({
                   ) : (
                     <ChatCard
                       key={conversationId}
+                      conversationId={conversationId}
                       compact
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
@@ -4795,7 +4748,9 @@ function AuthenticatedContent({
       {/* Media Lightbox Preview Modal */}
       {previewMedia && (
         <ImageLightbox
-          src={previewMedia.url || ""}
+          src={previewMedia.path ? `const-file://${previewMedia.path.replace(/\\/g, "/")}` : (previewMedia.url || previewMedia.base64 || "")}
+          fallbackBase64={previewMedia.base64}
+          filePath={previewMedia.path}
           alt={previewMedia.name}
           type={previewMedia.type}
           fileSize={previewMedia.size}

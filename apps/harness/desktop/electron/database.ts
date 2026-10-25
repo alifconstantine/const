@@ -396,11 +396,15 @@ export class ConversationDatabase {
     try {
       const logsDir = path.join(this.brainDir, convo.id, ".system_generated", "logs");
       const scratchDir = path.join(this.brainDir, convo.id, "scratch");
+      const userUploadedDir = path.join(this.brainDir, convo.id, ".user_uploaded");
       if (!fs.existsSync(logsDir)) {
         fs.mkdirSync(logsDir, { recursive: true });
       }
       if (!fs.existsSync(scratchDir)) {
         fs.mkdirSync(scratchDir, { recursive: true });
+      }
+      if (!fs.existsSync(userUploadedDir)) {
+        fs.mkdirSync(userUploadedDir, { recursive: true });
       }
 
       if (convo.messages && convo.messages.length > 0) {

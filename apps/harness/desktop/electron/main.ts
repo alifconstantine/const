@@ -1,4 +1,20 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, nativeImage, protocol, net } from "electron";
+import { pathToFileURL } from "node:url";
+
+// Register custom protocol scheme for safe local file serving (images/attachments in brain)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "const-file",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -580,6 +596,21 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 app.whenReady().then(() => {
+  // Register const-file:// protocol handler for rendering local media & brain attachments safely
+  protocol.handle("const-file", (request) => {
+    try {
+      let rawPath = decodeURIComponent(request.url.replace(/^const-file:\/\//, ""));
+      if (process.platform === "win32" && /^\/[a-zA-Z]:/.test(rawPath)) {
+        rawPath = rawPath.slice(1);
+      }
+      if (fs.existsSync(rawPath)) {
+        return net.fetch(pathToFileURL(rawPath).toString());
+      }
+      return new Response("File not found", { status: 404 });
+    } catch (err: any) {
+      return new Response(err?.message || "Failed to load file", { status: 500 });
+    }
+  });
 
   // Window control handlers
   ipcMain.on("window:minimize", () => {
@@ -1427,27 +1458,78 @@ app.whenReady().then(() => {
     ) => {
       try {
         const convoId = payload.conversationId || "shared_uploads";
-        const uploadDir = path.join(constBrainDir, convoId, "uploads");
+        const uploadDir = path.join(constBrainDir, convoId, ".user_uploaded");
         if (!fs.existsSync(uploadDir)) {
           fs.mkdirSync(uploadDir, { recursive: true });
         }
-        const safeName = path.basename(payload.name).replace(/[^a-zA-Z0-9._-]/g, "_");
-        const targetPath = path.join(uploadDir, safeName);
+
+        const rawName = payload.name || "upload.bin";
+        const ext = path.extname(rawName);
+        let baseName = path.basename(rawName, ext).replace(/[^a-zA-Z0-9._-]/g, "_");
+
+        // Normalize generic pasted/temporary filenames
+        const isGenericName =
+          !baseName ||
+          baseName.toLowerCase() === "image" ||
+          baseName.toLowerCase() === "blob" ||
+          baseName.toLowerCase() === "pasted-image" ||
+          baseName.toLowerCase() === "screenshot";
+        if (isGenericName) {
+          baseName = `media_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        }
+
+        let safeName = `${baseName}${ext || ".png"}`;
+        let targetPath = path.join(uploadDir, safeName);
+        if (fs.existsSync(targetPath)) {
+          safeName = `${baseName}_${Date.now()}${ext || ".png"}`;
+          targetPath = path.join(uploadDir, safeName);
+        }
 
         if (payload.sourcePath && fs.existsSync(payload.sourcePath)) {
           fs.copyFileSync(payload.sourcePath, targetPath);
-          return { success: true, path: targetPath };
+          return { success: true, path: targetPath, filename: safeName };
         } else if (payload.base64) {
           const cleanBase64 = payload.base64.replace(/^data:[^;]+;base64,/, "");
           fs.writeFileSync(targetPath, Buffer.from(cleanBase64, "base64"));
-          return { success: true, path: targetPath };
+          return { success: true, path: targetPath, filename: safeName };
         }
         return { success: false, error: "No source path or base64 provided" };
       } catch (err: any) {
-        return { success: false, error: err.message };
+        return { success: false, error: err?.message || String(err) };
       }
     }
   );
+
+  ipcMain.handle("file:read-as-data-url", async (_event, filePath: string) => {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        return { success: false, error: "File not found" };
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeMap: Record<string, string> = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".pdf": "application/pdf",
+      };
+      const mime = mimeMap[ext] || "application/octet-stream";
+      const buffer = fs.readFileSync(filePath);
+      return { success: true, dataUrl: `data:${mime};base64,${buffer.toString("base64")}` };
+    } catch (err: any) {
+      return { success: false, error: err?.message || String(err) };
+    }
+  });
 
   ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
     for (const [tcId, resolver] of pendingQuestions.entries()) {

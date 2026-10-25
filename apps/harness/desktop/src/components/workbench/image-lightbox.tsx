@@ -1,10 +1,12 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText } from "lucide-react";
 import { useTranslation } from "../../lib/i18n";
 
 export interface ImageLightboxProps {
   src: string;
+  fallbackBase64?: string;
+  filePath?: string;
   alt: string;
   type?: "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "document" | "presentation" | "spreadsheet" | "other";
   fileSize?: number;
@@ -13,12 +15,42 @@ export interface ImageLightboxProps {
 
 export function ImageLightbox({
   src,
+  fallbackBase64,
+  filePath,
   alt,
   type = "image",
   onClose,
 }: ImageLightboxProps) {
   const { t } = useTranslation();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  const getResolvedSrc = (): string => {
+    if (filePath) {
+      return `const-file://${filePath.replace(/\\/g, "/")}`;
+    }
+    if (src && !src.startsWith("blob:")) {
+      return src;
+    }
+    return fallbackBase64 || src || "";
+  };
+
+  const [displaySrc, setDisplaySrc] = useState<string>(getResolvedSrc);
+
+  useEffect(() => {
+    setDisplaySrc(getResolvedSrc());
+  }, [src, filePath, fallbackBase64]);
+
+  const handleMediaError = () => {
+    if (fallbackBase64 && displaySrc !== fallbackBase64) {
+      setDisplaySrc(fallbackBase64);
+    } else if (filePath && window.electron?.readAsDataUrl) {
+      window.electron.readAsDataUrl(filePath).then((res) => {
+        if (res.success && res.dataUrl) {
+          setDisplaySrc(res.dataUrl);
+        }
+      });
+    }
+  };
 
   const isVideo = type === "video";
   const isImage = type === "image";
@@ -64,17 +96,19 @@ export function ImageLightbox({
 
         {isImage ? (
           <img
-            src={src}
+            src={displaySrc}
             alt={alt}
+            onError={handleMediaError}
             className="max-w-[85vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl block border border-white/10"
           />
         ) : isVideo ? (
           <div className="max-w-[85vw] max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10">
             <video
-              src={src}
+              src={displaySrc}
               controls
               autoPlay
               playsInline
+              onError={handleMediaError}
               className="max-w-[85vw] max-h-[85vh] object-contain rounded-2xl"
             />
           </div>
@@ -86,7 +120,7 @@ export function ImageLightbox({
             <span className="text-sm font-medium text-white truncate max-w-[280px]" title={alt}>
               {alt}
             </span>
-            <audio src={src} controls className="w-full mt-2" />
+            <audio src={displaySrc} controls className="w-full mt-2" onError={handleMediaError} />
           </div>
         ) : (
           <div className="bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3">

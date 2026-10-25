@@ -101,6 +101,21 @@ export interface AttachedFile {
   pages?: number;
 }
 
+export function cleanAttachmentsForPersistence(attachments?: AttachedFile[]): AttachedFile[] | undefined {
+  if (!attachments || attachments.length === 0) return undefined;
+  return attachments.map((att) => {
+    const permanentUrl = att.path
+      ? `const-file://${att.path.replace(/\\/g, "/")}`
+      : att.url?.startsWith("blob:")
+      ? undefined
+      : att.url;
+    return {
+      ...att,
+      url: permanentUrl || att.url,
+    };
+  });
+}
+
 export const readBase64 = (file: File): Promise<string> =>
   new Promise((resolve) => {
     const reader = new FileReader();
@@ -109,7 +124,7 @@ export const readBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export async function parseUploadedFiles(files: FileList | File[]): Promise<AttachedFile[]> {
+export async function parseUploadedFiles(files: FileList | File[], conversationId?: string): Promise<AttachedFile[]> {
   const result: AttachedFile[] = [];
   const list = Array.from(files);
 
@@ -229,25 +244,35 @@ export async function parseUploadedFiles(files: FileList | File[]): Promise<Atta
     }
 
     let finalPath = filePath;
-    // 4. If file has no disk path, persist to session uploads directory via electron
-    if (!finalPath && window.electron?.saveAttachment && (base64 || textContent)) {
+    let savedFilename = file.name;
+    // Persist to conversation's .user_uploaded directory via electron
+    if (window.electron?.saveAttachment && (base64 || textContent || filePath)) {
       try {
         const saved = await window.electron.saveAttachment({
+          conversationId,
           name: file.name,
+          sourcePath: filePath || undefined,
           base64: base64 || (textContent ? btoa(unescape(encodeURIComponent(textContent))) : undefined),
         });
         if (saved.success && saved.path) {
           finalPath = saved.path;
+          if (saved.filename) {
+            savedFilename = saved.filename;
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[chat-card] Failed to save attachment to disk:", err);
+      }
     }
+
+    const safeUrl = url || (finalPath ? `const-file://${finalPath.replace(/\\/g, "/")}` : base64);
 
     result.push({
       id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
-      name: file.name,
+      name: savedFilename || file.name,
       size: file.size,
       type,
-      url: url || base64,
+      url: safeUrl,
       base64,
       path: finalPath,
       textContent,
@@ -296,6 +321,7 @@ export interface ModelItem {
 }
 
 interface ChatCardProps {
+  conversationId?: string;
   onSendMessage?: (payload: {
     prompt: string;
     project: string;
@@ -346,6 +372,7 @@ export interface MentionedItem {
 }
 
 export function ChatCard({
+  conversationId,
   onSendMessage,
   isExecuting = false,
   onAbort,
@@ -449,7 +476,7 @@ export function ChatCard({
     }
 
     const filesToProcess = fileList.slice(0, remainingSlots);
-    const newAttached = await parseUploadedFiles(filesToProcess);
+    const newAttached = await parseUploadedFiles(filesToProcess, conversationId);
 
     setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
     setIsPlusOpen(false);
@@ -483,7 +510,7 @@ export function ChatCard({
     }
 
     const filesToProcess = fileList.slice(0, remainingSlots);
-    const newAttached = await parseUploadedFiles(filesToProcess);
+    const newAttached = await parseUploadedFiles(filesToProcess, conversationId);
     setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
   };
 
@@ -522,7 +549,7 @@ export function ChatCard({
     }
 
     const filesToProcess = fileList.slice(0, remainingSlots);
-    const newAttached = await parseUploadedFiles(filesToProcess);
+    const newAttached = await parseUploadedFiles(filesToProcess, conversationId);
     setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
   };
 
@@ -2543,7 +2570,9 @@ export function ChatCard({
       {/* Media Lightbox Preview Modal */}
       {previewItem && (
         <ImageLightbox
-          src={previewItem.url || previewItem.base64 || ""}
+          src={previewItem.path ? `const-file://${previewItem.path.replace(/\\/g, "/")}` : (previewItem.url || previewItem.base64 || "")}
+          fallbackBase64={previewItem.base64}
+          filePath={previewItem.path}
           alt={previewItem.name}
           type={previewItem.type}
           fileSize={previewItem.size}

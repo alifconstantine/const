@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("electron", {
     base64?: string;
     sourcePath?: string;
   }) => ipcRenderer.invoke("file:save-attachment", payload),
+  readAsDataUrl: (filePath: string) =>
+    ipcRenderer.invoke("file:read-as-data-url", filePath),
   platform: process.platform,
   versions: {
     node: process.versions.node,

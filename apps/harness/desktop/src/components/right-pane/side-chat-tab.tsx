@@ -10,7 +10,9 @@ import {
 import { ScrollArea, cn, toast } from "@const/ui";
 import type { RightPaneTab } from "./types";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
-import { ChatCard, type AttachedFile } from "../workbench/chat-card";
+import { ChatCard, type AttachedFile, cleanAttachmentsForPersistence } from "../workbench/chat-card";
+import { ImageLightbox } from "../workbench/image-lightbox";
+import { MessageAttachmentItem } from "../workbench/message-attachment-item";
 import { MarkdownContent } from "../workbench/markdown-content";
 import { ExecutionTrace } from "../workbench/execution-trace";
 import { AssistantResponse } from "../intelligence-ui/assistant-response";
@@ -100,6 +102,7 @@ export function SideChatTab({
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<AttachedFile | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, "good" | "bad">>({});
 
   const handleFeedback = (id: string, type: "good" | "bad") => {
@@ -398,7 +401,7 @@ export function SideChatTab({
       role: "user",
       content: prompt.trim(),
       timestamp: Date.now(),
-      attachments,
+      attachments: cleanAttachmentsForPersistence(attachments),
     };
 
     const assistantPlaceholder: SideChatMessage = {
@@ -601,6 +604,17 @@ Answer the user's query directly. Only modify workspace files or run commands if
               {msg.role === "user" ? (
                 /* User Bubble */
                 <div className="w-full flex flex-col items-end group select-text cursor-text">
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-[85%]">
+                      {msg.attachments.map((att) => (
+                        <MessageAttachmentItem
+                          key={att.id}
+                          att={att}
+                          onPreview={(item) => setPreviewMedia(item)}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <div className="w-fit max-w-[85%] rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#242424] border border-[#e2e2e4] dark:border-[#363636] px-3.5 py-2 text-xs text-[#262626] dark:text-[#ececec] leading-relaxed break-words select-text cursor-text">
                     <MarkdownContent
                       content={msg.content}
@@ -730,6 +744,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
       {/* 3. Anchored Bottom Input Card with Responsive Icon-Only Toolbar */}
       <div className="w-full px-2.5 pb-2.5 pt-1 bg-transparent shrink-0">
         <ChatCard
+          conversationId={sideChatId}
           compact={true}
           forceIconOnly={true}
           isExecuting={isExecuting}
@@ -744,6 +759,19 @@ Answer the user's query directly. Only modify workspace files or run commands if
           conversations={effectiveConversations}
         />
       </div>
+
+      {/* Media Lightbox Preview Modal */}
+      {previewMedia && (
+        <ImageLightbox
+          src={previewMedia.path ? `const-file://${previewMedia.path.replace(/\\/g, "/")}` : (previewMedia.url || previewMedia.base64 || "")}
+          fallbackBase64={previewMedia.base64}
+          filePath={previewMedia.path}
+          alt={previewMedia.name}
+          type={previewMedia.type}
+          fileSize={previewMedia.size}
+          onClose={() => setPreviewMedia(null)}
+        />
+      )}
     </div>
   );
 }
