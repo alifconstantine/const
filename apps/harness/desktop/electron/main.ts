@@ -315,14 +315,15 @@ try {
 }
 
 // Explicitly set app name, AUMID and userData
+const APP_USER_MODEL_ID = "id.web.const.harness.desktop";
 app.setName("Const Harness");
 // Windows identifies taskbar/pinned/jump-list entries by AppUserModelID, not by the
 // window icon. Unpackaged Electron inherits its identity from electron.exe, so the
 // taskbar resolves whatever icon Windows cached for electron.exe (the generic
-// Electron logo) instead of build/icon.ico. Pin the AUMID for dev runs too so the
-// window icon we set below is what Windows actually shows.
+// Electron logo). Use a stable identity here and explicit taskbar/relaunch
+// properties on each window below.
 if (process.platform === "win32") {
-  app.setAppUserModelId("id.web.const.harness.desktop");
+  app.setAppUserModelId(APP_USER_MODEL_ID);
 }
 const userDataPath = path.join(app.getPath("appData"), "Const Harness");
 app.setPath("userData", userDataPath);
@@ -469,42 +470,33 @@ app.on("open-url", (event, url) => {
 
 function createWindow() {
   const isDark = nativeTheme.shouldUseDarkColors;
-  const iconCandidate = process.platform === "win32"
-    ? path.join(__dirname, "../build/icon.ico")
-    : path.join(__dirname, "../build/icon.png");
-
-  const appIconPath = fs.existsSync(iconCandidate)
-    ? iconCandidate
-    : fs.existsSync(path.join(process.cwd(), "build/icon.ico"))
-    ? path.join(process.cwd(), "build/icon.ico")
-    : fs.existsSync(path.join(__dirname, "../build/icon.png"))
-    ? path.join(__dirname, "../build/icon.png")
-    : fs.existsSync(path.join(process.cwd(), "build/icon.png"))
-    ? path.join(process.cwd(), "build/icon.png")
-    : fs.existsSync(path.join(__dirname, "../public/icon.png"))
-    ? path.join(__dirname, "../public/icon.png")
-    : undefined;
-
-  let nativeIcon: Electron.NativeImage | undefined;
-  if (appIconPath) {
+  // The Windows shell cannot read relaunch icons from app.asar. Packaged builds
+  // ship a real file under resources/branding; dev builds use the app's build dir.
+  const iconDirectories = [
+    path.join(process.resourcesPath, "branding"),
+    path.join(app.getAppPath(), "build"),
+    path.resolve(__dirname, "../build"),
+    path.join(app.getAppPath(), "public"),
+  ];
+  const iconNames = process.platform === "win32" ? ["icon.ico", "icon.png"] : ["icon.png"];
+  const appIconPath = iconDirectories.flatMap(directory => iconNames.map(name => path.join(directory, name))).find(candidate => {
+    if (!fs.existsSync(candidate)) return false;
     try {
-      const img = nativeImage.createFromPath(appIconPath);
-      if (!img.isEmpty()) {
-        nativeIcon = img;
-      }
-    } catch {}
-  }
+      return !nativeImage.createFromPath(candidate).isEmpty();
+    } catch { return false; }
+  });
+  if (!appIconPath) console.warn("[Branding] No usable application icon found.");
 
   win = new BrowserWindow({
     title: "Const Harness",
-    icon: appIconPath || nativeIcon,
+    icon: appIconPath,
     width: 1280,
     height: 800,
     minWidth: 480,
     minHeight: 400,
     frame: false,
     backgroundColor: isDark ? "#0c0c0c" : "#ffffff",
-    show: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -513,15 +505,18 @@ function createWindow() {
     },
   });
 
-  if (nativeIcon) {
-    try {
-      win.setIcon(nativeIcon);
-    } catch {}
-  } else if (appIconPath) {
-    try {
-      win.setIcon(appIconPath);
-    } catch {}
+  if (process.platform === "win32" && appIconPath) {
+    win.setAppDetails({
+      appId: APP_USER_MODEL_ID,
+      appIconPath,
+      appIconIndex: 0,
+      relaunchCommand: [process.execPath, ...(app.isPackaged ? [] : [app.getAppPath()])]
+        .map(argument => `"${path.resolve(argument)}"`).join(" "),
+      relaunchDisplayName: app.getName(),
+    });
   }
+  // Publish the taskbar button only after its branding has been configured.
+  win.show();
 
   browserController.setParentWindow(win);
   win.on("closed", () => {

@@ -78,6 +78,11 @@
     ],
     "extraResources": [
       {
+        "from": "build",
+        "to": "branding",
+        "filter": ["icon.ico", "icon.png"]
+      },
+      {
         "from": "plugins",
         "to": "plugins",
         "filter": ["**/*"]
