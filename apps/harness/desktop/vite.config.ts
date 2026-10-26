@@ -18,9 +18,10 @@ export default defineConfig({
             outDir: "dist-electron",
           },
           resolve: {
-            alias: {
-              "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
-            },
+            alias: [
+              { find: "@const/agent/token-meter", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/token-meter.ts") },
+              { find: "@const/agent", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
+            ],
           },
         },
       },
@@ -38,9 +39,10 @@ export default defineConfig({
     ]),
   ],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
-    },
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+      { find: "@const/agent/token-meter", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/token-meter.ts") },
+      { find: "@const/agent", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
+    ],
   },
 });

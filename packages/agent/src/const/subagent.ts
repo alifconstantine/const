@@ -1150,6 +1150,7 @@ export class SubAgentManager {
           baseUrl: context.parentConfig.baseUrl,
           apiKey: context.parentConfig.apiKey,
           model: item.model || context.parentConfig.model,
+          contextWindow: !item.model || item.model === context.parentConfig.model ? context.parentConfig.contextWindow : undefined,
           thinkingLevel: item.thinkingLevel || context.parentConfig.thinkingLevel,
           workspacePath: context.workspacePath,
           conversationId,
@@ -1196,8 +1197,20 @@ export class SubAgentManager {
           },
         ];
 
+        const publishUsage = () => {
+          const requests = Object.values(item.requests ?? {});
+          item.turnCount = requests.filter(r => !r.scope).length;
+          item.tokenUsage = requests.reduce((sum, r) => ({
+            promptTokens: sum.promptTokens + (r.promptTokens ?? 0),
+            completionTokens: sum.completionTokens + (r.completionTokens ?? 0),
+            totalTokens: sum.totalTokens + (r.totalTokens ?? 0),
+          }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+          context.onUpdated?.({ ...item });
+          this.emitLifecycle("updated", item);
+        };
+
         const history = await childAgent.run(initialMessages, (event) => {
-          if (abortController.signal.aborted) return;
+          if (abortController.signal.aborted && event.type !== "usage" && event.type !== "llm_request") return;
 
           if (event.type === "thinking" && event.thinking) {
             const steps: SubAgentTraceStep[] = item.traceSteps ? [...item.traceSteps] : [];
@@ -1288,17 +1301,22 @@ export class SubAgentManager {
             context.onSourceCreated?.(event.source);
           } else if (event.type === "artifact_created" && event.artifact) {
             context.onArtifactCreated?.(event.artifact);
-          } else if (event.type === "usage") {
-            item.tokenUsage = {
-              promptTokens: event.promptTokens,
-              completionTokens: event.completionTokens,
-              totalTokens: event.totalTokens,
-            };
-          } else if (event.type === "status" && event.message) {
-            const turnMatch = event.message.match(/Turn\s+(\d+)/i);
-            if (turnMatch && turnMatch[1]) {
-              item.turnCount = parseInt(turnMatch[1], 10);
+          } else if ((event.type === "usage" || event.type === "llm_request") && event.requestId) {
+            const request = { ...item.requests?.[event.requestId], requestId: event.requestId,
+              model: event.model || item.model || "", startedAt: event.startedAt ?? 0 };
+            for (const key of ["durationMs", "ttftMs", "promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "status"] as const) {
+              if (key in event && (event as any)[key] !== undefined) (request as any)[key] = (event as any)[key];
             }
+            item.requests = { ...item.requests, [event.requestId]: request };
+            publishUsage();
+          } else if ((event.type === "subagent_started" || event.type === "subagent_updated" || event.type === "subagent_finished" || event.type === "subagent_killed") && event.agent?.requests) {
+            const requests = { ...item.requests };
+            for (const request of Object.values(event.agent.requests)) {
+              requests[request.requestId] = { ...requests[request.requestId], ...request, scope: "subagent" };
+            }
+            item.requests = requests;
+            publishUsage();
+          } else if (event.type === "status" && event.message) {
             item.logs.push(event.message);
             if (item.logs.length > 80) item.logs.shift();
             context.onUpdated?.({ ...item });

@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
+import { mergeTelemetry, reduceTelemetry, telemetryForHistory, type ChatTelemetry } from "../src/lib/chat-telemetry";
 
 export interface StoredMessage {
   id?: string;
@@ -24,6 +25,7 @@ export interface ConversationRecord {
   createdAt: number;
   updatedAt: number;
   model?: string;
+  telemetry?: ChatTelemetry;
   mode?: "ask_before_changes" | "full_access" | string;
   messages: StoredMessage[];
   contextUsage?: {
@@ -110,6 +112,9 @@ export class ConversationDatabase {
     try {
       this.db.exec("ALTER TABLE conversations ADD COLUMN mode TEXT;");
     } catch {}
+    try {
+      this.db.exec("ALTER TABLE conversations ADD COLUMN telemetry TEXT;");
+    } catch {}
 
     // Clean up legacy [Scheduled] titles in existing database
     try {
@@ -169,11 +174,15 @@ export class ConversationDatabase {
     const isScheduled = convo.isScheduled || convo.id?.startsWith("scheduled_") ? 1 : 0;
 
     const diffStatsJson = convo.diffStats ? JSON.stringify(convo.diffStats) : null;
-    const contextUsageJson = convo.contextUsage ? JSON.stringify(convo.contextUsage) : null;
+    const previous = this.getConversation(convo.id);
+    const telemetry = mergeTelemetry(previous?.telemetry, convo.telemetry);
+    const telemetryJson = telemetry ? JSON.stringify(telemetry) : null;
+    const contextUsage = telemetry?.context ?? convo.contextUsage ?? previous?.contextUsage;
+    const contextUsageJson = contextUsage ? JSON.stringify(contextUsage) : null;
 
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, mode, diff_stats, context_usage)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, mode, diff_stats, context_usage, telemetry)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         project = excluded.project,
@@ -184,7 +193,8 @@ export class ConversationDatabase {
         model = excluded.model,
         mode = excluded.mode,
         diff_stats = excluded.diff_stats,
-        context_usage = excluded.context_usage
+        context_usage = excluded.context_usage,
+        telemetry = excluded.telemetry
     `);
 
     stmt.run(
@@ -199,7 +209,8 @@ export class ConversationDatabase {
       convo.model || null,
       convo.mode || null,
       diffStatsJson,
-      contextUsageJson
+      contextUsageJson,
+      telemetryJson
     );
 
     // Sync messages
@@ -239,6 +250,23 @@ export class ConversationDatabase {
 
     // Ensure brain directory and append to transcript.jsonl
     this.ensureBrainTranscript(convo);
+  }
+
+  /** Stream telemetry updates never rewrite messages or conversation metadata. */
+  public recordTelemetry(conversationId: string, event: unknown): void {
+    const row = this.db.prepare("SELECT telemetry FROM conversations WHERE id = ?").get(conversationId) as { telemetry?: string } | undefined;
+    if (!row) return;
+    let previous: ChatTelemetry | undefined;
+    try {
+      const parsed = row.telemetry ? JSON.parse(row.telemetry) : undefined;
+      if (parsed?.version === 1 && parsed.requests && typeof parsed.requests === "object" && !Array.isArray(parsed.requests)) {
+        previous = parsed;
+      }
+    } catch {}
+    previous ??= telemetryForHistory(this.getConversation(conversationId)?.messages ?? []);
+    const telemetry = reduceTelemetry(previous, event);
+    this.db.prepare("UPDATE conversations SET telemetry = ?, context_usage = COALESCE(?, context_usage) WHERE id = ?")
+      .run(JSON.stringify(telemetry), telemetry.context ? JSON.stringify(telemetry.context) : null, conversationId);
   }
 
   public deleteConversation(id: string): void {
@@ -328,6 +356,10 @@ export class ConversationDatabase {
   private hydrateConversation(row: any): ConversationRecord {
     let diffStats = undefined;
     let contextUsage = undefined;
+    let telemetry: ChatTelemetry | undefined;
+    try {
+      if (row.telemetry) telemetry = JSON.parse(row.telemetry);
+    } catch {}
     try {
       if (row.diff_stats) diffStats = JSON.parse(row.diff_stats);
     } catch {}
@@ -388,6 +420,7 @@ export class ConversationDatabase {
       mode: row.mode || undefined,
       diffStats,
       contextUsage,
+      telemetry,
       messages,
     };
   }

@@ -26,7 +26,7 @@ describe("token-meter", () => {
       };
       const result = parseProviderUsage(raw);
       expect(result).toBeDefined();
-      expect(result?.inputTokens).toBe(120);
+      expect(result?.inputTokens).toBe(80);
       expect(result?.outputTokens).toBe(45);
       expect(result?.totalTokens).toBe(165);
       expect(result?.cacheReadTokens).toBe(40);
@@ -67,7 +67,7 @@ describe("token-meter", () => {
       const raw = {
         input: 200,
         output: 75,
-        totalTokens: 275,
+        totalTokens: 325,
         cacheRead: 50,
         cacheWrite: 0,
         reasoning: 35,
@@ -76,7 +76,7 @@ describe("token-meter", () => {
       expect(result).toBeDefined();
       expect(result?.inputTokens).toBe(200);
       expect(result?.outputTokens).toBe(75);
-      expect(result?.totalTokens).toBe(275);
+      expect(result?.totalTokens).toBe(325);
       expect(result?.cacheReadTokens).toBe(50);
       expect(result?.reasoningTokens).toBe(35);
     });

@@ -144,6 +144,8 @@ export interface AgentStreamEvent {
     | "approval_resolved"
     | "file_mutation"
     | "usage"
+    | "llm_request"
+    | "context_update"
     | "status"
     | "done"
     | "error"
@@ -175,6 +177,21 @@ export interface AgentStreamEvent {
   record?: FileMutationRecord;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   promptTokens?: number;
+  requestId?: string;
+  model?: string;
+  phase?: "started" | "finished";
+  startedAt?: number;
+  durationMs?: number;
+  ttftMs?: number;
+  waitingMs?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  usedTokens?: number;
+  systemPromptTokens?: number;
+  toolsTokens?: number;
+  messagesTokens?: number;
+  updatedAt?: number;
   completionTokens?: number;
   totalTokens?: number;
   prompt_tokens?: number;
@@ -222,6 +239,7 @@ export interface UserConfig {
     supportsThinking?: boolean;
     supportsTools?: boolean;
     inputTypes?: string[];
+    contextWindow?: number;
   }>;
   workspaceMemoryEnabled?: boolean;
   enableComputerUse?: boolean;
@@ -291,6 +309,7 @@ declare global {
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;
+        contextWindow?: number;
       }) => Promise<{
         success: boolean;
         aborted?: boolean;

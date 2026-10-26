@@ -1,4 +1,6 @@
 import { shiftIntelligenceUiState } from "../components/intelligence-ui/protocol";
+import type { ChatTelemetry } from "./chat-telemetry";
+import { mergeTelemetry } from "./chat-telemetry";
 
 export interface ConversationItem {
   id: string;
@@ -11,6 +13,7 @@ export interface ConversationItem {
   isArchived?: boolean;
   isScheduled?: boolean;
   model?: string;
+  telemetry?: ChatTelemetry;
   mode?: "request_review" | "ask_before_changes" | "full_access";
   contextUsage?: {
     usedTokens: number;
@@ -336,7 +339,9 @@ export function saveConversation(conversation: ConversationItem): void {
     const index = list.findIndex((c) => c.id === conversation.id);
     const existing = index >= 0 ? list[index] : null;
     const updatedConvo = {
+      ...existing,
       ...conversation,
+      telemetry: mergeTelemetry(existing?.telemetry, conversation.telemetry),
       updatedAt: conversation.updatedAt || existing?.updatedAt || Date.now(),
     };
 

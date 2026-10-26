@@ -6,6 +6,10 @@
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
+		"./token-meter": {
+			"types": "./dist/const/token-meter.d.ts",
+			"import": "./dist/const/token-meter.js"
+		},
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"

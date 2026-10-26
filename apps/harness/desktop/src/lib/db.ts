@@ -1,3 +1,4 @@
+import type { ModelRequest } from "./chat-telemetry";
 import Dexie, { type EntityTable } from "dexie";
 export type { LocalSkill, LocalSkillBundle, SkillCategory, SkillFileEntry, SkillFrontmatter } from "./skills/types";
 import type { LocalSkill, LocalSkillBundle } from "./skills/types";
@@ -40,22 +41,24 @@ export const localDb = {
     await db.skills.update(id, { isEnabled, updatedAt: Date.now() });
   },
 
-  // Request Logs & Token Activity (Local-First Engine)
-  async recordRequestLog(data: Omit<LocalRequestLog, "id">): Promise<string> {
-    const id = "req_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-    await db.requestLogs.add({
-      ...data,
-      id,
+  async recordModelRequest(conversationId: string, request: ModelRequest): Promise<void> {
+    if (request.totalTokens === undefined) return;
+    const id = `llm_${conversationId}_${request.requestId}`;
+    await db.requestLogs.put({
+      id, requestId: id, model: request.model, conversationId,
+      promptTokens: request.promptTokens ?? 0, completionTokens: request.completionTokens ?? 0,
+      totalTokens: request.totalTokens, durationMs: request.durationMs ?? 0,
+      status: request.status === "failed" ? 500 : request.status === "cancelled" ? 499 : 200,
+      createdAt: request.startedAt,
     });
-    return id;
   },
 
   async getRequestLogs(since?: number): Promise<LocalRequestLog[]> {
     try {
       if (typeof since === "number") {
-        return await db.requestLogs.where("createdAt").aboveOrEqual(since).reverse().sortBy("createdAt");
+        return (await db.requestLogs.where("createdAt").aboveOrEqual(since).reverse().sortBy("createdAt")).filter(isModelRequestLog);
       }
-      return await db.requestLogs.reverse().sortBy("createdAt");
+      return (await db.requestLogs.reverse().sortBy("createdAt")).filter(isModelRequestLog);
     } catch {
       return [];
     }
@@ -65,36 +68,23 @@ export const localDb = {
     try {
       const convos = loadConversations();
       if (!Array.isArray(convos) || convos.length === 0) return 0;
-      const count = await db.requestLogs.count();
-      if (count > 0) return count;
-
-      const entries: LocalRequestLog[] = [];
-      for (const c of convos) {
-        const tokens = c.contextUsage?.usedTokens || 0;
-        if (tokens > 0) {
-          const prompt = c.contextUsage?.messagesTokens || Math.round(tokens * 0.7);
-          const completion = tokens - prompt;
-          entries.push({
-            id: `req_convo_${c.id}`,
-            requestId: `req_${c.id}`,
-            model: c.model || "agy/gemini-3.8-flash-tiered",
-            conversationId: c.id,
-            promptTokens: prompt,
-            completionTokens: completion,
-            totalTokens: tokens,
-            durationMs: 1200,
-            status: 200,
-            createdAt: c.updatedAt || c.createdAt || Date.now(),
-          });
+      let count = 0;
+      for (const conversation of convos) {
+        for (const request of Object.values(conversation.telemetry?.requests ?? {})) {
+          if (request.totalTokens === undefined) continue;
+          await localDb.recordModelRequest(conversation.id, request);
+          count++;
         }
       }
-
-      if (entries.length > 0) {
-        await db.requestLogs.bulkPut(entries);
-      }
-      return entries.length;
+      return count;
     } catch {
       return 0;
     }
   },
 };
+
+/** Historical tool estimates and context-derived backfills are not provider usage. */
+export function isModelRequestLog(log: LocalRequestLog): boolean {
+  return !log.requestId.startsWith("tool_") && !log.id.startsWith("req_convo_") &&
+    !(log.toolNames && log.toolNames.length > 0);
+}

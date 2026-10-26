@@ -144,7 +144,24 @@ export interface SubAgentTraceStep {
   mutation?: FileMutationRecord;
 }
 
+export interface ModelRequestUsage {
+  requestId: string;
+  model: string;
+  startedAt: number;
+  scope?: "subagent";
+  status?: "completed" | "failed" | "cancelled";
+  durationMs?: number;
+  ttftMs?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+}
+
 export interface SubAgentItem {
+  requests?: Record<string, ModelRequestUsage>;
   id: string;
   name?: string;
   parentId?: string;
@@ -171,15 +188,28 @@ export interface SubAgentItem {
 }
 
 export interface AgentEventMap {
+  llm_request: {
+    phase: "started" | "finished";
+    requestId: string;
+    model: string;
+    startedAt: number;
+    durationMs?: number;
+    ttftMs?: number;
+    status?: "completed" | "failed" | "cancelled";
+  };
   token: { token: string };
   token_reset: {};
   thinking: { thinking: string };
   tool_call: { toolCallId: string; toolName: string; args: any };
-  tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean };
+  tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean; durationMs?: number; waitingMs?: number };
   approval_request: ApprovalRequestData;
   approval_resolved: { approvalId: string; decision: ApprovalDecision };
   file_mutation: { record: FileMutationRecord };
   usage: {
+    requestId?: string;
+    model?: string;
+    startedAt?: number;
+    ttftMs?: number;
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
@@ -190,6 +220,8 @@ export interface AgentEventMap {
     durationMs?: number;
   };
   context_update: {
+    model?: string;
+    updatedAt?: number;
     usedTokens: number;
     totalTokens: number;
     systemPromptTokens: number;

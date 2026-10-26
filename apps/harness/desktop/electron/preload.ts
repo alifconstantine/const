@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld("electron", {
     conversationId?: string;
     authToken?: string;
     maxOutputTokens?: number;
+    contextWindow?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
   steerAgent: (payload: { conversationId: string; prompt: string; attachments?: any[] }) =>
     ipcRenderer.invoke("agent:steer", payload),

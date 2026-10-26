@@ -155,6 +155,10 @@ export function parseProviderUsage(raw: any): NormalizedTokenUsage | undefined {
     cacheWriteTokens = raw.cache_creation_input_tokens;
   } else if (isCount(raw.cacheWrite)) {
     cacheWriteTokens = raw.cacheWrite;
+  } else if (isCount(raw.prompt_tokens_details?.cache_write_tokens)) {
+    cacheWriteTokens = raw.prompt_tokens_details.cache_write_tokens;
+  } else if (isCount(raw.input_tokens_details?.cache_write_tokens)) {
+    cacheWriteTokens = raw.input_tokens_details.cache_write_tokens;
   }
 
   // Extract reasoning tokens
@@ -165,6 +169,18 @@ export function parseProviderUsage(raw: any): NormalizedTokenUsage | undefined {
     reasoningTokens = raw.reasoning;
   } else if (isCount(raw.completion_tokens_details?.reasoning_tokens)) {
     reasoningTokens = raw.completion_tokens_details.reasoning_tokens;
+  } else if (isCount(raw.output_tokens_details?.reasoning_tokens)) {
+    reasoningTokens = raw.output_tokens_details.reasoning_tokens;
+  }
+
+  // OpenAI-style prompt counts already include cache reads/writes. Anthropic
+  // and Pi-AI report uncached input separately. Keep the normalized contract
+  // identical for every provider before accumulating or calculating cache hit.
+  if (raw.prompt_tokens !== undefined || raw.promptTokens !== undefined ||
+      (raw.input_tokens !== undefined && raw.input_tokens_details !== undefined)) {
+    cacheReadTokens ??= isCount(raw.input_tokens_details?.cached_tokens)
+      ? raw.input_tokens_details.cached_tokens : undefined;
+    inputTokens = Math.max(0, inputTokens - (cacheReadTokens ?? 0) - (cacheWriteTokens ?? 0));
   }
 
   // Determine total tokens
@@ -289,10 +305,8 @@ export function estimateMessage(message: {
   if (message.tool_calls && Array.isArray(message.tool_calls)) {
     for (const tc of message.tool_calls) {
       const name = tc.name || tc.function?.name || "";
-      const args =
-        typeof tc.arguments === "string"
-          ? tc.arguments
-          : JSON.stringify(tc.arguments || tc.function?.arguments || {});
+      const rawArgs = tc.arguments ?? tc.function?.arguments ?? {};
+      const args = typeof rawArgs === "string" ? rawArgs : JSON.stringify(rawArgs);
       tokens += Math.ceil((name.length + args.length) / CHARS_PER_TOKEN) + BLOCK_OVERHEAD;
     }
   }
@@ -301,7 +315,7 @@ export function estimateMessage(message: {
     for (const att of message.attachments) {
       if (att.type === "image") tokens += 1600;
       else if (att.type === "video") tokens += 3200;
-      else if (att.size && typeof att.size === "number") tokens += Math.ceil(att.size / CHARS_PER_TOKEN);
+      else tokens += estimateTextTokens(att.textContent || att.name || att.path || "");
     }
   }
 

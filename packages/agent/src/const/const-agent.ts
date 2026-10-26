@@ -23,10 +23,10 @@ import {
 } from "./tools.js";
 import { globalSubAgentManager, formatTaskResultEnvelope } from "./subagent.js";
 import {
-  parseProviderUsage,
   calculateContextBreakdown,
   calculateContextOccupancy,
 } from "./token-meter.js";
+import { trackLlmRequest } from "./request-telemetry.js";
 import { DEFAULT_MODELS } from "./models.js";
 import { appendToolObservations, disableToolObservationImages, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 
@@ -909,6 +909,21 @@ export class ConstAgent {
     const conversationHistory: AgentMessage[] = [...messages];
     let toolVisionUnavailable = false;
     let currentTurn = 0;
+    const runId = `llm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    let requestSequence = 0;
+    let activeRequest: ReturnType<typeof trackLlmRequest> | undefined;
+    let contextSystemPrompt = "";
+    let contextTools: any[] = [];
+    const emitContext = () => {
+      const breakdown = calculateContextBreakdown({
+        systemPrompt: contextSystemPrompt, tools: contextTools,
+        messages: compactHistoryForContext(conversationHistory),
+      });
+      onEvent({ type: "context_update", model: this.config.model, updatedAt: Date.now(), systemPromptTokens: breakdown.systemTokens,
+        toolsTokens: breakdown.toolsTokens, messagesTokens: breakdown.messageTokens,
+        usedTokens: breakdown.totalHeuristicTokens,
+        totalTokens: this.config.contextWindow ?? DEFAULT_MODELS.find(m => m.id === this.config.model)?.contextWindow ?? 1_000_000 });
+    };
     let consecutiveStreamRetries = 0;
     let consecutivePlanningTurns = 0;
     let consecutiveDraftCutoffs = 0;
@@ -1020,6 +1035,8 @@ export class ConstAgent {
           effectiveSystemPrompt += `\n\n[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns, hard limit: ${maxTurns} turns). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`;
         }
 
+        contextSystemPrompt = effectiveSystemPrompt;
+        contextTools = activeTools;
         const historyForContext = compactHistoryForContext(conversationHistory);
 
         const formattedMessages = [
@@ -1063,7 +1080,7 @@ export class ConstAgent {
         const resolvedContextWindow =
           this.config.contextWindow ??
           activeModelInfo?.contextWindow ??
-          1_048_576;
+          1_000_000;
 
         const occupancy = calculateContextOccupancy(
           {
@@ -1075,7 +1092,7 @@ export class ConstAgent {
         );
 
         onEvent({
-          type: "context_update",
+          type: "context_update", model: this.config.model, updatedAt: Date.now(),
           systemPromptTokens: breakdown.systemTokens,
           toolsTokens: breakdown.toolsTokens,
           messagesTokens: breakdown.messageTokens,
@@ -1102,7 +1119,8 @@ export class ConstAgent {
           throw new Error("User cancelled agent execution.");
         }
 
-        const llmRequestStartTime = Date.now();
+        const request = trackLlmRequest(`${runId}_${++requestSequence}`, this.config.model, onEvent);
+        activeRequest = request;
         const response = await fetchWithRetry(
           endpoint,
           {
@@ -1191,6 +1209,7 @@ export class ConstAgent {
               message: "Input visual langsung tidak didukung provider. Mengalihkan ke mode referensi berkas dan melanjutkan respon...",
             });
 
+            request.finish("failed");
             currentTurn--;
             consecutiveEmptyRetries = 0;
             continue;
@@ -1297,30 +1316,7 @@ export class ConstAgent {
               }
 
               try {
-                if (json.usage) {
-                  const norm = parseProviderUsage(json.usage);
-                  if (norm && norm.totalTokens > 0) {
-                    const totalPrompt = norm.inputTokens + (norm.cacheReadTokens ?? 0) + (norm.cacheWriteTokens ?? 0);
-                    const cacheHitRate =
-                      norm.cacheReadTokens && totalPrompt > 0
-                        ? Math.min(100, Math.round((norm.cacheReadTokens / totalPrompt) * 100))
-                        : 0;
-
-                    const durationMs = Math.max(1, Date.now() - llmRequestStartTime);
-
-                    onEvent({
-                      type: "usage",
-                      promptTokens: norm.inputTokens,
-                      completionTokens: norm.outputTokens,
-                      totalTokens: norm.totalTokens,
-                      cacheReadTokens: norm.cacheReadTokens,
-                      cacheWriteTokens: norm.cacheWriteTokens,
-                      reasoningTokens: norm.reasoningTokens,
-                      cacheHitRate,
-                      durationMs,
-                    });
-                  }
-                }
+                if (json?.usage) request.observeUsage(json.usage);
                 const choice = json.choices?.[0];
                 if (choice?.finish_reason) {
                   turnFinishReason = choice.finish_reason;
@@ -1329,6 +1325,7 @@ export class ConstAgent {
 
                 const delta = choice?.delta || choice?.message;
                 if (!delta) continue;
+                request.observeDelta(delta);
 
                 const reasoningDelta =
                   delta.reasoning_content ||
@@ -1375,6 +1372,7 @@ export class ConstAgent {
             }
           }
         } catch (streamErr: any) {
+          request.finish(signal.aborted || this._isCancelled ? "cancelled" : "failed");
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
           }
@@ -1453,30 +1451,7 @@ export class ConstAgent {
             }
 
             try {
-              if (json?.usage) {
-                const norm = parseProviderUsage(json.usage);
-                if (norm && norm.totalTokens > 0) {
-                  const totalPrompt = norm.inputTokens + (norm.cacheReadTokens ?? 0) + (norm.cacheWriteTokens ?? 0);
-                  const cacheHitRate =
-                    norm.cacheReadTokens && totalPrompt > 0
-                      ? Math.min(100, Math.round((norm.cacheReadTokens / totalPrompt) * 100))
-                      : 0;
-
-                  const durationMs = Math.max(1, Date.now() - llmRequestStartTime);
-
-                  onEvent({
-                    type: "usage",
-                    promptTokens: norm.inputTokens,
-                    completionTokens: norm.outputTokens,
-                    totalTokens: norm.totalTokens,
-                    cacheReadTokens: norm.cacheReadTokens,
-                    cacheWriteTokens: norm.cacheWriteTokens,
-                    reasoningTokens: norm.reasoningTokens,
-                    cacheHitRate,
-                    durationMs,
-                  });
-                }
-              }
+              if (json?.usage) request.observeUsage(json.usage);
               const choice = json.choices?.[0];
               if (choice?.finish_reason) {
                 turnFinishReason = choice.finish_reason;
@@ -1484,6 +1459,7 @@ export class ConstAgent {
               }
               const delta = choice?.delta || choice?.message;
               if (delta) {
+                request.observeDelta(delta);
                 const reasoningDelta =
                   delta.reasoning_content ||
                   delta.reasoning ||
@@ -1536,6 +1512,8 @@ export class ConstAgent {
           turnContent += flushed.content;
           onEvent({ type: "token", token: flushed.content });
         }
+
+        request.finish("completed");
 
         const rawToolCalls: ToolCall[] = Array.from(toolCallsMap.values())
           .filter((tc) => tc.name && tc.name.trim().length > 0)
@@ -1800,6 +1778,7 @@ export class ConstAgent {
             continue;
           }
 
+          emitContext();
           onEvent({
             type: "done",
             fullContent: turnContent,
@@ -1873,7 +1852,7 @@ export class ConstAgent {
               type: "tool_result",
               toolCallId: tc.id,
               toolName: tc.function.name,
-              result: loopWarning,
+              result: loopWarning, durationMs: 0, waitingMs: 0,
               isError: true,
             });
 
@@ -2009,6 +1988,7 @@ export class ConstAgent {
               : this.config.mode === "ask_before_changes" && (isTerminalTool || isPythonTool || (isFileMutationTool && isOutside));
 
           let approvedThisTurn = false;
+          let waitingMs = 0;
 
           if ((isRequestReview || this.config.mode === "ask_before_changes") && requiresApproval && !isAlreadyAllowed) {
             const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -2043,6 +2023,7 @@ export class ConstAgent {
             });
 
             // Wait for user approval or abort signal
+            const approvalStartedAt = Date.now();
             const userResponse = await new Promise<ApprovalResponseData>((resolve, reject) => {
               const onAbort = () => {
                 this.pendingApprovals.delete(approvalId);
@@ -2066,6 +2047,7 @@ export class ConstAgent {
               decision: userResponse.decision,
             });
 
+            waitingMs += Date.now() - approvalStartedAt;
             if (userResponse.decision === "full_access") {
               this.updateMode("full_access");
               approvedThisTurn = true;
@@ -2110,7 +2092,7 @@ export class ConstAgent {
                 type: "tool_result",
                 toolCallId: tc.id,
                 toolName: tc.function.name,
-                result: rejectionMessage,
+                result: rejectionMessage, durationMs: 0, waitingMs: waitingMs,
                 isError: true,
               });
 
@@ -2141,7 +2123,7 @@ export class ConstAgent {
                 type: "tool_result",
                 toolCallId: tc.id,
                 toolName: tc.function.name,
-                result: skipMessage,
+                result: skipMessage, durationMs: 0, waitingMs: waitingMs,
                 isError: true,
               });
 
@@ -2183,6 +2165,8 @@ export class ConstAgent {
             ? { ...parsedArgs, run_in_background: true }
             : parsedArgs;
 
+          const toolStartedAt = Date.now();
+          let questionWaitingMs = 0;
           const { result, isError, images } = await executeNativeTool(
             tc.function.name,
             effectiveArgs,
@@ -2201,7 +2185,9 @@ export class ConstAgent {
               askUser: async (questions) => {
                 onEvent({ type: "ask_question", toolCallId: tc.id, questions });
                 if (this.config.onAskQuestion) {
-                  return await this.config.onAskQuestion(tc.id, questions);
+                  const questionStartedAt = Date.now();
+                  try { return await this.config.onAskQuestion(tc.id, questions); }
+                  finally { questionWaitingMs += Date.now() - questionStartedAt; }
                 }
                 return { status: "submitted" };
               },
@@ -2246,6 +2232,8 @@ export class ConstAgent {
             toolName: tc.function.name,
             result,
             isError,
+            durationMs: Math.max(0, Date.now() - toolStartedAt - questionWaitingMs),
+            waitingMs: waitingMs + questionWaitingMs,
           });
 
           if (!isError && images?.length) {
@@ -2401,6 +2389,7 @@ export class ConstAgent {
         });
       }
 
+      emitContext();
       onEvent({
         type: "done",
         fullContent: fallbackContent,
@@ -2417,6 +2406,7 @@ export class ConstAgent {
         err?.message?.includes("cancelled") ||
         err?.message?.includes("aborted");
 
+      activeRequest?.finish(isAborted ? "cancelled" : "failed");
       if (isAborted) {
         this._isCancelled = true;
         onEvent({ type: "error", error: "User cancelled agent execution." });

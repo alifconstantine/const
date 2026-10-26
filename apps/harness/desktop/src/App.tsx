@@ -24,6 +24,7 @@ import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
+import { isTelemetryEvent, reduceTelemetry, summarizeTelemetry, estimateVisibleContext, telemetryForHistory, type ChatTelemetry } from "./lib/chat-telemetry";
 import { shouldNotifyAgentFailure } from "./lib/agent-errors";
 import { Sidebar } from "./components/sidebar";
 import { TopToolbar } from "./components/workbench/top-toolbar";
@@ -663,23 +664,8 @@ function AuthenticatedContent({
     } catch {}
     return null;
   });
-  const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-    cacheReadTokens?: number;
-    cacheWriteTokens?: number;
-    reasoningTokens?: number;
-    cacheHitRate?: number;
-  } | null>(null);
-
-  const [backendContextBreakdown, setBackendContextBreakdown] = useState<{
-    systemPromptTokens: number;
-    toolsTokens: number;
-    messagesTokens: number;
-    usedTokens: number;
-    totalTokens: number;
-  } | null>(null);
+  const telemetryByConversationRef = useRef(new Map<string, ChatTelemetry>());
+  const [telemetryRevision, setTelemetryRevision] = useState(0);
 
   // Right Sidebar (Side Pane) state & tab management - initialized closed on startup
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
@@ -2036,6 +2022,7 @@ function AuthenticatedContent({
           mode: currentMode,
           conversationId,
           authToken: token || undefined,
+          contextWindow: activeModelItemRef.current?.contextWindow,
         });
 
         if (!res.success && res.error) {
@@ -2105,70 +2092,18 @@ function AuthenticatedContent({
     return "max-w-[85%] sm:max-w-2xl";
   }, [conversationWidth]);
 
-  // Dynamic Context Usage computation (Image 3)
+  const activeTelemetry = useMemo(() =>
+    telemetryByConversationRef.current.get(conversationId) ?? conversations.find(c => c.id === conversationId)?.telemetry,
+    [conversationId, conversations, telemetryRevision]);
+
   const contextUsage = useMemo<ContextUsageData>(() => {
-    // Dynamic breakdown from token-meter if available, fallback to baseline estimates
-    const systemPromptTokens = backendContextBreakdown?.systemPromptTokens ?? 850;
-    const toolsTokens = backendContextBreakdown?.toolsTokens ?? 950;
-
-    // Estimate tokens dynamically from active conversation messages (chars / ~3.8)
-    const messagesTokens = Math.round(
-      messages.reduce((sum, msg) => {
-        const contentChars = (msg.content || "").length;
-        const thinkingChars = (msg.thinking || "").length;
-        const toolCallsChars = msg.toolCalls ? JSON.stringify(msg.toolCalls).length : 0;
-        let traceStepsChars = 0;
-        if (msg.traceSteps) {
-          for (const step of msg.traceSteps) {
-            if (step.type === "tool" && step.result) {
-              traceStepsChars += (typeof step.result === "string" ? step.result : JSON.stringify(step.result)).length;
-            }
-          }
-        }
-        let attachmentTokens = 0;
-        if (msg.attachments) {
-          for (const att of msg.attachments) {
-            if (att.type === "image") attachmentTokens += 1600;
-            else if (att.type === "video") attachmentTokens += 3200;
-            else attachmentTokens += Math.round((att.size || 0) / 4);
-          }
-        }
-        return sum + (contentChars + thinkingChars + toolCallsChars + traceStepsChars) / 3.8 + attachmentTokens;
-      }, 0)
-    );
-
-    const modelLimit =
-      activeModelItem?.contextWindow && activeModelItem.contextWindow >= 200_000
-        ? activeModelItem.contextWindow
-        : getModelContextLimit(
-            activeModelItem?.id || activeModelItem?.name,
-            backendContextBreakdown?.totalTokens ?? 1_000_000
-          );
-    const totalTokens = modelLimit;
-
-    // If we have verified ground-truth usage from the LLM provider API:
-    let usedTokens: number;
-    if (lastKnownLlmUsage && lastKnownLlmUsage.totalTokens > 0) {
-      usedTokens = Math.max(lastKnownLlmUsage.totalTokens, systemPromptTokens + toolsTokens + messagesTokens);
-    } else if (backendContextBreakdown?.usedTokens) {
-      usedTokens = Math.max(backendContextBreakdown.usedTokens, systemPromptTokens + toolsTokens + messagesTokens);
-    } else {
-      usedTokens = systemPromptTokens + toolsTokens + messagesTokens;
-    }
-
-    return {
-      usedTokens,
-      totalTokens,
-      systemPromptTokens,
-      toolsTokens,
-      messagesTokens,
-    };
-  }, [messages, activeModelItem, lastKnownLlmUsage, backendContextBreakdown]);
-
-  const contextUsageRef = React.useRef(contextUsage);
-  useEffect(() => {
-    contextUsageRef.current = contextUsage;
-  }, [contextUsage]);
+    const snapshot = activeTelemetry?.context;
+    const totalTokens = getModelContextLimit(activeModelItem?.id || activeModelItem?.name,
+      activeModelItem?.contextWindow ?? snapshot?.totalTokens);
+    if (snapshot) return { ...snapshot, totalTokens };
+    const messagesTokens = estimateVisibleContext(messages);
+    return { usedTokens: messagesTokens, totalTokens, messagesTokens };
+  }, [messages, activeModelItem, activeTelemetry]);
 
   const activeModelItemRef = React.useRef(activeModelItem);
   useEffect(() => {
@@ -2177,9 +2112,7 @@ function AuthenticatedContent({
 
   const handleModelChange = useCallback((modelItem: ModelItem) => {
     const limit =
-      modelItem.contextWindow && modelItem.contextWindow >= 200_000
-        ? modelItem.contextWindow
-        : getModelContextLimit(modelItem.id || modelItem.name);
+      getModelContextLimit(modelItem.id || modelItem.name, modelItem.contextWindow);
     const enrichedItem: ModelItem = {
       ...modelItem,
       contextWindow: limit,
@@ -2219,6 +2152,14 @@ function AuthenticatedContent({
           (target.model && modelItem.name && target.model.toLowerCase() === modelItem.name.toLowerCase()));
       if (target && chosenId && !isAlreadySameModel) {
         target.model = chosenId;
+        const telemetry = telemetryByConversationRef.current.get(currentId) ?? target.telemetry;
+        if (telemetry?.context) {
+          const next = { ...telemetry, context: { ...telemetry.context, model: chosenId, totalTokens: limit, updatedAt: Date.now() } };
+          telemetryByConversationRef.current.set(currentId, next);
+          target.telemetry = next;
+          target.contextUsage = next.context;
+          setTelemetryRevision(revision => revision + 1);
+        }
         // Keep target.updatedAt untouched so changing the model does NOT bump/reorder history!
         saveConversation(target);
         setConversations(loadConversations());
@@ -2226,98 +2167,26 @@ function AuthenticatedContent({
     }
   }, []);
 
-  // Dynamic Conversation Metrics for footer bar (Image 2)
   const conversationMetrics = useMemo<ConversationMetrics | undefined>(() => {
     if (messages.length === 0) return undefined;
-
-    const userMessages = messages.filter((m) => m.role === "user");
-    const assistantMessages = messages.filter((m) => m.role === "assistant");
-    const turns = Math.max(1, userMessages.length);
-
-    let totalToolCalls = 0;
-    let actualToolDurationMs = 0;
-    let actualLlmDurationMs = 0;
-
-    for (const m of assistantMessages) {
-      if (m.durationMs && m.durationMs > 0) {
-        actualLlmDurationMs += m.durationMs;
-      }
-      if (m.toolCalls) totalToolCalls += m.toolCalls.length;
-      if (m.traceSteps) {
-        for (const step of m.traceSteps) {
-          if (step.type === "tool" && step.durationMs) {
-            actualToolDurationMs += step.durationMs;
-          }
+    const usage = summarizeTelemetry(activeTelemetry);
+    const assistants = messages.filter(m => m.role === "assistant");
+    const tools = new Map<string, { durationMs?: number }>();
+    for (const message of assistants) {
+      for (const tool of message.toolCalls ?? []) tools.set(tool.id, {});
+      for (const step of message.traceSteps ?? []) {
+        if (step.type === "tool" && (step.toolCallId || tools.has(step.id))) {
+          tools.set(step.toolCallId || step.id, { durationMs: step.durationMs });
         }
       }
     }
-    const steps = Math.max(1, assistantMessages.length + totalToolCalls);
-
-    // Real tracked execution durations
-    const toolDurationMs = actualToolDurationMs > 0 ? actualToolDurationMs : Math.max(0, totalToolCalls * 800);
-    const estimatedLlmMs = actualLlmDurationMs > 0 ? actualLlmDurationMs : Math.max(1000, turns * 2500);
-
-    const outputTokens =
-      lastKnownLlmUsage?.completionTokens && lastKnownLlmUsage.completionTokens > 0
-        ? lastKnownLlmUsage.completionTokens
-        : Math.max(
-            0,
-            Math.round(
-              assistantMessages.reduce(
-                (sum, m) => sum + (m.content?.length || 0) / 4 + (m.thinking?.length || 0) / 4,
-                0
-              )
-            )
-          );
-
-    // Prompt tokens: Ground-truth from provider response if available, or token-meter projection
-    const inputTokens =
-      lastKnownLlmUsage?.promptTokens && lastKnownLlmUsage.promptTokens > 0
-        ? lastKnownLlmUsage.promptTokens
-        : (backendContextBreakdown?.usedTokens ?? contextUsage.usedTokens);
-
-    const ttftSeconds =
-      estimatedLlmMs > 0
-        ? Math.max(0.2, +((estimatedLlmMs / 1000) * 0.15).toFixed(1))
-        : 0.8;
-    const tokPerSec =
-      outputTokens > 0 && estimatedLlmMs > 0
-        ? Math.max(1, Math.round(outputTokens / (estimatedLlmMs / 1000)))
-        : 58;
-
-    // Real cache hit rate from provider when available, otherwise 0% (no synthetic dummy formula)
-    const cacheHitRate =
-      lastKnownLlmUsage?.cacheHitRate !== undefined
-        ? lastKnownLlmUsage.cacheHitRate
-        : 0;
-
-    const totalTokens =
-      lastKnownLlmUsage?.totalTokens && lastKnownLlmUsage.totalTokens > 0
-        ? lastKnownLlmUsage.totalTokens
-        : inputTokens + outputTokens;
-
-    const cachedInputTokens = lastKnownLlmUsage?.cacheReadTokens ?? 0;
-    const uncachedInputTokens =
-      lastKnownLlmUsage?.promptTokens !== undefined
-        ? Math.max(0, lastKnownLlmUsage.promptTokens - cachedInputTokens)
-        : Math.max(0, inputTokens - cachedInputTokens);
-
     return {
-      turns,
-      steps,
-      llmDurationMs: estimatedLlmMs,
-      toolDurationMs,
-      ttftSeconds,
-      tokPerSec,
-      cacheHitRate,
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      cachedInputTokens,
-      uncachedInputTokens,
-      reasoningTokens: lastKnownLlmUsage?.reasoningTokens,
+      ...usage, turns: messages.filter(m => m.role === "user").length,
+      steps: activeTelemetry ? usage.modelRequests + Math.max(usage.toolCalls, tools.size) : undefined, toolCalls: Math.max(usage.toolCalls, tools.size),
+      toolDurationMs: usage.toolDurationMs,
+      workingDurationMs: assistants.reduce((n, m) => n + (m.durationMs ?? 0), 0) + (isExecuting ? liveDurationMs : 0),
     };
-  }, [messages, lastKnownLlmUsage, backendContextBreakdown]);
+  }, [messages, activeTelemetry, isExecuting, liveDurationMs]);
 
   // Smart auto-scroll: pause when user scrolls up, resume when user is near bottom
   const isAutoScrollEnabledRef = useRef<boolean>(true);
@@ -2509,6 +2378,23 @@ function AuthenticatedContent({
         }
       }
 
+      if (isTelemetryEvent(event)) {
+        const stored = loadConversations();
+        const target = stored.find(c => c.id === targetConvoId);
+        const previous = telemetryByConversationRef.current.get(targetConvoId) ?? target?.telemetry ?? telemetryForHistory(target?.messages ?? targetMsgs);
+        const telemetry = reduceTelemetry(previous, event);
+        telemetryByConversationRef.current.set(targetConvoId, telemetry);
+        setTelemetryRevision(revision => revision + 1);
+        if (target) {
+          target.telemetry = telemetry;
+          if (telemetry.context) target.contextUsage = telemetry.context;
+          saveConversation(target);
+        }
+        for (const request of Object.values(telemetry.requests)) {
+          if (request.totalTokens !== undefined && request !== previous?.requests[request.requestId]) localDb.recordModelRequest(targetConvoId, request).catch(() => {});
+        }
+      }
+
       if (event.type === "token") {
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
@@ -2642,7 +2528,7 @@ function AuthenticatedContent({
             );
             const steps = (last.traceSteps || []).map((st) => {
               if (st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)) {
-                const durationMs = st.startTime ? Math.max(1, Date.now() - st.startTime) : (st.durationMs || 50);
+                const durationMs = event.durationMs ?? st.durationMs;
                 return { ...st, result: event.result, isError: event.isError, durationMs };
               }
               return st;
@@ -2654,31 +2540,6 @@ function AuthenticatedContent({
             };
             targetMsgs = [...targetMsgs];
             targetMsgs[lastIdx] = updated;
-
-            if (event.toolName) {
-              const matchingStep = steps.find(
-                (st) => st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
-              );
-              const durationMs = matchingStep?.durationMs ?? 50;
-              const rawArgs = JSON.stringify(event.args ?? matchingStep?.args ?? {});
-              const rawResult = typeof event.result === "string" ? event.result : JSON.stringify(event.result ?? {});
-              const promptTokens = Math.max(1, Math.ceil(rawArgs.length / 4));
-              const completionTokens = Math.max(1, Math.ceil(rawResult.length / 4));
-              const totalTokens = promptTokens + completionTokens;
-
-              localDb.recordRequestLog({
-                requestId: `tool_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                model: event.toolName,
-                conversationId: targetConvoId,
-                promptTokens,
-                completionTokens,
-                totalTokens,
-                durationMs,
-                status: event.isError ? 500 : 200,
-                toolNames: [event.toolName],
-                createdAt: Date.now(),
-              }).catch(() => {});
-            }
           }
         }
         if (event.toolName === "ask_question") {
@@ -2723,87 +2584,6 @@ function AuthenticatedContent({
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
           setMessages(targetMsgs);
-        }
-      } else if (event.type === "context_update") {
-        const sys = event.systemPromptTokens ?? 850;
-        const tls = event.toolsTokens ?? 950;
-        const msg = event.messagesTokens ?? 0;
-        const used = event.usedTokens ?? sys + tls + msg;
-        const total = event.totalTokens ?? (activeModelItemRef.current?.contextWindow || 1_048_576);
-
-        setBackendContextBreakdown({
-          systemPromptTokens: sys,
-          toolsTokens: tls,
-          messagesTokens: msg,
-          usedTokens: used,
-          totalTokens: total,
-        });
-
-        const stored = loadConversations();
-        const target = stored.find((c) => c.id === targetConvoId);
-        if (target) {
-          target.contextUsage = {
-            usedTokens: used,
-            totalTokens: total,
-            systemPromptTokens: sys,
-            toolsTokens: tls,
-            messagesTokens: msg,
-          };
-          saveConversation(target);
-        }
-      } else if (event.type === "usage") {
-        const usage = event.usage || event;
-        const promptTokens = Math.max(0, Math.round(Number(usage.promptTokens ?? usage.prompt_tokens ?? 0) || 0));
-        const completionTokens = Math.max(0, Math.round(Number(usage.completionTokens ?? usage.completion_tokens ?? 0) || 0));
-        const totalTokens = Math.max(0, Math.round(Number(usage.totalTokens ?? usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
-        const cacheReadTokens = usage.cacheReadTokens !== undefined ? Math.max(0, Math.round(Number(usage.cacheReadTokens) || 0)) : undefined;
-        const cacheWriteTokens = usage.cacheWriteTokens !== undefined ? Math.max(0, Math.round(Number(usage.cacheWriteTokens) || 0)) : undefined;
-        const reasoningTokens = usage.reasoningTokens !== undefined ? Math.max(0, Math.round(Number(usage.reasoningTokens) || 0)) : undefined;
-        const cacheHitRate = usage.cacheHitRate !== undefined ? Math.max(0, Math.round(Number(usage.cacheHitRate) || 0)) : undefined;
-
-        if (totalTokens > 0) {
-          if (targetConvoId === conversationIdRef.current) {
-            setLastKnownLlmUsage({
-              promptTokens,
-              completionTokens,
-              totalTokens,
-              cacheReadTokens,
-              cacheWriteTokens,
-              reasoningTokens,
-              cacheHitRate,
-            });
-          }
-          const stored = loadConversations();
-          const target = stored.find((c) => c.id === targetConvoId);
-          if (target) {
-            const sys = backendContextBreakdown?.systemPromptTokens ?? target.contextUsage?.systemPromptTokens ?? 850;
-            const tls = backendContextBreakdown?.toolsTokens ?? target.contextUsage?.toolsTokens ?? 950;
-            target.contextUsage = {
-              usedTokens: totalTokens,
-              totalTokens: target.contextUsage?.totalTokens || (activeModelItemRef.current?.contextWindow || 1_048_576),
-              systemPromptTokens: sys,
-              toolsTokens: tls,
-              messagesTokens: Math.max(0, totalTokens - (sys + tls)),
-            };
-            saveConversation(target);
-          }
-
-          // Record LLM request directly to local desktop Dexie database
-          localDb.recordRequestLog({
-            requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-            model:
-              target?.model ||
-              activeModelItemRef.current?.id ||
-              activeModelItemRef.current?.name ||
-              "default",
-            conversationId: targetConvoId,
-            promptTokens,
-            completionTokens,
-            totalTokens,
-            durationMs: usage.durationMs ?? 1200,
-            status: 200,
-            createdAt: Date.now(),
-          }).catch(() => {});
         }
       } else if (event.type === "approval_request") {
         const approvalData: ApprovalRequestData = event.approval || {
@@ -3085,7 +2865,8 @@ function AuthenticatedContent({
         if (target) {
           target.messages = targetMsgs;
           target.updatedAt = Date.now();
-          target.contextUsage = contextUsageRef.current;
+          target.telemetry = telemetryByConversationRef.current.get(targetConvoId) ?? target.telemetry;
+          target.contextUsage = target.telemetry?.context ?? target.contextUsage;
           saveConversation(target);
           setConversations(loadConversations());
         }
@@ -3311,7 +3092,8 @@ function AuthenticatedContent({
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: currentStreamMessages,
-      contextUsage: contextUsage,
+      contextUsage,
+      telemetry: telemetryByConversationRef.current.get(conversationId) ?? activeTelemetry,
       mode: effectiveMode,
       model: chosenModel,
     };
@@ -3332,6 +3114,7 @@ function AuthenticatedContent({
           conversationId,
           authToken: token || undefined,
           maxOutputTokens,
+          contextWindow: activeModelItemRef.current?.contextWindow,
         });
 
         if (!res.success && res.error) {
@@ -3673,7 +3456,6 @@ function AuthenticatedContent({
     setConversationId(newSessionId);
     conversationIdRef.current = newSessionId;
     setEditingPrompt("");
-    setLastKnownLlmUsage(null);
     setCurrentMode(getDefaultAgentMode());
 
     // Reset right pane for fresh new chat session - default closed
@@ -3766,7 +3548,7 @@ function AuthenticatedContent({
         } catch {}
       }
       if (effectiveModel) {
-        const limit = getModelContextLimit(effectiveModel);
+        const limit = getModelContextLimit(effectiveModel, target?.telemetry?.context?.model === effectiveModel ? target.contextUsage?.totalTokens : undefined);
         setActiveModelItem((prev) => ({
           id: effectiveModel!,
           name: effectiveModel!,
@@ -3782,23 +3564,6 @@ function AuthenticatedContent({
       }
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
-      if (target?.contextUsage?.usedTokens) {
-        setLastKnownLlmUsage({
-          promptTokens: target.contextUsage.usedTokens,
-          completionTokens: 0,
-          totalTokens: target.contextUsage.usedTokens,
-        });
-        setBackendContextBreakdown({
-          systemPromptTokens: target.contextUsage.systemPromptTokens ?? 850,
-          toolsTokens: target.contextUsage.toolsTokens ?? 950,
-          messagesTokens: target.contextUsage.messagesTokens ?? 0,
-          usedTokens: target.contextUsage.usedTokens ?? 0,
-          totalTokens: target.contextUsage.totalTokens ?? 1_048_576,
-        });
-      } else {
-        setLastKnownLlmUsage(null);
-        setBackendContextBreakdown(null);
-      }
       restoreConversationRightPaneState(id);
       return;
     }
@@ -3828,7 +3593,7 @@ function AuthenticatedContent({
         } catch {}
       }
       if (effectiveModel) {
-        const limit = getModelContextLimit(effectiveModel);
+        const limit = getModelContextLimit(effectiveModel, target?.telemetry?.context?.model === effectiveModel ? target.contextUsage?.totalTokens : undefined);
         setActiveModelItem((prev) => ({
           id: effectiveModel!,
           name: effectiveModel!,
@@ -3844,28 +3609,12 @@ function AuthenticatedContent({
       }
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
-      if (target.contextUsage?.usedTokens) {
-        setLastKnownLlmUsage({
-          promptTokens: target.contextUsage.usedTokens,
-          completionTokens: 0,
-          totalTokens: target.contextUsage.usedTokens,
-        });
-        setBackendContextBreakdown({
-          systemPromptTokens: target.contextUsage.systemPromptTokens ?? 850,
-          toolsTokens: target.contextUsage.toolsTokens ?? 950,
-          messagesTokens: target.contextUsage.messagesTokens ?? 0,
-          usedTokens: target.contextUsage.usedTokens ?? 0,
-          totalTokens: target.contextUsage.totalTokens ?? 1_048_576,
-        });
-      } else {
-        setLastKnownLlmUsage(null);
-        setBackendContextBreakdown(null);
-      }
       restoreConversationRightPaneState(target.id);
     }
   };
 
   const handleDeleteConversation = (id: string) => {
+    telemetryByConversationRef.current.delete(id);
     deleteConversation(id);
     convoRightPaneMapRef.current.delete(id);
     removeStoredRightPaneState(id);

@@ -1,3 +1,5 @@
+import { getModelContextLimit } from "../../lib/model-context";
+import { estimateMessage } from "@const/agent/token-meter";
 import { ROUTER_DEFAULT_MODELS } from "../../lib/router-models";
 import { modelDisplayName, uniqueModelsById, resolveModelId } from "../../lib/model-identity";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
@@ -74,7 +76,7 @@ function formatTokenDisplay(tokens: number): string {
 }
 
 function formatDurationDisplay(ms: number): string {
-  if (ms < 1000) return `${Math.max(1, Math.round(ms / 1000))}s`;
+  if (ms < 1000) return `${(Math.max(0, ms) / 1000).toFixed(2)}s`;
   const sec = Math.round(ms / 1000);
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
@@ -287,17 +289,24 @@ export async function parseUploadedFiles(files: FileList | File[], conversationI
 
 export interface ConversationMetrics {
   turns: number;
-  steps: number;
-  llmDurationMs: number;
-  toolDurationMs: number;
-  ttftSeconds: number;
-  tokPerSec: number;
-  cacheHitRate: number;
+  steps?: number;
+  modelRequests: number;
+  toolCalls: number;
+  hasUsage: boolean;
+  incompleteUsage: boolean;
+  workingDurationMs: number;
+  llmDurationMs?: number;
+  toolDurationMs?: number;
+  waitingDurationMs?: number;
+  ttftSeconds?: number;
+  tokPerSec?: number;
+  cacheHitRate?: number;
   inputTokens: number;
   outputTokens: number;
   totalTokens?: number;
   cachedInputTokens?: number;
   uncachedInputTokens?: number;
+  cacheWriteTokens?: number;
   reasoningTokens?: number;
 }
 
@@ -322,24 +331,7 @@ export interface ModelItem {
   contextWindow?: number;
 }
 
-export function getModelContextLimit(modelId?: string, fallback?: number): number {
-  if (!modelId) return fallback && fallback > 0 ? fallback : 1_000_000;
-  const id = modelId.toLowerCase().trim();
-  if (id.includes("luna") || id === "gpt-6-luna" || id === "combo/auto" || id === "combo/fast") return 272_000;
-  if (id.includes("gemini")) return 1_048_576;
-  if (
-    id.includes("glm") ||
-    id.includes("deepseek") ||
-    id.includes("qwen") ||
-    id.includes("coding") ||
-    id.startsWith("combo")
-  ) {
-    return 1_000_000;
-  }
-  if (id.includes("claude")) return 200_000;
-  if (id.includes("gpt-4") || id.includes("gpt-3.5")) return 128_000;
-  return fallback && fallback > 0 ? fallback : 1_000_000;
-}
+export { getModelContextLimit } from "../../lib/model-context";
 
 export const INITIAL_DEFAULT_MODELS: ModelItem[] = ROUTER_DEFAULT_MODELS.map((model) => ({ ...model, name: model.displayName }));
 
@@ -905,9 +897,9 @@ export function ChatCard({
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
-      contextWindow: getModelContextLimit(selectedModel),
+      contextWindow: getModelContextLimit(selectedModel, contextUsage?.totalTokens),
     };
-  }, [models, selectedModel]);
+  }, [models, selectedModel, contextUsage?.totalTokens]);
 
   useEffect(() => {
     if (currentModelItem) {
@@ -1204,37 +1196,20 @@ export function ChatCard({
   );
 
   // Real-time calculation of tokens for draft prompt and pending attachments
-  const draftInputTokens = useMemo(() => {
-    let tokens = 0;
-    if (prompt && prompt.trim().length > 0) {
-      tokens += Math.max(1, Math.ceil(prompt.trim().length / 3.8));
-    }
-    if (attachments && attachments.length > 0) {
-      for (const att of attachments) {
-        if (att.type === "image") {
-          tokens += 258;
-        } else if (att.size && att.size > 0) {
-          tokens += Math.max(10, Math.ceil(att.size / 3.8));
-        } else {
-          tokens += 50;
-        }
-      }
-    }
-    return tokens;
-  }, [prompt, attachments]);
+  const draftInputTokens = useMemo(() =>
+    prompt.trim() || attachments.length
+      ? estimateMessage({ role: "user", content: prompt, attachments }) : 0,
+    [prompt, attachments]);
 
   const modelContextLimit = useMemo(() => {
     const modelId = currentModelItem?.id || selectedModel || "";
     const explicitLimit = currentModelItem?.contextWindow;
-    if (explicitLimit && explicitLimit >= 200_000) {
-      return explicitLimit;
-    }
-    return getModelContextLimit(modelId, contextUsage?.totalTokens ?? 1_000_000);
+    return getModelContextLimit(modelId, contextUsage?.totalTokens ?? explicitLimit);
   }, [currentModelItem, selectedModel, contextUsage?.totalTokens]);
 
   const totalTokens = modelContextLimit > 0 ? modelContextLimit : 1_000_000;
-  const systemPromptTokens = contextUsage?.systemPromptTokens ?? 850;
-  const toolsTokens = contextUsage?.toolsTokens ?? 950;
+  const systemPromptTokens = contextUsage?.systemPromptTokens ?? 0;
+  const toolsTokens = contextUsage?.toolsTokens ?? 0;
   const messagesTokens = contextUsage?.messagesTokens ?? 0;
   const effectiveMessagesTokens = Math.max(
     messagesTokens,
@@ -2251,7 +2226,7 @@ export function ChatCard({
       {/* Active Conversation Footer Telemetry Bar */}
       {compact && (metrics || shouldShowContextUsage) && (() => {
         const convTokens = metrics ? (metrics.totalTokens ?? (metrics.inputTokens + metrics.outputTokens)) : 0;
-        const cachedInputTokens = metrics ? (metrics.cachedInputTokens ?? Math.round(metrics.inputTokens * (metrics.cacheHitRate / 100))) : 0;
+        const cachedInputTokens = metrics ? (metrics.cachedInputTokens ?? Math.round(metrics.inputTokens * ((metrics.cacheHitRate ?? 0) / 100))) : 0;
         const uncachedInputTokens = metrics ? (metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens)) : 0;
 
         return (
@@ -2268,7 +2243,7 @@ export function ChatCard({
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>
-                        {metrics.turns} {metrics.turns === 1 ? "turn" : "turns"} &middot; {metrics.steps} steps &middot; {metrics.tokPerSec} tok/s
+                        {t(metrics.turns === 1 ? "workbench.telemetryTurn" : "workbench.telemetryTurns").replace("{count}", String(metrics.turns))} &middot; {t(metrics.steps === 1 ? "workbench.telemetryStep" : "workbench.telemetrySteps").replace("{count}", String(metrics.steps ?? "—"))} &middot; {metrics.tokPerSec === undefined ? "—" : metrics.tokPerSec.toFixed(1)} tok/s
                       </span>
                     </button>
                   </PopoverTrigger>
@@ -2283,21 +2258,37 @@ export function ChatCard({
                       <span className="font-medium text-[13px] text-foreground">{t("workbench.sessionStatistics")}</span>
                     </div>
                     <div className="space-y-2 text-[12.5px] font-sans">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryModelRequests")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.modelRequests || "—"}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryToolCalls")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.toolCalls}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryWorkingTime")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{formatDurationDisplay(metrics.workingDurationMs)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">{t("workbench.llmTime")}</span>
-                        <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.llmDurationMs)}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.llmDurationMs === undefined ? "—" : formatDurationDisplay(metrics.llmDurationMs)}</span>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <span className="text-muted-foreground">{t("workbench.toolTime")}</span>
-                        <span className="tabular-nums text-foreground">{formatDurationDisplay(metrics.toolDurationMs)}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.toolDurationMs === undefined ? "—" : formatDurationDisplay(metrics.toolDurationMs)}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
-                        <span className="tabular-nums text-foreground">{metrics.ttftSeconds.toFixed(1)}s</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryWaitingTime")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.waitingDurationMs === undefined ? "—" : formatDurationDisplay(metrics.waitingDurationMs)}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Tokens per second (TPS)</span>
-                        <span className="tabular-nums text-foreground">{metrics.tokPerSec} tok/s</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryTtft")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.ttftSeconds === undefined ? "—" : `${metrics.ttftSeconds.toFixed(2)}s`}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryTps")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.tokPerSec === undefined ? "—" : `${metrics.tokPerSec.toFixed(1)} tok/s`}</span>
                       </div>
                     </div>
                   </PopoverContent>
@@ -2318,8 +2309,8 @@ export function ChatCard({
                           ? "text-[#e79737] hover:text-[#ff9838] hover:bg-[#e79737]/10 data-[state=open]:bg-[#e79737]/15"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground"
                       )}
-                      title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
-                      aria-label="Context window usage"
+                      title={`${t("workbench.telemetryContextTitle")}: ~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)}`}
+                      aria-label={t("workbench.telemetryContextTitle")}
                     >
                       <svg
                         className="w-3.5 h-3.5 shrink-0 transform -rotate-90"
@@ -2343,7 +2334,7 @@ export function ChatCard({
                           strokeWidth="2.5"
                           strokeDasharray={56.55}
                           strokeDashoffset={
-                            56.55 - (56.55 * (rawPercentUsed > 0 ? Math.max(1, safePercent) : 0)) / 100
+                            56.55 - (56.55 * (rawPercentUsed > 0 ? safePercent : 0)) / 100
                           }
                           strokeLinecap="round"
                           className={cn(
@@ -2369,79 +2360,80 @@ export function ChatCard({
                     {/* Header: % of context used and tokens */}
                     <div className="flex items-center justify-between text-[13px]">
                       <span className="text-foreground font-medium">
-                        {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
+                        {t("workbench.telemetryContextUsed").replace("{percent}", rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`)}
                       </span>
                       <span className="font-sans tabular-nums text-[12px] text-muted-foreground">
                         ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
                       </span>
                     </div>
 
+                    <p className="text-[11px] text-muted-foreground">{t("workbench.telemetryContextEstimate")}</p>
                     {/* Multi-segment Horizontal Progress Bar */}
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex gap-0.5">
                       {systemPromptTokens > 0 && (
                         <div
                           className="bg-[#71717a] h-full transition-all"
                           style={{
-                            width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
+                            width: `${Math.min(100, (systemPromptTokens / totalTokens) * 100)}%`,
                           }}
-                          title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
+                          title={`${t("workbench.telemetrySystemPrompt")}: ~${formatTokenDisplay(systemPromptTokens)}`}
                         />
                       )}
                       {toolsTokens > 0 && (
                         <div
                           className="bg-[#a855f7] h-full transition-all"
                           style={{
-                            width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
+                            width: `${Math.min(100, (toolsTokens / totalTokens) * 100)}%`,
                           }}
-                          title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
+                          title={`${t("workbench.telemetryTools")}: ~${formatTokenDisplay(toolsTokens)}`}
                         />
                       )}
                       {effectiveMessagesTokens > 0 && (
                         <div
                           className="bg-[#3b82f6] h-full transition-all"
                           style={{
-                            width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
+                            width: `${Math.min(100, (effectiveMessagesTokens / totalTokens) * 100)}%`,
                           }}
-                          title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
+                          title={`${t("workbench.telemetryMessages")}: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
                         />
                       )}
                       {draftInputTokens > 0 && (
                         <div
                           className="bg-[#10b981] h-full transition-all"
                           style={{
-                            width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
+                            width: `${Math.min(100, (draftInputTokens / totalTokens) * 100)}%`,
                           }}
-                          title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
+                          title={`${t("workbench.telemetryCurrentInput")}: ~${formatTokenDisplay(draftInputTokens)}`}
                         />
                       )}
                     </div>
 
                     {/* Legend / Breakdown List */}
                     <div className="flex flex-col gap-2 pt-1 text-[12px]">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                          <span className="text-foreground">System prompt</span>
+                          <span className="text-foreground">{t("workbench.telemetrySystemPrompt")}</span>
                         </div>
                         <span className="font-sans tabular-nums text-foreground">
-                          ~{formatTokenDisplay(systemPromptTokens)}
+                          {contextUsage?.systemPromptTokens === undefined ? "—" : `~${formatTokenDisplay(systemPromptTokens)}`}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                          <span className="text-foreground">Tools</span>
+                          <span className="text-foreground">{t("workbench.telemetryTools")}</span>
                         </div>
                         <span className="font-sans tabular-nums text-foreground">
-                          ~{formatTokenDisplay(toolsTokens)}
+                          {contextUsage?.toolsTokens === undefined ? "—" : `~${formatTokenDisplay(toolsTokens)}`}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                          <span className="text-foreground">Messages</span>
+                          <span className="text-foreground">{t("workbench.telemetryMessages")}</span>
                         </div>
                         <span className="font-sans tabular-nums text-foreground">
                           ~{formatTokenDisplay(effectiveMessagesTokens)}
@@ -2449,10 +2441,10 @@ export function ChatCard({
                       </div>
 
                       {draftInputTokens > 0 && (
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
                             <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
-                            <span className="text-[#10b981] font-medium">Current input</span>
+                            <span className="text-[#10b981] font-medium">{t("workbench.telemetryCurrentInput")}</span>
                           </div>
                           <span className="font-sans tabular-nums text-[#10b981]">
                             ~{formatTokenDisplay(draftInputTokens)}
@@ -2463,7 +2455,7 @@ export function ChatCard({
                       <div className="flex items-center justify-between pt-1 border-t border-border/80">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/30 shrink-0" />
-                          <span className="text-muted-foreground">Available context</span>
+                          <span className="text-muted-foreground">{t("workbench.telemetryAvailable")}</span>
                         </div>
                         <span className="font-sans tabular-nums text-muted-foreground">
                           ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
@@ -2483,11 +2475,11 @@ export function ChatCard({
                     <button
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                      title="Token usage"
+                      title={t("workbench.telemetryUsage")}
                     >
                       <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                       <span>
-                        {formatTokenDisplay(convTokens)} tok &middot; Cache hit {metrics.cacheHitRate}%
+                        {metrics.hasUsage ? formatTokenDisplay(convTokens) : "—"} tok &middot; {t("workbench.telemetryCacheHit")} {metrics.cacheHitRate === undefined ? "—" : `${metrics.cacheHitRate.toFixed(1)}%`}
                       </span>
                     </button>
                   </PopoverTrigger>
@@ -2500,33 +2492,39 @@ export function ChatCard({
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Database className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium text-[13px] text-foreground">Token usage</span>
+                        <span className="font-medium text-[13px] text-foreground">{t("workbench.telemetryUsage")}</span>
                       </div>
                       <span className="tabular-nums font-medium text-foreground text-[13px]">
-                        {convTokens.toLocaleString()} tok
+                        {metrics.hasUsage ? convTokens.toLocaleString() : "—"} tok
                       </span>
                     </div>
+                    <p className="text-[11px] text-muted-foreground mb-2">{t("workbench.telemetryUsageScope")}</p>
                     <div className="space-y-2 text-[12.5px] font-sans">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Cache hit</span>
-                        <span className="tabular-nums text-foreground">{metrics.cacheHitRate}%</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryCacheHit")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.cacheHitRate === undefined ? "—" : `${metrics.cacheHitRate.toFixed(1)}%`}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Uncached input</span>
-                        <span className="tabular-nums text-foreground">{uncachedInputTokens.toLocaleString()} tok</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryUncached")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.hasUsage ? uncachedInputTokens.toLocaleString() : "—"} tok</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Cached input</span>
-                        <span className="tabular-nums text-foreground">{cachedInputTokens.toLocaleString()} tok</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryCached")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.hasUsage ? cachedInputTokens.toLocaleString() : "—"} tok</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Output</span>
-                        <span className="tabular-nums text-foreground">{metrics.outputTokens.toLocaleString()} tok</span>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryOutput")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.hasUsage ? metrics.outputTokens.toLocaleString() : "—"} tok</span>
                       </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">{t("workbench.telemetryCacheWrite")}</span>
+                        <span className="tabular-nums text-foreground shrink-0">{metrics.hasUsage ? (metrics.cacheWriteTokens ?? 0).toLocaleString() : "—"} tok</span>
+                      </div>
+                      {(!metrics.hasUsage || metrics.incompleteUsage) && <p className="text-muted-foreground">{t(metrics.hasUsage ? "workbench.telemetryPartialUsage" : "workbench.telemetryUnavailable")}</p>}
                       {metrics.reasoningTokens && metrics.reasoningTokens > 0 ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Reasoning tokens</span>
-                          <span className="tabular-nums text-foreground">{metrics.reasoningTokens.toLocaleString()} tok</span>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">{t("workbench.telemetryReasoning")}</span>
+                          <span className="tabular-nums text-foreground shrink-0">{metrics.reasoningTokens.toLocaleString()} tok</span>
                         </div>
                       ) : null}
                     </div>

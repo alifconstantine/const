@@ -1,3 +1,5 @@
+import { getModelContextLimit } from "../src/lib/model-context";
+import { isTelemetryEvent } from "../src/lib/chat-telemetry";
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "./browser/guest-policy";
 import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, protocol, net, session } from "electron";
 import { pathToFileURL } from "node:url";
@@ -122,6 +124,7 @@ export interface UserConfig {
     supportsThinking?: boolean;
     supportsTools?: boolean;
     inputTypes?: string[];
+    contextWindow?: number;
   }>;
   workspaceMemoryEnabled?: boolean;
   enableComputerUse?: boolean;
@@ -907,16 +910,7 @@ app.whenReady().then(() => {
               thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
-              contextWindow:
-                m.context_length ||
-                m.contextLength ||
-                m.context_window ||
-                m.contextWindow ||
-                (m.id?.toLowerCase().includes("luna")
-                  ? 272000
-                  : m.id?.toLowerCase().includes("gemini")
-                  ? 1048576
-                  : 1000000),
+              contextWindow: getModelContextLimit(m.id, m.context_length ?? m.contextLength ?? m.context_window ?? m.contextWindow),
             };
           });
         }
@@ -940,7 +934,7 @@ app.whenReady().then(() => {
         thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
         defaultThinkingLevel: (m as any).defaultThinkingLevel || "medium",
         maxOutputTokens: (m as any).maxOutputTokens || 65536,
-        contextWindow: (m as any).contextWindow || (m as any).context_window || 128000,
+        contextWindow: getModelContextLimit(m.id, (m as any).contextWindow ?? (m as any).context_window ?? 128000),
       };
     });
 
@@ -1166,6 +1160,7 @@ app.whenReady().then(() => {
         authToken?: string;
         maxOutputTokens?: number;
         maxTurns?: number;
+        contextWindow?: number;
       }
     ) => {
       const config = loadUserConfig();
@@ -1233,6 +1228,7 @@ app.whenReady().then(() => {
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         maxTurns: payload.maxTurns ?? 200,
+        contextWindow: getModelContextLimit(model, payload.contextWindow ?? modelDef?.contextWindow),
         onAskQuestion: (toolCallId, questions) => {
           return new Promise((resolve) => {
             pendingQuestions.set(toolCallId, resolve);
@@ -1290,6 +1286,9 @@ app.whenReady().then(() => {
         const updatedMessages = await agent.run(
           payload.messages,
           (agentEvent: any) => {
+            if (isTelemetryEvent(agentEvent)) {
+              conversationDb.recordTelemetry(convoId, agentEvent);
+            }
             eventForwarder.forward(agentEvent);
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
@@ -1312,6 +1311,7 @@ app.whenReady().then(() => {
             // Preserve rich UI messages with traceSteps/durationMs if already present
             const hasRichMessages = existingConvo?.messages && existingConvo.messages.length > 0;
             conversationDb.saveConversation({
+              ...existingConvo,
               id: convoId,
               title: existingConvo?.title || "New Task",
               project: payload.workspacePath || "Outside Project",

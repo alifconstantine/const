@@ -118,7 +118,7 @@ function UsageStatsInner({
 
   // 1. Reactive query from local Dexie database
   const localLogs = useLiveQuery(
-    () => db.requestLogs.reverse().sortBy("createdAt"),
+    () => localDb.getRequestLogs(),
     [refreshKey]
   );
 
@@ -155,47 +155,7 @@ function UsageStatsInner({
         };
       }
 
-      // Check conversation store
-      const convos = loadConversations();
-      if (!Array.isArray(convos) || convos.length === 0) {
-        return null;
-      }
-
-      let totalTokens = 0;
-      const modelMap = new Map<string, number>();
-      const dayMap = new Map<string, { tokens: number; count: number }>();
-
-      for (const c of convos) {
-        const used = c.contextUsage?.usedTokens || 0;
-        if (used > 0) {
-          totalTokens += used;
-
-          const model = c.model || activeModel || "gemini-3.8-flash";
-          modelMap.set(model, (modelMap.get(model) || 0) + used);
-
-          const d = new Date(c.updatedAt || c.createdAt || Date.now());
-          const yyyy = d.getFullYear();
-          const mm = String(d.getMonth() + 1).padStart(2, "0");
-          const dd = String(d.getDate()).padStart(2, "0");
-          const key = `${yyyy}-${mm}-${dd}`;
-
-          const existing = dayMap.get(key) || { tokens: 0, count: 0 };
-          existing.tokens += used;
-          existing.count += c.messages?.length || 1;
-          dayMap.set(key, existing);
-        }
-      }
-
-      if (totalTokens === 0) {
-        return null;
-      }
-
-      return {
-        totalTokens,
-        modelMap,
-        dayMap,
-        requestCount: convos.length,
-      };
+      return null;
     } catch {
       return null;
     }
