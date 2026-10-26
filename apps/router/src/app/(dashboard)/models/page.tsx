@@ -15,18 +15,18 @@ const MODEL_SAVINGS: Record<
   string,
   { savePercent: string; officialInput: string; officialOutput: string }
 > = {
-  "deepseek-v4.1-flash": { savePercent: "91.1%", officialInput: "$0.140", officialOutput: "$0.280" },
-  "qwen-3.8-omni-flash": { savePercent: "91.1%", officialInput: "$0.140", officialOutput: "$0.280" },
-  "glm-5.3-flash": { savePercent: "87.5%", officialInput: "$0.100", officialOutput: "$0.200" },
-  "gemini-3.8-flash": { savePercent: "73.3%", officialInput: "$0.075", officialOutput: "$0.300" },
-  "glm-5.3": { savePercent: "82.5%", officialInput: "$0.200", officialOutput: "$0.600" },
-  "minimax-m3.1-flash": { savePercent: "82.5%", officialInput: "$0.200", officialOutput: "$0.600" },
-  "qwen-3.8-max": { savePercent: "87.5%", officialInput: "$0.400", officialOutput: "$1.200" },
-  "gpt-6.1-sol": { savePercent: "84.0%", officialInput: "$1.500", officialOutput: "$6.000" },
-  "gpt-6-astra": { savePercent: "82.0%", officialInput: "$2.500", officialOutput: "$10.000" },
-  "claude-haiku-5.5": { savePercent: "86.3%", officialInput: "$0.800", officialOutput: "$4.000" },
-  "claude-sonnet-5.5": { savePercent: "73.7%", officialInput: "$3.000", officialOutput: "$15.000" },
-  "grok-4.7": { savePercent: "86.0%", officialInput: "$1.000", officialOutput: "$3.000" },
+  "deepseek-v4.1-flash": { savePercent: "91.7%", officialInput: "$0.150", officialOutput: "$0.600" },
+  "qwen-3.8-omni-flash": { savePercent: "91.7%", officialInput: "$0.150", officialOutput: "$0.470" },
+  "glm-5.3-flash": { savePercent: "91.7%", officialInput: "$0.150", officialOutput: "$0.500" },
+  "gemini-3.8-flash": { savePercent: "97.3%", officialInput: "$0.750", officialOutput: "$3.750" },
+  "glm-5.3": { savePercent: "97.5%", officialInput: "$1.400", officialOutput: "$4.400" },
+  "minimax-m3.1-flash": { savePercent: "76.7%", officialInput: "$0.150", officialOutput: "$0.600" },
+  "qwen-3.8-max": { savePercent: "97.5%", officialInput: "$2.000", officialOutput: "$6.000" },
+  "gpt-6.1-sol": { savePercent: "88.0%", officialInput: "$2.000", officialOutput: "$10.000" },
+  "gpt-6-astra": { savePercent: "95.5%", officialInput: "$10.000", officialOutput: "$50.000" },
+  "claude-haiku-5.5": { savePercent: "80.0%", officialInput: "$0.100", officialOutput: "$0.500" },
+  "claude-sonnet-5.5": { savePercent: "60.5%", officialInput: "$2.000", officialOutput: "$10.000" },
+  "grok-4.7": { savePercent: "93.0%", officialInput: "$2.000", officialOutput: "$6.000" },
 };
 
 export function ModelCatalog({

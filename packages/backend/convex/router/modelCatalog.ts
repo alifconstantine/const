@@ -263,9 +263,9 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     pricing: {
-      input: "$0.110",
-      cache: "$0.025",
-      output: "$0.550",
+      input: "$0.020",
+      cache: "$0.005",
+      output: "$0.100",
       unit: "/ 1M tokens",
     },
     inputTypes: ["text", "image"],
