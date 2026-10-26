@@ -105,6 +105,11 @@ export function SkillsSettings({
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   // List filter state
   const [searchQuery, setSearchQuery] = useState("");
+  const handleMarketplaceTabChange = (tab: "skills" | "plugins") => {
+    if (tab === marketplaceTab) return;
+    setSearchQuery("");
+    setMarketplaceTab(tab);
+  };
   const [selectedScope, setSelectedScope] = useState<"user" | "workspace">(
     "user",
   );
@@ -1181,29 +1186,33 @@ export function SkillsSettings({
               {t("marketplace.title")}
             </h1>
             <p className="text-sm text-[#969696] mt-1">
-              {t("marketplace.skillsIntro")}
+              {t(marketplaceTab === "skills" ? "marketplace.skillsIntro" : "marketplace.pluginUsageHint")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleOpenSkillsFolder}
-            className="text-[#969696] gap-2"
-          >
-            <Folder className="w-4 h-4" />
-            {t("marketplace.openFolder")}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setViewMode("upload")}
-            className="gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            {t("uploadBtn")}
-          </Button>
+          {marketplaceTab === "skills" && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleOpenSkillsFolder}
+                className="text-[#969696] gap-2"
+              >
+                <Folder className="w-4 h-4" />
+                {t("marketplace.openFolder")}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setViewMode("upload")}
+                className="gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                {t("uploadBtn")}
+              </Button>
+            </>
+          )}
           {onClose && (
             <Button
               variant="ghost"
@@ -1216,10 +1225,12 @@ export function SkillsSettings({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-5 text-sm">
+      <div className="flex items-center gap-5 text-sm" role="tablist" aria-label={t("marketplace.title")}>
         <button
           type="button"
-          onClick={() => setMarketplaceTab("skills")}
+          role="tab"
+          aria-selected={marketplaceTab === "skills"}
+          onClick={() => handleMarketplaceTabChange("skills")}
           className={cn(
             "py-2",
             marketplaceTab === "skills" ? "text-white" : "text-[#969696]",
@@ -1229,7 +1240,9 @@ export function SkillsSettings({
         </button>
         <button
           type="button"
-          onClick={() => setMarketplaceTab("plugins")}
+          role="tab"
+          aria-selected={marketplaceTab === "plugins"}
+          onClick={() => handleMarketplaceTabChange("plugins")}
           className={cn(
             "py-2",
             marketplaceTab === "plugins" ? "text-white" : "text-[#969696]",

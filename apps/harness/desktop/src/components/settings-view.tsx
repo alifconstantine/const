@@ -84,6 +84,7 @@ import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { ComputerUseSettings } from "./settings/computer-use-settings";
 import { UsageStatsView } from "./settings/usage-stats-view";
+import { WeeklyQuotaCard } from "./settings/weekly-quota-card";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
 import { playTaskCompletionSound } from "../lib/sound";
@@ -135,12 +136,6 @@ export const AVATAR_PRESETS = [
     svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231e293b"/><stop offset="100%" stop-color="%230f172a"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g6)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
   },
 ];
-
-function formatTokenDisplay(tokens: number): string {
-  if (tokens < 1000) return `${tokens}`;
-  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(1)}K`;
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
 
 export function SettingsView({
   open = true,
@@ -509,13 +504,6 @@ export function SettingsView({
 
   // Real-time reactive query for 7M Token Quota from Convex
   const quota = useQuery(api.router.quotas.getUserQuota, {});
-
-  // Compute remaining token percentage
-  const percentRemaining = useMemo(() => {
-    if (!quota) return 100;
-    const limit = quota.weeklyLimitTokens || 7_000_000;
-    return Math.max(0, Math.min(100, (quota.remainingTokens / limit) * 100));
-  }, [quota]);
 
   // Load config on mount or refresh
   useEffect(() => {
@@ -1180,32 +1168,7 @@ export function SettingsView({
                   </div>
                 </div>
 
-                {/* Token Quota Card */}
-                {quota && (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                      {t("settings.tokenAllocation")}
-                    </span>
-                    <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-[#262626] dark:text-white">{t("settings.weeklyQuota")}</span>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                          {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)} tokens
-                        </span>
-                      </div>
-                      <div className="w-full h-2 bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#22c55e] transition-all rounded-full"
-                          style={{ width: `${Math.max(2, percentRemaining)}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-[#737373] dark:text-[#969696]">
-                        <span>{t("settings.percentRemaining", { percent: percentRemaining.toFixed(1) })}</span>
-                        <span>{t("settings.resetsIn", { time: quota.resetsInText || "7 days" })}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <WeeklyQuotaCard quota={quota} />
               </div>
             ) : activeTab === "general" ? (
               /* --------------------------------------------------------- */

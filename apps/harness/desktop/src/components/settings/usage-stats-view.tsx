@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation } from "../../lib/i18n";
+import { WeeklyQuotaCard, type WeeklyQuota } from "./weekly-quota-card";
 import {
   cn,
   toast,
@@ -8,7 +9,6 @@ import {
 } from "@const/ui";
 import {
   RefreshCw,
-  Info,
   Terminal,
   Cpu,
   Wrench,
@@ -28,7 +28,7 @@ import {
 } from "../ui/github-activity";
 
 export interface UsageStatsViewProps {
-  quota?: any;
+  quota?: WeeklyQuota | null;
   activeModel?: string;
   user?: any;
 }
@@ -160,15 +160,6 @@ function UsageStatsInner({
       return null;
     }
   }, [localLogs, activeModel, refreshKey]);
-
-  // Quota & remaining tokens calculations
-  const weeklyLimit = quota?.weeklyLimitTokens ?? 7_000_000;
-  const remainingTokens = quota?.remainingTokens ?? 7_000_000;
-  const usedTokens = Math.max(0, weeklyLimit - remainingTokens);
-  const percentRemaining = Math.max(
-    0,
-    Math.min(100, (remainingTokens / weeklyLimit) * 100)
-  );
 
   // Normalize active model display name
   const modelDisplayName = useMemo(() => {
@@ -464,6 +455,8 @@ function UsageStatsInner({
           </button>
         </div>
 
+        <WeeklyQuotaCard quota={quota} />
+
         {/* ------------------------------------------------------------- */}
         {/* 5 KPI Metric Summary Cards (Strictly Real Data)               */}
         {/* ------------------------------------------------------------- */}
@@ -712,88 +705,8 @@ function UsageStatsInner({
           </div>
         </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* Model Usage Card (Strictly Real Data)                         */}
-        {/* ------------------------------------------------------------- */}
-        {/* ------------------------------------------------------------- */}
-        {/* Mid-Bottom Section: Weekly Quota & Model Usage (2-Column Grid)*/}
-        {/* ------------------------------------------------------------- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          {/* Card 1: Weekly Quota & Allocation */}
-          <div className="rounded-xl border border-[#dedee2] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#18181a] p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-[#262626] dark:text-white">
-                {t("settings.weeklyQuotaCard")}
-              </span>
-              <span className="font-sans tabular-nums text-[11px] font-medium px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2e] text-[#262626] dark:text-[#d4d4d4]">
-                {percentRemaining.toFixed(0)}% {t("settings.percentLeft")}
-              </span>
-            </div>
-
-            {/* Quota Progress Bar */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#737373] dark:text-[#969696] font-medium">
-                  {t("settings.tokenAllocation")}
-                </span>
-                <span className="font-sans tabular-nums text-[#262626] dark:text-white font-medium text-[11px]">
-                  {formatTokens(usedTokens)} / {formatTokens(weeklyLimit)}
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-[#e5e5e8] dark:bg-[#252528] overflow-hidden border border-[#dedee2] dark:border-[#38383e]">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all duration-300",
-                    percentRemaining > 50
-                      ? "bg-[#22c55e]"
-                      : percentRemaining > 20
-                      ? "bg-[#eab308]"
-                      : "bg-[#ef4444]"
-                  )}
-                  style={{ width: `${percentRemaining}%` }}
-                />
-              </div>
-            </div>
-
-            {/* 3 Metric Pills / Boxes */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
-                <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  {t("settings.remaining")}
-                </span>
-                <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
-                  {formatTokens(remainingTokens)}
-                </span>
-              </div>
-
-              <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
-                <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  {t("settings.limit")}
-                </span>
-                <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
-                  {formatTokens(weeklyLimit)}
-                </span>
-              </div>
-
-              <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-[#dedee2]/60 dark:border-[#333336] p-2 flex flex-col items-center text-center">
-                <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  {t("settings.resetsInLabel")}
-                </span>
-                <span className="text-sm font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-0.5">
-                  {quota?.resetsInText || "7d 0h"}
-                </span>
-              </div>
-            </div>
-
-            {/* Note footer */}
-            <div className="flex items-start gap-2 pt-1 text-[11px] text-[#737373] dark:text-[#969696] leading-tight">
-              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#737373] dark:text-[#969696]" />
-              <span>
-                {t("settings.quotaNote")}
-              </span>
-            </div>
-          </div>
-
+        {/* Model usage across local conversations. */}
+        <div>
           {/* Card 2: Model Usage Card (Strictly Real Data) */}
           <div className="rounded-xl border border-[#dedee2] dark:border-[#2f2f32] bg-[#f9f9fb] dark:bg-[#18181a] p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-3.5">
             <div className="flex items-center justify-between">

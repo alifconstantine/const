@@ -109,7 +109,11 @@ export function SkillsLibrary({
             type="button"
             role="tab"
             aria-selected={tab === value}
-            onClick={() => setTab(value)}
+            onClick={() => {
+              if (value === tab) return;
+              onQueryChange("");
+              setTab(value);
+            }}
             className={cn(
               "rounded-lg px-4 py-2 text-sm transition-colors",
               tab === value
