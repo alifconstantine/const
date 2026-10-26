@@ -1,7 +1,10 @@
 "use client";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
+import { HeadingReveal } from "@/components/ui/text-reveal";
 import { LINKS } from "@/lib/links";
+import { motion } from "framer-motion";
+
 const CAPABILITIES = [
   { index: 0, image: "/assets/image/landing/capability-plugins.png" },
   { index: 1, image: null },
@@ -15,13 +18,19 @@ export function CapabilitySection() {
   return (
     <section className="ch-section" id="features">
       <div className="ch-shell ch-shell-wide">
-        <h2 className="ch-title">{t("capabilities.title")}</h2>
+        <HeadingReveal>
+          <h2 className="ch-title">{t("capabilities.title")}</h2>
+        </HeadingReveal>
         <div className="ch-capabilities">
           {CAPABILITIES.map((item) => (
-            <article
+            <motion.article
               key={item.index}
               className="ch-capability"
               id={item.index === 4 ? "terminal" : undefined}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             >
               <div>
                 <h3 className="ch-capability-title">
@@ -54,7 +63,7 @@ export function CapabilitySection() {
                   <WorkbenchPreview compact />
                 )}
               </div>
-            </article>
+            </motion.article>
           ))}
         </div>
       </div>

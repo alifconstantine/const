@@ -3,7 +3,7 @@
 
 /*
  * Const Harness landing — design tokens.
- * Light theme mirrors the MiniMax marketing surface (white canvas, tight type),
+ * Light theme mirrors the modern marketing surface (white canvas, tight type),
  * dark theme mirrors the Const studio palette used by the desktop workbench.
  */
 :root {
@@ -44,10 +44,7 @@
     0 1px 2px rgba(0, 0, 0, 0.5), 0 18px 48px -20px rgba(0, 0, 0, 0.9);
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
+html,
 body {
   background-color: var(--ch-canvas);
   color: var(--ch-ink);
@@ -61,10 +58,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   *,
   *::before,
   *::after {

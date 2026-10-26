@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/context/I18nContext";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ConstLogoIcon } from "@const/ui";
 import { LINKS } from "@/lib/links";
 
 const ITEMS = [
@@ -38,13 +39,10 @@ export function Navbar() {
         {t("nav.skip")}
       </a>
       <div className="ch-header-inner">
-        <Link href="/" className="ch-brand">
-          <img
-            src="/assets/image/landing/harness-icon.png"
-            alt=""
-            className="ch-brand-mark"
-            width={26}
-            height={26}
+        <Link href="/" className="ch-brand group" aria-label="Const Harness">
+          <ConstLogoIcon
+            size="sm"
+            className="w-[26px] h-[26px] shrink-0 transition-transform group-hover:scale-105"
           />
           <span>Const Harness</span>
         </Link>

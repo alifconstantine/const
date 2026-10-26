@@ -2,16 +2,31 @@
 import { CalendarClock, Check, Terminal } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
+import { HeadingReveal } from "@/components/ui/text-reveal";
+import { motion } from "framer-motion";
 
 export function PlatformSection() {
   const { t } = useI18n();
   return (
     <section className="ch-section" id="platforms">
       <div className="ch-shell">
-        <h2 className="ch-title">{t("platform.title")}</h2>
+        <HeadingReveal>
+          <h2 className="ch-title">{t("platform.title")}</h2>
+        </HeadingReveal>
         <div className="ch-platform-grid">
           {([0, 1, 2] as const).map((index) => (
-            <article key={index} className="ch-platform-card">
+            <motion.article
+              key={index}
+              className="ch-platform-card"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{
+                duration: 0.6,
+                delay: index * 0.1,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
               <div className="ch-platform-visual">
                 {index === 0 ? (
                   <WorkbenchPreview compact />
@@ -54,7 +69,7 @@ export function PlatformSection() {
                       : "platform.scheduleCta",
                 )}
               </a>
-            </article>
+            </motion.article>
           ))}
         </div>
       </div>

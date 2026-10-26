@@ -10,8 +10,8 @@ export const en = {
   "nav.cta": "Download",
   "nav.menu": "Open menu",
   "nav.skip": "Skip to content",
-  "hero.subtitle":
-    "From coding to creative work, Const Harness connects your local files, tools, and browser. Research, build, run, and review the result in one desktop workspace.",
+  "hero.subtitle": "From coding to office work, Const Harness connects to your local files, tools, and browser to help you execute, organize, verify, and turn ideas into deliverable results.",
+  "hero.downloadButton": "Download Const Harness",
   "statement.title":
     "Const Harness is a desktop AI workbench for developers, researchers, and creators. Bring your projects, models, and tools together to turn an idea into working code, useful research, and finished creative work.",
   "tasks.title": "Every task, delivered with quality",
@@ -198,6 +198,21 @@ export const en = {
   "builds.back": "Back to home",
   "builds.arch": "Architecture",
   "builds.all": "All builds",
+  "preview.tagline": "Const Harness makes work easier.",
+  "preview.inputPlaceholder": "Enter a message... (type / for commands)",
+  "preview.smartAuth": "Smart authorization",
+  "preview.selectFolder": "Select folder",
+  "preview.local": "Local",
+  "preview.cloud": "Cloud",
+  "preview.quick.video": "Video generation",
+  "preview.quick.code": "Code",
+  "preview.quick.data": "Data analysis",
+  "preview.quick.general": "General tasks",
+  "preview.quick.ideas": "Ideas for you",
+  "preview.plugins": "Plugins",
+  "preview.scheduled": "Scheduled",
+  "preview.sites": "Sites",
+  "preview.remote": "Remote control",
 } as const;
 export type CopyKey = keyof typeof en;
 export type Copy = Record<CopyKey, string>;
