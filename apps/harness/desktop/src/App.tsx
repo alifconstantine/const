@@ -45,6 +45,7 @@ import { FileIcon } from "./components/workbench/file-icon";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
+import { ApprovalResponseGate, approvalResponseKey, removeMatchingApproval } from "./lib/approval-state";
 import { QuestionCard } from "./components/workbench/question-card";
 import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
 import { ChatMessageItem } from "./components/workbench/chat-message-item";
@@ -1592,8 +1593,14 @@ function AuthenticatedContent({
     }
   }, [conversationId]);
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, ApprovalRequestData>>(new Map());
-  const [isRespondingApproval, setIsRespondingApproval] = useState<boolean>(false);
+  const approvalResponseGateRef = useRef(new ApprovalResponseGate());
+  const [respondingApprovals, setRespondingApprovals] = useState<Set<string>>(new Set());
+  const activeRunIdsRef = useRef(new Map<string, string>());
+  const sendingConversationsRef = useRef(new Set<string>());
   const activeApproval = pendingApprovals.get(conversationId);
+  const isRespondingApproval = Boolean(activeApproval && respondingApprovals.has(
+    approvalResponseKey(conversationId, activeApproval.approvalId || activeApproval.id),
+  ));
   const [pendingQuestions, setPendingQuestions] = useState<
     Map<string, { toolCallId: string; questions: QuestionItem[] }>
   >(new Map());
@@ -2293,12 +2300,22 @@ function AuthenticatedContent({
 
     const unsubStarted = window.electron?.onSessionStarted?.((data) => {
       if (data?.conversationId) {
+        if (data.runId) activeRunIdsRef.current.set(data.conversationId, data.runId);
         setRunningConvoIds((prev) => new Set(prev).add(data.conversationId));
       }
     });
 
     const unsubEnded = window.electron?.onSessionEnded?.((data) => {
       if (data?.conversationId) {
+        const currentRunId = activeRunIdsRef.current.get(data.conversationId);
+        if (data.runId && currentRunId && data.runId !== currentRunId) return;
+        setPendingApprovals((prev) => {
+          const current = prev.get(data.conversationId);
+          if (!current || (data.runId && current.runId && current.runId !== data.runId)) return prev;
+          const next = new Map(prev);
+          next.delete(data.conversationId);
+          return next;
+        });
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
           next.delete(data.conversationId);
@@ -2336,6 +2353,7 @@ function AuthenticatedContent({
         if (queued && queued.length > 0) {
           const [nextItem, ...remaining] = queued;
           if (nextItem) {
+            queuedMessagesByConvoRef.current = { ...queuedMessagesByConvoRef.current, [data.conversationId]: remaining };
             setQueuedMessagesByConvo((prev) => ({
               ...prev,
               [data.conversationId]: remaining,
@@ -2366,6 +2384,8 @@ function AuthenticatedContent({
     const unsubscribe = window.electron.onAgentEvent((event: any) => {
       const targetConvoId = event.conversationId || conversationIdRef.current;
       if (!targetConvoId) return;
+      const currentRunId = activeRunIdsRef.current.get(targetConvoId);
+      if (event.runId && currentRunId && event.runId !== currentRunId) return;
 
       // Retrieve or initialize accumulated message list for this session
       let targetMsgs = activeSessionMessagesRef.current.get(targetConvoId);
@@ -2600,6 +2620,7 @@ function AuthenticatedContent({
           timestamp: event.timestamp || event.createdAt || Date.now(),
         };
         if (approvalData && (approvalData.id || approvalData.approvalId)) {
+          approvalData.runId = event.runId;
           setPendingApprovals((prev) => {
             const next = new Map(prev);
             next.set(targetConvoId, approvalData);
@@ -2610,12 +2631,7 @@ function AuthenticatedContent({
           }, 60);
         }
       } else if (event.type === "approval_resolved") {
-        setPendingApprovals((prev) => {
-          if (!prev.has(targetConvoId)) return prev;
-          const next = new Map(prev);
-          next.delete(targetConvoId);
-          return next;
-        });
+        if (event.approvalId) setPendingApprovals((prev) => removeMatchingApproval(prev, targetConvoId, event.approvalId));
       } else if (event.type === "todo_update") {
         setConversationTodos((prev) => {
           const next = new Map(prev);
@@ -2797,24 +2813,7 @@ function AuthenticatedContent({
           return next;
         });
 
-        const queued = queuedMessagesByConvoRef.current[targetConvoId];
-        if (queued && queued.length > 0) {
-          const [nextItem, ...remaining] = queued;
-          if (nextItem) {
-            setQueuedMessagesByConvo((prev) => ({
-              ...prev,
-              [targetConvoId]: remaining,
-            }));
-            setTimeout(() => {
-              handleSendMessageRef.current?.({
-                prompt: nextItem.prompt,
-                project: currentProjectRef.current || "Outside Project",
-                mode: currentModeRef.current,
-                attachments: nextItem.attachments,
-              });
-            }, 150);
-          }
-        }
+        // Queued messages are dispatched once, by session-ended after backend cleanup.
 
         setPendingApprovals((prev) => {
           if (!prev.has(targetConvoId)) return prev;
@@ -3015,7 +3014,8 @@ function AuthenticatedContent({
     attachments?: AttachedFile[];
     maxOutputTokens?: number;
   }) => {
-    if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting) return;
+    if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting || sendingConversationsRef.current.has(conversationId)) return;
+    sendingConversationsRef.current.add(conversationId);
 
     setEditingPrompt("");
 
@@ -3138,8 +3138,11 @@ function AuthenticatedContent({
           return next;
         });
         activeSessionMessagesRef.current.delete(conversationId);
+      } finally {
+        sendingConversationsRef.current.delete(conversationId);
       }
     } else {
+      sendingConversationsRef.current.delete(conversationId);
       setTimeout(() => {
         setMessages((prev) => {
           if (prev.length === 0) return prev;
@@ -3409,35 +3412,40 @@ function AuthenticatedContent({
     decision: ApprovalDecision,
     feedback?: string
   ) => {
-    if (!window.electron?.respondApproval) return;
-    setIsRespondingApproval(true);
-    try {
-      const res = await window.electron.respondApproval({
-        conversationId,
-        approvalId,
-        decision,
-        feedback,
-      });
-      if (!res.success) {
-        toast.error(res.error || "Failed to submit approval response");
-      } else {
-        if (decision === "full_access") {
-          setCurrentMode("full_access");
-          try {
-            localStorage.setItem("const_harness_default_mode", "full_access");
-          } catch {}
+    const respondApproval = window.electron?.respondApproval;
+    if (!respondApproval) return;
+    const targetConvoId = conversationId;
+    const key = approvalResponseKey(targetConvoId, approvalId);
+    await approvalResponseGateRef.current.run(key, async () => {
+      setRespondingApprovals((prev) => new Set(prev).add(key));
+      try {
+        const res = await respondApproval({
+          conversationId: targetConvoId,
+          approvalId,
+          decision,
+          feedback,
+        });
+        if (!res.success) {
+          toast.error(res.error || t("toast.failedToSubmitApproval"));
+        } else {
+          if (decision === "full_access") {
+            if (conversationIdRef.current === targetConvoId) setCurrentMode("full_access");
+            try {
+              localStorage.setItem("const_harness_default_mode", "full_access");
+            } catch {}
+          }
+          setPendingApprovals((prev) => removeMatchingApproval(prev, targetConvoId, approvalId));
         }
-        setPendingApprovals((prev) => {
-          const next = new Map(prev);
-          next.delete(conversationId);
+      } catch (err: any) {
+        toast.error(err?.message || t("toast.failedToSubmitApproval"));
+      } finally {
+        setRespondingApprovals((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
           return next;
         });
       }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to submit approval response");
-    } finally {
-      setIsRespondingApproval(false);
-    }
+    });
   };
 
   const handleNewChat = (targetProject?: any) => {
@@ -4386,7 +4394,7 @@ function AuthenticatedContent({
                     activeQuestion
                       ? `question_${activeQuestion.toolCallId}`
                       : activeApproval
-                      ? `approval_${activeApproval.id || activeApproval.approvalId || "active"}`
+                      ? `approval_${activeApproval.approvalId || activeApproval.id || "active"}`
                       : "chat"
                   }
                 >
@@ -4407,7 +4415,7 @@ function AuthenticatedContent({
                       onStopTask={handleStopBackgroundTask}
                       onDecide={(decision, feedback) =>
                         handleRespondApproval(
-                          activeApproval.id || activeApproval.approvalId!,
+                          activeApproval.approvalId || activeApproval.id,
                           decision,
                           feedback
                         )

@@ -51,6 +51,7 @@ export type ApprovalDecision =
   | "skip";
 
 export interface ApprovalRequestData {
+  runId?: string;
   id: string;
   approvalId?: string;
   conversationId?: string;
@@ -133,6 +134,7 @@ export interface SubAgentItem {
 }
 
 export interface AgentStreamEvent {
+  runId?: string;
   conversationId?: string;
   type:
     | "token"
@@ -313,6 +315,7 @@ declare global {
       }) => Promise<{
         success: boolean;
         aborted?: boolean;
+        alreadyRunning?: boolean;
         errorReported?: boolean;
         messages?: any[];
         workspacePath?: string;
@@ -357,8 +360,8 @@ declare global {
         feedback?: string;
       }) => Promise<{ success: boolean; error?: string }>;
       getRunningSessions?: () => Promise<string[]>;
-      onSessionStarted?: (callback: (data: { conversationId: string }) => void) => () => void;
-      onSessionEnded?: (callback: (data: { conversationId: string }) => void) => () => void;
+      onSessionStarted?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
+      onSessionEnded?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
       rollbackFile: (record: FileMutationRecord) => Promise<{
         success: boolean;
         message?: string;

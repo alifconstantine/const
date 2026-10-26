@@ -42,6 +42,7 @@ import { executeRetain, executeRecall, executeReflect } from "./memory.js";
 import { executeEval } from "./eval.js";
 import { executeAstEdit } from "./ast-edit.js";
 import { executeGhTool } from "./gh.js";
+import { normalizeToolName } from "./tool-policy.js";
 
 export type BrowserToolHandler = (
   toolName: string,
@@ -5603,7 +5604,7 @@ export async function executeNativeTool(
       return { result: "Action cancelled", isError: true };
     }
 
-    const normalizedTool = toolName.toLowerCase().replace(/[-_]/g, "");
+    const normalizedTool = normalizeToolName(toolName);
 
     // -----------------------------------------------------------------------
     // Native Browser Tools (OpenBot & oh-my-pi inspired)

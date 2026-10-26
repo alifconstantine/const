@@ -185,6 +185,10 @@ export function ApprovalCard({
   // Keyboard navigation: Arrow Up/Down, Tab/Shift-Tab, 1..4 shortcuts, Enter to confirm, Esc to skip
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat && (e.key === "Enter" || e.key === "Escape")) {
+        e.preventDefault();
+        return;
+      }
       const isInputFocused = document.activeElement === inputRef.current;
 
       if (e.key === "Escape") {
@@ -238,7 +242,7 @@ export function ApprovalCard({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedIdx, feedbackText, isResponding]);
+  }, [selectedIdx, feedbackText, isResponding, onDecide]);
 
   // Auto-focus input when option 4 is selected
   useEffect(() => {

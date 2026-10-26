@@ -28,6 +28,7 @@ import {
 } from "./token-meter.js";
 import { trackLlmRequest } from "./request-telemetry.js";
 import { DEFAULT_MODELS } from "./models.js";
+import { getToolActionKind, normalizeToolName } from "./tool-policy.js";
 import { appendToolObservations, disableToolObservationImages, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
@@ -810,7 +811,7 @@ export class ConstAgent {
     };
     if (config.initialAllowedTools) {
       for (const item of config.initialAllowedTools) {
-        if (item) this.sessionAllowedTools.add(item);
+        if (item) this.sessionAllowedTools.add(item.includes(":") || item === "file_mutations" ? item : normalizeToolName(item));
       }
     }
   }
@@ -844,6 +845,7 @@ export class ConstAgent {
   }
 
   public resolveApproval(approvalId: string, response: ApprovalResponseData): boolean {
+    if (response.approvalId !== approvalId) return false;
     const resolver = this.pendingApprovals.get(approvalId);
     if (resolver) {
       this.pendingApprovals.delete(approvalId);
@@ -1816,8 +1818,7 @@ export class ConstAgent {
         }> = [];
 
         const toolObservations: ToolObservation[] = [];
-        let tcIdx = 0;
-        for (const tc of toolCalls) {
+        for (const [tcIdx, tc] of toolCalls.entries()) {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
           }
@@ -1881,38 +1882,11 @@ export class ConstAgent {
           });
 
           // Check for Approval in "ask_before_changes" mode for terminal / shell execution, python execution, and file mutations
-          const toolLower = tc.function.name.toLowerCase();
-          const isTerminalTool =
-            toolLower === "bash" ||
-            toolLower === "powershell" ||
-            toolLower === "exec" ||
-            toolLower === "terminal" ||
-            toolLower === "sh" ||
-            toolLower === "run_command" ||
-            toolLower === "runcommand";
-
-          const isPythonTool =
-            toolLower === "run_python" ||
-            toolLower === "python" ||
-            toolLower === "py" ||
-            toolLower === "runpython" ||
-            toolLower === "pythoneval";
-
-          const isFileMutationTool =
-            toolLower === "write" ||
-            toolLower === "writefile" ||
-            toolLower === "write_to_file" ||
-            toolLower === "edit" ||
-            toolLower === "editfile" ||
-            toolLower === "edit_file" ||
-            toolLower === "replaceinfile" ||
-            toolLower === "replace_file_content" ||
-            toolLower === "applypatch" ||
-            toolLower === "patch" ||
-            toolLower === "mkdir" ||
-            toolLower === "makedir";
-
-          const isActionTool = isTerminalTool || isPythonTool || isFileMutationTool;
+          const toolLower = normalizeToolName(tc.function.name);
+          const actionKind = getToolActionKind(tc.function.name);
+          const isTerminalTool = actionKind === "terminal";
+          const isPythonTool = actionKind === "python";
+          const isFileMutationTool = actionKind === "file_mutation";
 
           let cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
           let targetCwd = workspacePath;
@@ -1952,15 +1926,15 @@ export class ConstAgent {
             if (dirPath) dirPath = `${dirPath}/`;
 
             // Compute added / removed lines estimate
-            if (toolLower === "write" || toolLower === "writefile" || toolLower === "write_to_file") {
+            if (toolLower === "write" || toolLower === "writefile") {
               const codeStr = parsedArgs.CodeContent || parsedArgs.code || parsedArgs.content || "";
               const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
               diffStats = { added: lineCount, removed: 0 };
-            } else if (toolLower === "replaceinfile" || toolLower === "replace_file_content") {
+            } else if (toolLower === "replaceinfile") {
               const rep = typeof parsedArgs.ReplacementContent === "string" ? parsedArgs.ReplacementContent.split("\n").length : 1;
               const tar = typeof parsedArgs.TargetContent === "string" ? parsedArgs.TargetContent.split("\n").length : 1;
               diffStats = { added: rep, removed: tar };
-            } else if (toolLower === "edit" || toolLower === "editfile" || toolLower === "edit_file") {
+            } else if (toolLower === "edit" || toolLower === "editfile") {
               const codeStr = parsedArgs.code || parsedArgs.content || "";
               const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
               diffStats = { added: lineCount, removed: 0 };
@@ -1993,12 +1967,6 @@ export class ConstAgent {
           if ((isRequestReview || this.config.mode === "ask_before_changes") && requiresApproval && !isAlreadyAllowed) {
             const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-            onEvent({
-              type: "status",
-              status: "waiting_approval",
-              message: `Waiting for approval: ${description || cmd || tc.function.name}`,
-            });
-
             const approvalReq: ApprovalRequestData = {
               approvalId,
               toolCallId: tc.id,
@@ -2015,13 +1983,6 @@ export class ConstAgent {
               isMutation: isFileMutationTool,
             };
 
-            onEvent({
-              type: "approval_request",
-              id: approvalId,
-              approval: approvalReq,
-              ...approvalReq,
-            });
-
             // Wait for user approval or abort signal
             const approvalStartedAt = Date.now();
             const userResponse = await new Promise<ApprovalResponseData>((resolve, reject) => {
@@ -2036,9 +1997,30 @@ export class ConstAgent {
               signal.addEventListener("abort", onAbort, { once: true });
 
               this.pendingApprovals.set(approvalId, (res) => {
+                this.pendingApprovals.delete(approvalId);
                 signal.removeEventListener("abort", onAbort);
                 resolve(res);
               });
+
+              // Register first: subscribers may respond or change mode synchronously.
+              try {
+                onEvent({
+                  type: "status",
+                  status: "waiting_approval",
+                  message: `Waiting for approval: ${description || cmd || tc.function.name}`,
+                });
+                if (!this.pendingApprovals.has(approvalId)) return;
+                onEvent({
+                  type: "approval_request",
+                  id: approvalId,
+                  approval: approvalReq,
+                  ...approvalReq,
+                });
+              } catch (error) {
+                this.pendingApprovals.delete(approvalId);
+                signal.removeEventListener("abort", onAbort);
+                reject(error);
+              }
             });
 
             onEvent({
@@ -2048,6 +2030,10 @@ export class ConstAgent {
             });
 
             waitingMs += Date.now() - approvalStartedAt;
+            if (signal.aborted || this._isCancelled) {
+              throw new Error("User cancelled agent execution.");
+            }
+
             if (userResponse.decision === "full_access") {
               this.updateMode("full_access");
               approvedThisTurn = true;
@@ -2110,7 +2096,14 @@ export class ConstAgent {
                 isError: true,
               });
 
-              continue;
+              // A denial invalidates the rest of this model-generated plan. Supply
+              // a result for every pending call before asking the model to replan.
+              for (const skippedTc of toolCalls.slice(tcIdx + 1)) {
+                const result = "[ACTION CANCELLED]: An earlier action in this batch was rejected by the user. Replan using their feedback before proposing further actions.";
+                onEvent({ type: "tool_result", toolCallId: skippedTc.id, toolName: skippedTc.function.name, result, isError: true });
+                conversationHistory.push({ role: "tool", tool_call_id: skippedTc.id, name: skippedTc.function.name, content: result, timestamp: Date.now() });
+              }
+              break;
             } else if (userResponse.decision === "skip") {
               const actionSubject = isFileMutationTool
                 ? `file mutation: '${targetFilePath || "file"}'`
@@ -2296,7 +2289,6 @@ export class ConstAgent {
             }
             break;
           }
-          tcIdx++;
         }
 
         const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find(model => model.id === this.config.model)?.inputTypes;

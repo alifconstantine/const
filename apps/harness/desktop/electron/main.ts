@@ -21,6 +21,7 @@ protocol.registerSchemesAsPrivileged([
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   createConstAgent,
@@ -60,6 +61,7 @@ import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt
 import { ROUTER_DEFAULT_MODELS as DEFAULT_MODELS, DEFAULT_ROUTER_MODEL_ID } from "../src/lib/router-models";
 import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/model-identity";
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
+import { AgentSessionRegistry } from "./agent-sessions";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -1089,6 +1091,7 @@ app.whenReady().then(() => {
   // Agent & Execution IPC Handlers (Multi-Session Concurrent Architecture)
   // ---------------------------------------------------------------------------
   interface ActiveAgentSession {
+    runId: string;
     agent: any;
     conversationId: string;
     workspacePath: string;
@@ -1096,8 +1099,21 @@ app.whenReady().then(() => {
     mode?: "request_review" | "ask_before_changes" | "full_access";
     startedAt: number;
   }
-  const activeSessions = new Map<string, ActiveAgentSession>();
-  const pendingQuestions = new Map<string, (answer: any) => void>();
+  const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
+  const pendingQuestions = new Map<string, { runId: string; resolve: (answer: any) => void }>();
+
+  const finishSession = (session: ActiveAgentSession) => {
+    if (!activeSessions.release(session.conversationId, session.runId)) return;
+    computerController.releaseSession(session.conversationId);
+    for (const [id, question] of pendingQuestions) {
+      if (question.runId !== session.runId) continue;
+      pendingQuestions.delete(id);
+      question.resolve({ status: "cancelled", error: "Session ended" });
+    }
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("agent:session-ended", { conversationId: session.conversationId, runId: session.runId });
+    }
+  };
 
   // Subscribe to background tasks to push real-time events to renderer
   globalTaskManager.subscribe((event) => {
@@ -1109,10 +1125,10 @@ app.whenReady().then(() => {
   ipcMain.handle(
     "agent:answer-question",
     async (_event, { toolCallId, answer }: { toolCallId: string; answer: any }) => {
-      const resolver = pendingQuestions.get(toolCallId);
-      if (resolver) {
+      const question = pendingQuestions.get(toolCallId);
+      if (question) {
         pendingQuestions.delete(toolCallId);
-        resolver(answer);
+        question.resolve(answer);
         return true;
       }
       return false;
@@ -1183,6 +1199,8 @@ app.whenReady().then(() => {
       }
 
       const convoId = payload.conversationId || `session_${Date.now()}`;
+      if (activeSessions.has(convoId)) return { success: false, alreadyRunning: true };
+      const runId = randomUUID();
 
       // Project vs Outside of Project Scoping
       let targetWorkspace: string;
@@ -1231,11 +1249,12 @@ app.whenReady().then(() => {
         contextWindow: getModelContextLimit(model, payload.contextWindow ?? modelDef?.contextWindow),
         onAskQuestion: (toolCallId, questions) => {
           return new Promise((resolve) => {
-            pendingQuestions.set(toolCallId, resolve);
+            pendingQuestions.set(toolCallId, { runId, resolve });
             if (win && !win.isDestroyed()) {
               win.webContents.send("agent:stream-event", {
                 type: "ask_question",
                 conversationId: convoId,
+                runId,
                 toolCallId,
                 questions,
               });
@@ -1264,22 +1283,24 @@ app.whenReady().then(() => {
         },
       });
 
-      activeSessions.set(convoId, {
+      const agentSession: ActiveAgentSession = {
+        runId,
         agent,
         conversationId: convoId,
         workspacePath: targetWorkspace,
         model,
         mode: payload.mode || "ask_before_changes",
         startedAt: Date.now(),
-      });
+      };
+      if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
 
       if (win && !win.isDestroyed()) {
-        win.webContents.send("agent:session-started", { conversationId: convoId });
+        win.webContents.send("agent:session-started", { conversationId: convoId, runId });
       }
 
       const eventForwarder = createAgentEventForwarder((agentEvent) => {
-        if (!win || win.isDestroyed()) return false;
-        win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId });
+        if (!activeSessions.owns(convoId, runId) || !win || win.isDestroyed()) return false;
+        win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId, runId });
         return true;
       });
       try {
@@ -1289,12 +1310,13 @@ app.whenReady().then(() => {
             if (isTelemetryEvent(agentEvent)) {
               conversationDb.recordTelemetry(convoId, agentEvent);
             }
+            if (!activeSessions.owns(convoId, runId)) return;
             eventForwarder.forward(agentEvent);
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
         );
 
-        if ((agent as any).isCancelled) {
+        if ((agent as any).isCancelled || !activeSessions.owns(convoId, runId)) {
           return {
             success: false,
             aborted: true,
@@ -1340,17 +1362,7 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
-        computerController.releaseSession(convoId);
-        activeSessions.delete(convoId);
-        for (const [tcId, resolver] of pendingQuestions.entries()) {
-          pendingQuestions.delete(tcId);
-          try {
-            resolver({ status: "cancelled", error: "Session ended" });
-          } catch {}
-        }
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:session-ended", { conversationId: convoId });
-        }
+        finishSession(agentSession);
       }
     }
   );
@@ -1519,13 +1531,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
-    for (const [tcId, resolver] of pendingQuestions.entries()) {
-      pendingQuestions.delete(tcId);
-      try {
-        resolver({ status: "cancelled", error: "Session aborted by user" });
-      } catch {}
-    }
-
     // Terminate any active background tasks
     try {
       const tasks = globalTaskManager.listTasks();
@@ -1557,30 +1562,21 @@ app.whenReady().then(() => {
     } catch {}
 
     let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
-    if (!targetSession && activeSessions.size === 1) {
+    if (!safeConvoId && activeSessions.size === 1) {
       targetSession = activeSessions.values().next().value;
     }
 
     if (targetSession) {
       targetSession.agent.abort();
-      const sId = targetSession.conversationId || safeConvoId;
-      if (sId) {
-        activeSessions.delete(sId);
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:session-ended", { conversationId: sId });
-        }
-      }
+      finishSession(targetSession);
       return { success: true };
-    } else {
-      for (const [id, session] of activeSessions.entries()) {
+    } else if (!safeConvoId) {
+      for (const session of activeSessions.values()) {
         session.agent.abort();
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:session-ended", { conversationId: id });
-        }
+        finishSession(session);
       }
-      activeSessions.clear();
-      return { success: true };
     }
+    return { success: true };
   });
 
   ipcMain.handle(
@@ -1601,10 +1597,7 @@ app.whenReady().then(() => {
         feedback?: string;
       }
     ) => {
-      let session = activeSessions.get(payload.conversationId);
-      if (!session && activeSessions.size === 1) {
-        session = activeSessions.values().next().value;
-      }
+      const session = activeSessions.get(payload.conversationId);
       if (session && session.agent && typeof session.agent.resolveApproval === "function") {
         const resolved = session.agent.resolveApproval(payload.approvalId, {
           approvalId: payload.approvalId,
@@ -1613,19 +1606,6 @@ app.whenReady().then(() => {
         });
         if (resolved) {
           return { success: true };
-        }
-      }
-      // Fallback: search across all active sessions in case of ID discrepancy
-      for (const s of activeSessions.values()) {
-        if (s.agent && typeof s.agent.resolveApproval === "function") {
-          const resolved = s.agent.resolveApproval(payload.approvalId, {
-            approvalId: payload.approvalId,
-            decision: payload.decision,
-            feedback: payload.feedback,
-          });
-          if (resolved) {
-            return { success: true };
-          }
         }
       }
       return { success: false, error: "Active session or approval not found" };
