@@ -1,0 +1,5 @@
+{
+  "name": "const-guide", "version": "1.0.0", "description": "Const Guide",
+  "author": { "name": "Const" }, "interface": { "displayName": "Const Guide", "icon": "const" },
+  "defaultInstalled": true, "placeholder": true
+}

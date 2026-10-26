@@ -529,6 +529,7 @@ declare global {
           title?: string;
         }>>;
       };
+      mcp?: import("./lib/mcp/types").McpBridge;
       marketplace?: {
         listPlugins: (workspacePath?: string) => Promise<import("./lib/plugins/types").PluginInventory>;
         installPlugin: (payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => Promise<void>;

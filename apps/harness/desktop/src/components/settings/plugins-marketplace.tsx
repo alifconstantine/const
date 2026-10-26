@@ -23,7 +23,13 @@ export function PluginsMarketplace({
   const { catalog, installed, error } = usePluginInventory(workspacePath);
   const [pending, setPending] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const targetScope = scope === "workspace" ? "workspace" : "user";
+  const [installScope, setInstallScope] = useState<"user" | "workspace">(scope === "workspace" ? "workspace" : "user");
+  const targetScope = scope === "workspace" ? "workspace" : installScope;
+  const { connections } = useMcpConnections(workspacePath);
+  const descriptionKeys: Record<string, string> = {
+    "const-guide": "mcp.guideEmpty", "plugins-creator": "mcp.pluginsCreatorDescription", "skills-creator": "mcp.skillsCreatorDescription",
+    "browser-use": "mcp.browserDescription", "computer-use": "mcp.computerDescription", context7: "mcp.context7Description", tinyfish: "mcp.tinyfishDescription",
+  };
   const matches = (plugin: PluginCatalogEntry) =>
     [
       plugin.interface.displayName,

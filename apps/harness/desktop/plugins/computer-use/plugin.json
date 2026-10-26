@@ -6,6 +6,8 @@
   "homepage": "https://const.dev",
   "skills": "./skills/",
   "entrypoint": "computer-use",
+  "defaultInstalled": true,
+  "nativeCapabilities": ["computer-use"],
   "interface": {
     "displayName": "Computer Use",
     "icon": "blocks"

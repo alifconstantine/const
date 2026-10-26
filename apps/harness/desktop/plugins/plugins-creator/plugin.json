@@ -1,0 +1,5 @@
+{
+  "name": "plugins-creator", "version": "1.0.0", "description": "Create and validate Const plugin packages.",
+  "author": { "name": "Const" }, "interface": { "displayName": "Plugins Creator", "icon": "blocks" },
+  "defaultInstalled": true, "entrypoint": "plugins-creator"
+}

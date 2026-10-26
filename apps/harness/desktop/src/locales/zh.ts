@@ -1,6 +1,8 @@
+import { mcpTranslations } from "./mcp";
 import type { TranslationDictionary } from "./types";
 
 export const zh: TranslationDictionary = {
+  mcp: mcpTranslations.zh,
   common: {
     save: "保存",
     cancel: "取消",

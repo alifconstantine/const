@@ -1,0 +1,5 @@
+{
+  "name": "skills-creator", "version": "1.0.0", "description": "Create, improve, and validate reusable agent skills.",
+  "author": { "name": "Const" }, "interface": { "displayName": "Skills Creator", "icon": "blocks" },
+  "defaultInstalled": true, "entrypoint": "skills-creator"
+}

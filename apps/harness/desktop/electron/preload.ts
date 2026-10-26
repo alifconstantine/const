@@ -274,6 +274,19 @@ contextBridge.exposeInMainWorld("electron", {
     getCapabilities: () => ipcRenderer.invoke("computer:get-capabilities"),
     listApps: () => ipcRenderer.invoke("computer:list-apps"),
   },
+  mcp: {
+    list: (workspacePath?: string) => ipcRenderer.invoke("mcp:list", workspacePath),
+    save: (input: import("../src/lib/mcp/types").McpSaveInput) => ipcRenderer.invoke("mcp:save", input),
+    remove: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:remove", id, workspacePath),
+    override: (id: string, workspacePath: string) => ipcRenderer.invoke("mcp:override", id, workspacePath),
+    connect: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:connect", id, workspacePath),
+    authenticate: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:authenticate", id, workspacePath),
+    disconnect: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:disconnect", id, workspacePath),
+    onChanged: (callback: () => void) => {
+      const handler = () => callback(); ipcRenderer.on("mcp:changed", handler);
+      return () => ipcRenderer.removeListener("mcp:changed", handler);
+    },
+  },
   marketplace: {
     listPlugins: (workspacePath?: string) => ipcRenderer.invoke("marketplace:list-plugins", workspacePath),
     installPlugin: (payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => ipcRenderer.invoke("marketplace:install-plugin", payload),

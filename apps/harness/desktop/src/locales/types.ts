@@ -1,4 +1,5 @@
 export interface TranslationDictionary {
+  mcp: import("./mcp").McpTranslations;
   common: {
     save: string;
     cancel: string;

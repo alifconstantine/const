@@ -10,10 +10,14 @@ export interface PluginCatalogEntry {
   description: string;
   author: { name: string };
   interface: { displayName: string; icon: string };
-  entrypoint: string;
+  entrypoint?: string;
+  defaultInstalled?: boolean;
+  placeholder?: boolean;
+  nativeCapabilities?: Array<"browser-use" | "computer-use">;
+  mcpServers?: Record<string, import("@const/agent").PluginMcpServer>;
+  ui?: { chat?: string; panel?: string; sidebar?: boolean };
   skillSlugs: string[];
   overview?: string;
-  mcpServers?: Record<string, any>;
   skills?: PluginSkillSummary[];
 }
 

@@ -7,6 +7,7 @@ import type { SkillSource, ResolvedRemoteSkill } from "./skill-installer";
 import type { SkillInstallProgress } from "../src/lib/skills/types";
 import { resolveSkillRegistry, readPluginManifest, installPluginFromDirectory, setCapabilityEnabled, uninstallRegisteredSkill, uninstallPlugin as removePlugin } from "@const/agent";
 import type { PluginInventory } from "../src/lib/plugins/types";
+import { initializeDefaultPlugins } from "./mcp/default-plugins";
 
 export interface InstalledSkillRecord {
   sourceId?: string;
@@ -69,7 +70,7 @@ export class MarketplaceService {
         console.error("[MarketplaceService] Failed to create global skills dir:", err);
       }
     }
-    // Native computer automation remains a bundled system plugin.
+    // Defaults are installed once; uninstalling one must survive an app restart.
     void this.ensureDefaultPluginsInstalled();
   }
 
@@ -187,15 +188,10 @@ export class MarketplaceService {
   public async ensureDefaultPluginsInstalled(): Promise<void> {
     try {
       const inventory = this.listPlugins();
-      if (
-        inventory.catalog.some((p) => p.name === "computer-use") &&
-        !inventory.installed.some((p) => p.name === "computer-use")
-      ) {
-        this.installPlugin("computer-use", "user");
-        console.log("[MarketplaceService] Pre-installed default plugin: computer-use");
-      }
+      initializeDefaultPlugins(path.join(os.homedir(), ".const", "harness"), inventory.catalog, inventory.installed,
+        (name) => this.installPlugin(name, "user"));
     } catch (err) {
-      console.warn("[MarketplaceService] Failed to pre-install computer-use plugin:", err);
+      console.warn("[MarketplaceService] Failed to initialize default plugins:", err);
     }
   }
 
@@ -316,6 +312,10 @@ export class MarketplaceService {
   public installPlugin(name: string, scope: "user" | "workspace", workspacePath?: string): void {
     if (!this.listPlugins(workspacePath).catalog.some((plugin) => plugin.name === name)) throw new Error("Unknown plugin.");
     installPluginFromDirectory(path.join(this.getBundledPluginsDir(), name), scope, workspacePath);
+  }
+
+  public nativeEnabled(name: "browser-use" | "computer-use", workspacePath?: string): boolean {
+    return resolveSkillRegistry(workspacePath).plugins.some((plugin) => plugin.name === name && plugin.isEnabled && plugin.isEffective);
   }
 
   public setEnabled(id: string, enabled: boolean, workspacePath?: string): void {

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PluginInventory } from "./types";
 
-export const pluginIconUrl = (_name: string): string | undefined => undefined;
 export function usePluginInventory(workspacePath?: string) {
   const [snapshot, setSnapshot] = useState<{ workspacePath?: string; inventory: PluginInventory; error: boolean }>();
   const [revision, setRevision] = useState(0);

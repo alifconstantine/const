@@ -15,7 +15,22 @@ export interface PluginManifest {
   description: string;
   author: { name: string };
   interface: { displayName: string; icon: string };
-  entrypoint: string;
+  entrypoint?: string;
+  defaultInstalled?: boolean;
+  placeholder?: boolean;
+  nativeCapabilities?: Array<"browser-use" | "computer-use">;
+  mcpServers?: Record<string, PluginMcpServer>;
+  ui?: { chat?: string; panel?: string; sidebar?: boolean };
+}
+export interface PluginMcpServer {
+  transport: "http" | "stdio";
+  url?: string;
+  command?: string;
+  args?: string[];
+  auth: "none" | "oauth" | "api-key";
+  authOptions?: Array<"none" | "oauth" | "api-key">;
+  apiKeyUrl?: string;
+  oauthUrl?: string;
 }
 export interface RegisteredSkill {
   id: string;
@@ -90,10 +105,34 @@ export function readPluginManifest(root: string): PluginManifest {
     typeof manifest.description !== "string" || !manifest.description.trim() ||
     typeof manifest.author?.name !== "string" || !manifest.author.name.trim() ||
     typeof manifest.interface?.displayName !== "string" || !manifest.interface.displayName.trim() ||
-    typeof manifest.entrypoint !== "string" ||
-    !validName.test(manifest.entrypoint)
+    (manifest.entrypoint !== undefined &&
+      (typeof manifest.entrypoint !== "string" || !validName.test(manifest.entrypoint)))
   ) {
     throw new Error(`Invalid plugin manifest: ${root}`);
+  }
+  for (const flag of [manifest.defaultInstalled, manifest.placeholder]) {
+    if (flag !== undefined && typeof flag !== "boolean") throw new Error(`Invalid plugin flag: ${root}`);
+  }
+  if (manifest.nativeCapabilities !== undefined && (!Array.isArray(manifest.nativeCapabilities) ||
+    manifest.nativeCapabilities.some((value) => value !== "browser-use" && value !== "computer-use")))
+    throw new Error(`Invalid native capabilities: ${root}`);
+  if (manifest.mcpServers !== undefined) {
+    if (!manifest.mcpServers || typeof manifest.mcpServers !== "object" || Array.isArray(manifest.mcpServers))
+      throw new Error(`Invalid plugin MCP servers: ${root}`);
+    for (const [name, server] of Object.entries(manifest.mcpServers)) {
+      if (!validName.test(name) || !server || !["none", "oauth", "api-key"].includes(server.auth) ||
+        !["http", "stdio"].includes(server.transport) ||
+        (server.transport === "http" && (typeof server.url !== "string" || !/^https?:\/\//.test(server.url))) ||
+        (server.transport === "stdio" && (typeof server.command !== "string" || !server.command.trim())) ||
+        (server.args !== undefined && (!Array.isArray(server.args) || server.args.some((arg) => typeof arg !== "string"))))
+        throw new Error(`Invalid plugin MCP server: ${root}/${name}`);
+      if (server.authOptions !== undefined && (!Array.isArray(server.authOptions) || server.authOptions.some((value) => !["none", "oauth", "api-key"].includes(value))))
+        throw new Error(`Invalid plugin authentication options: ${root}/${name}`);
+      for (const value of [server.url, server.apiKeyUrl, server.oauthUrl].filter((value): value is string => value !== undefined)) {
+        const endpoint = new URL(value);
+        if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password) throw new Error(`Invalid plugin endpoint: ${root}/${name}`);
+      }
+    }
   }
   return manifest;
 }
@@ -182,7 +221,7 @@ function readPlugin(
       isEnabled: isEnabled && skill.isEnabled,
     };
   });
-  if (
+  if (manifest.entrypoint &&
     !skills.some(
       (skill) => skill.slug === `${manifest.name}:${manifest.entrypoint}`,
     )
@@ -410,6 +449,8 @@ export function pluginInvocationInstructions(
   }
   return [...selected.values()]
     .map((plugin) => {
+      if (plugin.placeholder) return `The user selected ${plugin.interface.displayName}. Its documentation has not been provided yet. Explain that it is not available; do not invent guide content.`;
+      if (!plugin.entrypoint) return `The user explicitly selected ${plugin.interface.displayName}. Use its available connected tools. If authentication or dependencies are missing, ask the user to configure the plugin in Settings > MCP Servers. Do not invent results.`;
       const entry = plugin.skills.find(
         (skill) => skill.slug === `${plugin.name}:${plugin.entrypoint}`,
       );

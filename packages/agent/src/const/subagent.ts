@@ -1168,6 +1168,10 @@ export class SubAgentManager {
             ? []
             : ["file_mutations", "write", "edit", "mkdir", "apply_patch", "bash", "powershell", "run_python"],
           browserHandler: context.parentConfig.browserHandler,
+          computerHandler: context.parentConfig.computerHandler,
+          externalTools: agentDef.readOnly ? undefined : context.parentConfig.externalTools,
+          externalToolHandler: agentDef.readOnly ? undefined : context.parentConfig.externalToolHandler,
+          nativeCapabilityEnabled: context.parentConfig.nativeCapabilityEnabled,
         };
 
         const childAgent = new ConstAgent(childConfig);

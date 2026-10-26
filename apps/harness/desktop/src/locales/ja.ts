@@ -1,6 +1,8 @@
+import { mcpTranslations } from "./mcp";
 import type { TranslationDictionary } from "./types";
 
 export const ja: TranslationDictionary = {
+  mcp: mcpTranslations.ja,
   common: {
     save: "保存",
     cancel: "キャンセル",

@@ -263,9 +263,35 @@ describe("plugin lifecycle and shared skill resolution", () => {
   it("rejects manifests with missing or wrongly typed fields", () => {
     const file = path.join(source, "plugin.json");
     const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
-    for (const value of [{ ...manifest, name: undefined }, { ...manifest, description: 123 }, { ...manifest, entrypoint: undefined }, null]) {
+    for (const value of [{ ...manifest, name: undefined }, { ...manifest, description: 123 }, { ...manifest, entrypoint: 123 }, null]) {
       fs.writeFileSync(file, JSON.stringify(value));
       expect(() => readPluginManifest(source)).toThrow("Invalid plugin manifest");
     }
+  });
+
+  it("installs MCP-only and empty guide plugins without dummy skill entrypoints", () => {
+    const file = path.join(source, "plugin.json");
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    delete manifest.entrypoint;
+    fs.rmSync(path.join(source, "skills"), { recursive: true });
+    manifest.name = "docs";
+    manifest.mcpServers = { docs: { transport: "http", url: "https://example.com/mcp", auth: "oauth" } };
+    fs.writeFileSync(file, JSON.stringify(manifest));
+    const installed = installPluginFromDirectory(source, "user", undefined, options);
+    expect(installed.skills).toEqual([]);
+    expect(pluginInvocationInstructions("@docs", [installed])).toContain("connected tools");
+    expect(pluginInvocationInstructions("@docs", [{ ...installed, placeholder: true }])).toContain("has not been provided");
+  });
+
+  it("validates every bundled plugin and keeps Const Guide free of invented content", () => {
+    const bundled = fileURLToPath(new URL("../../../apps/harness/desktop/plugins/", import.meta.url));
+    for (const name of fs.readdirSync(bundled)) {
+      const dir = path.join(bundled, name);
+      const manifest = readPluginManifest(dir);
+      expect(manifest.name).toBe(name);
+      if (manifest.entrypoint) expect(fs.existsSync(path.join(dir, "skills", manifest.entrypoint, "SKILL.md"))).toBe(true);
+    }
+    expect(readPluginManifest(path.join(bundled, "const-guide"))).toMatchObject({ placeholder: true, interface: { icon: "const" } });
+    expect(fs.existsSync(path.join(bundled, "const-guide", "skills"))).toBe(false);
   });
 });

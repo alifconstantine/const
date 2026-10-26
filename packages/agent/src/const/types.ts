@@ -250,6 +250,7 @@ export type AgentEvent = {
 }[keyof AgentEventMap];
 
 export interface NativeToolDefinition {
+  requiresApproval?: boolean;
   type: "function";
   function: {
     name: string;
@@ -265,6 +266,9 @@ export interface AgentConfig {
   inputTypes?: string[];
   preset?: "harness" | "learn";
   tools?: NativeToolDefinition[];
+  externalTools?: (signal?: AbortSignal) => Promise<NativeToolDefinition[]>;
+  externalToolHandler?: (name: string, args: Record<string, any>, signal?: AbortSignal) => Promise<ToolExecutionResult>;
+  nativeCapabilityEnabled?: (capability: "browser-use" | "computer-use") => boolean;
   systemPrompt?: string;
   workspacePath?: string;
   learnId?: string;

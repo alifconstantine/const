@@ -5604,7 +5604,15 @@ export async function executeNativeTool(
       return { result: "Action cancelled", isError: true };
     }
 
+    if (/^mcp_/i.test(toolName)) {
+      const handler = options.parentConfig?.externalToolHandler;
+      if (!handler) return { result: "MCP connection is unavailable.", isError: true };
+      return await handler(toolName, args, signal);
+    }
     const normalizedTool = normalizeToolName(toolName);
+    const capability = normalizedTool.startsWith("browser") ? "browser-use" : normalizedTool.startsWith("computer") ? "computer-use" : undefined;
+    if (capability && options.parentConfig?.nativeCapabilityEnabled?.(capability) === false)
+      return { result: "This capability is disabled in Plugins.", isError: true };
 
     // -----------------------------------------------------------------------
     // Native Browser Tools (OpenBot & oh-my-pi inspired)

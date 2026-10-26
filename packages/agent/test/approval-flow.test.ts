@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createConstAgent } from "../src/const/const-agent.js";
+import { createConstAgent, extractFallbackToolCalls } from "../src/const/const-agent.js";
 import { getToolActionKind, normalizeToolName } from "../src/const/tool-policy.js";
 import type { AgentConfig, AgentEvent } from "../src/const/types.js";
 
@@ -33,6 +33,36 @@ function fixture(calls: ReturnType<typeof call>[], config: Partial<AgentConfig> 
 }
 
 describe("approval flow", () => {
+  it.each(["request_review", "ask_before_changes", "full_access"] as const)("routes namespaced MCP tools through the external registry and respects mode (%s)", async mode => {
+    const handler = vi.fn(async (_name: string, _args: Record<string, unknown>) => ({ result: "provider result", isError: false }));
+    const name = "mcp_fixture_query_docs";
+    const { agent, requests, events, run } = fixture([call(name, { query: "documentation" }, 0)], {
+      mode, externalTools: async () => [{ type: "function", requiresApproval: true, function: { name, description: "Fixture", parameters: { type: "object" } } }], externalToolHandler: handler,
+    });
+    await run(event => {
+      if (event.type === "approval_request") queueMicrotask(() => agent.resolveApproval(event.approvalId!, { approvalId: event.approvalId!, decision: "approve_once" }));
+    });
+    expect(handler).toHaveBeenCalledOnce();
+    expect(JSON.stringify(requests[0])).not.toContain("requiresApproval");
+    expect(handler.mock.calls[0]?.[0]).toBe(name);
+    expect(events.filter(event => event.type === "approval_request")).toHaveLength(mode === "full_access" ? 0 : 1);
+    expect(events.some(event => event.type === "tool_result" && event.result === "provider result")).toBe(true);
+  });
+
+  it("recognizes declared MCP names in fallback calls without accepting invented connections", () => {
+    const text = '<tool_call>{"name":"mcp_fixture_docs","arguments":{"query":"test"}}</tool_call>';
+    expect(extractFallbackToolCalls(text)).toEqual([]);
+    expect(extractFallbackToolCalls(text, new Set(["mcp_fixture_docs"]))[0]?.function.name).toBe("mcp_fixture_docs");
+  });
+
+  it.each(["browser_snapshot", "BrowserNavigate"])("rejects a model's native browser call when its plugin is disabled (%s)", async name => {
+    const browserHandler = vi.fn(async () => ({ result: "must not execute", isError: false }));
+    const { events, run } = fixture([call(name, {}, 0)], { mode: "full_access", nativeCapabilityEnabled: () => false, browserHandler });
+    await run(() => {});
+    expect(browserHandler).not.toHaveBeenCalled();
+    expect(events.some(event => event.type === "tool_result" && event.isError)).toBe(true);
+  });
+
   it.each(["request_review", "ask_before_changes"] as const)("replans after denial without requesting or executing the old batch (%s)", async mode => {
     const { agent, requests, events, run } = fixture([
       call("bash", { command: "echo A" }, 0),

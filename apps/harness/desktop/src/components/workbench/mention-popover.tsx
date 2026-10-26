@@ -4,12 +4,12 @@ import {
   Image as ImageIcon,
   MessageSquare,
   ChevronRight,
-  Blocks,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { useTranslation } from "../../lib/i18n";
 import type { MentionCandidate } from "../../lib/mention-search";
+import { PluginIcon } from "../settings/plugin-icon";
 
 export interface MentionPopoverProps {
   candidates: MentionCandidate[];
@@ -22,7 +22,7 @@ export interface MentionPopoverProps {
 
 function CandidateIcon({ candidate }: { candidate: MentionCandidate }) {
   if (candidate.kind === "plugin") {
-    return <Blocks className="w-4 h-4 shrink-0" />;
+    return <PluginIcon name={candidate.fullPath?.replace("plugin://", "") ?? ""} size={16} className="w-4 h-4 shrink-0" />;
   }
   if (candidate.kind === "directory") {
     return <Folder className="w-4 h-4 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />;

@@ -1,6 +1,8 @@
+import { mcpTranslations } from "./mcp";
 import type { TranslationDictionary } from "./types";
 
 export const en: TranslationDictionary = {
+  mcp: mcpTranslations.en,
   common: {
     save: "Save",
     cancel: "Cancel",

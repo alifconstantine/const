@@ -1,0 +1,6 @@
+{
+  "name": "context7", "version": "1.0.0", "description": "Find current library documentation and code examples with Context7.",
+  "author": { "name": "Upstash" }, "interface": { "displayName": "Context7", "icon": "context7" },
+  "entrypoint": "context7",
+  "mcpServers": { "docs": { "transport": "http", "url": "https://mcp.context7.com/mcp/oauth", "auth": "oauth", "authOptions": ["oauth", "api-key"], "apiKeyUrl": "https://mcp.context7.com/mcp", "oauthUrl": "https://mcp.context7.com/mcp/oauth" } }
+}

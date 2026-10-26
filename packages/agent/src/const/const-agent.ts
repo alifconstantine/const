@@ -211,8 +211,9 @@ const VALID_FALLBACK_TOOLS = new Set([
   "browser_paste",
 ]);
 
-export function extractFallbackToolCalls(content: string): ToolCall[] {
+export function extractFallbackToolCalls(content: string, declaredTools?: ReadonlySet<string>): ToolCall[] {
   const toolCalls: ToolCall[] = [];
+  const allowed = (name: string) => VALID_FALLBACK_TOOLS.has(name) || declaredTools?.has(name);
   if (!content || typeof content !== "string") return toolCalls;
 
   // Pattern 1: <tool_call>...</tool_call>
@@ -224,7 +225,7 @@ export function extractFallbackToolCalls(content: string): ToolCall[] {
       const parsed = JSON.parse(tagMatch[1].trim());
       const name = (parsed.name || parsed.tool || parsed.function?.name || "").toLowerCase();
       const args = parsed.arguments || parsed.parameters || parsed.args || parsed.function?.arguments || {};
-      if (name && VALID_FALLBACK_TOOLS.has(name)) {
+      if (name && allowed(name)) {
         toolCalls.push({
           id: `fallback_${Date.now()}_${toolCalls.length}`,
           type: "function",
@@ -246,7 +247,7 @@ export function extractFallbackToolCalls(content: string): ToolCall[] {
     try {
       const parsed = JSON.parse(blockMatch[1].trim());
       const name = (parsed.name || parsed.tool || (parsed.action === "command" ? "bash" : "")).toLowerCase();
-      if (name && VALID_FALLBACK_TOOLS.has(name)) {
+      if (name && allowed(name)) {
         const args = parsed.arguments || parsed.parameters || parsed.args || parsed.input || {};
         toolCalls.push({
           id: `fallback_${Date.now()}_${toolCalls.length}`,
@@ -267,7 +268,7 @@ export function extractFallbackToolCalls(content: string): ToolCall[] {
     try {
       const parsed = JSON.parse(standaloneMatch[0].trim());
       const name = (parsed.name || parsed.tool || "").toLowerCase();
-      if (VALID_FALLBACK_TOOLS.has(name)) {
+      if (allowed(name)) {
         let args = parsed.arguments || parsed.parameters || parsed.args;
         if (!args) {
           const { name: _n, tool: _t, ...rest } = parsed;
@@ -1008,9 +1009,14 @@ export class ConstAgent {
 
         onEvent({ type: "status", status: "thinking" });
 
-        const activeTools =
-          this.config.tools ??
-          (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
+        const baseTools = this.config.tools ?? (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
+        const activeTools = [...baseTools.filter((tool) => {
+          const capability = tool.function.name.startsWith("browser_") ? "browser-use"
+            : tool.function.name.startsWith("computer_") ? "computer-use" : undefined;
+          return !capability || this.config.nativeCapabilityEnabled?.(capability) !== false;
+        }), ...await this.config.externalTools?.(signal) ?? []];
+        // Approval metadata is local policy, not part of a model provider's function schema.
+        const requestTools = activeTools.map(({ requiresApproval: _approval, ...definition }) => definition);
 
         const systemPrompt =
           this.config.preset === "learn"
@@ -1038,7 +1044,7 @@ export class ConstAgent {
         }
 
         contextSystemPrompt = effectiveSystemPrompt;
-        contextTools = activeTools;
+        contextTools = requestTools;
         const historyForContext = compactHistoryForContext(conversationHistory);
 
         const formattedMessages = [
@@ -1074,7 +1080,7 @@ export class ConstAgent {
         // Token meter (DeepSeek Harness adaptation): Compute accurate context breakdown across system prompt, active tools, and message history
         const breakdown = calculateContextBreakdown({
           systemPrompt: effectiveSystemPrompt,
-          tools: activeTools,
+          tools: requestTools,
           messages: historyForContext,
         });
 
@@ -1134,7 +1140,7 @@ export class ConstAgent {
             body: JSON.stringify({
               model: this.config.model,
               messages: formattedMessages,
-              tools: activeTools,
+              tools: requestTools,
               ...(activeTools && activeTools.length > 0 ? { parallel_tool_calls: false } : {}),
               stream: true,
               stream_options: { include_usage: true },
@@ -1550,7 +1556,7 @@ export class ConstAgent {
 
         // Fallback Tool Call Extraction: Recover tool calls from markdown code blocks or text
         if (rawToolCalls.length === 0 && turnContent) {
-          const fallback = extractFallbackToolCalls(turnContent);
+          const fallback = extractFallbackToolCalls(turnContent, new Set(activeTools.map((tool) => tool.function.name.toLowerCase())));
           if (fallback.length > 0) {
             rawToolCalls.push(...fallback);
             turnContent = turnContent.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/gi, "").trim();
@@ -1887,10 +1893,12 @@ export class ConstAgent {
           const isTerminalTool = actionKind === "terminal";
           const isPythonTool = actionKind === "python";
           const isFileMutationTool = actionKind === "file_mutation";
+          const isExternalTool = tc.function.name.startsWith("mcp_");
+          const externalDefinition = activeTools.find((tool) => tool.function.name === tc.function.name);
 
           let cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
           let targetCwd = workspacePath;
-          let description = "";
+          let description = isExternalTool ? `Call connected tool: ${tc.function.name}` : "";
           let isOutside = false;
           let targetFilePath = "";
 
@@ -1957,9 +1965,9 @@ export class ConstAgent {
           // while terminal executions, Python executions, and out-of-workspace writes require approval.
           const isRequestReview = this.config.mode === "request_review";
           const requiresApproval =
-            isRequestReview
+            (isExternalTool && externalDefinition?.requiresApproval !== false) || (isRequestReview
               ? isTerminalTool || isPythonTool || isFileMutationTool
-              : this.config.mode === "ask_before_changes" && (isTerminalTool || isPythonTool || (isFileMutationTool && isOutside));
+              : this.config.mode === "ask_before_changes" && (isTerminalTool || isPythonTool || (isFileMutationTool && isOutside)));
 
           let approvedThisTurn = false;
           let waitingMs = 0;

@@ -1,0 +1,6 @@
+{
+  "name": "tinyfish", "version": "1.0.0", "description": "Search the web, extract page content, and run browser workflows with TinyFish.",
+  "author": { "name": "TinyFish" }, "interface": { "displayName": "TinyFish", "icon": "tinyfish" },
+  "entrypoint": "tinyfish",
+  "mcpServers": { "web": { "transport": "http", "url": "https://agent.tinyfish.ai/mcp", "auth": "oauth", "authOptions": ["oauth", "api-key"] } }
+}

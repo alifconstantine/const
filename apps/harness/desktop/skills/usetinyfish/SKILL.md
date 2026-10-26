@@ -1,32 +1,20 @@
 ---
 name: usetinyfish
-description: >-
-  Live web search, clean ad-free webpage extraction (markdown without navigation, cookies, or clutter), and multi-step browser agent automation via TinyFish (tinyfish.ai). Use when needing real-time web research, fast webpage scraping, or autonomous web navigation.
+description: Search the web, extract page content, and run user-directed browser workflows through a connected TinyFish MCP server.
 ---
 
-# TinyFish (Web Search, Scraping & Automation)
+# TinyFish
 
-Use this skill when you need fast, high-quality web research, clean markdown extraction from complex URLs, or AI-powered browser automation using the TinyFish agent infrastructure (`https://tinyfish.ai`).
+This skill supplies workflow instructions, not a server connection. Connect the TinyFish plugin or add its hosted MCP server in Settings > MCP Servers first. The official endpoint is `https://agent.tinyfish.ai/mcp`; authenticate using the server's OAuth flow or a configured API key. Never put credentials in URLs or skill files.
 
-## Capabilities
+Use tool names and schemas discovered from the connected server. Const namespaces those names by connection. Current upstream names include:
 
-1. **Clean Web Page Extraction**: Extracts raw content from web pages stripped of cookies, paywalls, popups, and navbars directly into token-efficient markdown.
-2. **Real-time Live Web Search**: Queries the live web for the latest facts, technical documentation, API specs, and market information.
-3. **Multi-step Web Agent**: Navigates dynamic JS-heavy websites, paginated articles, and complex web structures autonomously.
+- `search`: find relevant web pages.
+- `fetch_content`: read and extract page content without an interactive browser run.
+- `run_web_automation`: perform a specific browser workflow when clicking, navigation, or forms are required.
+- `run_web_automation_async` and `get_run`: start and check longer workflows.
+- `cancel_run`: cancel a run when requested.
 
-## When to Use
+Choose the smallest operation that completes the user's task. Use saved profiles only for the requested account and workflow. Verify terminal status and the actual result before reporting completion. Do not initiate broad crawling, recurring monitors, payments, or unrelated account actions without the corresponding user request.
 
-- When the user asks to "search the web", "look up the latest docs on X", or "scrape this website".
-- When an article or URL fails with standard fetch or curl due to JavaScript rendering or cloudflare anti-bot checks.
-- When you want to minimize token usage by retrieving clean markdown instead of messy raw HTML.
-
-## MCP & API Usage
-
-TinyFish operates through its hosted MCP endpoint:
-- **MCP Server URL**: `https://agent.tinyfish.ai/mcp?source=tinyfish_cli&client=zcode`
-- **Transport**: HTTP (SSE / Stream)
-
-If the TinyFish MCP connector is enabled in your workbench, use its native tools:
-- `tinyfish_web_search(query: string)`: Searches the live web.
-- `tinyfish_fetch_page(url: string)`: Fetches clean markdown for any URL.
-- `tinyfish_crawl(url: string, depth: number)`: Crawls linked pages.
+When a tool is missing, inspect the available connection rather than fabricating a name or result. Report authentication and provider failures accurately. Consult [official TinyFish MCP documentation](https://docs.tinyfish.ai/mcp-integration) for current capabilities.

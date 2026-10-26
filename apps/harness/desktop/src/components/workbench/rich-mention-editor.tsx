@@ -67,12 +67,18 @@ export function getMentionIconMarkup({
   title,
   kind,
   fileType,
+  pluginName,
 }: {
   title: string;
   kind?: string;
   fileType?: string;
+  pluginName?: string;
 }): string {
   if (kind === "plugin") {
+    if (pluginName === "const-guide") {
+      const base = typeof window !== "undefined" && window.location.protocol === "file:" ? "./" : "/";
+      return `<img src="${base}const-logo-light-transparent.png" alt="" width="14" height="14" class="shrink-0 inline-block dark:hidden" /><img src="${base}const-logo-dark-transparent.png" alt="" width="14" height="14" class="shrink-0 hidden dark:inline-block" />`;
+    }
     return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 inline-block"><path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>`;
   }
   if (kind === "skill") {
@@ -131,6 +137,7 @@ export function renderMentionBadgeHtml({
     title: cleanTitle,
     kind: resolvedKind,
     fileType,
+    pluginName: isPlugin ? href.replace("plugin://", "") : undefined,
   });
 
   const tooltip = isPlugin ? translate("marketplace.pluginMentionTooltip").replace("{name}", cleanTitle) : isSkill
@@ -193,6 +200,7 @@ function createMentionBadgeElement(
     title: cleanName,
     kind: resolvedKind,
     fileType: candidate.fileType,
+    pluginName: isPlugin ? targetPath.replace("plugin://", "") : undefined,
   });
 
   badge.innerHTML = iconHtml;

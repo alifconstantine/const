@@ -83,6 +83,8 @@ import {
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { ComputerUseSettings } from "./settings/computer-use-settings";
+import { McpSettings } from "./settings/mcp-settings";
+import { PluginsMarketplace } from "./settings/plugins-marketplace";
 import { UsageStatsView } from "./settings/usage-stats-view";
 import { WeeklyQuotaCard } from "./settings/weekly-quota-card";
 import { loadMultiModalConfig } from "../lib/models-config";
@@ -781,7 +783,7 @@ export function SettingsView({
       case "mcp-servers":
         return {
           title: t("settings.mcpServers"),
-          desc: "Manage Model Context Protocol servers and tool integrations.",
+          desc: t("mcp.settingsDescription"),
         };
       case "subagents":
         return {
@@ -791,7 +793,7 @@ export function SettingsView({
       case "plugins":
         return {
           title: t("settings.plugins"),
-          desc: "Extend desktop functionality with community and local plugins.",
+          desc: t("marketplace.subtitle"),
         };
       default:
         return {
@@ -2175,6 +2177,10 @@ export function SettingsView({
               /* Computer Use & Browser Settings View                      */
               /* --------------------------------------------------------- */
               <ComputerUseSettings />
+            ) : activeTab === "mcp-servers" ? (
+              <McpSettings workspacePath={currentProject} />
+            ) : activeTab === "plugins" ? (
+              <PluginsMarketplace workspacePath={currentProject} scope="all" search="" />
             ) : activeTab === "memory" ? (
               /* --------------------------------------------------------- */
               /* Memory Settings View                                      */

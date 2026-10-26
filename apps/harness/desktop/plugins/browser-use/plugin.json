@@ -1,0 +1,5 @@
+{
+  "name": "browser-use", "version": "1.0.0", "description": "Browse and interact with websites using Const's browser runtime.",
+  "author": { "name": "Const" }, "interface": { "displayName": "Browser Use", "icon": "blocks" },
+  "defaultInstalled": true, "nativeCapabilities": ["browser-use"], "entrypoint": "browser-use"
+}

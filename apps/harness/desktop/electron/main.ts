@@ -1,7 +1,7 @@
 import { getModelContextLimit } from "../src/lib/model-context";
 import { isTelemetryEvent } from "../src/lib/chat-telemetry";
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "./browser/guest-policy";
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, protocol, net, session } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, protocol, net, session, safeStorage } from "electron";
 import { pathToFileURL } from "node:url";
 
 // Register custom protocol scheme for safe local file serving (images/attachments in brain)
@@ -55,6 +55,9 @@ import {
 import { browserController, type ControlState } from "./browser-controller";
 import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
+import { McpStore } from "./mcp/store";
+import { McpService } from "./mcp/service";
+import type { McpSaveInput } from "../src/lib/mcp/types";
 import { fetchSkillsCatalog } from "../src/lib/skills/skills-sh-service";
 import { WINDOWS_APP_ID, loadWindowBranding, applyWindowBranding } from "./window-branding";
 import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
@@ -94,6 +97,24 @@ const constProjectsDir = path.join(harnessHomeDir, "projects");
 const constBrainDir = path.join(harnessHomeDir, "brain");
 const constConversationsDir = path.join(harnessHomeDir, "conversations");
 const constConfigFile = path.join(harnessHomeDir, "config.json");
+const mcpService = new McpService(new McpStore(harnessHomeDir, {
+  encrypt: (value) => {
+    if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) throw new Error("storage");
+    return safeStorage.encryptString(value);
+  },
+  decrypt: (value) => {
+    if (!safeStorage.isEncryptionAvailable()) throw new Error("storage");
+    return safeStorage.decryptString(value);
+  },
+}), () => {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("mcp:changed");
+}, (url) => shell.openExternal(url));
+let mcpShuttingDown = false;
+app.on("before-quit", (event) => {
+  if (mcpShuttingDown) return;
+  event.preventDefault(); mcpShuttingDown = true;
+  void mcpService.invalidate().finally(() => app.quit());
+});
 
 // Legacy root config fallback / migration
 const rootConfigFile = path.join(constHomeDir, "config.json");
@@ -257,6 +278,12 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
   };
   if (config.enableComputerUse !== undefined) {
     computerController.setEnabled(config.enableComputerUse);
+  }
+  for (const [name, enabled] of [["browser-use", config.enableBrowserUse], ["computer-use", config.enableComputerUse]] as const) {
+    if (enabled === undefined) continue;
+    const installed = marketplaceService.listPlugins().installed.find((plugin) => plugin.name === name && plugin.scope === "user");
+    if (installed) marketplaceService.setEnabled(installed.id, enabled);
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("marketplace:changed");
   }
   if (config.launchOnStartup !== undefined) {
     try {
@@ -809,8 +836,27 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   // Marketplace & Skills Management IPC Handlers
   const capabilitiesChanged = () => {
+    void mcpService.invalidate();
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send("marketplace:changed");
   };
+  const handleMcp = (channel: string, handler: (...args: any[]) => unknown) => {
+    ipcMain.handle(channel, async (event, ...args) => {
+      const ownWindow = BrowserWindow.getAllWindows().some((window) => window.webContents === event.sender);
+      if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
+      try { return await handler(...args); }
+      catch (error) {
+        const code = error instanceof Error && ["auth", "storage", "busy", "connection"].includes(error.message) ? error.message : "invalid";
+        throw new Error(code);
+      }
+    });
+  };
+  handleMcp("mcp:list", (workspace?: string) => mcpService.list(workspace));
+  handleMcp("mcp:save", (input: McpSaveInput) => mcpService.save(input));
+  handleMcp("mcp:remove", (id: string, workspace?: string) => mcpService.remove(id, workspace));
+  handleMcp("mcp:override", (id: string, workspace: string) => mcpService.override(id, workspace));
+  handleMcp("mcp:connect", async (id: string, workspace?: string) => { await mcpService.connect(id, workspace); });
+  handleMcp("mcp:authenticate", (id: string, workspace?: string) => mcpService.authenticate(id, workspace));
+  handleMcp("mcp:disconnect", (id: string, workspace?: string) => mcpService.disconnectAccount(id, workspace));
   ipcMain.handle("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
   ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => {
     marketplaceService.installPlugin(payload.name, payload.scope, payload.workspacePath);
@@ -821,7 +867,10 @@ app.whenReady().then(() => {
     capabilitiesChanged();
   });
   ipcMain.handle("marketplace:set-enabled", (_event, payload: { id: string; enabled: boolean; workspacePath?: string }) => {
+    const plugin = marketplaceService.listPlugins(payload.workspacePath).installed.find((item) => item.id === payload.id);
     marketplaceService.setEnabled(payload.id, payload.enabled, payload.workspacePath);
+    if (plugin?.scope === "user" && plugin.name === "browser-use") saveUserConfig({ enableBrowserUse: payload.enabled });
+    if (plugin?.scope === "user" && plugin.name === "computer-use") saveUserConfig({ enableComputerUse: payload.enabled });
     capabilitiesChanged();
   });
   // ---------------------------------------------------------------------------
@@ -1239,6 +1288,9 @@ app.whenReady().then(() => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
+        externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
+        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal),
+        nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
         inputTypes: modelDef?.inputTypes,
@@ -2128,6 +2180,9 @@ app.whenReady().then(() => {
         baseUrl,
         apiKey,
         model,
+        externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
+        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal),
+        nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
