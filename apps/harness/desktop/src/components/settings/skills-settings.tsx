@@ -41,6 +41,9 @@ import {
   type MarketplaceSkill,
 } from "../../lib/skills/skills-service";
 import { FileIcon } from "../workbench/file-icon";
+import { McpSettings } from "./mcp-settings";
+import { PluginIcon } from "./plugin-icon";
+import { pluginDescriptionKeys } from "./plugin-connection-info";
 import { PluginsMarketplace } from "./plugins-marketplace";
 import type { SkillsShItem } from "../../lib/skills/skills-sh-service";
 import type { SkillInstallProgress } from "../../lib/skills/types";
@@ -231,7 +234,7 @@ export function SkillsSettings({
         installedPlugins.find(
           (p) =>
             p.name === selectedPlugin.name &&
-            p.scope === (selectedScope === "workspace" ? "workspace" : "user"),
+            p.scope === ("scope" in selectedPlugin ? selectedPlugin.scope : selectedScope),
         ) ||
         installedPlugins.find((p) => p.name === selectedPlugin.name) ||
         pluginCatalog.find((p) => p.name === selectedPlugin.name);
@@ -1108,13 +1111,9 @@ export function SkillsSettings({
             };
           });
 
-    const pluginOverviewText =
-      selectedPlugin.overview ||
-      (selectedPlugin.name === "hyperframes"
-        ? `HyperFrames is an open-source, web-standard video creation framework that turns structured data and code into smooth 60fps MP4 videos.\n\nIncluded Skills:\n• /hyperframes-core: The HyperFrames composition contract, timing attributes, and validation rules.\n• /hyperframes-creative: Creative direction, typography, palettes, and beat planning.\n• /hyperframes-keyframes: Zooms, whip transitions, and seek-safe camera keyframes.\n• /hyperframes-studio: Timeline layout safe zones for visual Studio editing.\n• /hyperframes-cli: Development loop, preview, beats, keyframes, and render engine.\n• /hyperframes-animation: Atomic CSS/WAAPI motion patterns and scene transitions.\n• /hyperframes-audio: Audio-reactive visuals and waveform sync.`
-        : selectedPlugin.name === "computer-use"
-        ? `Native OS desktop GUI automation, mouse clicking, keyboard typing, window states, accessibility tree inspection, and screenshots in native applications and desktop windows.\n\nIncluded Skills:\n• /computer-use: Drives the GUI of visible local desktop applications through native accessibility tree, mouse clicks, typing, shortcuts, and screenshots.`
-        : selectedPlugin.description);
+    const pluginOverviewText = selectedPlugin.placeholder
+      ? t("mcp.guideEmpty")
+      : selectedPlugin.overview || (pluginDescriptionKeys[selectedPlugin.name] ? t(pluginDescriptionKeys[selectedPlugin.name]!) : selectedPlugin.description);
 
     const mcpServers = selectedPlugin.mcpServers || {};
     const mcpCount = Object.keys(mcpServers).length;
@@ -1161,8 +1160,8 @@ export function SkillsSettings({
         {/* Plugin Header Strip */}
         <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-[#222222] border border-[#383838]">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0 shadow-xs">
-              <Blocks className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
+              <PluginIcon name={selectedPlugin.name} />
             </div>
             <div className="flex flex-col min-w-0">
               <h2 className="text-xl sm:text-2xl font-normal tracking-tight text-white truncate">
@@ -1175,7 +1174,7 @@ export function SkillsSettings({
                 {selectedPlugin.skillSlugs.length > 0 && (
                   <>
                     <span>·</span>
-                    <span>{selectedPlugin.skillSlugs.length} skills</span>
+                    <span>{t("marketplace.pluginSkillsCount").replace("{count}", String(selectedPlugin.skillSlugs.length))}</span>
                   </>
                 )}
               </div>
@@ -1337,9 +1336,9 @@ export function SkillsSettings({
                   {t("marketplace.includedSkillsCount")?.replace(
                     "{count}",
                     String(pluginSkillsList.length),
-                  ) || `INCLUDED SKILLS (${pluginSkillsList.length})`}
+                  )}
                 </span>
-                <div className="flex flex-col divide-y divide-[#2e2e2e] border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
+                <div className="flex flex-col border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
                   {pluginSkillsList.map((subSkill) => (
                     <div
                       key={subSkill.slug}
@@ -1371,91 +1370,9 @@ export function SkillsSettings({
           </div>
         )}
 
-        {/* Tab 2: MCP */}
         {activeTab === "mcp" && hasMcp && (
-          <div className="max-w-3xl flex flex-col gap-4 pt-2">
-            {mcpCount > 0 ? (
-              <div className="flex flex-col gap-3">
-                <span className="text-xs font-semibold text-white uppercase tracking-wider">
-                  {t("marketplace.mcpServersConfigured")?.replace(
-                    "{count}",
-                    String(mcpCount),
-                  ) || `CONFIGURED MCP SERVERS (${mcpCount})`}
-                </span>
-                <div className="grid grid-cols-1 gap-3">
-                  {Object.entries(mcpServers).map(
-                    ([serverKey, serverConf]: [string, any]) => (
-                      <div
-                        key={serverKey}
-                        className="rounded-2xl border border-[#383838] bg-[#222222] p-4 flex flex-col gap-3"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
-                            <Cable className="w-4.5 h-4.5 text-emerald-400" />
-                          </div>
-                          <div>
-                            <h3 className="text-xs font-semibold text-white font-mono">
-                              {serverKey}
-                            </h3>
-                            <span className="text-[11px] text-[#969696]">
-                              {serverConf?.transport || "stdio"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {serverConf?.command && (
-                          <div className="bg-[#1b1b1b] rounded-xl p-3 font-mono text-xs text-[#d4d4d4] flex items-center gap-2 border border-[#2e2e2e]">
-                            <span className="text-emerald-400">
-                              {serverConf.command}
-                            </span>
-                            {serverConf.args && (
-                              <span className="text-[#969696]">
-                                {Array.isArray(serverConf.args)
-                                  ? serverConf.args.join(" ")
-                                  : serverConf.args}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {serverConf?.env &&
-                          Object.keys(serverConf.env).length > 0 && (
-                            <div className="flex flex-col gap-1.5 text-[11px]">
-                              <span className="text-[#969696] font-medium">
-                                {t("marketplace.environment")}
-                              </span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {Object.keys(serverConf.env).map((k) => (
-                                  <span
-                                    key={k}
-                                    className="px-2 py-0.5 rounded-md bg-[#2b2b2b] border border-[#333] text-[#969696] font-mono text-[10px]"
-                                  >
-                                    {k}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    ),
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="py-16 flex flex-col items-center justify-center text-center gap-3 bg-[#222222] rounded-2xl border border-[#383838] p-8">
-                <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696]">
-                  <Cable className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-white">
-                    {t("marketplace.noMcpTitle")}
-                  </p>
-                  <p className="text-xs text-[#969696] max-w-sm">
-                    {t("marketplace.noMcpDesc")}
-                  </p>
-                </div>
-              </div>
-            )}
+          <div className="max-w-3xl pt-2">
+            {installedRecord ? <McpSettings workspacePath={workspacePath} pluginId={installedRecord.id} compact /> : <p className="text-sm text-[#969696]">{t("mcp.installToConnect")}</p>}
           </div>
         )}
 
@@ -1465,7 +1382,7 @@ export function SkillsSettings({
             <span className="text-xs font-semibold text-white uppercase tracking-wider">
               {t("marketplace.tabSkills")} ({pluginSkillsList.length})
             </span>
-            <div className="flex flex-col divide-y divide-[#2e2e2e] border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
+            <div className="flex flex-col border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
               {pluginSkillsList.map((subSkill) => (
                 <div
                   key={subSkill.slug}
@@ -1790,6 +1707,8 @@ export function SkillsSettings({
           <PluginsMarketplace
             workspacePath={workspacePath}
             scope="all"
+            installScope={selectedScope}
+            onInstallScopeChange={setSelectedScope}
             search={searchQuery}
             onSelectPlugin={(plugin) => {
               setSelectedPlugin(plugin);

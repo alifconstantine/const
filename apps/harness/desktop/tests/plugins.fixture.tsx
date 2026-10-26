@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nProvider, useTranslation } from "../src/lib/i18n";
+import { SkillsSettings } from "../src/components/settings/skills-settings";
 import { PluginsMarketplace } from "../src/components/settings/plugins-marketplace";
 import { McpSettings } from "../src/components/settings/mcp-settings";
 import type {
@@ -44,6 +45,8 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     authOptions: server.authOptions,
     apiKeyUrl: server.apiKeyUrl,
     oauthUrl: server.oauthUrl,
+    oauthClientRequired: server.oauthClientRequired,
+    setupUrl: server.setupUrl,
     enabled: true,
     timeoutMs: 30000,
     status: "needs_auth",
@@ -62,6 +65,8 @@ const subscribe = (callback: () => void) => {
 };
 const bridge = {
   marketplace: {
+    listInstalled: async () => [],
+    onInstallProgress: () => () => {},
     listPlugins: async () => ({ catalog, installed }),
     onChanged: subscribe,
     installPlugin: async ({
@@ -146,7 +151,12 @@ const bridge = {
     authenticate: async (id: string) => {
       connections = connections.map((item) =>
         item.id === id
-          ? { ...item, status: "connected", hasCredentials: true }
+          ? {
+              ...item,
+              status: "connected",
+              hasCredentials: true,
+              lastConnectedAt: new Date().toISOString(),
+            }
           : item,
       );
       emit();
@@ -194,10 +204,10 @@ function Fixture() {
       >
         <main className="mx-auto max-w-5xl p-6">
           {tab === "plugins" ? (
-            <PluginsMarketplace
+            <SkillsSettings
               workspacePath="D:/fixture/workspace"
-              scope="all"
-              search=""
+              initialTab="plugins"
+              isModal
             />
           ) : (
             <McpSettings workspacePath="D:/fixture/workspace" />

@@ -31,6 +31,10 @@ import type {
   McpConnectionView,
   McpSaveInput,
 } from "../../lib/mcp/types";
+import {
+  ConnectionTime,
+  connectionAccountLabel,
+} from "./plugin-connection-info";
 import { PluginIcon } from "./plugin-icon";
 
 function mcpErrorKey(error: unknown) {
@@ -454,7 +458,7 @@ export function McpSettings({
     rawWorkspace && rawWorkspace !== "Outside Project"
       ? rawWorkspace
       : undefined;
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { connections, error, loading, refresh } =
     useMcpConnections(workspacePath);
   const [scope, setScope] = useState("all");
@@ -579,6 +583,24 @@ export function McpSettings({
                 : connection.command}
             </span>
           </div>
+          <div className="space-y-1 text-xs text-[#969696]">
+            <p>{t(connectionAccountLabel(connection))}</p>
+            <ConnectionTime at={connection.lastConnectedAt} />
+            {connection.auth === "oauth" &&
+              connection.oauthClientRequired &&
+              !connection.clientId && <p>{t("mcp.clientRequired")}</p>}
+            {connection.setupUrl && (
+              <button
+                type="button"
+                className="underline underline-offset-4 hover:text-white"
+                onClick={() =>
+                  void window.electron?.openExternal(connection.setupUrl!)
+                }
+              >
+                {t("mcp.setupGuide")}
+              </button>
+            )}
+          </div>
           {connection.error && (
             <p role="alert" className="text-xs text-[#d4d4d4]">
               {t(mcpErrorKey(new Error(connection.error)))}
@@ -613,15 +635,26 @@ export function McpSettings({
                   <Button
                     size="sm"
                     variant="ghost"
-                    disabled={!!pending}
+                    disabled={
+                      !!pending ||
+                      !!(connection.oauthClientRequired && !connection.clientId)
+                    }
                     onClick={() =>
                       bridge &&
                       void run(connection.id, () =>
-                        bridge.authenticate(connection.id, workspacePath),
+                        bridge.authenticate(
+                          connection.id,
+                          workspacePath,
+                          language,
+                        ),
                       )
                     }
                   >
-                    {t("mcp.authenticate")}
+                    {t(
+                      connection.hasCredentials
+                        ? "mcp.reconnectAccount"
+                        : "mcp.authenticate",
+                    )}
                   </Button>
                 )}
                 {(connection.status === "connected" ||

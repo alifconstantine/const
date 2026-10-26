@@ -31,6 +31,8 @@ export interface PluginMcpServer {
   authOptions?: Array<"none" | "oauth" | "api-key">;
   apiKeyUrl?: string;
   oauthUrl?: string;
+  oauthClientRequired?: boolean;
+  setupUrl?: string;
 }
 export interface RegisteredSkill {
   id: string;
@@ -128,7 +130,8 @@ export function readPluginManifest(root: string): PluginManifest {
         throw new Error(`Invalid plugin MCP server: ${root}/${name}`);
       if (server.authOptions !== undefined && (!Array.isArray(server.authOptions) || server.authOptions.some((value) => !["none", "oauth", "api-key"].includes(value))))
         throw new Error(`Invalid plugin authentication options: ${root}/${name}`);
-      for (const value of [server.url, server.apiKeyUrl, server.oauthUrl].filter((value): value is string => value !== undefined)) {
+      if (server.oauthClientRequired !== undefined && typeof server.oauthClientRequired !== "boolean") throw new Error("Invalid OAuth client requirement");
+      for (const value of [server.url, server.apiKeyUrl, server.oauthUrl, server.setupUrl].filter((value): value is string => value !== undefined)) {
         const endpoint = new URL(value);
         if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password) throw new Error(`Invalid plugin endpoint: ${root}/${name}`);
       }

@@ -30,6 +30,8 @@ import type {
 } from "../../src/lib/mcp/types";
 import { McpStore, validateEndpoint, validWorkspace } from "./store";
 
+import { respondOAuth } from "./oauth-page";
+
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
 interface LiveConnection {
   client: Client;
@@ -121,6 +123,8 @@ export class McpService {
         authOptions: definition?.authOptions,
         apiKeyUrl: definition?.apiKeyUrl,
         oauthUrl: definition?.oauthUrl,
+        oauthClientRequired: definition?.oauthClientRequired,
+        setupUrl: definition?.setupUrl,
         enabled: record.enabled && !!plugin?.isEnabled && !!plugin?.isEffective,
       };
     });
@@ -151,6 +155,7 @@ export class McpService {
         ...record,
         isEffective,
         hasCredentials,
+        lastConnectedAt: this.store.lastConnectedAt(record),
         status: !record.enabled
           ? "disabled"
           : (state?.status ??
@@ -310,10 +315,15 @@ export class McpService {
       },
     };
   }
-  async authenticate(id: string, workspace?: string): Promise<void> {
+  async authenticate(
+    id: string,
+    workspace?: string,
+    language = "en",
+  ): Promise<void> {
     const record = this.get(id, workspace);
     if (record.transport !== "http" || record.auth !== "oauth")
       throw new Error("invalid");
+    if (record.oauthClientRequired && !record.clientId) throw new Error("auth");
     if (this.login) throw new Error("busy");
     await this.disconnect(id);
     if (!this.store.isTrusted(record)) throw new Error("invalid");
@@ -328,6 +338,7 @@ export class McpService {
       rejectCode = reject;
     });
     void code.catch(() => {});
+    let callbackResponse: http.ServerResponse | undefined;
     const server = http.createServer((request, response) => {
       const url = new URL(request.url ?? "/", CALLBACK);
       if (
@@ -335,12 +346,12 @@ export class McpService {
         url.pathname !== "/oauth/callback" ||
         url.searchParams.get("state") !== state
       ) {
-        response.writeHead(400).end();
+        respondOAuth(response, false, language);
         return;
       }
       if (url.searchParams.has("error") || !url.searchParams.get("code")) {
         rejectCode(new Error("auth"));
-        response.writeHead(400).end();
+        respondOAuth(response, false, language);
         return;
       }
       const discovery = provider.discoveryState?.();
@@ -356,14 +367,15 @@ export class McpService {
           (metadata?.authorization_response_iss_parameter_supported && !issuer)
         ) {
           rejectCode(new Error("auth"));
-          response.writeHead(400).end();
+          respondOAuth(response, false, language);
           return;
         }
       }
-      response.setHeader("Content-Type", "text/html; charset=utf-8");
-      response.end(
-        '<!doctype html><meta charset="utf-8"><title>Const</title><script>window.close()</script>',
-      );
+      if (callbackResponse) {
+        respondOAuth(response, false, language);
+        return;
+      }
+      callbackResponse = response;
       resolveCode(url.searchParams.get("code")!);
     });
     const provider = this.provider(
@@ -424,14 +436,19 @@ export class McpService {
       }
       if (controller.signal.aborted) throw new Error("auth");
       await this.connect(id, workspace);
+      if (controller.signal.aborted) throw new Error("auth");
+      if (callbackResponse) respondOAuth(callbackResponse, true, language);
     } catch {
+      if (callbackResponse && !callbackResponse.writableEnded)
+        respondOAuth(callbackResponse, false, language);
       this.states.set(id, { status: "needs_auth", error: "auth" });
       throw new Error("auth");
     } finally {
       clearTimeout(timer);
       this.login = undefined;
-      server.closeAllConnections();
       server.close();
+      // Allow the response to flush before closing remaining keep-alive sockets.
+      setTimeout(() => server.closeAllConnections(), 1000).unref();
       await transport?.close().catch(() => {});
       this.changed();
       finishLogin();
@@ -500,6 +517,7 @@ export class McpService {
       await client.connect(transport, { timeout: record.timeoutMs, signal });
       const tools = await this.readTools(client, record.timeoutMs, signal);
       if (signal.aborted) throw new Error("connection");
+      this.store.markConnected(record);
       const active = { client, transport, tools, fingerprint };
       this.live.set(record.id, active);
       this.retryAfter.delete(record.id);

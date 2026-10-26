@@ -1,3 +1,4 @@
+import { SkillsSettings } from "./settings/skills-settings";
 import { CONST_ROUTER_LLM_MODELS } from "../lib/models-config";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -84,7 +85,7 @@ import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { ComputerUseSettings } from "./settings/computer-use-settings";
 import { McpSettings } from "./settings/mcp-settings";
-import { PluginsMarketplace } from "./settings/plugins-marketplace";
+
 import { UsageStatsView } from "./settings/usage-stats-view";
 import { WeeklyQuotaCard } from "./settings/weekly-quota-card";
 import { loadMultiModalConfig } from "../lib/models-config";
@@ -2180,7 +2181,7 @@ export function SettingsView({
             ) : activeTab === "mcp-servers" ? (
               <McpSettings workspacePath={currentProject} />
             ) : activeTab === "plugins" ? (
-              <PluginsMarketplace workspacePath={currentProject} scope="all" search="" />
+              <SkillsSettings key="plugins" workspacePath={currentProject} initialTab="plugins" isModal />
             ) : activeTab === "memory" ? (
               /* --------------------------------------------------------- */
               /* Memory Settings View                                      */

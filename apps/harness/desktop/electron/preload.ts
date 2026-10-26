@@ -280,7 +280,7 @@ contextBridge.exposeInMainWorld("electron", {
     remove: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:remove", id, workspacePath),
     override: (id: string, workspacePath: string) => ipcRenderer.invoke("mcp:override", id, workspacePath),
     connect: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:connect", id, workspacePath),
-    authenticate: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:authenticate", id, workspacePath),
+    authenticate: (id: string, workspacePath?: string, language?: string) => ipcRenderer.invoke("mcp:authenticate", id, workspacePath, language),
     disconnect: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:disconnect", id, workspacePath),
     onChanged: (callback: () => void) => {
       const handler = () => callback(); ipcRenderer.on("mcp:changed", handler);

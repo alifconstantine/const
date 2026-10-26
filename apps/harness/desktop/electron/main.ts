@@ -855,7 +855,11 @@ app.whenReady().then(() => {
   handleMcp("mcp:remove", (id: string, workspace?: string) => mcpService.remove(id, workspace));
   handleMcp("mcp:override", (id: string, workspace: string) => mcpService.override(id, workspace));
   handleMcp("mcp:connect", async (id: string, workspace?: string) => { await mcpService.connect(id, workspace); });
-  handleMcp("mcp:authenticate", (id: string, workspace?: string) => mcpService.authenticate(id, workspace));
+  handleMcp("mcp:authenticate", async (id: string, workspace?: string, language?: string) => {
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    await mcpService.authenticate(id, workspace, language);
+    if (window && !window.isDestroyed()) { window.show(); window.focus(); }
+  });
   handleMcp("mcp:disconnect", (id: string, workspace?: string) => mcpService.disconnectAccount(id, workspace));
   ipcMain.handle("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
   ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => {

@@ -1,6 +1,6 @@
 import { Blocks } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
-import { Github } from "@thesvg/react";
+import { Github, Canva } from "@thesvg/react";
 import hyperframesIcon from "../../../plugins/hyperframes/assets/icon.svg";
 
 /** Only packaged, known assets render here. Missing brand logos consistently fall back to Blocks. */
@@ -19,5 +19,7 @@ export function PluginIcon({
     return <img src={hyperframesIcon} alt="" className={className} />;
   if (name === "github")
     return <Github className={className} aria-hidden="true" />;
+  if (name === "canva")
+    return <Canva className={className} aria-hidden="true" />;
   return <Blocks className={className} aria-hidden="true" />;
 }

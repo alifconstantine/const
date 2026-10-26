@@ -1,7 +1,22 @@
 import { useState } from "react";
-import { Blocks, ChevronRight, Loader2, Trash2 } from "lucide-react";
-import { Button, Switch, toast } from "@const/ui";
+import { ChevronRight, Loader2, Trash2 } from "lucide-react";
+import {
+  Button,
+  Switch,
+  toast,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
+import { PluginIcon } from "./plugin-icon";
+import {
+  PluginConnectionInfo,
+  pluginDescriptionKeys,
+} from "./plugin-connection-info";
+import { useMcpConnections } from "../../lib/mcp/use-mcp";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import type {
   InstalledPluginRecord,
@@ -13,23 +28,24 @@ export function PluginsMarketplace({
   scope,
   search,
   onSelectPlugin,
+  installScope,
+  onInstallScopeChange,
 }: {
   workspacePath?: string;
   scope: "all" | "user" | "workspace";
   search: string;
+  installScope?: "user" | "workspace";
+  onInstallScopeChange?: (scope: "user" | "workspace") => void;
   onSelectPlugin?: (plugin: PluginCatalogEntry | InstalledPluginRecord) => void;
 }) {
   const { t } = useTranslation();
   const { catalog, installed, error } = usePluginInventory(workspacePath);
   const [pending, setPending] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [installScope, setInstallScope] = useState<"user" | "workspace">(scope === "workspace" ? "workspace" : "user");
-  const targetScope = scope === "workspace" ? "workspace" : installScope;
+  const [localScope, setLocalScope] = useState<"user" | "workspace">("user");
+  const targetScope =
+    scope === "workspace" ? "workspace" : (installScope ?? localScope);
   const { connections } = useMcpConnections(workspacePath);
-  const descriptionKeys: Record<string, string> = {
-    "const-guide": "mcp.guideEmpty", "plugins-creator": "mcp.pluginsCreatorDescription", "skills-creator": "mcp.skillsCreatorDescription",
-    "browser-use": "mcp.browserDescription", "computer-use": "mcp.computerDescription", context7: "mcp.context7Description", tinyfish: "mcp.tinyfishDescription",
-  };
   const matches = (plugin: PluginCatalogEntry) =>
     [
       plugin.interface.displayName,
@@ -72,15 +88,29 @@ export function PluginsMarketplace({
     plugin: PluginCatalogEntry,
     installation?: InstalledPluginRecord,
   ) => {
+    const related = installation
+      ? connections.filter((c) => c.pluginId === installation.id)
+      : [];
+    const effective = related.filter((c) => c.isEffective);
     return (
       <article
         key={installation?.id ?? plugin.name}
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            (event.key === "Enter" || event.key === " ")
+          ) {
+            event.preventDefault();
+            onSelectPlugin?.(installation ?? plugin);
+          }
+        }}
         onClick={() => onSelectPlugin?.(installation ?? plugin)}
         className="rounded-xl bg-[#222222] hover:bg-[#262626] border border-transparent hover:border-[#383838] p-4 flex flex-col justify-between gap-3 transition-all cursor-pointer group"
       >
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white group-hover:border-white/20 transition-colors">
-            <Blocks className="w-4.5 h-4.5" />
+            <PluginIcon name={plugin.name} className="w-4.5 h-4.5" size={18} />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-white truncate">
@@ -159,10 +189,15 @@ export function PluginsMarketplace({
         </div>
 
         <p className="text-xs leading-relaxed text-[#d4d4d4] line-clamp-2">
-          {plugin.name === "hyperframes"
-            ? t("marketplace.hyperframesDescription")
+          {pluginDescriptionKeys[plugin.name]
+            ? t(pluginDescriptionKeys[plugin.name]!)
             : plugin.description}
         </p>
+
+        <PluginConnectionInfo
+          plugin={plugin}
+          connections={effective.length ? effective : related}
+        />
 
         <div className="flex items-center justify-between gap-2 text-[11px] text-[#969696] pt-1">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -188,7 +223,7 @@ export function PluginsMarketplace({
             )}
           </div>
           <span className="flex items-center gap-0.5 text-[#969696] group-hover:text-white transition-colors shrink-0">
-            <span>{t("marketplace.viewPluginDetails") || "Lihat detail"}</span>
+            <span>{t("marketplace.viewPluginDetails")}</span>
             <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </span>
         </div>
@@ -244,6 +279,29 @@ export function PluginsMarketplace({
 
   return (
     <div className="space-y-6">
+      {scope === "all" && (
+        <Select
+          value={targetScope}
+          onValueChange={(value) => {
+            const next = value === "workspace" ? "workspace" : "user";
+            setLocalScope(next);
+            onInstallScopeChange?.(next);
+          }}
+        >
+          <SelectTrigger
+            aria-label={t("mcp.scope")}
+            className="w-52 rounded-xl bg-[#2b2b2b]"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="user">{t("mcp.global")}</SelectItem>
+            <SelectItem value="workspace" disabled={!workspacePath}>
+              {t("mcp.workspace")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      )}
       {targetScope === "workspace" && !workspacePath && (
         <p className="text-xs text-[#969696]">
           {t("marketplace.pluginChooseWorkspace")}

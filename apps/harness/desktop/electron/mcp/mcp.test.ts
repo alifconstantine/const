@@ -10,6 +10,8 @@ import {
   randomBytes,
   createHash,
 } from "node:crypto";
+import { readPluginManifest } from "@const/agent";
+import { fileURLToPath } from "node:url";
 import { McpStore } from "./store";
 import { McpService, exposedToolName } from "./service";
 import { initializeDefaultPlugins } from "./default-plugins";
@@ -242,10 +244,11 @@ test("rejects malformed configurations and insecure remote credential transport"
   }
 });
 
-async function testServer(oauth = false) {
+async function testServer(oauth = false, failExchange = false) {
   let origin = "";
   let challenge = "";
   let authorized = false;
+  let completion: Promise<string> | undefined;
   const methods: string[] = [];
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", origin);
@@ -276,6 +279,7 @@ async function testServer(oauth = false) {
     if (url.pathname === "/register")
       return json({ ...JSON.parse(body), client_id: "fixture-client" }, 201);
     if (url.pathname === "/token") {
+      if (failExchange) return json({ error: "invalid_grant" }, 400);
       const params = new URLSearchParams(body);
       assert.equal(
         createHash("sha256")
@@ -342,6 +346,7 @@ async function testServer(oauth = false) {
     url: `${origin}/mcp`,
     methods,
     authorized: () => authorized,
+    completion: () => completion!,
     browser: async (value: string) => {
       const auth = new URL(value);
       challenge = auth.searchParams.get("code_challenge")!;
@@ -352,7 +357,12 @@ async function testServer(oauth = false) {
       assert.equal((await fetch(wrong)).status, 400);
       callback.searchParams.set("state", auth.searchParams.get("state")!);
       callback.searchParams.set("code", "fixture-code");
-      assert.equal((await fetch(callback)).status, 200);
+      completion = fetch(callback).then(async (response) => {
+        assert.equal(response.status, failExchange ? 400 : 200);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        return response.text();
+      });
+      void completion.catch(() => {});
     },
     close: async () => {
       server.closeAllConnections();
@@ -372,6 +382,9 @@ test("real SDK initializes, discovers tools, routes calls, and rejects disabled 
       auth: "none",
     });
     const definitions = await f.service.tools();
+    const at = f.service.list()[0]!.lastConnectedAt;
+    assert.ok(at && Number.isFinite(Date.parse(at)));
+    assert.equal(f.store.lastConnectedAt(connection), at);
     assert.equal(definitions.length, 1);
     assert.equal(definitions[0]!.requiresApproval, true);
     assert.equal(
@@ -415,7 +428,14 @@ test("OAuth discovery, dynamic registration, state validation, and PKCE exchange
       url: server.url,
       auth: "oauth",
     });
-    await service.authenticate(record.id);
+    await service.authenticate(record.id, undefined, "id");
+    const page = await server.completion();
+    assert.match(page, /Akun berhasil terhubung/);
+    assert.match(page, /history.replaceState/);
+    assert.match(page, /window.close/);
+    assert.ok(
+      !page.includes("fixture-code") && !page.includes("fixture-token"),
+    );
     assert.equal(server.authorized(), true);
     assert.equal(service.list()[0]!.status, "connected");
     assert.equal(
@@ -487,6 +507,110 @@ test("stdio connects to a local child process and discovers its tools", async ()
       false,
     );
   } finally {
+    await f.cleanup();
+  }
+});
+
+test("failed OAuth token exchange renders a failure page without claiming success", async () => {
+  const f = fixture();
+  const server = await testServer(true, true);
+  const service = new McpService(
+    f.store,
+    () => {},
+    server.browser,
+    () => [],
+  );
+  try {
+    const record = f.store.save({
+      name: "Failed OAuth",
+      scope: "user",
+      transport: "http",
+      url: server.url,
+      auth: "oauth",
+    });
+    await assert.rejects(service.authenticate(record.id), /auth/);
+    const page = await server.completion();
+    assert.match(page, /Connection was not completed/);
+    assert.ok(!page.includes("Account connected"));
+    assert.equal(service.list()[0]!.lastConnectedAt, undefined);
+  } finally {
+    await service.invalidate();
+    await f.cleanup();
+    await server.close();
+  }
+});
+
+test("connection history stays local and is invalidated by endpoint changes", async () => {
+  const f = fixture();
+  const workspace = path.join(f.root, "workspace");
+  try {
+    const record = f.store.save({
+      name: "History",
+      scope: "workspace",
+      workspacePath: workspace,
+      transport: "http",
+      url: "https://example.com/mcp",
+      auth: "none",
+    });
+    f.store.markConnected(record);
+    assert.ok(f.store.lastConnectedAt(record));
+    assert.ok(
+      !fs
+        .readFileSync(path.join(workspace, ".const", "mcp.json"), "utf8")
+        .includes("lastConnected"),
+    );
+    const changed = f.store.save({
+      ...record,
+      url: "https://other.example/mcp",
+    });
+    assert.equal(f.store.lastConnectedAt(changed), undefined);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test("GitHub and Canva seed official presets and require a registered client before OAuth", async () => {
+  const f = fixture();
+  let browserOpened = false;
+  const plugins = ["github", "canva"].map((name) => {
+    const root = fileURLToPath(
+      new URL("../../plugins/" + name + "/", import.meta.url),
+    );
+    return {
+      ...readPluginManifest(root),
+      id: name,
+      path: root,
+      scope: "user" as const,
+      isEnabled: true,
+      isEffective: true,
+      skills: [],
+    };
+  });
+  const service = new McpService(
+    f.store,
+    () => {},
+    async () => {
+      browserOpened = true;
+    },
+    () => plugins,
+  );
+  try {
+    const records = service.list();
+    const github = records.find((r) => r.pluginId === "github")!;
+    const canva = records.find((r) => r.pluginId === "canva")!;
+    assert.equal(github.url, "https://api.githubcopilot.com/mcp/");
+    assert.equal(github.auth, "api-key");
+    assert.deepEqual(github.authOptions, ["api-key", "oauth"]);
+    assert.equal(canva.url, "https://api.canva.com/connect/v1/mcp");
+    assert.equal(canva.oauthClientRequired, true);
+    await assert.rejects(service.authenticate(canva.id), /auth/);
+    assert.equal(browserOpened, false);
+    assert.equal(
+      service.list().find((r) => r.id === canva.id)!.hasCredentials,
+      false,
+    );
+  } finally {
+    await service.invalidate();
     await f.cleanup();
   }
 });

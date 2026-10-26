@@ -1,4 +1,4 @@
-# Plugins and MCP: sessions 0–2
+# Plugins and MCP: sessions 0–3
 
 Implemented 2026-10-26. This document describes Const Harness, not the OpenAI plugin directory.
 
@@ -51,3 +51,21 @@ User-account OAuth and authenticated Context7/TinyFish calls remain pending unti
 Both hosted provider endpoints were probed without credentials and returned HTTP 401 with an OAuth challenge. This establishes endpoint availability, not successful account authorization. The broader existing subagent suite has three unrelated baseline failures (role normalization, notice wording, concurrency limit); these were reproduced with the original subagent source and are outside this change.
 
 The focused verification set passes 81 agent/registry/approval/native-tool tests, 10 MCP/default-plugin tests, and 7 installer tests. Desktop typecheck and production build pass. Browser fixture checks covered the plugin listing and Const logo, Context7 auth-mode switching, custom connection creation, tool preview, and English/Indonesian rendering. Source dictionaries also include Japanese, Chinese, and Spanish.
+
+
+## Session 3 and OAuth completion (2026-10-27)
+
+Rebased onto the upstream marketplace/detail-page update. Plugin account controls live in the detail page's MCP tab. Listing cards show authentication requirements, effective connection state, and the most recent successful connection time. Settings > Plugins uses the same detail page as Marketplace. Global/workspace installation scope is selectable; workspace MCP overrides remain available in Settings > MCP Servers.
+
+The loopback callback now returns a localized completion page after token exchange and tool discovery succeed. Failures return a failure page. It removes callback query parameters from browser history and attempts to close the tab, with a visible fallback when the browser prevents script-driven closing. The app is focused after a successful user-initiated login. Callback responses are not cached, never include authorization codes/tokens, and have a restrictive CSP. The HTTP response can finish before the callback server's connections are closed.
+
+Successful connection times are recorded in user-local mcp-state.json with a configuration fingerprint; runtime timestamps are not written into workspace files. Endpoint/client/auth changes invalidate the displayed history.
+
+New opt-in packages:
+
+- GitHub: official remote endpoint https://api.githubcopilot.com/mcp/, bearer PAT by default, optional OAuth with a registered client. No local runtime required. The fine-grained PAT is entered through Edit > Access token/API key, encrypted in the OS-backed vault. A registered OAuth client is necessary because remote GitHub does not support dynamic registration. [GitHub host integration guide](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md).
+- Canva: official remote endpoint https://api.canva.com/connect/v1/mcp. Register a Canva app, start Outside Canva integration, enable Canva MCP, and set the loopback redirect URI shown by Const's OAuth settings. Enter client ID and secret through Edit > Advanced; credentials are user-provided for this initial release, not bundled Const-wide credentials. Public distribution with a developer-owned confidential client should use a backend token exchange. [Canva access](https://www.canva.dev/docs/apps/mcp/access/), [quickstart](https://www.canva.dev/docs/apps/quickstart/).
+
+Both plugins include workflow skills but discover executable tool schemas from their servers. Missing registered client IDs disable the account-connect action and show a setup link. GitHub and Canva logos use the installed @thesvg/react exports. Real GitHub/Canva account authorization remains unverified without user-provided credentials; local OAuth and UI fixtures are explicitly simulated.
+
+Focused verification now includes 13 MCP tests (including success/failure callback responses, PKCE, cancellation, secret boundaries, and local-only history), plus the 81 agent tests and 7 installer tests. See google-workspace-oauth-research.md for the prerequisite decision before sessions 4 and 5.

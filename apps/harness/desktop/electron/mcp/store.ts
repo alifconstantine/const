@@ -179,6 +179,25 @@ export class McpStore {
       [record.id]: this.fingerprint(record),
     });
   }
+  lastConnectedAt(record: McpConnection): string | undefined {
+    const state = readJson<Record<string, { fingerprint: string; at: string }>>(
+      path.join(this.home, "mcp-state.json"),
+      {},
+    )[record.id];
+    return state?.fingerprint === this.fingerprint(record)
+      ? state.at
+      : undefined;
+  }
+  markConnected(record: McpConnection) {
+    const file = path.join(this.home, "mcp-state.json");
+    atomicJson(file, {
+      ...readJson(file, {}),
+      [record.id]: {
+        fingerprint: this.fingerprint(record),
+        at: new Date().toISOString(),
+      },
+    });
+  }
   private vault(): Record<string, string> {
     return readJson(path.join(this.home, "mcp-secrets.json"), {});
   }
