@@ -243,12 +243,73 @@ export class MarketplaceService {
     const catalog = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => {
       const dir = path.join(root, entry.name);
       const manifest = readPluginManifest(dir);
-      const skillSlugs = fs.readdirSync(path.join(dir, "skills")).filter((slug) => fs.existsSync(path.join(dir, "skills", slug, "SKILL.md"))).sort();
-      return { ...manifest, skillSlugs };
+      const skillsDir = path.join(dir, "skills");
+      const skillSlugs = fs.existsSync(skillsDir)
+        ? fs.readdirSync(skillsDir).filter((slug) => fs.existsSync(path.join(skillsDir, slug, "SKILL.md"))).sort()
+        : [];
+      const skills = skillSlugs.map((slug) => {
+        try {
+          const fileContent = fs.readFileSync(path.join(skillsDir, slug, "SKILL.md"), "utf8");
+          const parsed = this.parseFrontmatter(fileContent);
+          return {
+            slug,
+            name: parsed.name || slug,
+            description: parsed.description || "",
+          };
+        } catch {
+          return { slug, name: slug, description: "" };
+        }
+      });
+      let mcpServers: Record<string, any> | undefined = undefined;
+      let overview: string | undefined = undefined;
+      try {
+        const rawJson = JSON.parse(fs.readFileSync(path.join(dir, "plugin.json"), "utf8"));
+        mcpServers = rawJson.mcpServers || rawJson.mcp;
+        overview = rawJson.overview;
+      } catch {}
+      if (!overview && fs.existsSync(path.join(dir, "README.md"))) {
+        try {
+          overview = fs.readFileSync(path.join(dir, "README.md"), "utf8");
+        } catch {}
+      }
+      if (!mcpServers && fs.existsSync(path.join(dir, "mcp.json"))) {
+        try {
+          mcpServers = JSON.parse(fs.readFileSync(path.join(dir, "mcp.json"), "utf8"));
+        } catch {}
+      }
+      return { ...manifest, skillSlugs, skills, overview, mcpServers };
     });
-    const installed = resolveSkillRegistry(workspacePath).plugins.map(({ skills, ...plugin }) => ({
-      ...plugin, skillSlugs: skills.map((skill) => skill.slug.split(":")[1]!),
-    }));
+    const installed = resolveSkillRegistry(workspacePath).plugins.map(({ skills, ...plugin }) => {
+      const pluginDir = plugin.path;
+      let mcpServers: Record<string, any> | undefined = undefined;
+      let overview: string | undefined = undefined;
+      try {
+        const rawJson = JSON.parse(fs.readFileSync(path.join(pluginDir, "plugin.json"), "utf8"));
+        mcpServers = rawJson.mcpServers || rawJson.mcp;
+        overview = rawJson.overview;
+      } catch {}
+      if (!overview && fs.existsSync(path.join(pluginDir, "README.md"))) {
+        try {
+          overview = fs.readFileSync(path.join(pluginDir, "README.md"), "utf8");
+        } catch {}
+      }
+      if (!mcpServers && fs.existsSync(path.join(pluginDir, "mcp.json"))) {
+        try {
+          mcpServers = JSON.parse(fs.readFileSync(path.join(pluginDir, "mcp.json"), "utf8"));
+        } catch {}
+      }
+      return {
+        ...plugin,
+        skillSlugs: skills.map((skill) => (skill.slug.includes(":") ? skill.slug.split(":")[1]! : skill.slug)),
+        skills: skills.map((skill) => ({
+          slug: skill.slug.includes(":") ? skill.slug.split(":")[1]! : skill.slug,
+          name: skill.name.includes(":") ? skill.name.split(":")[1]! : skill.name,
+          description: skill.description || "",
+        })),
+        overview,
+        mcpServers,
+      };
+    });
     return { catalog, installed };
   }
 
@@ -270,31 +331,54 @@ export class MarketplaceService {
     workspacePath?: string
   ): Promise<SkillContentResult | null> {
     const cleanSlug = slug.toLowerCase().trim();
-    const registered = resolveSkillRegistry(workspacePath).skills.find((skill) => skill.slug === cleanSlug);
+    const rawSubSlug = cleanSlug.includes(":") ? cleanSlug.split(":").pop()! : cleanSlug;
+
+    // 1. Registered / installed skills (standalone or inside installed plugins)
+    const registered = resolveSkillRegistry(workspacePath).skills.find(
+      (skill) =>
+        skill.slug.toLowerCase() === cleanSlug ||
+        skill.slug.toLowerCase().endsWith(":" + rawSubSlug) ||
+        skill.slug.toLowerCase().split(":").pop() === rawSubSlug
+    );
     if (registered) return this.loadSkillDetailsFromDir(registered.path, cleanSlug, true, registered.scope);
 
-    // Bundled repository / catalog source
-    const bundledDir = path.join(this.getBundledSkillsDir(), cleanSlug);
+    // 2. Bundled repository / catalog standalone skills
+    const bundledDir = path.join(this.getBundledSkillsDir(), rawSubSlug);
     if (fs.existsSync(path.join(bundledDir, "SKILL.md"))) {
       return this.loadSkillDetailsFromDir(bundledDir, cleanSlug, false);
     }
 
-    // Remote fetch fallback
+    // 3. Bundled plugins skills (whether installed or available)
+    try {
+      const bundledPluginsDir = this.getBundledPluginsDir();
+      if (fs.existsSync(bundledPluginsDir)) {
+        const pluginEntries = fs.readdirSync(bundledPluginsDir, { withFileTypes: true });
+        for (const entry of pluginEntries) {
+          if (!entry.isDirectory()) continue;
+          const candidateDir = path.join(bundledPluginsDir, entry.name, "skills", rawSubSlug);
+          if (fs.existsSync(path.join(candidateDir, "SKILL.md"))) {
+            return this.loadSkillDetailsFromDir(candidateDir, cleanSlug, false);
+          }
+        }
+      }
+    } catch {}
+
+    // 4. Remote fetch fallback
     try {
       const baseUrl = this.getRemoteRegistryBaseUrl();
-      const skillMdUrl = `${baseUrl}/${cleanSlug}/SKILL.md`;
+      const skillMdUrl = `${baseUrl}/${rawSubSlug}/SKILL.md`;
       const resp = await fetch(skillMdUrl, { signal: AbortSignal.timeout(10000) });
       if (resp.ok) {
-        const content = await resp.text();
-        const parsed = this.parseFrontmatter(content);
+        const fileContent = await resp.text();
+        const parsed = this.parseFrontmatter(fileContent);
         return {
           slug: cleanSlug,
           name: parsed.name || cleanSlug,
           description: parsed.description || "Agent skill.",
-          content,
+          content: fileContent,
           author: parsed.author,
           version: parsed.version || "1.0.0",
-          files: { "SKILL.md": content },
+          files: { "SKILL.md": fileContent },
           isInstalled: false,
         };
       }

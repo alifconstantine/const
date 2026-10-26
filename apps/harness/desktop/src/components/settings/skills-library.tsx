@@ -98,51 +98,53 @@ export function SkillsLibrary({
   const noWorkspace = !workspacePath || workspacePath === "Outside Project";
   return (
     <section className="space-y-5">
-      <div
-        className="flex gap-1 rounded-xl bg-[#222222] p-1 w-fit"
-        role="tablist"
-        aria-label={t("marketplace.tabSkills")}
-      >
-        {(["discover", "installed"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => {
-              if (value === tab) return;
-              onQueryChange("");
-              setTab(value);
-            }}
-            className={cn(
-              "rounded-lg px-4 py-2 text-sm transition-colors",
-              tab === value
-                ? "bg-[#383838] text-white"
-                : "text-[#969696] hover:text-white",
-            )}
-          >
-            {t(
-              value === "discover"
-                ? "marketplace.discover"
-                : "marketplace.installedSection",
-            )}
-            {value === "installed" && (
-              <span className="ml-2 text-[#969696] tabular-nums">
-                {skills.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#969696] pointer-events-none" />
-        <Input
-          aria-label={t("marketplace.searchByName")}
-          placeholder={t("marketplace.searchByName")}
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          className="h-12 w-full pl-11 pr-4 rounded-xl bg-[#2b2b2b] border-0 text-sm text-white placeholder:text-[#969696] shadow-none"
-        />
+      <div className="flex items-center gap-2.5 w-full">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#969696] pointer-events-none" />
+          <Input
+            aria-label={t("marketplace.searchByName")}
+            placeholder={t("marketplace.searchByName")}
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            className="h-9 w-full pl-9 pr-3 rounded-xl bg-[#2b2b2b] border-0 text-xs text-white placeholder:text-[#969696] shadow-none focus-visible:ring-1 focus-visible:ring-white/20"
+          />
+        </div>
+        <div
+          className="flex gap-1 rounded-xl bg-[#222222] p-1 shrink-0"
+          role="tablist"
+          aria-label={t("marketplace.tabSkills")}
+        >
+          {(["discover", "installed"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => {
+                if (value === tab) return;
+                onQueryChange("");
+                setTab(value);
+              }}
+              className={cn(
+                "rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+                tab === value
+                  ? "bg-[#383838] text-white shadow-xs"
+                  : "text-[#969696] hover:text-white",
+              )}
+            >
+              {t(
+                value === "discover"
+                  ? "marketplace.discover"
+                  : "marketplace.installedSection",
+              )}
+              {value === "installed" && (
+                <span className="ml-1.5 text-[#969696] tabular-nums">
+                  {skills.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
       {tab === "discover" && (
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -290,7 +292,7 @@ export function SkillsLibrary({
               return (
                 <article
                   key={item.id}
-                  className="rounded-2xl bg-[#222222] p-5 flex flex-col gap-4"
+                  className="rounded-xl bg-[#222222] p-4 flex flex-col gap-3 border border-transparent hover:border-[#383838] transition-colors"
                 >
                   <div className="flex items-start gap-3 justify-between">
                     <div className="min-w-0">
@@ -359,7 +361,7 @@ export function SkillsLibrary({
             {filtered.map((skill) => (
               <article
                 key={skill.id}
-                className="flex items-center gap-4 rounded-xl bg-[#222222] p-4"
+                className="flex items-center gap-3.5 rounded-xl bg-[#222222] p-3 px-3.5 border border-transparent hover:border-[#383838] transition-colors"
               >
                 <button
                   type="button"

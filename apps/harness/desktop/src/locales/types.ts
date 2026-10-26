@@ -1025,6 +1025,18 @@ export interface TranslationDictionary {
     skillSlugPlaceholder: string;
     skillDescPlaceholder: string;
     skillContentPlaceholder: string;
+    tabOverview: string;
+    tabMcp: string;
+    noMcpTitle: string;
+    noMcpDesc: string;
+    includedSkillsCount: string;
+    mcpServersConfigured: string;
+    viewPluginDetails: string;
+    backToPlugins: string;
+    command: string;
+    arguments: string;
+    environment: string;
+    enabled: string;
   };
   [key: string]: any;
 }

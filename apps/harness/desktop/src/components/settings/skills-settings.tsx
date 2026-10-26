@@ -13,7 +13,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
+  Blocks,
+  Video,
+  Monitor,
+  Cable,
+  FileCode,
+  ChevronRight,
+  Check,
+  Plus,
+  Search,
 } from "lucide-react";
+import { marked } from "marked";
+import type {
+  PluginCatalogEntry,
+  InstalledPluginRecord,
+} from "../../lib/plugins/types";
 import JSZip from "jszip";
 import { db, localDb, type LocalSkill, type SkillCategory } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
@@ -58,6 +72,7 @@ function SkillCodeViewer({
   );
 }
 
+
 export interface SkillsSettingsProps {
   onClose?: () => void;
   isSidebarOpen?: boolean;
@@ -82,7 +97,7 @@ export function SkillsSettings({
   const skills = useResolvedSkills(workspacePath).filter(
     (skill) => !skill.pluginId,
   );
-  const { catalog: pluginCatalog } = usePluginInventory(workspacePath);
+  const { catalog: pluginCatalog, installed: installedPlugins } = usePluginInventory(workspacePath);
 
   // Marketplace tab: Skills vs Plugins
   const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(
@@ -90,9 +105,18 @@ export function SkillsSettings({
   );
 
   // Navigation state
-  const [viewMode, setViewMode] = useState<"list" | "skill-detail" | "upload">(
-    "list",
-  );
+  const [viewMode, setViewMode] = useState<
+    "list" | "skill-detail" | "plugin-detail" | "upload"
+  >("list");
+  const [selectedPlugin, setSelectedPlugin] = useState<
+    PluginCatalogEntry | InstalledPluginRecord | null
+  >(null);
+  const [originPlugin, setOriginPlugin] = useState<
+    PluginCatalogEntry | InstalledPluginRecord | null
+  >(null);
+  const [pluginActiveTab, setPluginActiveTab] = useState<
+    "overview" | "mcp" | "skills"
+  >("overview");
   const [selectedSkill, setSelectedSkill] = useState<
     LocalSkill | MarketplaceSkill | null
   >(null);
@@ -200,6 +224,20 @@ export function SkillsSettings({
       cancelled = true;
     };
   }, [selectedSkill?.slug, selectedSkill?.id, workspacePath]);
+
+  useEffect(() => {
+    if (selectedPlugin) {
+      const updated =
+        installedPlugins.find(
+          (p) =>
+            p.name === selectedPlugin.name &&
+            p.scope === (selectedScope === "workspace" ? "workspace" : "user"),
+        ) ||
+        installedPlugins.find((p) => p.name === selectedPlugin.name) ||
+        pluginCatalog.find((p) => p.name === selectedPlugin.name);
+      if (updated) setSelectedPlugin(updated);
+    }
+  }, [installedPlugins, pluginCatalog]);
 
   // Update selected skill when db updates
   useEffect(() => {
@@ -680,11 +718,22 @@ export function SkillsSettings({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setViewMode("list")}
+            onClick={() => {
+              if (originPlugin) {
+                setViewMode("plugin-detail");
+                setOriginPlugin(null);
+              } else {
+                setViewMode("list");
+              }
+            }}
             className="gap-1.5 text-xs text-[#969696] hover:text-white cursor-pointer -ml-2 h-8"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{t("marketplace.title")}</span>
+            <span>
+              {originPlugin
+                ? originPlugin.interface.displayName
+                : t("marketplace.title")}
+            </span>
           </Button>
 
           {onClose && !isModal && (
@@ -1003,7 +1052,453 @@ export function SkillsSettings({
     );
   }
 
+  const handleSelectPluginSkill = (subSkill: {
+    slug: string;
+    name: string;
+    description?: string;
+  }) => {
+    if (!selectedPlugin) return;
+    setOriginPlugin(selectedPlugin);
+    setSelectedSkill({
+      id: `plugin_skill_${selectedPlugin.name}_${subSkill.slug}`,
+      slug: subSkill.slug,
+      name: subSkill.name,
+      description: subSkill.description || "",
+      author: selectedPlugin.author.name,
+      version: selectedPlugin.version,
+      pluginId: "id" in selectedPlugin ? selectedPlugin.id : undefined,
+      pluginName: selectedPlugin.interface.displayName,
+      scope: "scope" in selectedPlugin ? selectedPlugin.scope : "user",
+      isEnabled: "isEnabled" in selectedPlugin ? selectedPlugin.isEnabled : true,
+      isBuiltIn: false,
+      category: "custom",
+      createdAt: Date.now(),
+    });
+    setSkillActiveTab("overview");
+    setViewMode("skill-detail");
+  };
+
   // ---------------------------------------------------------------------------
+  // RENDER: VIEW 1.5 — PLUGIN DETAIL VIEW
+  // ---------------------------------------------------------------------------
+  if (viewMode === "plugin-detail" && selectedPlugin) {
+    const isInstalled =
+      "id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id;
+    const installedRecord = isInstalled
+      ? (selectedPlugin as InstalledPluginRecord)
+      : undefined;
+
+    const pluginSkillsList =
+      selectedPlugin.skills && selectedPlugin.skills.length > 0
+        ? selectedPlugin.skills
+        : selectedPlugin.skillSlugs.map((slug) => {
+            const matched = skills.find(
+              (s) =>
+                s.slug === slug ||
+                s.slug === `${selectedPlugin.name}:${slug}`,
+            );
+            return {
+              slug,
+              name: matched?.name
+                ? matched.name.includes(":")
+                  ? matched.name.split(":")[1]!
+                  : matched.name
+                : slug,
+              description: matched?.description || "",
+            };
+          });
+
+    const pluginOverviewText =
+      selectedPlugin.overview ||
+      (selectedPlugin.name === "hyperframes"
+        ? `HyperFrames is an open-source, web-standard video creation framework that turns structured data and code into smooth 60fps MP4 videos.\n\nIncluded Skills:\n• /hyperframes-core: The HyperFrames composition contract, timing attributes, and validation rules.\n• /hyperframes-creative: Creative direction, typography, palettes, and beat planning.\n• /hyperframes-keyframes: Zooms, whip transitions, and seek-safe camera keyframes.\n• /hyperframes-studio: Timeline layout safe zones for visual Studio editing.\n• /hyperframes-cli: Development loop, preview, beats, keyframes, and render engine.\n• /hyperframes-animation: Atomic CSS/WAAPI motion patterns and scene transitions.\n• /hyperframes-audio: Audio-reactive visuals and waveform sync.`
+        : selectedPlugin.name === "computer-use"
+        ? `Native OS desktop GUI automation, mouse clicking, keyboard typing, window states, accessibility tree inspection, and screenshots in native applications and desktop windows.\n\nIncluded Skills:\n• /computer-use: Drives the GUI of visible local desktop applications through native accessibility tree, mouse clicks, typing, shortcuts, and screenshots.`
+        : selectedPlugin.description);
+
+    const mcpServers = selectedPlugin.mcpServers || {};
+    const mcpCount = Object.keys(mcpServers).length;
+    const hasMcp = mcpCount > 0;
+    const hasSkills = pluginSkillsList.length > 0;
+    const activeTab =
+      pluginActiveTab === "mcp" && !hasMcp
+        ? "overview"
+        : pluginActiveTab === "skills" && !hasSkills
+          ? "overview"
+          : pluginActiveTab;
+
+    return (
+      <div
+        className={cn(
+          "w-full flex flex-col font-sans select-none outline-none ring-0",
+          isModal ? "space-y-4 pb-8" : "space-y-5",
+        )}
+      >
+        {/* Top Back Navigation Bar */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className="gap-1.5 text-xs text-[#969696] hover:text-white cursor-pointer -ml-2 h-8"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>{t("marketplace.tabPlugins")}</span>
+          </Button>
+
+          {onClose && !isModal && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 rounded-lg text-[#969696] hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* Plugin Header Strip */}
+        <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-[#222222] border border-[#383838]">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0 shadow-xs">
+              <Blocks className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h2 className="text-xl sm:text-2xl font-normal tracking-tight text-white truncate">
+                {selectedPlugin.interface.displayName}
+              </h2>
+              <div className="flex items-center gap-2 text-xs text-[#969696] mt-0.5 flex-wrap">
+                <span>{selectedPlugin.author.name}</span>
+                <span>·</span>
+                <span>v{selectedPlugin.version}</span>
+                {selectedPlugin.skillSlugs.length > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{selectedPlugin.skillSlugs.length} skills</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Action button */}
+          <div className="shrink-0 flex items-center gap-2.5">
+            {installedRecord ? (
+              <div className="flex items-center gap-2.5">
+                <Button
+                  size="sm"
+                  variant={installedRecord.isEnabled ? "secondary" : "default"}
+                  onClick={async () => {
+                    const newEnabled = !installedRecord.isEnabled;
+                    try {
+                      await window.electron?.marketplace?.setEnabled({
+                        id: installedRecord.id,
+                        enabled: newEnabled,
+                        workspacePath,
+                      });
+                      toast.success(
+                        newEnabled
+                          ? t("marketplace.enabled")
+                          : t("marketplace.disabled"),
+                      );
+                    } catch {
+                      toast.error(t("marketplace.pluginMutationError"));
+                    }
+                  }}
+                  className="rounded-xl text-xs font-semibold gap-1.5 shadow-none h-8 px-3"
+                >
+                  {installedRecord.isEnabled ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{t("marketplace.enabled")}</span>
+                    </>
+                  ) : (
+                    <span>{t("marketplace.disabled")}</span>
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await window.electron?.marketplace?.uninstallPlugin({
+                        id: installedRecord.id,
+                        workspacePath,
+                      });
+                      toast.success(
+                        t("marketplace.pluginUninstalledSuccess").replace(
+                          "{name}",
+                          selectedPlugin.interface.displayName,
+                        ),
+                      );
+                      setViewMode("list");
+                    } catch {
+                      toast.error(t("marketplace.pluginMutationError"));
+                    }
+                  }}
+                  title={t("marketplace.uninstall")}
+                  className="p-2 rounded-lg text-[#969696] hover:text-white hover:bg-[#383838] cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await window.electron?.marketplace?.installPlugin({
+                      name: selectedPlugin.name,
+                      scope: selectedScope,
+                      workspacePath,
+                    });
+                    toast.success(
+                      t("marketplace.pluginInstalledSuccess").replace(
+                        "{name}",
+                        selectedPlugin.interface.displayName,
+                      ),
+                    );
+                  } catch {
+                    toast.error(t("marketplace.pluginMutationError"));
+                  }
+                }}
+                className="rounded-xl bg-white text-black hover:bg-[#d4d4d4] text-xs font-semibold gap-1.5 h-8 px-3.5 shadow-none"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t("marketplace.install")}</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs Row: only show tabs when hasMcp or hasSkills */}
+        {(hasMcp || hasSkills) && (
+          <div className="border-b border-[#383838] flex items-center gap-6 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setPluginActiveTab("overview")}
+              className={cn(
+                "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
+                activeTab === "overview"
+                  ? "border-white text-white font-semibold"
+                  : "border-transparent text-[#969696] hover:text-white",
+              )}
+            >
+              {t("marketplace.tabOverview")}
+            </button>
+            {hasMcp && (
+              <button
+                type="button"
+                onClick={() => setPluginActiveTab("mcp")}
+                className={cn(
+                  "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px] flex items-center gap-1.5",
+                  activeTab === "mcp"
+                    ? "border-white text-white font-semibold"
+                    : "border-transparent text-[#969696] hover:text-white",
+                )}
+              >
+                <span>{t("marketplace.tabMcp")}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#383838] text-white">
+                  {mcpCount}
+                </span>
+              </button>
+            )}
+            {hasSkills && (
+              <button
+                type="button"
+                onClick={() => setPluginActiveTab("skills")}
+                className={cn(
+                  "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
+                  activeTab === "skills"
+                    ? "border-white text-white font-semibold"
+                    : "border-transparent text-[#969696] hover:text-white",
+                )}
+              >
+                {t("marketplace.tabSkills")} · {pluginSkillsList.length}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Tab 1: OVERVIEW */}
+        {activeTab === "overview" && (
+          <div className="max-w-3xl flex flex-col gap-6 pt-2">
+            <div
+              className="prose prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-[#2b2b2b] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-white"
+              dangerouslySetInnerHTML={{
+                __html: marked.parse(pluginOverviewText) as string,
+              }}
+            />
+
+            {/* Included Skills List (only if plugin has skills) */}
+            {hasSkills && (
+              <div className="flex flex-col gap-2 pt-2">
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">
+                  {t("marketplace.includedSkillsCount")?.replace(
+                    "{count}",
+                    String(pluginSkillsList.length),
+                  ) || `INCLUDED SKILLS (${pluginSkillsList.length})`}
+                </span>
+                <div className="flex flex-col divide-y divide-[#2e2e2e] border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
+                  {pluginSkillsList.map((subSkill) => (
+                    <div
+                      key={subSkill.slug}
+                      onClick={() => handleSelectPluginSkill(subSkill)}
+                      className="p-3.5 hover:bg-[#2b2b2b] transition-colors cursor-pointer flex items-start gap-3 group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696] shrink-0 mt-0.5 group-hover:border-white/40 transition-colors">
+                        <FileCode className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-white">
+                            {subSkill.name}
+                          </span>
+                          <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-[#1b1b1b] border border-[#333] text-[#969696]">
+                            /{subSkill.slug}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#969696] line-clamp-2 mt-0.5 leading-relaxed">
+                          {subSkill.description}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#969696] shrink-0 mt-2 group-hover:translate-x-0.5 group-hover:text-white transition-all" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: MCP */}
+        {activeTab === "mcp" && hasMcp && (
+          <div className="max-w-3xl flex flex-col gap-4 pt-2">
+            {mcpCount > 0 ? (
+              <div className="flex flex-col gap-3">
+                <span className="text-xs font-semibold text-white uppercase tracking-wider">
+                  {t("marketplace.mcpServersConfigured")?.replace(
+                    "{count}",
+                    String(mcpCount),
+                  ) || `CONFIGURED MCP SERVERS (${mcpCount})`}
+                </span>
+                <div className="grid grid-cols-1 gap-3">
+                  {Object.entries(mcpServers).map(
+                    ([serverKey, serverConf]: [string, any]) => (
+                      <div
+                        key={serverKey}
+                        className="rounded-2xl border border-[#383838] bg-[#222222] p-4 flex flex-col gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
+                            <Cable className="w-4.5 h-4.5 text-emerald-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-xs font-semibold text-white font-mono">
+                              {serverKey}
+                            </h3>
+                            <span className="text-[11px] text-[#969696]">
+                              {serverConf?.transport || "stdio"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {serverConf?.command && (
+                          <div className="bg-[#1b1b1b] rounded-xl p-3 font-mono text-xs text-[#d4d4d4] flex items-center gap-2 border border-[#2e2e2e]">
+                            <span className="text-emerald-400">
+                              {serverConf.command}
+                            </span>
+                            {serverConf.args && (
+                              <span className="text-[#969696]">
+                                {Array.isArray(serverConf.args)
+                                  ? serverConf.args.join(" ")
+                                  : serverConf.args}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {serverConf?.env &&
+                          Object.keys(serverConf.env).length > 0 && (
+                            <div className="flex flex-col gap-1.5 text-[11px]">
+                              <span className="text-[#969696] font-medium">
+                                {t("marketplace.environment")}
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {Object.keys(serverConf.env).map((k) => (
+                                  <span
+                                    key={k}
+                                    className="px-2 py-0.5 rounded-md bg-[#2b2b2b] border border-[#333] text-[#969696] font-mono text-[10px]"
+                                  >
+                                    {k}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="py-16 flex flex-col items-center justify-center text-center gap-3 bg-[#222222] rounded-2xl border border-[#383838] p-8">
+                <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696]">
+                  <Cable className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-white">
+                    {t("marketplace.noMcpTitle")}
+                  </p>
+                  <p className="text-xs text-[#969696] max-w-sm">
+                    {t("marketplace.noMcpDesc")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: SKILLS */}
+        {activeTab === "skills" && hasSkills && (
+          <div className="max-w-3xl flex flex-col gap-4 pt-2">
+            <span className="text-xs font-semibold text-white uppercase tracking-wider">
+              {t("marketplace.tabSkills")} ({pluginSkillsList.length})
+            </span>
+            <div className="flex flex-col divide-y divide-[#2e2e2e] border border-[#383838] rounded-2xl bg-[#222222] overflow-hidden">
+              {pluginSkillsList.map((subSkill) => (
+                <div
+                  key={subSkill.slug}
+                  onClick={() => handleSelectPluginSkill(subSkill)}
+                  className="p-3.5 hover:bg-[#2b2b2b] transition-colors cursor-pointer flex items-start gap-3 group"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#969696] shrink-0 mt-0.5 group-hover:border-white/40 transition-colors">
+                    <FileCode className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-white">
+                        {subSkill.name}
+                      </span>
+                      <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-[#1b1b1b] border border-[#333] text-[#969696]">
+                        /{subSkill.slug}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#969696] line-clamp-2 mt-0.5 leading-relaxed">
+                      {subSkill.description}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#969696] shrink-0 mt-2 group-hover:translate-x-0.5 group-hover:text-white transition-all" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+    // ---------------------------------------------------------------------------
   // RENDER: VIEW 2 — UPLOAD SKILL VIEW
   // ---------------------------------------------------------------------------
   if (viewMode === "upload") {
@@ -1282,16 +1777,25 @@ export function SkillsSettings({
         />
       ) : (
         <>
-          <Input
-            aria-label={t("marketplace.searchPlaceholder")}
-            placeholder={t("marketplace.searchPlaceholder")}
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#969696] pointer-events-none" />
+            <Input
+              aria-label={t("marketplace.searchPlaceholder")}
+              placeholder={t("marketplace.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="h-9 w-full pl-9 pr-3 rounded-xl bg-[#2b2b2b] border-0 text-xs text-white placeholder:text-[#969696] shadow-none focus-visible:ring-1 focus-visible:ring-white/20"
+            />
+          </div>
           <PluginsMarketplace
             workspacePath={workspacePath}
             scope="all"
             search={searchQuery}
+            onSelectPlugin={(plugin) => {
+              setSelectedPlugin(plugin);
+              setPluginActiveTab("overview");
+              setViewMode("plugin-detail");
+            }}
           />
         </>
       )}

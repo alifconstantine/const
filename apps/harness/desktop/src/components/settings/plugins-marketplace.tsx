@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Blocks, ChevronDown, Loader2, Trash2 } from "lucide-react";
+import { Blocks, ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { Button, Switch, toast } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
-import {
-  usePluginInventory,
-} from "../../lib/plugins/plugins-service";
+import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import type {
   InstalledPluginRecord,
   PluginCatalogEntry,
@@ -14,10 +12,12 @@ export function PluginsMarketplace({
   workspacePath,
   scope,
   search,
+  onSelectPlugin,
 }: {
   workspacePath?: string;
   scope: "all" | "user" | "workspace";
   search: string;
+  onSelectPlugin?: (plugin: PluginCatalogEntry | InstalledPluginRecord) => void;
 }) {
   const { t } = useTranslation();
   const { catalog, installed, error } = usePluginInventory(workspacePath);
@@ -65,170 +65,179 @@ export function PluginsMarketplace({
   const card = (
     plugin: PluginCatalogEntry,
     installation?: InstalledPluginRecord,
-  ) => (
-    <article
-      key={installation?.id ?? plugin.name}
-      className="rounded-2xl bg-[#222222] p-5 space-y-4"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white">
-          <Blocks className="w-6 h-6" />
+  ) => {
+    return (
+      <article
+        key={installation?.id ?? plugin.name}
+        onClick={() => onSelectPlugin?.(installation ?? plugin)}
+        className="rounded-xl bg-[#222222] hover:bg-[#262626] border border-transparent hover:border-[#383838] p-4 flex flex-col justify-between gap-3 transition-all cursor-pointer group"
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white group-hover:border-white/20 transition-colors">
+            <Blocks className="w-4.5 h-4.5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-white truncate">
+              {plugin.interface.displayName}
+            </h3>
+            <p className="text-[11px] text-[#969696] truncate">
+              {plugin.author.name} · {plugin.version}
+            </p>
+          </div>
+          {installation ? (
+            <div
+              className="flex items-center gap-2 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Switch
+                aria-label={t("marketplace.pluginToggleLabel").replace(
+                  "{name}",
+                  plugin.interface.displayName,
+                )}
+                checked={installation.isEnabled}
+                disabled={pending !== null}
+                onCheckedChange={(enabled) =>
+                  mutate(installation.id, () =>
+                    window.electron!.marketplace!.setEnabled({
+                      id: installation.id,
+                      enabled,
+                      workspacePath,
+                    }),
+                  )
+                }
+              />
+              <button
+                type="button"
+                disabled={pending !== null}
+                onClick={() => setConfirmId(installation.id)}
+                title={t("marketplace.uninstall")}
+                className="p-1.5 rounded-lg text-[#969696] hover:text-white hover:bg-[#383838] disabled:opacity-50 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Button
+                size="sm"
+                disabled={
+                  pending !== null ||
+                  (targetScope === "workspace" && !workspacePath)
+                }
+                onClick={() =>
+                  mutate(
+                    plugin.name,
+                    () =>
+                      window.electron!.marketplace!.installPlugin({
+                        name: plugin.name,
+                        scope: targetScope,
+                        workspacePath,
+                      }),
+                    t("marketplace.pluginInstalledSuccess").replace(
+                      "{name}",
+                      plugin.interface.displayName,
+                    ),
+                  )
+                }
+                className="h-7.5 px-3 rounded-lg bg-white text-black hover:bg-[#d4d4d4] text-xs font-medium gap-1.5 shrink-0"
+              >
+                {pending === plugin.name && (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                )}
+                {pending === plugin.name
+                  ? t("marketplace.installing")
+                  : t("marketplace.install")}
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-white">
-            {plugin.interface.displayName}
-          </h3>
-          <p className="mt-1 text-xs text-[#969696]">
-            {plugin.author.name} · {plugin.version}
-          </p>
+
+        <p className="text-xs leading-relaxed text-[#d4d4d4] line-clamp-2">
+          {plugin.name === "hyperframes"
+            ? t("marketplace.hyperframesDescription")
+            : plugin.description}
+        </p>
+
+        <div className="flex items-center justify-between gap-2 text-[11px] text-[#969696] pt-1">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span>
+              {t("marketplace.pluginSkillsCount").replace(
+                "{count}",
+                String(plugin.skillSlugs.length),
+              )}
+            </span>
+            <span>·</span>
+            <span>
+              {(installation?.scope ?? targetScope) === "workspace"
+                ? t("marketplace.workspaceScope")
+                : t("marketplace.globalScope")}
+            </span>
+            {installation && !installation.isEffective && (
+              <>
+                <span>·</span>
+                <span className="text-amber-400">
+                  {t("marketplace.pluginOverridden")}
+                </span>
+              </>
+            )}
+          </div>
+          <span className="flex items-center gap-0.5 text-[#969696] group-hover:text-white transition-colors shrink-0">
+            <span>{t("marketplace.viewPluginDetails") || "Lihat detail"}</span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </span>
         </div>
-        {installation ? (
-          <div className="flex items-center gap-3">
-            <Switch
-              aria-label={t("marketplace.pluginToggleLabel").replace(
+
+        {confirmId === installation?.id && installation && (
+          <div
+            className="rounded-xl bg-[#2b2b2b] p-3 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs text-white">
+              {t("marketplace.pluginUninstallConfirm").replace(
                 "{name}",
                 plugin.interface.displayName,
               )}
-              checked={installation.isEnabled}
-              disabled={pending !== null}
-              onCheckedChange={(enabled) =>
-                mutate(installation.id, () =>
-                  window.electron!.marketplace!.setEnabled({
-                    id: installation.id,
-                    enabled,
-                    workspacePath,
-                  }),
-                )
-              }
-            />
-            <button
-              type="button"
-              disabled={pending !== null}
-              onClick={() => setConfirmId(installation.id)}
-              title={t("marketplace.uninstall")}
-              className="p-2 rounded-lg text-[#969696] hover:text-white hover:bg-[#383838] disabled:opacity-50 cursor-pointer"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={pending !== null}
+                onClick={() =>
+                  mutate(
+                    installation.id,
+                    () =>
+                      window.electron!.marketplace!.uninstallPlugin({
+                        id: installation.id,
+                        workspacePath,
+                      }),
+                    t("marketplace.pluginUninstalledSuccess").replace(
+                      "{name}",
+                      plugin.interface.displayName,
+                    ),
+                  )
+                }
+                className="h-7 px-3 text-xs bg-red-600 hover:bg-red-500 text-white rounded-lg"
+              >
+                {t("marketplace.uninstall")}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending !== null}
+                onClick={() => setConfirmId(null)}
+                className="h-7 px-3 text-xs text-[#969696] hover:text-white"
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
           </div>
-        ) : (
-          <Button
-            disabled={
-              pending !== null ||
-              (targetScope === "workspace" && !workspacePath)
-            }
-            onClick={() =>
-              mutate(
-                plugin.name,
-                () =>
-                  window.electron!.marketplace!.installPlugin({
-                    name: plugin.name,
-                    scope: targetScope,
-                    workspacePath,
-                  }),
-                t("marketplace.pluginInstalledSuccess").replace(
-                  "{name}",
-                  plugin.interface.displayName,
-                ),
-              )
-            }
-            className="rounded-xl bg-white text-black hover:bg-[#d4d4d4] text-xs gap-2"
-          >
-            {pending === plugin.name && (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            )}
-            {pending === plugin.name
-              ? t("marketplace.installing")
-              : t("marketplace.install")}
-          </Button>
         )}
-      </div>
-      <p className="text-sm leading-relaxed text-[#d4d4d4]">
-        {plugin.name === "hyperframes"
-          ? t("marketplace.hyperframesDescription")
-          : plugin.description}
-      </p>
-      <div className="flex items-center gap-3 flex-wrap text-xs text-[#969696]">
-        <span>
-          {t("marketplace.pluginSkillsCount").replace(
-            "{count}",
-            String(plugin.skillSlugs.length),
-          )}
-        </span>
-        <span>
-          {(installation?.scope ?? targetScope) === "workspace"
-            ? t("marketplace.workspaceScope")
-            : t("marketplace.globalScope")}
-        </span>
-        {installation && (
-          <span>
-            {!installation.isEffective ? t("marketplace.pluginOverridden") : installation.isEnabled
-              ? t("marketplace.active")
-              : t("marketplace.disabled")}
-          </span>
-        )}
-      </div>
-      <details className="text-xs text-[#969696]">
-        <summary className="flex items-center gap-1.5 cursor-pointer list-none">
-          <ChevronDown className="w-3.5 h-3.5" />
-          {t("marketplace.pluginIncludedSkills")}
-        </summary>
-        <div className="flex flex-wrap gap-2 pt-3">
-          {plugin.skillSlugs.map((slug) => (
-            <span key={slug} className="rounded-lg bg-[#2b2b2b] px-2 py-1">
-              {slug}
-            </span>
-          ))}
-        </div>
-      </details>
-      {confirmId === installation?.id && installation && (
-        <div className="rounded-xl bg-[#2b2b2b] p-3 space-y-3">
-          <p className="text-xs text-white">
-            {t("marketplace.pluginUninstallConfirm").replace(
-              "{name}",
-              plugin.interface.displayName,
-            )}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              disabled={pending !== null}
-              onClick={() =>
-                mutate(
-                  installation.id,
-                  () =>
-                    window.electron!.marketplace!.uninstallPlugin({
-                      id: installation.id,
-                      workspacePath,
-                    }),
-                  t("marketplace.pluginUninstalledSuccess").replace(
-                    "{name}",
-                    plugin.interface.displayName,
-                  ),
-                )
-              }
-            >
-              {t("marketplace.uninstall")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending !== null}
-              onClick={() => setConfirmId(null)}
-            >
-              {t("common.cancel")}
-            </Button>
-          </div>
-        </div>
-      )}
-    </article>
-  );
+      </article>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[#969696]">
-        {t("marketplace.pluginUsageHint")}
-      </p>
       {targetScope === "workspace" && !workspacePath && (
         <p className="text-xs text-[#969696]">
           {t("marketplace.pluginChooseWorkspace")}
@@ -241,20 +250,20 @@ export function PluginsMarketplace({
       )}
       {visibleInstalled.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-white">
-            {t("marketplace.installedSection")}
+          <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
+            {t("marketplace.installedSection")} ({visibleInstalled.length})
           </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
             {visibleInstalled.map((plugin) => card(plugin, plugin))}
           </div>
         </section>
       )}
       {(available.length > 0 || search.trim()) && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-white">
-            {t("marketplace.availableSection")}
+          <h2 className="text-xs font-semibold text-white uppercase tracking-wider">
+            {t("marketplace.availableSection")} ({available.length})
           </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
             {available.map((plugin) => card(plugin))}
           </div>
           {available.length === 0 && (
