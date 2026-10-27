@@ -213,7 +213,7 @@ export function ScheduledTaskHistory({
   const taskTitle = task.name || task.title;
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
+    <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-7 flex flex-col select-none">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">{t("common.edit")}</h1>

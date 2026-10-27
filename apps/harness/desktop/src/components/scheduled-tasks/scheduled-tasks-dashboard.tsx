@@ -136,7 +136,7 @@ export function ScheduledTasksDashboard({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
+    <div className="w-full max-w-7xl mx-auto px-6 sm:px-10 py-7 flex flex-col select-none">
       {/* Page Heading & Actions */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
@@ -266,7 +266,7 @@ export function ScheduledTasksDashboard({
           <h2 className="text-sm font-semibold text-white tracking-tight">{t("scheduledTasks.scheduledTemplateTitle")}</h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {STARTER_TEMPLATES.map((tmpl, idx) => (
             <div
               key={tmpl.title}
