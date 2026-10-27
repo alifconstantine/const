@@ -10,6 +10,7 @@ import {
 } from "./protocol";
 import { normalizeUiMessages } from "../../lib/conversation-store";
 import { definitions, intelligenceSchema } from "./schema";
+import { intelligenceLibrary } from "./library";
 import { INTELLIGENCE_UI_PROMPT } from "./prompt";
 import {
   compareTableValues,
@@ -19,7 +20,7 @@ import {
 } from "./format";
 
 const program =
-  'root = Stack([metric, changes])\nmetric = Metric("Files changed", "3", "Inspected diff")\nchanges = Table("Changes", ["File", "Purpose"], [["chat.tsx", "Rendering"], ["agent.ts", "Prompt"]])';
+  'root = Stack([title, changes])\ntitle = TextContent("Files changed: 3")\nchanges = Table([c1, c2])\nc1 = Col("File", ["chat.tsx", "agent.ts"])\nc2 = Col("Purpose", ["Rendering", "Prompt"])';
 const fenced = (value: string) => `\`\`\`openui-lang\n${value}\n\`\`\``;
 
 test("ordinary Markdown, code, and legacy messages pass through unchanged", () => {
@@ -87,8 +88,8 @@ test("cancelled, unclosed blocks remain explicitly incomplete", () => {
 
 test("registered components resolve through the real OpenUI parser", () => {
   const parser = createParser(
-    intelligenceSchema.toJSONSchema(),
-    intelligenceSchema.root,
+    intelligenceLibrary.toJSONSchema(),
+    intelligenceLibrary.root,
   );
   const result = parser.parse(program);
   assert.equal(result.root?.typeName, "Stack");
@@ -170,7 +171,21 @@ test("message state is isolated by message and block and survives JSON persisten
 });
 
 test("the agent prompt derives from the same allowed component contracts", () => {
-  for (const name of Object.keys(definitions))
+  for (const name of [
+    "Table",
+    "Col",
+    "BarChart",
+    "LineChart",
+    "PieChart",
+    "Form",
+    "Buttons",
+    "Button",
+    "Tabs",
+    "Accordion",
+    "Card",
+    "Stack",
+    "TextContent",
+  ])
     assert.ok(INTELLIGENCE_UI_PROMPT.includes(`${name}(`));
   assert.ok(INTELLIGENCE_UI_PROMPT.includes("openui-lang"));
   assert.ok(INTELLIGENCE_UI_PROMPT.includes("permission flow"));

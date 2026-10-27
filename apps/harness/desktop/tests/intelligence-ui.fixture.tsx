@@ -6,11 +6,23 @@ import type { IntelligenceUiState } from "../src/components/intelligence-ui/sche
 import "../src/index.css";
 
 const program = [
-  "root = Stack([overview, files, chart, preferences])",
-  'overview = Card("Implementation review", [Metric("Files checked", "6", "Fixture data for layout verification")])',
-  'files = Table("Changes", ["File", "Lines"], [["App.tsx", 20], ["side-chat-tab.tsx", 12], ["protocol.ts", 80], ["schema.ts", 40], ["library.tsx", 120], ["prompt.ts", 30]])',
-  'chart = BarChart("Line changes", [{label: "Added", value: 120}, {label: "Removed", value: -30}, {label: "Unchanged", value: 0}], "lines")',
-  'preferences = Form("preferences", "Choose the next step", [{name: "scope", label: "Scope", type: "select", options: ["Main chat", "Both chats"], required: true}, {name: "notes", label: "Notes", type: "text"}], "Continue")',
+  "root = Stack([overview, tabs, callout, accordion])",
+  "overview = Card([header, desc])",
+  'header = CardHeader("OpenUI Native Runtime", "Harness Desktop Implementation Review")',
+  'desc = TextContent("Native OpenUI components rendered with official tokens and styles across Main Chat and Side Chat.")',
+  "tabs = Tabs([tab1, tab2])",
+  'tab1 = TabItem("chart", "Activity Chart", [chart])',
+  'tab2 = TabItem("table", "Modified Files", [files])',
+  'chart = BarChart(["Added", "Removed", "Unchanged"], [s1], "grouped", "Category", "Lines", 200)',
+  's1 = Series("Lines", [120, 30, 45])',
+  "files = Table([c1, c2, c3])",
+  'c1 = Col("File", ["App.tsx", "side-chat-tab.tsx", "protocol.ts", "library.tsx", "prompt.ts"])',
+  'c2 = Col("Lines", [20, 12, 80, 120, 30], "number")',
+  'c3 = Col("Status", ["Updated", "Updated", "Updated", "Migrated", "Generated"])',
+  'callout = Callout("success", "Audit Complete", "All 82+ native components available with responsive layouts and dark/light mode.")',
+  "accordion = Accordion([acc1])",
+  'acc1 = AccordionItem("tech", "Technical Architecture", [techDesc])',
+  'techDesc = TextContent("Powered by @openuidev/react-ui and @openuidev/react-lang with Radix UI primitives and D3 charts.")',
 ].join("\n");
 const content = `## Review\n\nThese are test values for the shared response renderer.\n\n\`\`\`openui-lang\n${program}\n\`\`\`\n\n| Legacy Markdown | Status |\n|---|---|\n| Shared table | Ready |`;
 
@@ -44,6 +56,7 @@ function Fixture() {
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [invalid, setInvalid] = useState(false);
+  const [isDark, setIsDark] = useState(true);
   const [submissions, setSubmissions] = useState<
     Array<{ scope: string; prompt: string }>
   >([]);
@@ -97,6 +110,23 @@ function Fixture() {
         </label>
         <button onClick={() => setRevision((value) => value + 1)}>
           Remount saved views
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !isDark;
+            setIsDark(next);
+            if (next) {
+              document.documentElement.classList.add("dark");
+              document.documentElement.setAttribute("data-openui-theme", "dark");
+            } else {
+              document.documentElement.classList.remove("dark");
+              document.documentElement.setAttribute("data-openui-theme", "light");
+            }
+          }}
+          className="border border-black/20 dark:border-white/20 rounded px-2 py-0.5 text-xs hover:bg-black/5 dark:hover:bg-white/10"
+        >
+          Theme: {isDark ? "Dark" : "Light"}
         </button>
       </nav>
       <div

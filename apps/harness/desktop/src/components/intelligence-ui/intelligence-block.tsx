@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import {
+  BuiltinActionType,
   Renderer,
   type ActionEvent,
   type OpenUIError,
@@ -17,6 +18,7 @@ export interface IntelligenceBlockProps {
   state?: Record<string, unknown>;
   onStateChange?: (state: Record<string, unknown>) => void;
   onSubmit?: (prompt: string) => void | Promise<void>;
+  onOpenBrowser?: (url: string) => void;
 }
 
 export function ProgramSource({ program }: { program: string }) {
@@ -45,6 +47,7 @@ export default function IntelligenceBlock({
   state,
   onStateChange,
   onSubmit,
+  onOpenBrowser,
 }: IntelligenceBlockProps) {
   const { t } = useTranslation();
   const [initialState] = useState(() => state || {});
@@ -64,25 +67,43 @@ export default function IntelligenceBlock({
     !isStreaming && (!complete || incomplete || errors.length > 0 || !hasRoot);
 
   const onAction = async (event: ActionEvent) => {
+    if (disabled || isStreaming || !complete || unavailable) return;
+
     if (
-      disabled ||
-      isStreaming ||
-      !complete ||
-      unavailable ||
-      submitting.current ||
-      !onSubmit ||
-      event.type !== "continue_conversation"
-    )
+      event.type === "open_url" ||
+      (typeof BuiltinActionType !== "undefined" && event.type === BuiltinActionType.OpenUrl)
+    ) {
+      const url = String(event.params?.url || "");
+      if (url) {
+        if (onOpenBrowser) {
+          onOpenBrowser(url);
+        } else {
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      }
       return;
-    submitting.current = true;
-    setPending(true);
-    try {
-      await onSubmit(event.humanFriendlyMessage);
-    } catch {
-      toast.error(t("intelligenceUi.submitFailed"));
-    } finally {
-      submitting.current = false;
-      setPending(false);
+    }
+
+    if (
+      (event.type === "continue_conversation" ||
+        (typeof BuiltinActionType !== "undefined" && event.type === BuiltinActionType.ContinueConversation)) &&
+      onSubmit &&
+      !submitting.current
+    ) {
+      submitting.current = true;
+      setPending(true);
+      try {
+        let msg = event.humanFriendlyMessage || "";
+        if (event.formState && Object.keys(event.formState).length > 0) {
+          msg += `\n\nForm values: ${JSON.stringify(event.formState, null, 2)}`;
+        }
+        await onSubmit(msg);
+      } catch {
+        toast.error(t("intelligenceUi.submitFailed"));
+      } finally {
+        submitting.current = false;
+        setPending(false);
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 import { createParser } from "@openuidev/lang-core";
-import { intelligenceSchema, type IntelligenceUiState } from "./schema";
+import { intelligenceLibrary } from "./library";
+import type { IntelligenceUiState } from "./schema";
 
 export interface ResponsePart {
   kind: "markdown" | "ui";
@@ -95,8 +96,8 @@ export function splitAssistantResponse(
 }
 
 const parser = createParser(
-  intelligenceSchema.toJSONSchema(),
-  intelligenceSchema.root,
+  intelligenceLibrary.toJSONSchema(),
+  intelligenceLibrary.root,
 );
 
 /** Plain-text projection for clipboard, side-to-main transfer, and accessibility. */
@@ -117,37 +118,89 @@ export function uiProgramToText(program: string): string {
       switch (element.typeName) {
         case "Stack":
           return visit(p.children);
-        case "Text":
-          return String(p.text ?? "");
         case "Card":
           return [p.title, visit(p.children)].filter(Boolean).join("\n");
+        case "CardHeader":
+          return [p.title, p.subtitle].filter(Boolean).join(" - ");
+        case "Text":
+        case "TextContent":
+          return String(p.text ?? "");
+        case "BoldText":
+          return [p.title, p.value, p.sub].filter(Boolean).join(" ");
+        case "Callout":
+        case "TextCallout":
+          return [p.title, p.description].filter(Boolean).join("\n");
         case "Metric":
           return [`${p.label ?? ""}: ${p.value ?? ""}`, p.detail]
             .filter(Boolean)
             .join("\n");
-        case "Table":
+        case "Table": {
+          if (Array.isArray(p.columns) && p.columns.length > 0 && (p.columns[0] as any)?.typeName === "Col") {
+            const headers = p.columns.map((c: any) => c.props?.label ?? "");
+            const colData = p.columns.map((c: any) => (Array.isArray(c.props?.data) ? c.props.data : []));
+            const maxRows = Math.max(0, ...colData.map((d: any[]) => d.length));
+            const rows: string[] = [];
+            for (let i = 0; i < maxRows; i++) {
+              rows.push(colData.map((d: any[]) => (d[i] == null ? "" : String(d[i]))).join("\t"));
+            }
+            return [headers.join("\t"), ...rows].join("\n");
+          }
           return [
             p.title,
             ((p.columns as unknown[]) || []).join("\t"),
             ...((p.rows as unknown[][]) || []).map((row) =>
               row.map((c) => (c == null ? "" : String(c))).join("\t"),
             ),
-          ].join("\n");
+          ].filter(Boolean).join("\n");
+        }
         case "BarChart":
+        case "LineChart":
+        case "AreaChart":
+        case "HorizontalBarChart":
+        case "PieChart": {
+          if (Array.isArray(p.labels) && Array.isArray(p.series)) {
+            const labels = p.labels as string[];
+            const seriesStrs = (p.series as any[]).map((s) => {
+              const name = s.props?.name || "";
+              const data = (s.props?.data || []) as number[];
+              return `${name}: ` + labels.map((l, i) => `${l}: ${data[i] ?? ""}`).join(", ");
+            });
+            return seriesStrs.join("\n");
+          }
           return [
             p.title,
             ...((p.items as Array<{ label: string; value: number }>) || []).map(
               (item) =>
                 `${item.label}: ${item.value}${p.unit ? ` ${p.unit}` : ""}`,
             ),
-          ].join("\n");
+          ].filter(Boolean).join("\n");
+        }
+        case "Tabs":
+        case "Accordion":
+        case "Steps":
+        case "Carousel":
+        case "SectionBlock":
+          return visit(p.items || p.content || p.children);
+        case "TabItem":
+        case "AccordionItem":
+        case "SectionItem":
+          return [p.trigger || p.header, visit(p.content)].filter(Boolean).join("\n");
         case "Form":
           return [
-            p.title,
-            ...((p.fields as Array<{ label: string }>) || []).map(
-              (field) => field.label,
-            ),
-          ].join("\n");
+            p.name || p.title,
+            visit(p.buttons),
+            visit(p.fields),
+          ].filter(Boolean).join("\n");
+        case "FormControl":
+          return [p.label, visit(p.input)].filter(Boolean).join(": ");
+        case "Buttons":
+          return visit(p.buttons);
+        case "Button":
+          return String(p.label ?? "");
+        case "FollowUpBlock":
+          return visit(p.items || p.children);
+        case "FollowUpItem":
+          return String(p.text || p.label || "");
         default:
           return "";
       }

@@ -20,8 +20,10 @@ export function applyTheme(theme: Theme = "system") {
 
   if (isDark) {
     root.classList.add("dark");
+    root.setAttribute("data-openui-theme", "dark");
   } else {
     root.classList.remove("dark");
+    root.setAttribute("data-openui-theme", "light");
   }
 }
 

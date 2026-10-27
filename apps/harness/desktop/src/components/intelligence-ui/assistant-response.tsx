@@ -112,6 +112,7 @@ export function AssistantResponse({
                     : undefined
                 }
                 onSubmit={onSubmit}
+                onOpenBrowser={onOpenBrowser}
               />
             </Suspense>
           </BlockBoundary>

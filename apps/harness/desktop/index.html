@@ -11,10 +11,13 @@
           document.documentElement.style.zoom = "";
           var stored = localStorage.getItem("theme");
           var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          if (stored === "dark" || (!stored && systemDark) || (stored === "system" && systemDark)) {
+          var isDark = stored === "dark" || (!stored && systemDark) || (stored === "system" && systemDark);
+          if (isDark) {
             document.documentElement.classList.add("dark");
+            document.documentElement.setAttribute("data-openui-theme", "dark");
           } else {
             document.documentElement.classList.remove("dark");
+            document.documentElement.setAttribute("data-openui-theme", "light");
           }
         } catch (e) {}
       })();

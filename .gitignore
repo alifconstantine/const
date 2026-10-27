@@ -38,6 +38,7 @@ Desktop.ini
 !.vscode/extensions.json
 .idea/
 .claude/
+.commandcode/
 .zcode/
 .zcodeignore
 *.suo

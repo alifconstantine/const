@@ -5,7 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node scripts/build-computer-use-macos.cjs && vite",
-    "build": "node scripts/build-computer-use-macos.cjs && tsc && vite build",
+    "build": "node scripts/build-computer-use-macos.cjs && tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
@@ -37,7 +37,9 @@
     "@iconify/react": "^6.0.2",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@openuidev/lang-core": "1.0.1",
+    "@openuidev/react-headless": "0.18.1",
     "@openuidev/react-lang": "1.0.1",
+    "@openuidev/react-ui": "0.18.1",
     "@thesvg/react": "^3.3.13",
     "@types/marked": "^6.0.0",
     "@xterm/addon-fit": "^0.11.0",
@@ -94,12 +96,17 @@
       {
         "from": "build",
         "to": "branding",
-        "filter": ["icon.ico", "icon.png"]
+        "filter": [
+          "icon.ico",
+          "icon.png"
+        ]
       },
       {
         "from": "plugins",
         "to": "plugins",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "skills",
