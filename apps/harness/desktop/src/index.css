@@ -38,3 +38,14 @@ webview {
   flex: 1 1 auto;
 }
 
+/* Suppress OpenUI Devtools floating inspector widget / branding */
+[data-openui-devtools-auto-mount],
+div[data-openui-devtools-auto-mount],
+.openui-devtools,
+[data-openui-inspect] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+

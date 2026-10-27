@@ -8,6 +8,7 @@
     <script>
       (function () {
         try {
+          window[Symbol.for("openui.devtools.autoMount")] = true;
           document.documentElement.style.zoom = "";
           var stored = localStorage.getItem("theme");
           var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;

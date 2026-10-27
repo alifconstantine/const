@@ -1,3 +1,6 @@
+// Suppress OpenUI floating devtools inspector widget across all environments
+(globalThis as Record<symbol, unknown>)[Symbol.for("openui.devtools.autoMount")] = true;
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster } from "@const/ui";

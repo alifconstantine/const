@@ -5,16 +5,7 @@ import { useTranslation } from "../../lib/i18n";
 import { splitAssistantResponse } from "./protocol";
 import type { IntelligenceUiState } from "./schema";
 
-const IntelligenceBlock = lazy(() => {
-  // react-lang 1.0.1 auto-mounts a CDN-backed inspector in development.
-  // Keep desktop output self-contained; the production build removes this branch.
-  if (import.meta.env.DEV) {
-    (globalThis as Record<symbol, unknown>)[
-      Symbol.for("openui.devtools.autoMount")
-    ] = true;
-  }
-  return import("./intelligence-block");
-});
+const IntelligenceBlock = lazy(() => import("./intelligence-block"));
 
 interface AssistantResponseProps {
   content: string;
