@@ -46,6 +46,10 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     apiKeyUrl: server.apiKeyUrl,
     oauthUrl: server.oauthUrl,
     oauthClientRequired: server.oauthClientRequired,
+    managedOAuth:
+      plugin.name === "github" && server.auth === "oauth"
+        ? "github"
+        : undefined,
     setupUrl: server.setupUrl,
     enabled: true,
     timeoutMs: 30000,

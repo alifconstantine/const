@@ -569,7 +569,7 @@ test("connection history stays local and is invalidated by endpoint changes", as
   }
 });
 
-test("MCP-only presets use Canva hosted OAuth and guard unconfigured GitHub OAuth", async () => {
+test("MCP-only presets use hosted Canva and managed GitHub OAuth", async () => {
   const f = fixture();
   let browserOpened = false;
   const plugins = ["github", "canva"].map((name) => {
@@ -599,16 +599,28 @@ test("MCP-only presets use Canva hosted OAuth and guard unconfigured GitHub OAut
     const github = records.find((r) => r.pluginId === "github")!;
     const canva = records.find((r) => r.pluginId === "canva")!;
     assert.equal(github.url, "https://api.githubcopilot.com/mcp/");
-    assert.equal(github.auth, "api-key");
-    assert.deepEqual(github.authOptions, ["api-key", "oauth"]);
+    assert.equal(github.auth, "oauth");
+    assert.deepEqual(github.authOptions, ["oauth", "api-key"]);
+    assert.equal(github.managedOAuth, "github");
+    assert.equal(github.oauthClientRequired, false);
+    f.store.save({ ...github, auth: "api-key" });
+    assert.equal(service.list().find((r) => r.id === github.id)!.auth, "oauth");
+    f.store.save({
+      ...github,
+      auth: "api-key",
+      apiKey: "fixture-existing-pat",
+    });
+    const pat = service.list().find((r) => r.id === github.id)!;
+    assert.equal(pat.auth, "api-key");
+    assert.equal(pat.hasCredentials, true);
+    assert.equal(pat.managedOAuth, undefined);
     assert.equal(canva.url, "https://mcp.canva.com/mcp");
     assert.equal(canva.oauthClientRequired, undefined);
     assert.ok(plugins.every((plugin) => !plugin.entrypoint));
-    f.store.save({ ...github, auth: "oauth" });
-    await assert.rejects(service.authenticate(github.id), /auth/);
+
     assert.equal(browserOpened, false);
     assert.equal(
-      service.list().find((r) => r.id === github.id)!.hasCredentials,
+      service.list().find((r) => r.id === canva.id)!.hasCredentials,
       false,
     );
   } finally {

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import githubMcp from "./legacy-github-mcp.json";
 import legacy from "./legacy-presets.json";
 import { atomicJson } from "./store";
 
@@ -29,7 +30,7 @@ export function upgradeBundledMcpPreset(
       (process.platform === "win32" ? root.toLowerCase() : root)
     )
       return false;
-    for (const file of [root, manifestFile, skills, skillDir, skillFile]) {
+    for (const file of [root, manifestFile]) {
       if (fs.lstatSync(file).isSymbolicLink()) return false;
     }
     const current = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -38,12 +39,27 @@ export function upgradeBundledMcpPreset(
     );
     if (
       next.name !== name ||
-      next.version !== "1.0.1" ||
-      next.entrypoint ||
+      !["1.0.1", "1.1.0"].includes(next.version) ||
+      next.entrypoint
+    )
+      return false;
+    if (
+      name === "github" &&
+      isDeepStrictEqual(current, githubMcp) &&
+      next.version === "1.1.0"
+    ) {
+      // Existing MCP-only installations have no active skills to archive.
+      if (fs.existsSync(skills)) return false;
+      atomicJson(manifestFile, next);
+      return true;
+    }
+    if (
       !isDeepStrictEqual(current, legacy[name].manifest) ||
       fs.existsSync(archive)
     )
       return false;
+    for (const file of [skills, skillDir, skillFile])
+      if (fs.lstatSync(file).isSymbolicLink()) return false;
     if (
       !isDeepStrictEqual(fs.readdirSync(skills), [name]) ||
       !isDeepStrictEqual(fs.readdirSync(skillDir), ["SKILL.md"])

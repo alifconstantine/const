@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { readPluginManifest, resolveSkillRegistry } from "@const/agent";
 import legacy from "./legacy-presets.json";
+import githubMcp from "./legacy-github-mcp.json";
 import { upgradeBundledMcpPreset } from "./upgrade-presets";
 
 for (const name of ["github", "canva"] as const) {
@@ -34,7 +35,10 @@ for (const name of ["github", "canva"] as const) {
       );
       assert.equal(upgradeBundledMcpPreset(dir, bundled), true);
       assert.equal(upgradeBundledMcpPreset(dir, bundled), false);
-      assert.equal(readPluginManifest(dir).version, "1.0.1");
+      assert.equal(
+        readPluginManifest(dir).version,
+        name === "github" ? "1.1.0" : "1.0.1",
+      );
       assert.equal(readPluginManifest(dir).entrypoint, undefined);
       const registry = resolveSkillRegistry(undefined, {
         userRoot: home,
@@ -70,3 +74,26 @@ for (const name of ["github", "canva"] as const) {
     }
   });
 }
+
+test("GitHub upgrades its previous MCP-only preset while leaving customized manifests alone", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "const-github-preset-"));
+  const dir = path.join(root, "github");
+  const bundled = fileURLToPath(
+    new URL("../../plugins/github/", import.meta.url),
+  );
+  try {
+    fs.mkdirSync(dir);
+    const file = path.join(dir, "plugin.json");
+    fs.writeFileSync(file, JSON.stringify(githubMcp));
+    assert.equal(upgradeBundledMcpPreset(dir, bundled), true);
+    assert.equal(readPluginManifest(dir).mcpServers!.github!.auth, "oauth");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ ...githubMcp, description: "Custom GitHub package" }),
+    );
+    assert.equal(upgradeBundledMcpPreset(dir, bundled), false);
+    assert.equal(readPluginManifest(dir).description, "Custom GitHub package");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

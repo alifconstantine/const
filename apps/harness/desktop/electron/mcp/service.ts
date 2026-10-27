@@ -30,6 +30,7 @@ import type {
 } from "../../src/lib/mcp/types";
 import { McpStore, validateEndpoint, validWorkspace } from "./store";
 
+import { GitHubOAuthClient, isManagedGitHub } from "./github-oauth";
 import { respondOAuth } from "./oauth-page";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
@@ -65,6 +66,7 @@ export class McpService {
   private controllers = new Map<string, AbortController>();
   private retryAfter = new Map<string, number>();
   private login?: Login;
+  private readonly github: GitHubOAuthClient;
   constructor(
     readonly store: McpStore,
     private readonly changed: () => void,
@@ -72,7 +74,10 @@ export class McpService {
     private readonly plugins: (workspace?: string) => InstalledPlugin[] = (
       workspace,
     ) => resolveSkillRegistry(workspace).plugins,
-  ) {}
+    github?: GitHubOAuthClient,
+  ) {
+    this.github = github ?? new GitHubOAuthClient(store);
+  }
 
   private configurations(workspace?: string): McpConnection[] {
     const plugins = this.plugins(workspace);
@@ -135,6 +140,23 @@ export class McpService {
           /* Keep listing usable; the per-record status reports vault errors. */
         }
       }
+      if (
+        plugin?.name === "github" &&
+        definition?.auth === "oauth" &&
+        record.key === "plugin-github-github" &&
+        record.url === "https://api.githubcopilot.com/mcp/" &&
+        record.auth === "api-key" &&
+        !record.clientId &&
+        !record.scopes &&
+        this.store.isTrusted(record)
+      ) {
+        try {
+          if (Object.keys(this.store.secrets(record.id)).length === 0)
+            record = this.store.save({ ...record, auth: "oauth" });
+        } catch {
+          /* The normal listing reports vault errors. */
+        }
+      }
       return {
         ...record,
         pluginId: plugin?.id,
@@ -142,8 +164,14 @@ export class McpService {
         authOptions: definition?.authOptions,
         apiKeyUrl: definition?.apiKeyUrl,
         oauthUrl: definition?.oauthUrl,
-        oauthClientRequired: definition?.oauthClientRequired,
-        setupUrl: definition?.setupUrl,
+        oauthClientRequired: isManagedGitHub(record)
+          ? false
+          : definition?.oauthClientRequired,
+        managedOAuth: isManagedGitHub(record) ? "github" : undefined,
+        setupUrl:
+          plugin?.name === "github" && !isManagedGitHub(record)
+            ? undefined
+            : definition?.setupUrl,
         enabled: record.enabled && !!plugin?.isEnabled && !!plugin?.isEffective,
       };
     });
@@ -232,6 +260,7 @@ export class McpService {
   async disconnect(id: string, _workspace?: string) {
     if (this.login?.id === id) this.login.abort();
     this.controllers.get(id)?.abort();
+    this.controllers.delete(id);
     const active = this.live.get(id);
     this.live.delete(id);
     await active?.client.close().catch(() => {});
@@ -246,6 +275,7 @@ export class McpService {
     const {
       tokens: _tokens,
       apiKey: _apiKey,
+      githubOAuth: _github,
       ...remaining
     } = this.store.secrets(id);
     if (Object.keys(remaining).length) this.store.writeSecrets(id, remaining);
@@ -342,9 +372,12 @@ export class McpService {
     const record = this.get(id, workspace);
     if (record.transport !== "http" || record.auth !== "oauth")
       throw new Error("invalid");
-    if (record.oauthClientRequired && !record.clientId) throw new Error("auth");
+    const managedGitHub = isManagedGitHub(record);
+    if (!managedGitHub && record.oauthClientRequired && !record.clientId)
+      throw new Error("auth");
     if (this.login) throw new Error("busy");
     await this.disconnect(id);
+    if (this.login) throw new Error("busy");
     if (!this.store.isTrusted(record)) throw new Error("invalid");
     // Verify the OS vault before registering a client or opening the user's browser.
     this.store.writeSecrets(id, this.store.secrets(id));
@@ -357,6 +390,8 @@ export class McpService {
       rejectCode = reject;
     });
     void code.catch(() => {});
+    const githubVerifier = randomBytes(32).toString("base64url");
+    let githubTicket = "";
     let callbackResponse: http.ServerResponse | undefined;
     const server = http.createServer((request, response) => {
       const url = new URL(request.url ?? "/", CALLBACK);
@@ -372,6 +407,14 @@ export class McpService {
         rejectCode(new Error("auth"));
         respondOAuth(response, false, language);
         return;
+      }
+      if (managedGitHub) {
+        githubTicket = url.searchParams.get("ticket") ?? "";
+        if (!githubTicket || githubTicket.length > 4096) {
+          rejectCode(new Error("auth"));
+          respondOAuth(response, false, language);
+          return;
+        }
       }
       const discovery = provider.discoveryState?.();
       if (discovery && !(discovery instanceof Promise)) {
@@ -429,39 +472,58 @@ export class McpService {
         server.once("error", reject);
         server.listen(24139, "127.0.0.1", resolve);
       });
-      transport = new StreamableHTTPClientTransport(new URL(record.url!), {
-        authProvider: provider,
-        fetch: (input, init) =>
-          fetch(input, {
-            ...init,
-            signal: AbortSignal.any([
-              controller.signal,
-              AbortSignal.timeout(record.timeoutMs),
-              ...(init?.signal ? [init.signal] : []),
-            ]),
-          }),
-      });
-      const client = new Client({ name: "const-harness", version: "1.0.0" });
-      try {
-        await client.connect(transport, {
-          timeout: record.timeoutMs,
-          signal: controller.signal,
+      if (managedGitHub) {
+        const authorize = await this.github.authorizationUrl(
+          state,
+          GitHubOAuthClient.challenge(githubVerifier),
+          language,
+          controller.signal,
+        );
+        await this.openExternal(authorize);
+        await this.github.exchange(
+          record,
+          await code,
+          githubTicket,
+          githubVerifier,
+          controller.signal,
+        );
+      } else {
+        transport = new StreamableHTTPClientTransport(new URL(record.url!), {
+          authProvider: provider,
+          fetch: (input, init) =>
+            fetch(input, {
+              ...init,
+              signal: AbortSignal.any([
+                controller.signal,
+                AbortSignal.timeout(record.timeoutMs),
+                ...(init?.signal ? [init.signal] : []),
+              ]),
+            }),
         });
-      } catch (error) {
-        if (!(error instanceof UnauthorizedError)) throw error;
-        await transport.finishAuth(await code);
-      } finally {
-        await client.close().catch(() => {});
+        const client = new Client({ name: "const-harness", version: "1.0.0" });
+        try {
+          await client.connect(transport, {
+            timeout: record.timeoutMs,
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (!(error instanceof UnauthorizedError)) throw error;
+          await transport.finishAuth(await code);
+        } finally {
+          await client.close().catch(() => {});
+        }
       }
       if (controller.signal.aborted) throw new Error("auth");
       await this.connect(id, workspace);
       if (controller.signal.aborted) throw new Error("auth");
       if (callbackResponse) respondOAuth(callbackResponse, true, language);
-    } catch {
+    } catch (error) {
       if (callbackResponse && !callbackResponse.writableEnded)
         respondOAuth(callbackResponse, false, language);
-      this.states.set(id, { status: "needs_auth", error: "auth" });
-      throw new Error("auth");
+      const reason =
+        error instanceof Error && error.message === "setup" ? "setup" : "auth";
+      this.states.set(id, { status: "needs_auth", error: reason });
+      throw new Error(reason);
     } finally {
       clearTimeout(timer);
       this.login = undefined;
@@ -489,7 +551,8 @@ export class McpService {
       return await operation;
     } finally {
       if (this.pending.get(id) === operation) this.pending.delete(id);
-      if (this.controllers.get(id) === controller) this.controllers.delete(id);
+      if (!this.live.has(id) && this.controllers.get(id) === controller)
+        this.controllers.delete(id);
     }
   }
   private async establish(
@@ -512,18 +575,39 @@ export class McpService {
         record.transport === "http"
           ? new StreamableHTTPClientTransport(validateEndpoint(record.url!), {
               authProvider:
-                record.auth === "oauth"
+                record.auth === "oauth" && !isManagedGitHub(record)
                   ? this.provider(record, undefined, undefined, signal)
                   : undefined,
-              fetch: (input, init) =>
-                fetch(input, {
+              fetch: (input, init) => {
+                const bounded = {
                   ...init,
                   signal: AbortSignal.any([
                     signal,
                     AbortSignal.timeout(record.timeoutMs),
                     ...(init?.signal ? [init.signal] : []),
                   ]),
-                }),
+                };
+                return isManagedGitHub(record)
+                  ? this.github.fetch(record, input, bounded).catch((error) => {
+                      if (error instanceof Error && error.message === "auth") {
+                        const active = this.live.get(record.id);
+                        if (active) {
+                          this.live.delete(record.id);
+                          this.controllers.get(record.id)?.abort();
+                          this.controllers.delete(record.id);
+                          void active.client.close().catch(() => {});
+                        }
+                        this.states.set(record.id, {
+                          status: "needs_auth",
+                          error: "auth",
+                        });
+                        this.retryAfter.set(record.id, Date.now() + 30_000);
+                        this.changed();
+                      }
+                      throw error;
+                    })
+                  : fetch(input, bounded);
+              },
               requestInit: { headers },
             })
           : new StdioClientTransport({
@@ -558,6 +642,8 @@ export class McpService {
       client.onclose = () => {
         if (this.live.get(record.id) === active) {
           this.live.delete(record.id);
+          this.controllers.get(record.id)?.abort();
+          this.controllers.delete(record.id);
           this.states.set(record.id, { status: "disconnected" });
           this.changed();
         }
@@ -567,7 +653,9 @@ export class McpService {
       return active;
     } catch (error) {
       await client.close().catch(() => {});
-      const auth = error instanceof UnauthorizedError;
+      const auth =
+        error instanceof UnauthorizedError ||
+        (error instanceof Error && error.message === "auth");
       this.retryAfter.set(record.id, Date.now() + 30_000);
       this.states.set(record.id, {
         status: auth ? "needs_auth" : "error",

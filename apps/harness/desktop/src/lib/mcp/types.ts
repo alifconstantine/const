@@ -40,13 +40,14 @@ export interface McpConnectionView extends McpConnection {
   apiKeyUrl?: string;
   oauthUrl?: string;
   oauthClientRequired?: boolean;
+  managedOAuth?: "github";
   setupUrl?: string;
   lastConnectedAt?: string;
   status: McpStatus;
   tools: McpToolInfo[];
   isEffective: boolean;
   hasCredentials: boolean;
-  error?: "connection" | "auth" | "storage" | "busy" | "invalid";
+  error?: "connection" | "auth" | "storage" | "busy" | "invalid" | "setup";
 }
 export interface McpSaveInput extends Partial<McpConnection> {
   name: string;

@@ -59,6 +59,15 @@ export default async function middleware(
 ) {
   const { pathname } = request.nextUrl;
 
+  // Connector OAuth has its own state/cookie/PKCE flow; Const sign-in must not consume its code.
+  if (pathname.startsWith("/oauth/github/")) {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
+    if ((request.method === "POST" || pathname.endsWith("/start")) && isRateLimited(ip)) {
+      return NextResponse.json({error:"connection"}, {status:429,headers:{"Retry-After":"60","Cache-Control":"no-store"}});
+    }
+    return NextResponse.next();
+  }
+
   // Server-side IP rate limiting on sensitive /api/auth endpoints
   if (pathname.startsWith("/api/auth") && request.method === "POST") {
     const ip =

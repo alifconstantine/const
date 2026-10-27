@@ -846,7 +846,7 @@ app.whenReady().then(() => {
       if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
       try { return await handler(...args); }
       catch (error) {
-        const code = error instanceof Error && ["auth", "storage", "busy", "connection"].includes(error.message) ? error.message : "invalid";
+        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup"].includes(error.message) ? error.message : "invalid";
         throw new Error(code);
       }
     });

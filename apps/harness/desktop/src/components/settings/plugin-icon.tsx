@@ -18,7 +18,7 @@ export function PluginIcon({
   if (name === "hyperframes")
     return <img src={hyperframesIcon} alt="" className={className} />;
   if (name === "github")
-    return <Github className={className} aria-hidden="true" />;
+    return <Github variant="mono" className={`${className} text-white`} aria-hidden="true" />;
   if (name === "canva")
     return <Canva className={className} aria-hidden="true" />;
   return <Blocks className={className} aria-hidden="true" />;

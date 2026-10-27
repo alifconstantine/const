@@ -39,6 +39,7 @@ import { PluginIcon } from "./plugin-icon";
 
 function mcpErrorKey(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("setup")) return "mcp.errorSetup";
   if (message.includes("storage")) return "mcp.errorStorage";
   if (message.includes("busy")) return "mcp.errorBusy";
   if (message.includes("auth")) return "mcp.errorAuth";
@@ -586,6 +587,9 @@ export function McpSettings({
           <div className="space-y-1 text-xs text-[#969696]">
             <p>{t(connectionAccountLabel(connection))}</p>
             <ConnectionTime at={connection.lastConnectedAt} />
+            {connection.managedOAuth === "github" && (
+              <p>{t("mcp.githubAccessHint")}</p>
+            )}
             {connection.auth === "oauth" &&
               connection.oauthClientRequired &&
               !connection.clientId && <p>{t("mcp.clientRequired")}</p>}
@@ -597,7 +601,11 @@ export function McpSettings({
                   void window.electron?.openExternal(connection.setupUrl!)
                 }
               >
-                {t("mcp.setupGuide")}
+                {t(
+                  connection.managedOAuth === "github"
+                    ? "mcp.githubRepositories"
+                    : "mcp.setupGuide",
+                )}
               </button>
             )}
           </div>

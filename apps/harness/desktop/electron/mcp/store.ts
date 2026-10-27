@@ -42,6 +42,7 @@ export interface McpSecrets {
   headers?: Record<string, string>;
   env?: Record<string, string>;
   tokens?: OAuthTokens;
+  githubOAuth?: { grant?: string; expiresAt?: number };
   clientInformation?: OAuthClientInformationMixed;
 }
 export interface SecretCodec {

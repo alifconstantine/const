@@ -8,7 +8,7 @@
     "build": "node scripts/build-computer-use-macos.cjs && tsc && vite build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
-    "test:mcp": "tsx --test electron/mcp/*.test.ts",
+    "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
     "test:plugins:preview": "vite --config tests/vite.config.ts --port 5190",
     "test:models": "tsx --test src/lib/models.test.ts",
     "test:telemetry": "tsx --test src/lib/chat-telemetry.test.ts electron/chat-telemetry.test.ts",

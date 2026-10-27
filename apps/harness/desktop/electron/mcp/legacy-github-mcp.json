@@ -1,0 +1,25 @@
+{
+  "name": "github",
+  "version": "1.0.1",
+  "description": "Work with GitHub repositories, issues, pull requests, and workflows.",
+  "author": {
+    "name": "GitHub"
+  },
+  "interface": {
+    "displayName": "GitHub",
+    "icon": "github"
+  },
+  "mcpServers": {
+    "github": {
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "auth": "api-key",
+      "authOptions": [
+        "api-key",
+        "oauth"
+      ],
+      "oauthClientRequired": true,
+      "setupUrl": "https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md"
+    }
+  }
+}
