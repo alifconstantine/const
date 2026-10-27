@@ -100,7 +100,8 @@ export class McpService {
         }
       }
     }
-    return this.store.list(workspace).map((record) => {
+    return this.store.list(workspace).map((savedRecord) => {
+      let record = savedRecord;
       if (!record.key.startsWith("plugin-")) return record;
       const matches = plugins.filter((item) =>
         Object.keys(item.mcpServers ?? {}).some(
@@ -116,6 +117,24 @@ export class McpService {
       const definition = Object.entries(plugin?.mcpServers ?? {}).find(
         ([key]) => `plugin-${plugin?.name}-${key}` === record.key,
       )?.[1];
+      // Move untouched, unauthenticated v1 Canva connections to the hosted DCR endpoint.
+      // Preserve accounts or custom OAuth configuration already supplied by the user.
+      if (
+        plugin?.name === "canva" &&
+        definition?.url === "https://mcp.canva.com/mcp" &&
+        record.url === "https://api.canva.com/connect/v1/mcp" &&
+        record.auth === "oauth" &&
+        !record.clientId &&
+        !record.scopes &&
+        this.store.isTrusted(record)
+      ) {
+        try {
+          if (Object.keys(this.store.secrets(record.id)).length === 0)
+            record = this.store.save({ ...record, url: definition.url });
+        } catch {
+          /* Keep listing usable; the per-record status reports vault errors. */
+        }
+      }
       return {
         ...record,
         pluginId: plugin?.id,

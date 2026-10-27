@@ -569,7 +569,7 @@ test("connection history stays local and is invalidated by endpoint changes", as
   }
 });
 
-test("GitHub and Canva seed official presets and require a registered client before OAuth", async () => {
+test("MCP-only presets use Canva hosted OAuth and guard unconfigured GitHub OAuth", async () => {
   const f = fixture();
   let browserOpened = false;
   const plugins = ["github", "canva"].map((name) => {
@@ -601,13 +601,65 @@ test("GitHub and Canva seed official presets and require a registered client bef
     assert.equal(github.url, "https://api.githubcopilot.com/mcp/");
     assert.equal(github.auth, "api-key");
     assert.deepEqual(github.authOptions, ["api-key", "oauth"]);
-    assert.equal(canva.url, "https://api.canva.com/connect/v1/mcp");
-    assert.equal(canva.oauthClientRequired, true);
-    await assert.rejects(service.authenticate(canva.id), /auth/);
+    assert.equal(canva.url, "https://mcp.canva.com/mcp");
+    assert.equal(canva.oauthClientRequired, undefined);
+    assert.ok(plugins.every((plugin) => !plugin.entrypoint));
+    f.store.save({ ...github, auth: "oauth" });
+    await assert.rejects(service.authenticate(github.id), /auth/);
     assert.equal(browserOpened, false);
     assert.equal(
-      service.list().find((r) => r.id === canva.id)!.hasCredentials,
+      service.list().find((r) => r.id === github.id)!.hasCredentials,
       false,
+    );
+  } finally {
+    await service.invalidate();
+    await f.cleanup();
+  }
+});
+
+test("Canva upgrades empty trusted settings while retaining existing accounts and custom clients", async () => {
+  const f = fixture();
+  const root = fileURLToPath(new URL("../../plugins/canva/", import.meta.url));
+  const plugin = {
+    ...readPluginManifest(root),
+    id: "canva",
+    path: root,
+    scope: "user" as const,
+    isEnabled: true,
+    isEffective: true,
+    skills: [],
+  };
+  const service = new McpService(
+    f.store,
+    () => {},
+    async () => {},
+    () => [plugin],
+  );
+  const oldUrl = "https://api.canva.com/connect/v1/mcp";
+  try {
+    const original = f.store.save({
+      key: "plugin-canva-canva",
+      name: "Canva",
+      scope: "user",
+      transport: "http",
+      url: oldUrl,
+      auth: "oauth",
+      enabled: false,
+    });
+    const migrated = service.list()[0]!;
+    assert.equal(migrated.id, original.id);
+    assert.equal(migrated.url, "https://mcp.canva.com/mcp");
+    assert.equal(migrated.enabled, false);
+    f.store.save({ ...original, clientId: "personal-client" });
+    assert.equal(service.list()[0]!.url, oldUrl);
+    f.store.save({ ...original });
+    f.store.writeSecrets(original.id, {
+      tokens: { access_token: "existing-account", token_type: "Bearer" },
+    });
+    assert.equal(service.list()[0]!.url, oldUrl);
+    assert.equal(
+      f.store.secrets(original.id).tokens!.access_token,
+      "existing-account",
     );
   } finally {
     await service.invalidate();

@@ -618,23 +618,25 @@ export function McpSettings({
             </Button>
             {connection.enabled && connection.isEffective && (
               <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={!!pending}
-                  onClick={() =>
-                    bridge &&
-                    void run(connection.id, () =>
-                      bridge.connect(connection.id, workspacePath),
-                    )
-                  }
-                >
-                  {t("mcp.connect")}
-                </Button>
-                {connection.auth === "oauth" && (
+                {(connection.auth === "none" || connection.hasCredentials) && (
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={!!pending}
+                    onClick={() =>
+                      bridge &&
+                      void run(connection.id, () =>
+                        bridge.connect(connection.id, workspacePath),
+                      )
+                    }
+                  >
+                    {t("mcp.connect")}
+                  </Button>
+                )}
+                {connection.auth === "oauth" && (
+                  <Button
+                    size="sm"
+                    variant={connection.hasCredentials ? "ghost" : "default"}
                     disabled={
                       !!pending ||
                       !!(connection.oauthClientRequired && !connection.clientId)

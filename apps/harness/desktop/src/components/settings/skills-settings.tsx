@@ -1712,7 +1712,7 @@ export function SkillsSettings({
             search={searchQuery}
             onSelectPlugin={(plugin) => {
               setSelectedPlugin(plugin);
-              setPluginActiveTab("overview");
+              setPluginActiveTab(plugin.mcpServers && plugin.skillSlugs.length === 0 ? "mcp" : "overview");
               setViewMode("plugin-detail");
             }}
           />

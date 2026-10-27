@@ -1,6 +1,6 @@
 {
   "name": "canva",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Find, create, edit, and export designs with your Canva account.",
   "author": {
     "name": "Canva"
@@ -9,15 +9,14 @@
     "displayName": "Canva",
     "icon": "canva"
   },
-  "entrypoint": "canva",
   "mcpServers": {
     "canva": {
       "transport": "http",
-      "url": "https://api.canva.com/connect/v1/mcp",
+      "url": "https://mcp.canva.com/mcp",
       "auth": "oauth",
-      "authOptions": ["oauth"],
-      "oauthClientRequired": true,
-      "setupUrl": "https://www.canva.dev/docs/apps/mcp/access/"
+      "authOptions": [
+        "oauth"
+      ]
     }
   }
 }

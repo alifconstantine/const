@@ -1,0 +1,54 @@
+{
+  "github": {
+    "manifest": {
+      "name": "github",
+      "version": "1.0.0",
+      "description": "Work with GitHub repositories, issues, pull requests, and workflows.",
+      "author": {
+        "name": "GitHub"
+      },
+      "interface": {
+        "displayName": "GitHub",
+        "icon": "github"
+      },
+      "entrypoint": "github",
+      "mcpServers": {
+        "github": {
+          "transport": "http",
+          "url": "https://api.githubcopilot.com/mcp/",
+          "auth": "api-key",
+          "authOptions": ["api-key", "oauth"],
+          "oauthClientRequired": true,
+          "setupUrl": "https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md"
+        }
+      }
+    },
+    "skillHash": "fd1dc68c7b9bcb32b04a7e0ab95459cf1154c2c3b4b34fe96eaa528af4f36c2c"
+  },
+  "canva": {
+    "manifest": {
+      "name": "canva",
+      "version": "1.0.0",
+      "description": "Find, create, edit, and export designs with your Canva account.",
+      "author": {
+        "name": "Canva"
+      },
+      "interface": {
+        "displayName": "Canva",
+        "icon": "canva"
+      },
+      "entrypoint": "canva",
+      "mcpServers": {
+        "canva": {
+          "transport": "http",
+          "url": "https://api.canva.com/connect/v1/mcp",
+          "auth": "oauth",
+          "authOptions": ["oauth"],
+          "oauthClientRequired": true,
+          "setupUrl": "https://www.canva.dev/docs/apps/mcp/access/"
+        }
+      }
+    },
+    "skillHash": "f93238599f37bc5bac0b8290eae89249fab9e5bc969d44c83825e400e01e0173"
+  }
+}

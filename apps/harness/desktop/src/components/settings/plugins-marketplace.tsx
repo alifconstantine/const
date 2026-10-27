@@ -202,10 +202,12 @@ export function PluginsMarketplace({
         <div className="flex items-center justify-between gap-2 text-[11px] text-[#969696] pt-1">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span>
-              {t("marketplace.pluginSkillsCount").replace(
-                "{count}",
-                String(plugin.skillSlugs.length),
-              )}
+              {plugin.skillSlugs.length === 0 && plugin.mcpServers
+                ? `${t("marketplace.tabMcp")} · ${Object.keys(plugin.mcpServers).length}`
+                : t("marketplace.pluginSkillsCount").replace(
+                    "{count}",
+                    String(plugin.skillSlugs.length),
+                  )}
             </span>
             <span>·</span>
             <span>

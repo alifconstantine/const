@@ -5,8 +5,9 @@ import os from "node:os";
 import { installRemoteSkill, resolveRemoteSkill, installError } from "./skill-installer";
 import type { SkillSource, ResolvedRemoteSkill } from "./skill-installer";
 import type { SkillInstallProgress } from "../src/lib/skills/types";
-import { resolveSkillRegistry, readPluginManifest, installPluginFromDirectory, setCapabilityEnabled, uninstallRegisteredSkill, uninstallPlugin as removePlugin } from "@const/agent";
+import { resolveSkillRegistry, capabilityDirectory, readPluginManifest, installPluginFromDirectory, setCapabilityEnabled, uninstallRegisteredSkill, uninstallPlugin as removePlugin } from "@const/agent";
 import type { PluginInventory } from "../src/lib/plugins/types";
+import { upgradeBundledMcpPreset } from "./mcp/upgrade-presets";
 import { initializeDefaultPlugins } from "./mcp/default-plugins";
 
 export interface InstalledSkillRecord {
@@ -210,6 +211,7 @@ export class MarketplaceService {
   }
 
   public listInstalledSkills(workspacePath?: string): InstalledSkillRecord[] {
+    this.upgradeMcpPresets(workspacePath);
     return resolveSkillRegistry(workspacePath).skills.map((skill) => {
       let source: Partial<SkillSource> = {};
       try { source = JSON.parse(fs.readFileSync(path.join(skill.path, ".const-source.json"), "utf8")); } catch {}
@@ -234,7 +236,26 @@ export class MarketplaceService {
     return root;
   }
 
+  private upgradeMcpPresets(workspacePath?: string) {
+    let bundled: string;
+    try {
+      bundled = this.getBundledPluginsDir();
+    } catch {
+      return;
+    }
+    const roots = [capabilityDirectory("user", undefined, "plugins")];
+    if (workspacePath && path.isAbsolute(workspacePath)) {
+      roots.push(capabilityDirectory("workspace", workspacePath, "plugins"));
+    }
+    for (const root of roots) {
+      for (const name of ["github", "canva"]) {
+        upgradeBundledMcpPreset(path.join(root, name), path.join(bundled, name));
+      }
+    }
+  }
+
   public listPlugins(workspacePath?: string): PluginInventory {
+    this.upgradeMcpPresets(workspacePath);
     const root = this.getBundledPluginsDir();
     const catalog = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => {
       const dir = path.join(root, entry.name);
