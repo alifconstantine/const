@@ -231,11 +231,6 @@ export function SkillsSettings({
   useEffect(() => {
     if (selectedPlugin) {
       const updated =
-        installedPlugins.find(
-          (p) =>
-            p.name === selectedPlugin.name &&
-            p.scope === ("scope" in selectedPlugin ? selectedPlugin.scope : selectedScope),
-        ) ||
         installedPlugins.find((p) => p.name === selectedPlugin.name) ||
         pluginCatalog.find((p) => p.name === selectedPlugin.name);
       if (updated) setSelectedPlugin(updated);
@@ -1086,10 +1081,12 @@ export function SkillsSettings({
   // ---------------------------------------------------------------------------
   if (viewMode === "plugin-detail" && selectedPlugin) {
     const isInstalled =
-      "id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id;
-    const installedRecord = isInstalled
-      ? (selectedPlugin as InstalledPluginRecord)
-      : undefined;
+      ("id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id) ||
+      installedPlugins.some((p) => p.name === selectedPlugin.name);
+    const installedRecord =
+      "id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id
+        ? (selectedPlugin as InstalledPluginRecord)
+        : installedPlugins.find((p) => p.name === selectedPlugin.name);
 
     const pluginSkillsList =
       selectedPlugin.skills && selectedPlugin.skills.length > 0
@@ -1248,7 +1245,7 @@ export function SkillsSettings({
                   try {
                     await window.electron?.marketplace?.installPlugin({
                       name: selectedPlugin.name,
-                      scope: selectedScope,
+                      scope: "user",
                       workspacePath,
                     });
                     toast.success(
@@ -1707,8 +1704,6 @@ export function SkillsSettings({
           <PluginsMarketplace
             workspacePath={workspacePath}
             scope="all"
-            installScope={selectedScope}
-            onInstallScopeChange={setSelectedScope}
             search={searchQuery}
             onSelectPlugin={(plugin) => {
               setSelectedPlugin(plugin);

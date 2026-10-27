@@ -4,11 +4,6 @@ import {
   Button,
   Switch,
   toast,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
 import { PluginIcon } from "./plugin-icon";
@@ -25,14 +20,14 @@ import type {
 
 export function PluginsMarketplace({
   workspacePath,
-  scope,
+  scope: _scope,
   search,
   onSelectPlugin,
-  installScope,
-  onInstallScopeChange,
+  installScope: _installScope,
+  onInstallScopeChange: _onInstallScopeChange,
 }: {
   workspacePath?: string;
-  scope: "all" | "user" | "workspace";
+  scope?: "all" | "user" | "workspace";
   search: string;
   installScope?: "user" | "workspace";
   onInstallScopeChange?: (scope: "user" | "workspace") => void;
@@ -42,9 +37,6 @@ export function PluginsMarketplace({
   const { catalog, installed, error } = usePluginInventory(workspacePath);
   const [pending, setPending] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [localScope, setLocalScope] = useState<"user" | "workspace">("user");
-  const targetScope =
-    scope === "workspace" ? "workspace" : (installScope ?? localScope);
   const { connections } = useMcpConnections(workspacePath);
   const matches = (plugin: PluginCatalogEntry) =>
     [
@@ -56,15 +48,11 @@ export function PluginsMarketplace({
       .join(" ")
       .toLowerCase()
       .includes(search.trim().toLowerCase());
-  const visibleInstalled = installed.filter(
-    (plugin) => (scope === "all" || plugin.scope === scope) && matches(plugin),
-  );
+  const visibleInstalled = installed.filter((plugin) => matches(plugin));
   const available = catalog.filter(
     (plugin) =>
       matches(plugin) &&
-      !installed.some(
-        (item) => item.name === plugin.name && item.scope === targetScope,
-      ),
+      !installed.some((item) => item.name === plugin.name),
   );
 
   const mutate = async (
@@ -156,17 +144,14 @@ export function PluginsMarketplace({
             <div onClick={(e) => e.stopPropagation()}>
               <Button
                 size="sm"
-                disabled={
-                  pending !== null ||
-                  (targetScope === "workspace" && !workspacePath)
-                }
+                disabled={pending !== null}
                 onClick={() =>
                   mutate(
                     plugin.name,
                     () =>
                       window.electron!.marketplace!.installPlugin({
                         name: plugin.name,
-                        scope: targetScope,
+                        scope: "user",
                         workspacePath,
                       }),
                     t("marketplace.pluginInstalledSuccess").replace(
@@ -210,19 +195,7 @@ export function PluginsMarketplace({
                   )}
             </span>
             <span>·</span>
-            <span>
-              {(installation?.scope ?? targetScope) === "workspace"
-                ? t("marketplace.workspaceScope")
-                : t("marketplace.globalScope")}
-            </span>
-            {installation && !installation.isEffective && (
-              <>
-                <span>·</span>
-                <span className="text-amber-400">
-                  {t("marketplace.pluginOverridden")}
-                </span>
-              </>
-            )}
+            <span>{t("marketplace.globalScope")}</span>
           </div>
           <span className="flex items-center gap-0.5 text-[#969696] group-hover:text-white transition-colors shrink-0">
             <span>{t("marketplace.viewPluginDetails")}</span>
@@ -281,34 +254,6 @@ export function PluginsMarketplace({
 
   return (
     <div className="space-y-6">
-      {scope === "all" && (
-        <Select
-          value={targetScope}
-          onValueChange={(value) => {
-            const next = value === "workspace" ? "workspace" : "user";
-            setLocalScope(next);
-            onInstallScopeChange?.(next);
-          }}
-        >
-          <SelectTrigger
-            aria-label={t("mcp.scope")}
-            className="w-52 rounded-xl bg-[#2b2b2b]"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="user">{t("mcp.global")}</SelectItem>
-            <SelectItem value="workspace" disabled={!workspacePath}>
-              {t("mcp.workspace")}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      )}
-      {targetScope === "workspace" && !workspacePath && (
-        <p className="text-xs text-[#969696]">
-          {t("marketplace.pluginChooseWorkspace")}
-        </p>
-      )}
       {error && (
         <p role="alert" className="text-sm text-[#d4d4d4]">
           {t("marketplace.pluginLoadError")}

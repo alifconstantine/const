@@ -85,10 +85,10 @@ const bridge = {
     onChanged: subscribe,
     installPlugin: async ({
       name,
-      scope,
+      scope = "user",
     }: {
       name: string;
-      scope: "user" | "workspace";
+      scope?: "user" | "workspace";
     }) => {
       installed = [
         ...installed,

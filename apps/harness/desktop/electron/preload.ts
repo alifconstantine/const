@@ -291,7 +291,7 @@ contextBridge.exposeInMainWorld("electron", {
   },
   marketplace: {
     listPlugins: (workspacePath?: string) => ipcRenderer.invoke("marketplace:list-plugins", workspacePath),
-    installPlugin: (payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => ipcRenderer.invoke("marketplace:install-plugin", payload),
+    installPlugin: (payload: { name: string; scope?: "user" | "workspace"; workspacePath?: string }) => ipcRenderer.invoke("marketplace:install-plugin", payload),
     uninstallPlugin: (payload: { id: string; workspacePath?: string }) => ipcRenderer.invoke("marketplace:uninstall-plugin", payload),
     setEnabled: (payload: { id: string; enabled: boolean; workspacePath?: string }) => ipcRenderer.invoke("marketplace:set-enabled", payload),
     onChanged: (callback: () => void) => {

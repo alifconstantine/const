@@ -894,8 +894,8 @@ app.whenReady().then(() => {
   });
   handleMcp("mcp:disconnect", (id: string, workspace?: string) => mcpService.disconnectAccount(id, workspace));
   ipcMain.handle("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
-  ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope: "user" | "workspace"; workspacePath?: string }) => {
-    marketplaceService.installPlugin(payload.name, payload.scope, payload.workspacePath);
+  ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope?: "user" | "workspace"; workspacePath?: string }) => {
+    marketplaceService.installPlugin(payload.name, "user", payload.workspacePath);
     capabilitiesChanged();
   });
   ipcMain.handle("marketplace:uninstall-plugin", (_event, payload: { id: string; workspacePath?: string }) => {

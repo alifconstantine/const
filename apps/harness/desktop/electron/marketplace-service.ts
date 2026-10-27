@@ -330,9 +330,9 @@ export class MarketplaceService {
     return { catalog, installed };
   }
 
-  public installPlugin(name: string, scope: "user" | "workspace", workspacePath?: string): void {
-    if (!this.listPlugins(workspacePath).catalog.some((plugin) => plugin.name === name)) throw new Error("Unknown plugin.");
-    installPluginFromDirectory(path.join(this.getBundledPluginsDir(), name), scope, workspacePath);
+  public installPlugin(name: string, _scope: "user" | "workspace" = "user", _workspacePath?: string): void {
+    if (!this.listPlugins().catalog.some((plugin) => plugin.name === name)) throw new Error("Unknown plugin.");
+    installPluginFromDirectory(path.join(this.getBundledPluginsDir(), name), "user");
   }
 
   public nativeEnabled(name: "browser-use" | "computer-use", workspacePath?: string): boolean {
