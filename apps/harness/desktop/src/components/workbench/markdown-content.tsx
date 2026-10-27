@@ -3,6 +3,7 @@ import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { ResponseTable } from "../intelligence-ui/response-table";
+import { MermaidBlock } from "./mermaid-block";
 import { FileIcon } from "./file-icon";
 import { renderMentionBadgeHtml } from "./rich-mention-editor";
 import { useTranslation } from "../../lib/i18n";
@@ -254,6 +255,10 @@ function TokenRenderer({
 
     case "code": {
       const code = token as Tokens.Code;
+      const lang = (code.lang || "text").toLowerCase().trim().split(/[\s:{]/)[0] || "";
+      if (lang === "mermaid") {
+        return <MermaidBlock code={code.text} />;
+      }
       return <CodeBlock code={code.text} language={code.lang || "text"} />;
     }
 
