@@ -1289,6 +1289,7 @@ app.whenReady().then(() => {
       const systemPrompt = personalizationParts.length > 0 ? personalizationParts.join("\n\n") : undefined;
 
       const agent = createConstAgent({
+        preset: "harness",
         baseUrl,
         apiKey,
         model,
@@ -2192,6 +2193,7 @@ app.whenReady().then(() => {
 
       // Scheduled tasks run autonomously in the background with full access
       const agent = createConstAgent({
+        preset: "harness",
         baseUrl,
         apiKey,
         model,

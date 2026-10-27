@@ -30,6 +30,28 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     expect(toolNames).toContain("find");
     expect(toolNames).toContain("grep");
     expect(toolNames).toContain("mkdir");
+    expect(toolNames).not.toContain("generate_speech");
+    expect(toolNames).not.toContain("generate_image");
+  });
+
+  it("rejects generate_speech and generate_image when not in learn preset", async () => {
+    const speechRes = await executeNativeTool(
+      "generate_speech",
+      { text: "hello", output_path: "speech.mp3" },
+      tempDir,
+      { parentConfig: { preset: "harness" } as any }
+    );
+    expect(speechRes.isError).toBe(true);
+    expect(speechRes.result).toContain("not available in Const Harness");
+
+    const imgRes = await executeNativeTool(
+      "generate_image",
+      { prompt: "a cat", output_path: "cat.png" },
+      tempDir,
+      { parentConfig: { preset: "harness" } as any }
+    );
+    expect(imgRes.isError).toBe(true);
+    expect(imgRes.result).toContain("not available in Const Harness");
   });
 
   it("handles write_file and read_file with multi-alias argument names", async () => {

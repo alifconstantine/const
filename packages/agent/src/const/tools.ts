@@ -1467,8 +1467,6 @@ export const GENERATE_IMAGE_TOOL: NativeToolDefinition = {
 export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
   ...NATIVE_BROWSER_TOOLS,
   ...NATIVE_COMPUTER_TOOLS,
-  GENERATE_SPEECH_TOOL,
-  GENERATE_IMAGE_TOOL,
   {
     type: "function",
     function: {
@@ -7718,6 +7716,13 @@ export async function executeNativeTool(
       normalizedTool === "texttospeech" ||
       normalizedTool === "speech"
     ) {
+      if (options.parentConfig?.preset !== "learn") {
+        return {
+          result: "Tool 'generate_speech' is not available in Const Harness. Const Harness is focused on code and system automation.",
+          isError: true,
+        };
+      }
+
       if (options.speechHandler) {
         return await options.speechHandler(args, workspacePath);
       }
@@ -7911,6 +7916,13 @@ export async function executeNativeTool(
       normalizedTool === "texttoimage" ||
       normalizedTool === "image"
     ) {
+      if (options.parentConfig?.preset !== "learn") {
+        return {
+          result: "Tool 'generate_image' is not available in Const Harness. Const Harness is focused on code and system automation.",
+          isError: true,
+        };
+      }
+
       if (options.imageHandler) {
         return await options.imageHandler(args, workspacePath);
       }
@@ -8058,7 +8070,7 @@ export async function executeNativeTool(
     }
 
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, run_command, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, wait, lsp, ast_grep, ast_edit, jfind, retain, recall, reflect, eval, gh, think, task, agent_status, kill_agent, run_python, generate_speech, generate_image.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, run_command, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, wait, lsp, ast_grep, ast_edit, jfind, retain, recall, reflect, eval, gh, think, task, agent_status, kill_agent, run_python.`,
       isError: true,
     };
   } catch (err: any) {
