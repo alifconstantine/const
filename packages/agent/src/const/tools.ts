@@ -8066,6 +8066,14 @@ export async function executeNativeTool(
       normalizedTool.includes("codeinterpreter") ||
       normalizedTool.includes("cloudsandbox")
     ) {
+      const config = options.parentConfig;
+      if (config?.preset === "harness" && config.externalToolHandler &&
+        !(config.tools ?? CONST_DEFAULT_TOOLS).some(tool => normalizeToolName(tool.function.name) === normalizedTool)) {
+        return {
+          result: "This legacy connector is not available in this chat. Use the declared connected-app MCP tools, or mcp_search_tools when available. Connect the app in Plugins if its tools are missing.",
+          isError: true,
+        };
+      }
       return await executeComposioTool(toolName, args, signal);
     }
 

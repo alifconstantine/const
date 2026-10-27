@@ -22,6 +22,7 @@ test("managed GitHub OAuth connects through the hosted callback, refreshes once 
   let generation = 0;
   let refreshes = 0;
   let accepted = "";
+  let rejectMcp = false;
   let completion: Promise<Response> | undefined;
   const broker = createGitHubOAuthHandlers({
     config: () => ({
@@ -64,7 +65,7 @@ test("managed GitHub OAuth connects through the hosted callback, refreshes once 
       response.end(Buffer.from(await result.arrayBuffer()));
       return;
     }
-    if (request.headers.authorization !== "Bearer " + accepted) {
+    if (rejectMcp || request.headers.authorization !== "Bearer " + accepted) {
       response.writeHead(401).end();
       return;
     }
@@ -174,6 +175,20 @@ test("managed GitHub OAuth connects through the hosted callback, refreshes once 
       false,
     );
     assert.equal(refreshes, 2);
+    rejectMcp = true;
+    assert.equal(
+      (await service.execute(definitions[0]!.function.name, {})).isError,
+      true,
+    );
+    assert.equal(service.list()[0]!.status, "needs_auth");
+    assert.equal(service.list()[0]!.tools.length, 0);
+    const failedRefreshes = refreshes;
+    assert.deepEqual(await service.tools(), []);
+    assert.equal(
+      refreshes,
+      failedRefreshes,
+      "revoked account waits for user reconnection",
+    );
     await service.disconnectAccount(record.id);
     assert.equal(store.secrets(record.id).tokens, undefined);
     assert.equal(store.secrets(record.id).githubOAuth, undefined);

@@ -86,3 +86,15 @@ Verification: 16 MCP/migration tests, existing bundled-registry checks, and desk
 ## Seven managed Google apps (2026-10-27)
 
 Google Drive, Docs, Sheets, Slides, Gmail, Calendar and Classroom are now optional MCP-only plugins with packaged logos and localized descriptions. Each plugin has Connect account in its detail page. Accounts provides the confidential Web OAuth callback/exchange/refresh and seven distinct REST-to-MCP endpoints, with a shared encrypted Google account per global/workspace scope and incremental app permissions. This supersedes the earlier unimplemented Google notes. See [Google deployment, scopes and limitations](google-managed-oauth.md).
+
+## Main Chat audit (2026-10-27)
+
+The production Main Chat and scheduled-task factories supply `McpService.tools` and `McpService.execute` to the native agent. Tools refresh every model round, respect installed/enabled/effective plugin scope and local trust, and dispatch before legacy Google/Canva/Composio aliases. The Electron build resolves the agent source directly, so these callbacks do not depend on a stale published agent bundle.
+
+The harness supplies 64 native functions. When connected MCP definitions exceed 64, the service exposes `mcp_search_tools` and `mcp_call_tool` instead of sending an oversized function list to model providers. Search returns matching tool schemas from available connections; execution still uses the exact opaque tool name and checks current workspace, enablement and trust. Searching tool definitions does not require approval. Execution retains the existing approval policy, including denial and full-access mode. Small catalogs continue exposing direct tool functions.
+
+The audit fixed stale MCP sessions after transport errors (including HTTP 404), repeated GitHub 401s leaving a connection marked connected, and an incremental Google consent race with background refresh. Uncertain failed tool actions are never automatically replayed. Expired MCP sessions are rediscovered for a subsequent explicit action; revoked accounts wait for user reconnection. A Google Connect account click can recover revoked saved credentials by continuing to browser consent on that same click.
+
+Harness chats with a managed MCP handler reject undeclared legacy Google/Canva connector aliases instead of falling through to a different account gateway or a placeholder success response. Explicitly configured legacy tools for other clients retain their existing behavior.
+
+`electron/mcp/main-chat.test.ts` drives the real native agent loop, approval engine, MCP SDK and Google REST adapter through all nine GitHub/Canva/Google plugins. It verifies schemas in the model request, per-call approval, denial without provider execution, full access, returned tool observations in the next model request, and a large catalog using all 64 native functions plus deferred discovery. Provider, model and storage responses are fixtures. This is not evidence of real user consent or permission to every live repository, document or organization resource.

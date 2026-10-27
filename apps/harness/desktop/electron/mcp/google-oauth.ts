@@ -229,8 +229,16 @@ export class GoogleOAuthClient {
     );
     this.current(record, signal);
     const latest = this.account(record);
+    const refreshedSameGrant =
+      previous &&
+      latest &&
+      previous.googleOAuth.subject === latest.googleOAuth.subject &&
+      previous.tokens.refresh_token === latest.tokens.refresh_token &&
+      previous.googleOAuth.scopes.join(" ") ===
+        latest.googleOAuth.scopes.join(" ");
     if (
-      latest?.googleOAuth.grant !== previous?.googleOAuth.grant ||
+      (latest?.googleOAuth.grant !== previous?.googleOAuth.grant &&
+        !refreshedSameGrant) ||
       (latest && latest.googleOAuth.subject !== result.googleOAuth.subject)
     )
       throw new Error("account");

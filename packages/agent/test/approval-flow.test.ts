@@ -33,6 +33,17 @@ function fixture(calls: ReturnType<typeof call>[], config: Partial<AgentConfig> 
 }
 
 describe("approval flow", () => {
+  it.each(["google_docs_manage", "canva_mcp_generate_design"])("rejects undeclared legacy connectors instead of bypassing connected MCP accounts (%s)", async name => {
+    const handler = vi.fn(async () => ({ result: "must not execute", isError: false }));
+    const { requests, events, run } = fixture([call(name, { action: "create", title: "Fixture" }, 0)], {
+      preset: "harness", mode: "full_access", tools: [], externalTools: async () => [], externalToolHandler: handler,
+    });
+    await run(() => {});
+    expect(requests).toHaveLength(2); // Only the model rounds; no legacy gateway request.
+    expect(handler).not.toHaveBeenCalled();
+    expect(events.some(event => event.type === "tool_result" && event.isError && event.result.includes("connected-app MCP tools"))).toBe(true);
+  });
+
   it.each(["request_review", "ask_before_changes", "full_access"] as const)("routes namespaced MCP tools through the external registry and respects mode (%s)", async mode => {
     const handler = vi.fn(async (_name: string, _args: Record<string, unknown>) => ({ result: "provider result", isError: false }));
     const name = "mcp_fixture_query_docs";

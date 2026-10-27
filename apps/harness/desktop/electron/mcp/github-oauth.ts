@@ -203,6 +203,9 @@ export class GitHubOAuthClient {
     )
       token = await this.refresh(record, signal);
     const send = (value: string) => {
+      // Recheck after a shared refresh: logout or a settings edit may have won the race.
+      if (this.current(record, signal).tokens?.access_token !== value)
+        throw new Error("auth");
       const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + value);
       return this.request(input, { ...init, headers, redirect: "error" });
@@ -211,7 +214,12 @@ export class GitHubOAuthClient {
     if (response.status !== 401) return response;
     await response.body?.cancel();
     const renewed = await this.refresh(record, signal, token);
-    return send(renewed);
+    const retried = await send(renewed);
+    if (retried.status === 401) {
+      await retried.body?.cancel();
+      throw new Error("auth");
+    }
+    return retried;
   }
   static challenge(verifier: string) {
     return createHash("sha256").update(verifier).digest("base64url");

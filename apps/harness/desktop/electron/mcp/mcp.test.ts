@@ -250,6 +250,7 @@ async function testServer(oauth = false, failExchange = false) {
   let authorized = false;
   let completion: Promise<string> | undefined;
   const methods: string[] = [];
+  let expiredSession = false;
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", origin);
     const buffers: Buffer[] = [];
@@ -309,6 +310,11 @@ async function testServer(oauth = false, failExchange = false) {
     }
     const message = JSON.parse(body);
     methods.push(message.method);
+    if (message.method === "tools/call" && expiredSession) {
+      expiredSession = false;
+      response.writeHead(404).end();
+      return;
+    }
     if (message.id === undefined) {
       response.writeHead(202).end();
       return;
@@ -345,6 +351,9 @@ async function testServer(oauth = false, failExchange = false) {
   return {
     url: `${origin}/mcp`,
     methods,
+    expireSession: () => {
+      expiredSession = true;
+    },
     authorized: () => authorized,
     completion: () => completion!,
     browser: async (value: string) => {
@@ -411,6 +420,44 @@ test("real SDK initializes, discovers tools, routes calls, and rejects disabled 
     await server.close();
   }
 });
+test("expired MCP sessions are rediscovered for the next call without replaying an uncertain action", async () => {
+  const f = fixture();
+  const server = await testServer();
+  try {
+    const record = f.store.save({
+      name: "Expiring session",
+      scope: "user",
+      transport: "http",
+      url: server.url,
+      auth: "none",
+    });
+    const [definition] = await f.service.tools();
+    server.expireSession();
+    const failed = await f.service.execute(definition!.function.name, {
+      query: "uncertain action",
+    });
+    assert.equal(failed.isError, true);
+    assert.equal(f.service.list()[0]!.status, "error");
+    assert.equal(server.methods.filter((m) => m === "tools/call").length, 1);
+    const rediscovered = await f.service.tools();
+    assert.equal(rediscovered.length, 1);
+    assert.equal(server.methods.filter((m) => m === "initialize").length, 2);
+    assert.equal(server.methods.filter((m) => m === "tools/call").length, 1);
+    assert.equal(
+      (
+        await f.service.execute(rediscovered[0]!.function.name, {
+          query: "explicit new action",
+        })
+      ).isError,
+      false,
+    );
+    assert.equal(f.service.list()[0]!.id, record.id);
+  } finally {
+    await f.cleanup();
+    await server.close();
+  }
+});
+
 test("OAuth discovery, dynamic registration, state validation, and PKCE exchange work end to end", async () => {
   const f = fixture();
   const server = await testServer(true);

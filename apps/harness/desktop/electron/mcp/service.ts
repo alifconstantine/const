@@ -1,7 +1,10 @@
 import http from "node:http";
 import { createHash, randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   StdioClientTransport,
   getDefaultEnvironment,
@@ -14,10 +17,13 @@ import {
 import {
   ToolListChangedNotificationSchema,
   CallToolResultSchema,
+  McpError,
+  ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   resolveSkillRegistry,
+  CONST_DEFAULT_TOOLS,
   type InstalledPlugin,
   type NativeToolDefinition,
   type ToolExecutionResult,
@@ -35,6 +41,48 @@ import { GoogleOAuthClient, managedGoogleApp } from "./google-oauth";
 import { respondOAuth } from "./oauth-page";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
+const SEARCH_TOOLS = "mcp_search_tools";
+const CALL_TOOL = "mcp_call_tool";
+// Harness has 64 native tools; leave room under the common 128-function provider limit.
+const DIRECT_TOOL_LIMIT = Math.max(2, 128 - CONST_DEFAULT_TOOLS.length);
+const CATALOG_TOOLS: NativeToolDefinition[] = [
+  {
+    type: "function",
+    requiresApproval: false,
+    function: {
+      name: SEARCH_TOOLS,
+      description:
+        "Find tools from connected apps by app name, action, or keywords. Returns toolName, description and inputSchema. Then use mcp_call_tool with the selected toolName and arguments matching its schema. Search again for another app or action.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          limit: { type: "integer", minimum: 1, maximum: 20 },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    requiresApproval: true,
+    function: {
+      name: CALL_TOOL,
+      description:
+        "Execute a connected-app tool found with mcp_search_tools. Use its exact toolName and arguments matching the returned inputSchema. Results come from the connected account. A failed write must not be retried without checking its outcome.",
+      parameters: {
+        type: "object",
+        properties: {
+          toolName: { type: "string" },
+          arguments: { type: "object", additionalProperties: true },
+        },
+        required: ["toolName", "arguments"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
 interface LiveConnection {
   client: Client;
   transport: Transport;
@@ -425,9 +473,27 @@ export class McpService {
     // Verify the OS vault before registering a client or opening the user's browser.
     this.store.writeSecrets(id, this.store.secrets(id));
     if (reuseGoogle && this.google.reuse(record)) {
-      await this.connect(id, workspace);
-      return;
+      try {
+        await this.connect(id, workspace);
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !["auth", "scope"].includes(error.message)
+        )
+          throw error;
+        // Revoked credentials can survive a restart. Continue to browser consent on this click.
+        await this.disconnect(id);
+      }
     }
+    // Reusing saved credentials awaited network I/O; another login or settings edit may have started.
+    if (this.login) throw new Error("busy");
+    const current = this.get(id, workspace);
+    if (
+      !this.store.isTrusted(current) ||
+      this.store.fingerprint(current) !== this.store.fingerprint(record)
+    )
+      throw new Error("invalid");
     const state = randomBytes(32).toString("hex");
     const controller = new AbortController();
     let resolveCode!: (code: string) => void;
@@ -773,6 +839,7 @@ export class McpService {
   async tools(
     workspace?: string,
     signal?: AbortSignal,
+    maxDirectTools = DIRECT_TOOL_LIMIT,
   ): Promise<NativeToolDefinition[]> {
     let records: McpConnectionView[];
     try {
@@ -784,6 +851,7 @@ export class McpService {
       (record) =>
         record.isEffective &&
         record.enabled &&
+        record.status !== "needs_auth" &&
         this.store.isTrusted(record) &&
         (record.auth === "none" || record.hasCredentials) &&
         (this.retryAfter.get(record.id) ?? 0) <= Date.now(),
@@ -825,7 +893,7 @@ export class McpService {
         }
       }),
     );
-    return definitions;
+    return definitions.length > maxDirectTools ? CATALOG_TOOLS : definitions;
   }
   async execute(
     name: string,
@@ -834,6 +902,78 @@ export class McpService {
     signal?: AbortSignal,
   ): Promise<ToolExecutionResult> {
     try {
+      if (name === SEARCH_TOOLS) {
+        if (
+          typeof args.query !== "string" ||
+          args.query.length > 1000 ||
+          (args.limit !== undefined &&
+            (!Number.isInteger(args.limit) ||
+              Number(args.limit) < 1 ||
+              Number(args.limit) > 20))
+        )
+          return {
+            result:
+              "Provide a search query and an optional limit from 1 to 20.",
+            isError: true,
+          };
+        const available = await this.tools(
+          workspace,
+          signal,
+          Number.MAX_SAFE_INTEGER,
+        );
+        const words = args.query
+          .toLowerCase()
+          .split(/[^\p{L}\p{N}_-]+/u)
+          .filter(Boolean);
+        const matches = available
+          .map((tool) => {
+            const text =
+              `${tool.function.name} ${tool.function.description}`.toLowerCase();
+            return {
+              tool,
+              score: words.filter((word) => text.includes(word)).length,
+            };
+          })
+          .filter((item) => !words.length || item.score > 0)
+          .sort(
+            (a, b) =>
+              b.score - a.score ||
+              a.tool.function.name.localeCompare(b.tool.function.name),
+          );
+        return {
+          result: JSON.stringify({
+            totalMatches: matches.length,
+            tools: matches
+              .slice(0, Number(args.limit ?? 8))
+              .map(({ tool }) => ({
+                toolName: tool.function.name,
+                description: tool.function.description,
+                inputSchema: tool.function.parameters,
+              })),
+          }),
+          isError: false,
+        };
+      }
+      if (name === CALL_TOOL) {
+        if (
+          typeof args.toolName !== "string" ||
+          !/^mcp_[a-f0-9]{20}_/.test(args.toolName) ||
+          !args.arguments ||
+          typeof args.arguments !== "object" ||
+          Array.isArray(args.arguments)
+        )
+          return {
+            result:
+              "Use an exact toolName and arguments from mcp_search_tools.",
+            isError: true,
+          };
+        return this.execute(
+          args.toolName,
+          args.arguments as Record<string, unknown>,
+          workspace,
+          signal,
+        );
+      }
       for (const record of this.list(workspace)) {
         if (
           !record.isEffective ||
@@ -851,13 +991,50 @@ export class McpService {
           active.fingerprint !== this.store.fingerprint(record)
         )
           continue;
-        const result = CallToolResultSchema.parse(
-          await active.client.callTool(
+        let response;
+        try {
+          response = await active.client.callTool(
             { name: tool.name, arguments: args },
             undefined,
             { signal, timeout: record.timeoutMs },
-          ),
-        );
+          );
+        } catch (error) {
+          const auth =
+            error instanceof UnauthorizedError ||
+            (error instanceof StreamableHTTPError && error.code === 401) ||
+            (error instanceof Error &&
+              ["auth", "scope", "account"].includes(error.message));
+          const broken =
+            auth ||
+            error instanceof StreamableHTTPError ||
+            error instanceof TypeError ||
+            (error instanceof McpError &&
+              [ErrorCode.ConnectionClosed, ErrorCode.RequestTimeout].includes(
+                error.code,
+              )) ||
+            (error instanceof Error && error.message === "connection");
+          if (
+            !signal?.aborted &&
+            broken &&
+            this.live.get(record.id) === active
+          ) {
+            this.live.delete(record.id);
+            this.controllers.get(record.id)?.abort();
+            this.controllers.delete(record.id);
+            void active.client.close().catch(() => {});
+            this.states.set(record.id, {
+              status: auth ? "needs_auth" : "error",
+              error: auth ? "auth" : "connection",
+            });
+            // Rediscover an expired session on the next round, without replaying this tool call.
+            if (error instanceof StreamableHTTPError && error.code === 404)
+              this.retryAfter.delete(record.id);
+            else this.retryAfter.set(record.id, Date.now() + 30_000);
+            this.changed();
+          }
+          throw error;
+        }
+        const result = CallToolResultSchema.parse(response);
         const images = result.content.flatMap((item) =>
           item.type === "image" && item.data.length < 8_000_000
             ? [{ data: item.data, mimeType: item.mimeType }]

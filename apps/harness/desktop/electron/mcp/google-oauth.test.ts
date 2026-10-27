@@ -11,6 +11,7 @@ import { McpService } from "./service";
 import { GoogleOAuthClient, managedGoogleApp } from "./google-oauth";
 import {
   GOOGLE_CONNECTORS,
+  GOOGLE_IDENTITY_SCOPES,
   GOOGLE_MCP_ORIGIN,
   googleMcpUrl,
   type GoogleApp,
@@ -279,6 +280,191 @@ test("seven managed Google plugins connect over real MCP, share scoped credentia
     await service.invalidate();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("adding Google permissions tolerates a concurrent refresh of the same account", async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "const-google-race-"));
+  const store = new McpStore(home, {
+    encrypt: (v) => Buffer.from(v),
+    decrypt: (v) => v.toString(),
+  });
+  const record = store.save({
+    name: "Google Docs",
+    key: "plugin-google-docs-docs",
+    scope: "user",
+    transport: "http",
+    auth: "oauth",
+    url: googleMcpUrl("docs"),
+  });
+  const scopes = [
+    ...GOOGLE_IDENTITY_SCOPES,
+    ...GOOGLE_CONNECTORS.docs.scopes,
+  ].sort();
+  const subject = "a".repeat(43);
+  let finish!: (value: Response) => void;
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => (started = resolve));
+  const google = new GoogleOAuthClient(store, {
+    fetch: async () => {
+      started();
+      return new Promise<Response>((resolve) => (finish = resolve));
+    },
+  });
+  const key = google.accountId(record);
+  const account = {
+    tokens: {
+      access_token: "before-refresh",
+      token_type: "Bearer",
+      refresh_token: "stable-refresh",
+    },
+    googleOAuth: {
+      grant: "old-receipt",
+      expiresAt: Date.now() + 3600000,
+      subject,
+      scopes,
+    },
+  };
+  store.writeSecrets(key, account);
+  store.writeSecrets(record.id, { googleAccountId: key });
+  try {
+    const exchange = google.exchange(
+      record,
+      "code",
+      "ticket",
+      "verifier",
+      new AbortController().signal,
+    );
+    await pending;
+    store.writeSecrets(key, {
+      ...account,
+      tokens: { ...account.tokens, access_token: "refreshed-access" },
+      googleOAuth: { ...account.googleOAuth, grant: "refresh-receipt" },
+    });
+    finish(
+      Response.json({
+        access_token: "expanded-access",
+        refresh_token: "new-refresh",
+        token_type: "Bearer",
+        expires_in: 3600,
+        subject,
+        grant: "expanded-receipt",
+        scope: [...scopes, ...GOOGLE_CONNECTORS.gmail.scopes].join(" "),
+      }),
+    );
+    await exchange;
+    assert.equal(store.secrets(key).tokens?.access_token, "expanded-access");
+    assert.ok(
+      store
+        .secrets(key)
+        .googleOAuth?.scopes.includes(GOOGLE_CONNECTORS.gmail.scopes[0]),
+    );
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("Connect account opens Google consent on the same click when saved credentials were revoked", async () => {
+  const home = fs.mkdtempSync(
+    path.join(os.tmpdir(), "const-google-reconnect-"),
+  );
+  const store = new McpStore(home, {
+    encrypt: (v) => Buffer.from(v),
+    decrypt: (v) => v.toString(),
+  });
+  const root = fileURLToPath(
+    new URL("../../plugins/google-docs/", import.meta.url),
+  );
+  const plugin = {
+    ...readPluginManifest(root),
+    id: "google-docs",
+    path: root,
+    scope: "user" as const,
+    isEnabled: true,
+    isEffective: true,
+    skills: [],
+  };
+  const scopes = [
+    ...GOOGLE_IDENTITY_SCOPES,
+    ...GOOGLE_CONNECTORS.docs.scopes,
+  ].sort();
+  const subject = "a".repeat(43);
+  let visits = 0;
+  let refreshes = 0;
+  let completion: Promise<Response> | undefined;
+  const adapter = createGoogleMcpHandler({
+    fetch: async () => Response.json({ sub: "fixture-user" }),
+  });
+  const google = new GoogleOAuthClient(store, {
+    fetch: async (input, init) => {
+      const address = String(input);
+      if (address.endsWith("/oauth/google/config"))
+        return Response.json({ configured: true });
+      if (address.endsWith("/oauth/google/refresh")) {
+        refreshes++;
+        return Response.json({ error: "auth" }, { status: 401 });
+      }
+      if (address.endsWith("/oauth/google/exchange"))
+        return Response.json({
+          access_token: "fresh-access",
+          refresh_token: "fresh-refresh",
+          token_type: "Bearer",
+          expires_in: 3600,
+          subject,
+          grant: "new-receipt",
+          scope: scopes.join(" "),
+        });
+      assert.equal(address, googleMcpUrl("docs"));
+      if (
+        new Headers(init?.headers).get("authorization") !==
+        "Bearer fresh-access"
+      )
+        return new Response(null, { status: 401 });
+      return adapter(new Request(address, init), "docs");
+    },
+  });
+  const service = new McpService(
+    store,
+    () => {},
+    async (address) => {
+      visits++;
+      const url = new URL(address);
+      const callback = new URL("http://127.0.0.1:24139/oauth/callback");
+      callback.searchParams.set("state", url.searchParams.get("state")!);
+      callback.searchParams.set("code", "fixture-code");
+      callback.searchParams.set("ticket", "fixture-ticket");
+      completion = fetch(callback);
+    },
+    () => [plugin],
+    undefined,
+    google,
+  );
+  try {
+    const record = service.list()[0]!;
+    const key = google.accountId(record);
+    store.writeSecrets(key, {
+      tokens: {
+        access_token: "revoked-access",
+        token_type: "Bearer",
+        refresh_token: "revoked-refresh",
+      },
+      googleOAuth: {
+        grant: "old-receipt",
+        subject,
+        expiresAt: Date.now() + 3600000,
+        scopes,
+      },
+    });
+    store.writeSecrets(record.id, { googleAccountId: key });
+    await service.authenticate(record.id);
+    assert.equal((await completion!).status, 200);
+    assert.equal(visits, 1);
+    assert.equal(refreshes, 1);
+    assert.equal(service.list()[0]!.status, "connected");
+    assert.equal(store.secrets(key).tokens?.access_token, "fresh-access");
+  } finally {
+    await service.invalidate();
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
