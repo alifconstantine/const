@@ -165,29 +165,41 @@ export function ChatMessageItem({
             }
           }}
           className={cn(
-            "w-fit rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-2 text-[13.5px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
+            "relative w-fit rounded-2xl rounded-tr-[2px] bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-2 text-[13.5px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
             userBubbleWidthClass,
             !isReadOnly && isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#b0b0b0] dark:hover:border-[#484848]"
           )}
         >
           {isLongPrompt && !isReadOnly ? (
-            <ScrollArea
-              className={cn(
-                "w-full transition-[max-height] duration-200 ease-in-out",
-                isExpanded ? "max-h-[380px]" : "max-h-24"
-              )}
-              viewportClassName="[&>div[style]]:!block"
-            >
-              <div className="pr-2">
-                <MarkdownContent
-                  content={message.content}
-                  onOpenFilePreview={onOpenFilePreview}
-                  onOpenTrajectory={onOpenTrajectory}
-                  onOpenBrowser={onOpenBrowser}
-                  variant="user"
+            <>
+              <ScrollArea
+                className={cn(
+                  "w-full transition-[max-height] duration-200 ease-in-out",
+                  isExpanded ? "max-h-[380px]" : "max-h-24"
+                )}
+                viewportClassName={cn(
+                  "[&>div[style]]:!block",
+                  !isExpanded && "!overflow-hidden"
+                )}
+                scrollBarClassName={!isExpanded ? "!hidden" : undefined}
+              >
+                <div className="pr-2">
+                  <MarkdownContent
+                    content={message.content}
+                    onOpenFilePreview={onOpenFilePreview}
+                    onOpenTrajectory={onOpenTrajectory}
+                    onOpenBrowser={onOpenBrowser}
+                    variant="user"
+                  />
+                </div>
+              </ScrollArea>
+              {!isExpanded && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-[#f0f0f0] via-[#f0f0f0]/80 dark:from-[#222222] dark:via-[#222222]/80 to-transparent"
                 />
-              </div>
-            </ScrollArea>
+              )}
+            </>
           ) : (
             <MarkdownContent
               content={message.content}
