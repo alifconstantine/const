@@ -15,21 +15,21 @@ const dollars = (n: number) => "$" + n.toFixed(6);
 
 const QUICK_SETUP_CODE = {
   curl: `curl https://router.const.web.id/v1/chat/completions \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Authorization: Bearer sk-const-live-YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "deepseek-v4.1-flash",
+    "model": "deepseek-v4.1-flash:free",
     "messages": [{"role": "user", "content": "Hello world"}]
   }'`,
   python: `from openai import OpenAI
 
 client = OpenAI(
     base_url="https://router.const.web.id/v1",
-    api_key="YOUR_API_KEY",
+    api_key="sk-const-live-YOUR_API_KEY",
 )
 
 response = client.chat.completions.create(
-    model="deepseek-v4.1-flash",
+    model="deepseek-v4.1-flash:free",
     messages=[{"role": "user", "content": "Hello world"}],
 )
 print(response.choices[0].message.content)`,
@@ -41,7 +41,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "deepseek-v4.1-flash",
+  model: "deepseek-v4.1-flash:free",
   messages: [{ role: "user", content: "Hello world" }],
 });
 console.log(response.choices[0].message.content);`,

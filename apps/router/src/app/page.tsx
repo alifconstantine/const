@@ -207,13 +207,13 @@ export default function HomePage() {
       note: "Standard OpenAI request format. Test connectivity and model inference:",
       lang: "bash",
       code: `export OPENAI_BASE_URL="https://router.const.web.id/v1"
-export OPENAI_API_KEY="const_live_xxxxxxxxxxxx"
+export OPENAI_API_KEY="sk-const-live-xxxxxxxxxxxx"
 
 curl $OPENAI_BASE_URL/chat/completions \\
   -H "Authorization: Bearer $OPENAI_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "deepseek-v4.1-flash",
+    "model": "deepseek-v4.1-flash:free",
     "messages": [{"role": "user", "content": "Explain Virtual Combos in 2 sentences."}]
   }'`,
     },
@@ -227,11 +227,11 @@ curl $OPENAI_BASE_URL/chat/completions \\
 
 client = OpenAI(
     base_url="https://router.const.web.id/v1",
-    api_key="const_live_xxxxxxxxxxxx",
+    api_key="sk-const-live-xxxxxxxxxxxx",
 )
 
 response = client.chat.completions.create(
-    model="deepseek-v4.1-flash",
+    model="deepseek-v4.1-flash:free",
     messages=[{"role": "user", "content": "Optimize this Python snippet."}],
 )
 
@@ -441,7 +441,7 @@ for chunk in stream:
               <span className="feature-tag">Unified Access</span>
               <h3>One Key, All Models</h3>
               <p>
-                Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">const_live_</code> key.
+                Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">sk-const-live-</code> key.
               </p>
 
               <div className="key-clients-visual">
@@ -779,7 +779,7 @@ for chunk in stream:
           <article>
             <span className="font-mono text-xs text-[#737373]">03</span>
             <h3>Generate a Key</h3>
-            <p>Create a const_live_ key, configure daily spend ceilings and allowed models.</p>
+            <p>Create an sk-const-live- key, configure daily spend ceilings and allowed models.</p>
           </article>
           <article>
             <span className="font-mono text-xs text-[#737373]">04</span>
