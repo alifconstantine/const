@@ -39,6 +39,9 @@ import { McpStore, validateEndpoint, validWorkspace } from "./store";
 import { GitHubOAuthClient, isManagedGitHub } from "./github-oauth";
 import { GoogleOAuthClient, managedGoogleApp } from "./google-oauth";
 import { respondOAuth } from "./oauth-page";
+import { McpAppsStore, type StoredApp } from "./apps-store";
+import type { McpAppView } from "../../src/lib/mcp/apps";
+import path from "node:path";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
 const SEARCH_TOOLS = "mcp_search_tools";
@@ -117,6 +120,7 @@ export class McpService {
   private login?: Login;
   private readonly github: GitHubOAuthClient;
   private readonly google: GoogleOAuthClient;
+  readonly apps: McpAppsStore;
   constructor(
     readonly store: McpStore,
     private readonly changed: () => void,
@@ -129,6 +133,7 @@ export class McpService {
   ) {
     this.github = github ?? new GitHubOAuthClient(store);
     this.google = google ?? new GoogleOAuthClient(store);
+    this.apps = new McpAppsStore(store.home);
   }
 
   private configurations(workspace?: string): McpConnection[] {
@@ -687,7 +692,18 @@ export class McpService {
   ): Promise<LiveConnection> {
     this.states.set(record.id, { status: "connecting" });
     this.changed();
-    const client = new Client({ name: "const-harness", version: "1.0.0" });
+    const client = new Client(
+      { name: "const-harness", version: "1.0.0" },
+      {
+        capabilities: {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        } as any,
+      },
+    );
     try {
       const secret = this.store.secrets(record.id);
       const headers = new Headers(secret.headers);
@@ -828,6 +844,14 @@ export class McpService {
           description: tool.description,
           inputSchema: tool.inputSchema,
           readOnly: tool.annotations?.readOnlyHint === true,
+          appResourceUri:
+            typeof (tool._meta?.ui as any)?.resourceUri === "string" &&
+            String((tool._meta?.ui as any).resourceUri).startsWith("ui://")
+              ? String((tool._meta?.ui as any).resourceUri)
+              : undefined,
+          appOnly:
+            Array.isArray((tool._meta?.ui as any)?.visibility) &&
+            !(tool._meta?.ui as any).visibility.includes("model"),
         });
       cursor = page.nextCursor;
       if ((cursor && cursors.has(cursor)) || tools.length > 1000)
@@ -857,6 +881,7 @@ export class McpService {
         (this.retryAfter.get(record.id) ?? 0) <= Date.now(),
     );
     const definitions: NativeToolDefinition[] = [];
+    let supportsApps = false;
     await Promise.all(
       eligible.map(async (record) => {
         if (signal?.aborted) return;
@@ -875,24 +900,43 @@ export class McpService {
             if (onAbort) signal?.removeEventListener("abort", onAbort);
           }
           for (const tool of active.tools)
-            definitions.push({
-              type: "function",
-              requiresApproval: true,
-              function: {
-                name: exposedToolName(record.id, tool.name),
-                description:
-                  `[${record.name}] ${tool.description ?? tool.name}`.slice(
-                    0,
-                    8000,
-                  ),
-                parameters: tool.inputSchema,
-              },
-            });
+            if (!tool.appOnly)
+              definitions.push({
+                type: "function",
+                requiresApproval: true,
+                function: {
+                  name: exposedToolName(record.id, tool.name),
+                  description:
+                    `[${record.name}] ${tool.description ?? tool.name}`.slice(
+                      0,
+                      8000,
+                    ),
+                  parameters: tool.inputSchema,
+                },
+              });
+          if (active.tools.some((tool) => tool.appResourceUri))
+            supportsApps = true;
         } catch {
           /* One unavailable integration must not prevent a chat from starting. */
         }
       }),
     );
+    if (supportsApps)
+      definitions.push({
+        type: "function",
+        requiresApproval: false,
+        function: {
+          name: "mcp_read_app_context",
+          description:
+            "Read the latest user edits and local file of a displayed app before modifying its diagram. Use the app id returned in constMcpApp.",
+          parameters: {
+            type: "object",
+            properties: { id: { type: "string" } },
+            required: ["id"],
+            additionalProperties: false,
+          },
+        },
+      });
     return definitions.length > maxDirectTools ? CATALOG_TOOLS : definitions;
   }
   async execute(
@@ -902,6 +946,24 @@ export class McpService {
     signal?: AbortSignal,
   ): Promise<ToolExecutionResult> {
     try {
+      if (name === "mcp_read_app_context") {
+        const app = this.apps.get(String(args.id));
+        if (
+          !workspace ||
+          path.resolve(workspace) !== path.resolve(app.workspace)
+        )
+          throw new Error("invalid");
+        this.appConnection(app);
+        return {
+          result: JSON.stringify({
+            checkpointId: app.checkpointId,
+            filePath: app.filePath,
+            userEdits: app.modelContext,
+            elements: app.scene?.elements,
+          }),
+          isError: false,
+        };
+      }
       if (name === SEARCH_TOOLS) {
         if (
           typeof args.query !== "string" ||
@@ -957,7 +1019,8 @@ export class McpService {
       if (name === CALL_TOOL) {
         if (
           typeof args.toolName !== "string" ||
-          !/^mcp_[a-f0-9]{20}_/.test(args.toolName) ||
+          (!/^mcp_[a-f0-9]{20}_/.test(args.toolName) &&
+            args.toolName !== "mcp_read_app_context") ||
           !args.arguments ||
           typeof args.arguments !== "object" ||
           Array.isArray(args.arguments)
@@ -983,7 +1046,8 @@ export class McpService {
           continue;
         const active = this.live.get(record.id);
         const tool = active?.tools.find(
-          (item) => exposedToolName(record.id, item.name) === name,
+          (item) =>
+            !item.appOnly && exposedToolName(record.id, item.name) === name,
         );
         if (
           !active ||
@@ -1035,17 +1099,73 @@ export class McpService {
           throw error;
         }
         const result = CallToolResultSchema.parse(response);
+        let constMcpApp;
+        if (!result.isError && tool.appResourceUri && workspace) {
+          let scene;
+          const checkpointId =
+            typeof result.structuredContent?.checkpointId === "string"
+              ? result.structuredContent.checkpointId
+              : undefined;
+          if (record.key === "plugin-excalidraw-excalidraw" && checkpointId) {
+            try {
+              const checkpoint = await active.client.callTool({
+                name: "read_checkpoint",
+                arguments: { id: checkpointId },
+              });
+              const block = (checkpoint.content as any[])?.find(
+                (item) => item.type === "text",
+              );
+              const value = JSON.parse(block?.text ?? "{}");
+              if (Array.isArray(value.elements)) scene = value;
+            } catch {
+              /* Inputs remain available if the server's checkpoint read is unavailable. */
+            }
+          }
+          const app = this.apps.create({
+            connectionId: record.id,
+            fingerprint: active.fingerprint,
+            workspace: path.resolve(workspace),
+            title: record.name,
+            resourceUri: tool.appResourceUri,
+            arguments: args,
+            result: {
+              content: result.content,
+              structuredContent: result.structuredContent,
+            },
+            checkpointId,
+            scene,
+            kind:
+              record.key === "plugin-excalidraw-excalidraw" &&
+              tool.appResourceUri === "ui://excalidraw/mcp-app.html"
+                ? "excalidraw"
+                : undefined,
+          });
+          constMcpApp = {
+            id: app.id,
+            title: app.title,
+            filePath: app.filePath,
+            contextTool: "mcp_read_app_context",
+          };
+        }
         const images = result.content.flatMap((item) =>
           item.type === "image" && item.data.length < 8_000_000
             ? [{ data: item.data, mimeType: item.mimeType }]
             : [],
         );
         const text = result.content.filter((item) => item.type !== "image");
+        const payload = JSON.stringify({
+          constMcpApp,
+          content: text,
+          structuredContent: result.structuredContent,
+        });
         return {
-          result: JSON.stringify({
-            content: text,
-            structuredContent: result.structuredContent,
-          }).slice(0, 100_000),
+          result:
+            constMcpApp && payload.length > 100_000
+              ? JSON.stringify({
+                  constMcpApp,
+                  content: [{ type: "text", text: payload.slice(0, 90000) }],
+                })
+              : payload.slice(0, 100_000),
           isError: result.isError === true,
           images,
         };
@@ -1062,5 +1182,127 @@ export class McpService {
         isError: true,
       };
     }
+  }
+
+  private appConnection(app: StoredApp) {
+    const record = this.get(app.connectionId, app.workspace);
+    if (
+      !this.store.isTrusted(record) ||
+      this.store.fingerprint(record) !== app.fingerprint
+    )
+      throw new Error("invalid");
+    return record;
+  }
+  async appView(id: string): Promise<McpAppView> {
+    const app = this.apps.get(id);
+    const record = this.appConnection(app);
+    const active = await this.connect(record.id, app.workspace);
+    if (!active.tools.some((tool) => tool.appResourceUri === app.resourceUri))
+      throw new Error("invalid");
+    const resource = await active.client.readResource({ uri: app.resourceUri });
+    this.appConnection(app);
+    const page = resource.contents.find(
+      (item) =>
+        item.uri === app.resourceUri &&
+        "text" in item &&
+        item.mimeType?.startsWith("text/html"),
+    );
+    if (!page || !("text" in page) || page.text.length > 8_000_000)
+      throw new Error("invalid");
+    const ui = page._meta?.ui as any;
+    return {
+      id: app.id,
+      title: app.title,
+      filePath: app.filePath,
+      resourceUri: app.resourceUri,
+      html: page.text,
+      csp: {
+        resourceDomains: ui?.csp?.resourceDomains,
+        connectDomains: ui?.csp?.connectDomains,
+      },
+      arguments: app.arguments,
+      result: app.result,
+      scene: app.scene,
+    };
+  }
+  async appCall(
+    id: string,
+    name: string,
+    args: Record<string, unknown>,
+    approved = false,
+  ) {
+    const app = this.apps.get(id);
+    const record = this.appConnection(app);
+    // The initial Excalidraw app may only read its approved checkpoints or save its own edits.
+    if (
+      record.key !== "plugin-excalidraw-excalidraw" ||
+      !["read_checkpoint", "save_checkpoint", "export_to_excalidraw"].includes(
+        name,
+      )
+    )
+      throw new Error("invalid");
+    if (
+      name === "export_to_excalidraw" &&
+      (!approved ||
+        typeof args.json !== "string" ||
+        args.json.length > 5_000_000)
+    )
+      throw new Error("invalid");
+    let restoreIds: string[] = [];
+    try {
+      restoreIds = JSON.parse(String(app.arguments.elements))
+        .filter((element: any) => element.type === "restoreCheckpoint")
+        .map((element: any) => element.id);
+    } catch {}
+    if (
+      name !== "export_to_excalidraw" &&
+      args.id !== app.checkpointId &&
+      !(name === "read_checkpoint" && restoreIds.includes(String(args.id)))
+    )
+      throw new Error("invalid");
+    if (name === "read_checkpoint" && args.id === app.checkpointId && app.scene)
+      return { content: [{ type: "text", text: JSON.stringify(app.scene) }] };
+    if (name === "save_checkpoint") {
+      if (typeof args.data !== "string" || args.data.length > 8_000_000)
+        throw new Error("invalid");
+      const incoming = JSON.parse(args.data);
+      this.apps.saveScene(id, {
+        ...app.scene,
+        ...incoming,
+        files: incoming.files ?? app.scene?.files,
+        appState: incoming.appState ?? app.scene?.appState,
+      });
+    }
+    const active = await this.connect(record.id, app.workspace);
+    if (!active.tools.some((tool) => tool.name === name && tool.appOnly))
+      throw new Error("invalid");
+    return CallToolResultSchema.parse(
+      await active.client.callTool({ name, arguments: args }),
+    );
+  }
+  appContext(id: string, text: string) {
+    const app = this.apps.get(id);
+    this.appConnection(app);
+    if (typeof text !== "string" || text.length > 200_000)
+      throw new Error("invalid");
+    this.apps.save({ ...app, modelContext: text });
+  }
+  async saveDiagram(id: string, scene: NonNullable<McpAppView["scene"]>) {
+    const filePath = this.apps.saveScene(id, scene);
+    const app = this.apps.get(id);
+    if (app.checkpointId) {
+      try {
+        await this.appCall(id, "save_checkpoint", {
+          id: app.checkpointId,
+          data: JSON.stringify({ elements: scene.elements }),
+        });
+      } catch {
+        /* A local diagram remains editable when its MCP server is unavailable. */
+      }
+    }
+    return filePath;
+  }
+  readDiagram(filePath: string) {
+    return this.apps.byPath(filePath);
   }
 }

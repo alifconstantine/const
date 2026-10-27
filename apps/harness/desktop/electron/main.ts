@@ -884,6 +884,11 @@ app.whenReady().then(() => {
     });
   };
   handleMcp("mcp:list", (workspace?: string) => mcpService.list(workspace));
+  handleMcp("mcp:app-view", (id: string) => mcpService.appView(id));
+  handleMcp("mcp:app-call", (id: string, name: string, args: Record<string, unknown>, approved?: boolean) => mcpService.appCall(id, name, args, approved));
+  handleMcp("mcp:app-context", (id: string, text: string) => mcpService.appContext(id, text));
+  handleMcp("mcp:diagram-save", (id: string, scene: any) => mcpService.saveDiagram(id, scene));
+  handleMcp("mcp:diagram-read", (filePath: string) => mcpService.readDiagram(filePath));
   handleMcp("mcp:save", (input: McpSaveInput) => mcpService.save(input));
   handleMcp("mcp:remove", (id: string, workspace?: string) => mcpService.remove(id, workspace));
   handleMcp("mcp:override", (id: string, workspace: string) => mcpService.override(id, workspace));

@@ -282,6 +282,11 @@ contextBridge.exposeInMainWorld("electron", {
     listApps: () => ipcRenderer.invoke("computer:list-apps"),
   },
   mcp: {
+    appView: (id: string) => ipcRenderer.invoke("mcp:app-view", id),
+    appCall: (id: string, name: string, args: Record<string, unknown>, approved = false) => ipcRenderer.invoke("mcp:app-call", id, name, args, approved),
+    appContext: (id: string, text: string) => ipcRenderer.invoke("mcp:app-context", id, text),
+    saveDiagram: (id: string, scene: unknown) => ipcRenderer.invoke("mcp:diagram-save", id, scene),
+    readDiagram: (filePath: string) => ipcRenderer.invoke("mcp:diagram-read", filePath),
     list: (workspacePath?: string) => ipcRenderer.invoke("mcp:list", workspacePath),
     save: (input: import("../src/lib/mcp/types").McpSaveInput) => ipcRenderer.invoke("mcp:save", input),
     remove: (id: string, workspacePath?: string) => ipcRenderer.invoke("mcp:remove", id, workspacePath),

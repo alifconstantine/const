@@ -34,6 +34,8 @@ export interface McpToolInfo {
   description?: string;
   inputSchema: Record<string, unknown>;
   readOnly: boolean;
+  appResourceUri?: string;
+  appOnly?: boolean;
 }
 export interface McpConnectionView extends McpConnection {
   authOptions?: McpAuth[];
@@ -81,4 +83,9 @@ export interface McpBridge {
   ): Promise<void>;
   disconnect(id: string, workspacePath?: string): Promise<void>;
   onChanged(callback: () => void): () => void;
+  appView(id: string): Promise<import("./apps").McpAppView>;
+  appCall(id: string, name: string, args: Record<string, unknown>, approved?: boolean): Promise<any>;
+  appContext(id: string, text: string): Promise<void>;
+  saveDiagram(id: string, scene: NonNullable<import("./apps").McpAppView["scene"]>): Promise<string>;
+  readDiagram(filePath: string): Promise<Pick<import("./apps").McpAppView, "id" | "title" | "filePath" | "scene">>;
 }

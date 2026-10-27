@@ -24,6 +24,7 @@ import { highlightCodeToHtmlLines } from "../../lib/code-highlighter";
 import { useCodeFontSize } from "../../lib/theme";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
+const ExcalidrawEditor = React.lazy(() => import("../mcp-apps/excalidraw-editor"));
 
 interface FilePreviewTabProps {
   tab: RightPaneTab;
@@ -46,7 +47,12 @@ interface BreadcrumbCrumb {
   parentRelPath: string;
 }
 
-export function FilePreviewTab({
+export function FilePreviewTab(props: FilePreviewTabProps) {
+  if (props.tab.filePath && /[\\/]artifacts[\\/]diagrams[\\/][a-f0-9-]{36}\.excalidraw$/i.test(props.tab.filePath)) return <React.Suspense fallback={<div className="h-full grid place-items-center"><Loader2 className="size-5 animate-spin text-[#969696]" /></div>}><ExcalidrawEditor filePath={props.tab.filePath} /></React.Suspense>;
+  return <StandardFilePreviewTab {...props} />;
+}
+
+function StandardFilePreviewTab({
   tab,
   workspacePath: propWorkspacePath,
   onOpenFilePreview,

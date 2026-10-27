@@ -12,6 +12,7 @@ export const pluginDescriptionKeys: Record<string, string> = {
   tinyfish: "mcp.tinyfishDescription",
   github: "mcp.githubDescription",
   canva: "mcp.canvaDescription",
+  excalidraw: "mcp.excalidrawDescription",
   "google-drive": "mcp.googleDriveDescription",
   "google-docs": "mcp.googleDocsDescription",
   "google-sheets": "mcp.googleSheetsDescription",

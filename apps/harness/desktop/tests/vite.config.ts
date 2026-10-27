@@ -10,6 +10,22 @@ export default defineConfig({
     {
       name: "intelligence-ui-live-result",
       configureServer(server) {
+        server.middlewares.use("/__excalidraw-fixture", (request, response) => {
+          response.setHeader("Content-Type", "application/json");
+          response.setHeader("Cache-Control", "no-store");
+          const file = process.env.EXCALIDRAW_FIXTURE;
+          if (request.method !== "GET" || !file) {
+            response.statusCode = 404;
+            response.end("{}");
+            return;
+          }
+          try {
+            response.end(fs.readFileSync(file, "utf8"));
+          } catch {
+            response.statusCode = 500;
+            response.end("{}");
+          }
+        });
         server.middlewares.use(
           "/__intelligence-ui-live",
           (request, response) => {

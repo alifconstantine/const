@@ -10,6 +10,7 @@ import {
   Gmail,
   GoogleCalendar,
   GoogleClassroom,
+  Excalidraw,
 } from "@thesvg/react";
 import hyperframesIcon from "../../../plugins/hyperframes/assets/icon.svg";
 
@@ -37,6 +38,7 @@ export function PluginIcon({
     );
   if (name === "canva")
     return <Canva className={className} aria-hidden="true" />;
+  if (name === "excalidraw") return <Excalidraw className={className} aria-hidden="true" />;
   const GoogleIcon = (
     {
       "google-drive": GoogleDrive,

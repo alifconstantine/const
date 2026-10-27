@@ -1,0 +1,14 @@
+{
+  "name": "excalidraw",
+  "version": "1.0.0",
+  "description": "Create interactive diagrams in chat, edit them in the sidepanel, and save editable Excalidraw files locally.",
+  "author": { "name": "Excalidraw" },
+  "interface": { "displayName": "Excalidraw", "icon": "excalidraw" },
+  "mcpServers": {
+    "excalidraw": {
+      "transport": "http",
+      "url": "https://mcp.excalidraw.com",
+      "auth": "none"
+    }
+  }
+}

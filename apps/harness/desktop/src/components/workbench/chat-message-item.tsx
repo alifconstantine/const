@@ -9,6 +9,8 @@ import { useTranslation } from "../../lib/i18n";
 import { AssistantResponse } from "../intelligence-ui/assistant-response";
 import { assistantResponseToText } from "../intelligence-ui/protocol";
 import type { IntelligenceUiState } from "../intelligence-ui/schema";
+import { messageApps } from "../../lib/mcp/apps";
+import { McpAppCard } from "../mcp-apps/app-card";
 
 export interface ChatMessage {
   id: string;
@@ -280,6 +282,7 @@ export function ChatMessageItem({
       />
 
       {/* Formatted Markdown Content */}
+      {messageApps(message).map(app => <McpAppCard key={app.id} app={app} onOpenFile={onOpenFilePreview} />)}
       {message.content ? (
         <div className="px-0.5 select-text cursor-text">
           <AssistantResponse
