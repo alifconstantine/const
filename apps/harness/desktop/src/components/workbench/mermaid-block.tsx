@@ -1,4 +1,11 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import mermaid from "mermaid";
 import {
   AlertCircle,
@@ -7,6 +14,7 @@ import {
   Copy,
   Download,
   Eye,
+  Hand,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -80,6 +88,118 @@ function getDiagramTypeLabel(code: string): string {
   }
 }
 
+interface DiagramCanvasProps {
+  svgHtml: string;
+  zoom: number;
+  onZoomChange: (updater: (prev: number) => number) => void;
+  pan: { x: number; y: number };
+  onPanChange: (pan: { x: number; y: number }) => void;
+  onReset: () => void;
+  isFullscreen?: boolean;
+  className?: string;
+}
+
+function DiagramCanvas({
+  svgHtml,
+  zoom,
+  onZoomChange,
+  pan,
+  onPanChange,
+  onReset,
+  isFullscreen = false,
+  className,
+}: DiagramCanvasProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Left-click to drag/pan
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    onPanChange({
+      x: dragStartRef.current.panX + dx,
+      y: dragStartRef.current.panY + dy,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Wheel listener: trackpad pinch / Ctrl+wheel zooms, trackpad swipe pans
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Zoom on pinch or Ctrl/Meta + wheel or in fullscreen
+      if (e.ctrlKey || e.metaKey || isFullscreen) {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.08 : 0.92;
+        onZoomChange((prev) => {
+          const max = isFullscreen ? 4 : 3;
+          const next = Math.min(Math.max(0.3, Number((prev * factor).toFixed(2))), max);
+          return next;
+        });
+      } else {
+        // Trackpad 2-finger pan or horizontal scroll
+        if (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) > 0) {
+          // If shift key or horizontal movement, pan horizontally
+          if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+            e.preventDefault();
+            onPanChange({
+              x: pan.x - e.deltaX,
+              y: pan.y - (e.shiftKey ? 0 : e.deltaY),
+            });
+          }
+        }
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [isFullscreen, onZoomChange, onPanChange, pan]);
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onDoubleClick={onReset}
+      className={cn(
+        "relative w-full overflow-hidden select-none flex items-center justify-center",
+        isDragging ? "cursor-grabbing" : "cursor-grab",
+        className,
+      )}
+      title="Drag to pan • Pinch / Ctrl+Scroll to zoom • Double-click to reset"
+    >
+      <div
+        className="w-full h-full flex items-center justify-center p-4 transition-transform duration-75 ease-out will-change-transform [&_svg]:max-w-none [&_svg]:pointer-events-none"
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: "center center",
+        }}
+        dangerouslySetInnerHTML={{ __html: svgHtml }}
+      />
+    </div>
+  );
+}
+
 interface MermaidBlockProps {
   code: string;
   className?: string;
@@ -97,8 +217,18 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
   const [error, setError] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<"diagram" | "code">("diagram");
+
+  // Inline view state
   const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Fullscreen view state
   const [fullscreenZoom, setFullscreenZoom] = useState<number>(1);
+  const [fullscreenPan, setFullscreenPan] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+
   const [copied, setCopied] = useState<boolean>(false);
   const [expanded, setExpanded] = useState<boolean>(false);
 
@@ -194,6 +324,16 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
     };
   }, [code, isDark, baseId]);
 
+  const handleResetInline = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const handleResetFullscreen = useCallback(() => {
+    setFullscreenZoom(1);
+    setFullscreenPan({ x: 0, y: 0 });
+  }, []);
+
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(code);
@@ -244,6 +384,12 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[#666] dark:text-[#aaa]">
               Mermaid
             </span>
+            {viewMode === "diagram" && !error && svgHtml && (
+              <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-[#888] dark:text-[#777] ml-1">
+                <Hand className="w-3 h-3" />
+                <span>Drag to pan • Pinch / Ctrl+Scroll to zoom</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1">
@@ -284,7 +430,9 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
               <div className="flex items-center gap-0.5 mr-1 text-[#666] dark:text-[#999]">
                 <button
                   type="button"
-                  onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
+                  onClick={() =>
+                    setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))
+                  }
                   className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   title="Zoom Out"
                 >
@@ -292,15 +440,18 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoom(1)}
-                  className="px-1.5 py-0.5 text-[10px] font-mono rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Reset Zoom (100%)"
+                  onClick={handleResetInline}
+                  className="px-1.5 py-0.5 text-[10px] font-mono rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1"
+                  title="Reset Zoom & Pan (100%)"
                 >
-                  {Math.round(zoom * 100)}%
+                  <span>{Math.round(zoom * 100)}%</span>
+                  <RotateCcw className="w-2.5 h-2.5 opacity-60" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoom((z) => Math.min(2.5, Number((z + 0.15).toFixed(2))))}
+                  onClick={() =>
+                    setZoom((z) => Math.min(3, Number((z + 0.15).toFixed(2))))
+                  }
                   className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   title="Zoom In"
                 >
@@ -339,7 +490,11 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             {svgHtml && !error && (
               <button
                 type="button"
-                onClick={() => setExpanded(true)}
+                onClick={() => {
+                  setFullscreenZoom(zoom);
+                  setFullscreenPan(pan);
+                  setExpanded(true);
+                }}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 text-[#666] dark:text-[#aaa] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                 title="Expand to Fullscreen View"
               >
@@ -351,7 +506,10 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
 
         {/* Content Body */}
         {viewMode === "code" ? (
-          <ScrollArea orientation="horizontal" thumbClassName="bg-white/20 hover:bg-white/30">
+          <ScrollArea
+            orientation="horizontal"
+            thumbClassName="bg-white/20 hover:bg-white/30"
+          >
             <pre className="p-3.5 text-[12.5px] leading-relaxed font-mono text-[#262626] dark:text-white select-text bg-[#f4f4f6] dark:bg-[#18181a]">
               <code>{code}</code>
             </pre>
@@ -377,19 +535,15 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             <span>Rendering diagram...</span>
           </div>
         ) : (
-          <ScrollArea
-            orientation="horizontal"
-            className="w-full max-h-[580px] p-4 bg-white dark:bg-[#111113] overflow-auto select-text cursor-default"
-          >
-            <div
-              className="flex items-center justify-center min-w-full transition-transform duration-100 ease-out origin-top-left"
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: "center top",
-              }}
-              dangerouslySetInnerHTML={{ __html: svgHtml || "" }}
-            />
-          </ScrollArea>
+          <DiagramCanvas
+            svgHtml={svgHtml || ""}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            pan={pan}
+            onPanChange={setPan}
+            onReset={handleResetInline}
+            className="h-[440px] bg-white dark:bg-[#111113]"
+          />
         )}
       </div>
 
@@ -398,15 +552,19 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
         <DialogContent
           hideClose
           aria-describedby={undefined}
-          className="flex h-[90vh] max-w-[min(1400px,96vw)] flex-col gap-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#121214] p-0 shadow-2xl dark:text-white ring-0"
+          className="flex h-[92vh] max-w-[min(1500px,96vw)] flex-col gap-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#121214] p-0 shadow-2xl dark:text-white ring-0"
         >
           {/* Modal Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-black/10 dark:border-white/10 bg-[#f8f8fa] dark:bg-[#1a1a1d]">
             <div className="flex items-center gap-2">
               <Workflow className="w-4 h-4 text-[#ff7a00]" />
               <DialogTitle className="text-sm font-semibold">
-                {diagramType} — Fullscreen View
+                {diagramType} — Interactive View
               </DialogTitle>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-[#888] dark:text-[#777] ml-2">
+                <Hand className="w-3.5 h-3.5" />
+                <span>Drag to pan • Pinch / Scroll to zoom • Double click to center</span>
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -414,7 +572,11 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
               <div className="flex items-center gap-1 bg-black/5 dark:bg-white/5 rounded-lg px-2 py-0.5 border border-black/5 dark:border-white/5 text-xs">
                 <button
                   type="button"
-                  onClick={() => setFullscreenZoom((z) => Math.max(0.3, Number((z - 0.2).toFixed(2))))}
+                  onClick={() =>
+                    setFullscreenZoom((z) =>
+                      Math.max(0.3, Number((z - 0.2).toFixed(2))),
+                    )
+                  }
                   className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
                   title="Zoom Out"
                 >
@@ -422,15 +584,20 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFullscreenZoom(1)}
-                  className="px-1.5 py-0.5 text-xs font-mono rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
-                  title="Reset Zoom"
+                  onClick={handleResetFullscreen}
+                  className="px-1.5 py-0.5 text-xs font-mono rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer flex items-center gap-1"
+                  title="Reset Zoom & Pan (100%)"
                 >
-                  {Math.round(fullscreenZoom * 100)}%
+                  <span>{Math.round(fullscreenZoom * 100)}%</span>
+                  <RotateCcw className="w-3 h-3 opacity-60" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFullscreenZoom((z) => Math.min(3.5, Number((z + 0.2).toFixed(2))))}
+                  onClick={() =>
+                    setFullscreenZoom((z) =>
+                      Math.min(4, Number((z + 0.2).toFixed(2))),
+                    )
+                  }
                   className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
                   title="Zoom In"
                 >
@@ -442,6 +609,7 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
                 type="button"
                 onClick={handleDownloadSvg}
                 className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title="Download SVG"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>SVG</span>
@@ -451,6 +619,7 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
                 type="button"
                 onClick={handleCopyCode}
                 className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title="Copy Mermaid code"
               >
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -466,15 +635,17 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             </div>
           </div>
 
-          {/* Modal SVG Body */}
-          <div className="flex-1 w-full overflow-auto p-6 bg-white dark:bg-[#111113] flex items-center justify-center">
-            <div
-              className="transition-transform duration-100 ease-out flex items-center justify-center"
-              style={{
-                transform: `scale(${fullscreenZoom})`,
-                transformOrigin: "center center",
-              }}
-              dangerouslySetInnerHTML={{ __html: svgHtml || "" }}
+          {/* Modal SVG Body with Full Canvas Interaction */}
+          <div className="flex-1 w-full h-[calc(92vh-58px)] overflow-hidden bg-white dark:bg-[#111113]">
+            <DiagramCanvas
+              svgHtml={svgHtml || ""}
+              zoom={fullscreenZoom}
+              onZoomChange={setFullscreenZoom}
+              pan={fullscreenPan}
+              onPanChange={setFullscreenPan}
+              onReset={handleResetFullscreen}
+              isFullscreen={true}
+              className="w-full h-full"
             />
           </div>
         </DialogContent>
