@@ -1,0 +1,189 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "@const/ui/globals.css";
+
+/* Google Symbols & Ligature Fallback */
+@font-face {
+  font-family: 'Google Symbols';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url(/fonts/HhyNU5Ak9u-oMExPeInvcuEmPpEJ.ttf) format('truetype');
+}
+
+.symbol {
+  font-family: 'Google Symbols', sans-serif !important;
+  font-weight: normal;
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Const Design System — Studio Monochrome Theme Calibration */
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.dark, [data-theme="dark"] {
+  --theme-surface-surface: #0a0a0a;
+  --theme-surface-on-surface: #ffffff;
+  --theme-surface-on-surface-variant: #d4d4d4;
+  --theme-surface-surface-container: #171717;
+  --theme-surface-surface-container-high: #202020;
+  --theme-surface-surface-container-higher: #2a2a2a;
+  --theme-surface-surface-container-highest: #383838;
+  --theme-surface-inverse-surface: #ffffff;
+  --theme-surface-inverse-on-surface: #0a0a0a;
+  --theme-surface-inverse-on-surface-variant: #5d5d5d;
+  --theme-outline: #262626;
+  --theme-outline-variant: #1f1f1f;
+  --divider: #262626;
+  --theme-primary-primary: #ffffff;
+  --theme-primary-on-primary: #0a0a0a;
+  --theme-tonal-tonal: #171717;
+  --theme-tonal-on-tonal: #ffffff;
+  --theme-button-states-primary-enabled: #ffffff;
+  --theme-button-states-primary-hovered: #e5e5e5;
+  --theme-button-states-primary-disabled: #171717;
+}
+
+html.dark body, body.dark {
+  background-color: #0a0a0a !important;
+  color: #d4d4d4 !important;
+}
+
+html:not(.dark) body {
+  background-color: #fafafa;
+  color: #111827;
+}
+
+::selection {
+  background-color: rgba(0, 102, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Restrict header styling to site nav only with dark/light calibration */
+header.header,
+header[data-header] {
+  background: rgba(250, 250, 250, 0.88) !important;
+  border-bottom: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark header.header,
+.dark header[data-header] {
+  background: rgba(10, 10, 10, 0.88) !important;
+  border-bottom: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.download-cta-btn {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.dark .download-cta-btn {
+  background-color: #ffffff !important;
+  color: #0a0a0a !important;
+  border: none !important;
+}
+
+.dark .download-cta-btn:hover {
+  background-color: #e5e5e5 !important;
+}
+
+/* Remove all divider/border lines between sections */
+section,
+.welcome-wrapper-outer {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+/* Ensure Navbar header-actions keeps theme toggle and action grouped on the right */
+.header-actions:where(.astro-nen7h5rs) {
+  width: auto !important;
+  justify-content: flex-end !important;
+  display: flex !important;
+}
+
+@media (max-width: 1024px) {
+  .header-actions:where(.astro-nen7h5rs) {
+    display: flex !important;
+  }
+}
+
+/* Landing Main Header */
+.landing-main-header {
+  color: #111827;
+}
+
+.dark .landing-main-header {
+  color: #ffffff !important;
+}
+
+/* WebGL Canvas & Particle Containers Background Sync (#fafafa / #0a0a0a) */
+.welcome-wrapper {
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+.hero-video-wrapper {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+.hero-video-container {
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+}
+
+.welcome-section {
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.welcome-wrapper-outer,
+.welcome-wrapper,
+.hero-video-wrapper,
+.hero-video-container,
+.main-particles-component-section,
+.main-particles-container,
+.main-particles-container canvas {
+  background-color: #fafafa !important;
+}
+
+.dark .welcome-wrapper-outer,
+.dark .welcome-wrapper,
+.dark .hero-video-wrapper,
+.dark .hero-video-container,
+.dark .main-particles-component-section,
+.dark .main-particles-container,
+.dark .main-particles-container canvas {
+  background-color: #0a0a0a !important;
+}
+
+.landing-page,
+.landing-page button,
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page p,
+.landing-page span {
+  font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
+}
