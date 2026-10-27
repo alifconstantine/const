@@ -40,6 +40,8 @@ import { PluginIcon } from "./plugin-icon";
 function mcpErrorKey(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("setup")) return "mcp.errorSetup";
+  if (message.includes("scope")) return "mcp.errorScope";
+  if (message.includes("account")) return "mcp.errorAccount";
   if (message.includes("storage")) return "mcp.errorStorage";
   if (message.includes("busy")) return "mcp.errorBusy";
   if (message.includes("auth")) return "mcp.errorAuth";
@@ -586,9 +588,15 @@ export function McpSettings({
           </div>
           <div className="space-y-1 text-xs text-[#969696]">
             <p>{t(connectionAccountLabel(connection))}</p>
+            {connection.accountEmail && (
+              <p className="break-all">{connection.accountEmail}</p>
+            )}
             <ConnectionTime at={connection.lastConnectedAt} />
             {connection.managedOAuth === "github" && (
               <p>{t("mcp.githubAccessHint")}</p>
+            )}
+            {connection.managedOAuth === "google" && (
+              <p>{t("mcp.googleAccountHint")}</p>
             )}
             {connection.auth === "oauth" &&
               connection.oauthClientRequired &&

@@ -1,6 +1,4 @@
-import {
-  convexAuthNextjsMiddleware,
-} from "@convex-dev/auth/nextjs/server";
+import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 
 // In-memory sliding window rate-limiter for /api/auth requests per IP
@@ -8,7 +6,10 @@ const authRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const MAX_AUTH_REQUESTS_PER_MINUTE = 10;
 const WINDOW_MS = 60 * 1000;
 
-function isRateLimited(ip: string): boolean {
+function isRateLimited(
+  ip: string,
+  maximum = MAX_AUTH_REQUESTS_PER_MINUTE,
+): boolean {
   const now = Date.now();
   const record = authRateLimitMap.get(ip);
 
@@ -24,7 +25,7 @@ function isRateLimited(ip: string): boolean {
     return false;
   }
 
-  if (record.count >= MAX_AUTH_REQUESTS_PER_MINUTE) {
+  if (record.count >= maximum) {
     return true;
   }
 
@@ -39,8 +40,7 @@ const baseMiddleware = convexAuthNextjsMiddleware(async (request) => {
     url.searchParams.get("redirect") ||
     url.searchParams.get("app");
   const codeParam =
-    url.searchParams.get("code") ||
-    url.searchParams.get("token");
+    url.searchParams.get("code") || url.searchParams.get("token");
 
   const isProduction =
     process.env.NODE_ENV === "production" ||
@@ -55,15 +55,33 @@ const baseMiddleware = convexAuthNextjsMiddleware(async (request) => {
 
 export default async function middleware(
   request: NextRequest,
-  event: NextFetchEvent
+  event: NextFetchEvent,
 ) {
   const { pathname } = request.nextUrl;
 
   // Connector OAuth has its own state/cookie/PKCE flow; Const sign-in must not consume its code.
-  if (pathname.startsWith("/oauth/github/")) {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "127.0.0.1";
-    if ((request.method === "POST" || pathname.endsWith("/start")) && isRateLimited(ip)) {
-      return NextResponse.json({error:"connection"}, {status:429,headers:{"Retry-After":"60","Cache-Control":"no-store"}});
+  if (pathname.startsWith("/mcp/google/")) return NextResponse.next();
+  if (
+    pathname.startsWith("/oauth/github/") ||
+    pathname.startsWith("/oauth/google/")
+  ) {
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "127.0.0.1";
+    // Seven incremental Google connections need fourteen start/exchange requests.
+    // Keep connector traffic separate from the stricter Const sign-in limit.
+    if (
+      (request.method === "POST" || pathname.endsWith("/start")) &&
+      isRateLimited("connector:" + ip, 60)
+    ) {
+      return NextResponse.json(
+        { error: "connection" },
+        {
+          status: 429,
+          headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+        },
+      );
     }
     return NextResponse.next();
   }
@@ -81,7 +99,7 @@ export default async function middleware(
           error:
             "Too many authentication attempts. Please wait a minute before trying again.",
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
   }

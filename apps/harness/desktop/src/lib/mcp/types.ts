@@ -40,14 +40,23 @@ export interface McpConnectionView extends McpConnection {
   apiKeyUrl?: string;
   oauthUrl?: string;
   oauthClientRequired?: boolean;
-  managedOAuth?: "github";
+  managedOAuth?: "github" | "google";
+  accountEmail?: string;
   setupUrl?: string;
   lastConnectedAt?: string;
   status: McpStatus;
   tools: McpToolInfo[];
   isEffective: boolean;
   hasCredentials: boolean;
-  error?: "connection" | "auth" | "storage" | "busy" | "invalid" | "setup";
+  error?:
+    | "connection"
+    | "auth"
+    | "storage"
+    | "busy"
+    | "invalid"
+    | "setup"
+    | "scope"
+    | "account";
 }
 export interface McpSaveInput extends Partial<McpConnection> {
   name: string;
@@ -65,7 +74,11 @@ export interface McpBridge {
   remove(id: string, workspacePath?: string): Promise<void>;
   override(id: string, workspacePath: string): Promise<void>;
   connect(id: string, workspacePath?: string): Promise<void>;
-  authenticate(id: string, workspacePath?: string, language?: string): Promise<void>;
+  authenticate(
+    id: string,
+    workspacePath?: string,
+    language?: string,
+  ): Promise<void>;
   disconnect(id: string, workspacePath?: string): Promise<void>;
   onChanged(callback: () => void): () => void;
 }

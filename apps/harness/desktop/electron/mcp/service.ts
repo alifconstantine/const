@@ -31,6 +31,7 @@ import type {
 import { McpStore, validateEndpoint, validWorkspace } from "./store";
 
 import { GitHubOAuthClient, isManagedGitHub } from "./github-oauth";
+import { GoogleOAuthClient, managedGoogleApp } from "./google-oauth";
 import { respondOAuth } from "./oauth-page";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
@@ -67,6 +68,7 @@ export class McpService {
   private retryAfter = new Map<string, number>();
   private login?: Login;
   private readonly github: GitHubOAuthClient;
+  private readonly google: GoogleOAuthClient;
   constructor(
     readonly store: McpStore,
     private readonly changed: () => void,
@@ -75,8 +77,10 @@ export class McpService {
       workspace,
     ) => resolveSkillRegistry(workspace).plugins,
     github?: GitHubOAuthClient,
+    google?: GoogleOAuthClient,
   ) {
     this.github = github ?? new GitHubOAuthClient(store);
+    this.google = google ?? new GoogleOAuthClient(store);
   }
 
   private configurations(workspace?: string): McpConnection[] {
@@ -164,10 +168,15 @@ export class McpService {
         authOptions: definition?.authOptions,
         apiKeyUrl: definition?.apiKeyUrl,
         oauthUrl: definition?.oauthUrl,
-        oauthClientRequired: isManagedGitHub(record)
-          ? false
-          : definition?.oauthClientRequired,
-        managedOAuth: isManagedGitHub(record) ? "github" : undefined,
+        oauthClientRequired:
+          isManagedGitHub(record) || managedGoogleApp(record)
+            ? false
+            : definition?.oauthClientRequired,
+        managedOAuth: isManagedGitHub(record)
+          ? "github"
+          : managedGoogleApp(record)
+            ? "google"
+            : undefined,
         setupUrl:
           plugin?.name === "github" && !isManagedGitHub(record)
             ? undefined
@@ -182,10 +191,17 @@ export class McpService {
       const isEffective = !seen.has(record.key);
       seen.add(record.key);
       let hasCredentials = false;
+      let accountEmail: string | undefined;
       try {
         if (this.store.isTrusted(record)) {
           const secret = this.store.secrets(record.id);
-          hasCredentials = !!(secret.apiKey || secret.tokens);
+          const google = managedGoogleApp(record)
+            ? this.google.credentials(record)
+            : undefined;
+          hasCredentials = managedGoogleApp(record)
+            ? !!google
+            : !!(secret.apiKey || secret.tokens);
+          accountEmail = google?.googleOAuth.email;
         }
       } catch {
         return {
@@ -202,13 +218,18 @@ export class McpService {
         ...record,
         isEffective,
         hasCredentials,
+        accountEmail,
         lastConnectedAt: this.store.lastConnectedAt(record),
         status: !record.enabled
           ? "disabled"
-          : (state?.status ??
-            (record.auth !== "none" && !hasCredentials
-              ? "needs_auth"
-              : "disconnected")),
+          : managedGoogleApp(record) &&
+              !hasCredentials &&
+              state?.status !== "connecting"
+            ? "needs_auth"
+            : (state?.status ??
+              (record.auth !== "none" && !hasCredentials
+                ? "needs_auth"
+                : "disconnected")),
         error: state?.error,
         tools: this.live.get(record.id)?.tools ?? [],
       };
@@ -221,7 +242,19 @@ export class McpService {
     return record;
   }
   async save(input: McpSaveInput) {
-    if (input.id) await this.disconnect(input.id);
+    if (input.id) {
+      const previous = this.store.get(input.id, input.workspacePath);
+      await this.disconnect(input.id);
+      if (
+        managedGoogleApp(previous) &&
+        (previous.url !== input.url ||
+          previous.transport !== input.transport ||
+          previous.auth !== input.auth ||
+          previous.clientId !== input.clientId ||
+          previous.scopes !== input.scopes)
+      )
+        this.google.unlink(previous);
+    }
     // Custom callers cannot impersonate a plugin or mint a plugin-managed key.
     const { key: _key, pluginId: _plugin, pluginName: _name, ...safe } = input;
     this.store.save(safe);
@@ -242,6 +275,7 @@ export class McpService {
     )
       throw new Error("invalid");
     await this.disconnect(id);
+    if (managedGoogleApp(record)) this.google.unlink(record);
     this.store.remove(id, workspace);
     this.states.delete(id);
     this.changed();
@@ -272,6 +306,7 @@ export class McpService {
   async disconnectAccount(id: string, workspace?: string) {
     const record = this.store.get(id, workspace);
     await this.disconnect(id);
+    if (managedGoogleApp(record)) this.google.unlink(record);
     const {
       tokens: _tokens,
       apiKey: _apiKey,
@@ -373,7 +408,15 @@ export class McpService {
     if (record.transport !== "http" || record.auth !== "oauth")
       throw new Error("invalid");
     const managedGitHub = isManagedGitHub(record);
-    if (!managedGitHub && record.oauthClientRequired && !record.clientId)
+    const managedGoogle = managedGoogleApp(record);
+    const reuseGoogle =
+      managedGoogle && this.states.get(id)?.status !== "needs_auth";
+    if (
+      !managedGitHub &&
+      !managedGoogle &&
+      record.oauthClientRequired &&
+      !record.clientId
+    )
       throw new Error("auth");
     if (this.login) throw new Error("busy");
     await this.disconnect(id);
@@ -381,6 +424,10 @@ export class McpService {
     if (!this.store.isTrusted(record)) throw new Error("invalid");
     // Verify the OS vault before registering a client or opening the user's browser.
     this.store.writeSecrets(id, this.store.secrets(id));
+    if (reuseGoogle && this.google.reuse(record)) {
+      await this.connect(id, workspace);
+      return;
+    }
     const state = randomBytes(32).toString("hex");
     const controller = new AbortController();
     let resolveCode!: (code: string) => void;
@@ -408,7 +455,7 @@ export class McpService {
         respondOAuth(response, false, language);
         return;
       }
-      if (managedGitHub) {
+      if (managedGitHub || managedGoogle) {
         githubTicket = url.searchParams.get("ticket") ?? "";
         if (!githubTicket || githubTicket.length > 4096) {
           rejectCode(new Error("auth"));
@@ -472,15 +519,24 @@ export class McpService {
         server.once("error", reject);
         server.listen(24139, "127.0.0.1", resolve);
       });
-      if (managedGitHub) {
-        const authorize = await this.github.authorizationUrl(
-          state,
-          GitHubOAuthClient.challenge(githubVerifier),
-          language,
-          controller.signal,
-        );
+      if (managedGitHub || managedGoogle) {
+        const authorize = managedGoogle
+          ? await this.google.authorizationUrl(
+              record,
+              state,
+              GitHubOAuthClient.challenge(githubVerifier),
+              language,
+              controller.signal,
+            )
+          : await this.github.authorizationUrl(
+              state,
+              GitHubOAuthClient.challenge(githubVerifier),
+              language,
+              controller.signal,
+            );
         await this.openExternal(authorize);
-        await this.github.exchange(
+        const broker = managedGoogle ? this.google : this.github;
+        await broker.exchange(
           record,
           await code,
           githubTicket,
@@ -521,7 +577,10 @@ export class McpService {
       if (callbackResponse && !callbackResponse.writableEnded)
         respondOAuth(callbackResponse, false, language);
       const reason =
-        error instanceof Error && error.message === "setup" ? "setup" : "auth";
+        error instanceof Error &&
+        ["setup", "scope", "account", "connection"].includes(error.message)
+          ? (error.message as "setup" | "scope" | "account" | "connection")
+          : "auth";
       this.states.set(id, { status: "needs_auth", error: reason });
       throw new Error(reason);
     } finally {
@@ -575,7 +634,9 @@ export class McpService {
         record.transport === "http"
           ? new StreamableHTTPClientTransport(validateEndpoint(record.url!), {
               authProvider:
-                record.auth === "oauth" && !isManagedGitHub(record)
+                record.auth === "oauth" &&
+                !isManagedGitHub(record) &&
+                !managedGoogleApp(record)
                   ? this.provider(record, undefined, undefined, signal)
                   : undefined,
               fetch: (input, init) => {
@@ -587,9 +648,17 @@ export class McpService {
                     ...(init?.signal ? [init.signal] : []),
                   ]),
                 };
-                return isManagedGitHub(record)
-                  ? this.github.fetch(record, input, bounded).catch((error) => {
-                      if (error instanceof Error && error.message === "auth") {
+                const broker = managedGoogleApp(record)
+                  ? this.google
+                  : isManagedGitHub(record)
+                    ? this.github
+                    : undefined;
+                return broker
+                  ? broker.fetch(record, input, bounded).catch((error) => {
+                      if (
+                        error instanceof Error &&
+                        ["auth", "scope", "account"].includes(error.message)
+                      ) {
                         const active = this.live.get(record.id);
                         if (active) {
                           this.live.delete(record.id);
@@ -599,7 +668,7 @@ export class McpService {
                         }
                         this.states.set(record.id, {
                           status: "needs_auth",
-                          error: "auth",
+                          error: error.message as "auth" | "scope" | "account",
                         });
                         this.retryAfter.set(record.id, Date.now() + 30_000);
                         this.changed();
@@ -655,14 +724,23 @@ export class McpService {
       await client.close().catch(() => {});
       const auth =
         error instanceof UnauthorizedError ||
-        (error instanceof Error && error.message === "auth");
+        (error instanceof Error &&
+          ["auth", "scope", "account"].includes(error.message));
+      const reason =
+        auth &&
+        error instanceof Error &&
+        ["scope", "account"].includes(error.message)
+          ? (error.message as "scope" | "account")
+          : auth
+            ? "auth"
+            : "connection";
       this.retryAfter.set(record.id, Date.now() + 30_000);
       this.states.set(record.id, {
         status: auth ? "needs_auth" : "error",
-        error: auth ? "auth" : "connection",
+        error: reason,
       });
       this.changed();
-      throw new Error(auth ? "auth" : "connection");
+      throw new Error(reason);
     }
   }
   private async readTools(

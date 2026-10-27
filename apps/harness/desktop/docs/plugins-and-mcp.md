@@ -52,7 +52,6 @@ Both hosted provider endpoints were probed without credentials and returned HTTP
 
 The focused verification set passes 81 agent/registry/approval/native-tool tests, 10 MCP/default-plugin tests, and 7 installer tests. Desktop typecheck and production build pass. Browser fixture checks covered the plugin listing and Const logo, Context7 auth-mode switching, custom connection creation, tool preview, and English/Indonesian rendering. Source dictionaries also include Japanese, Chinese, and Spanish.
 
-
 ## Session 3 and OAuth completion (2026-10-27)
 
 Rebased onto the upstream marketplace/detail-page update. Plugin account controls live in the detail page's MCP tab. Listing cards show authentication requirements, effective connection state, and the most recent successful connection time. Settings > Plugins uses the same detail page as Marketplace. Global/workspace installation scope is selectable; workspace MCP overrides remain available in Settings > MCP Servers.
@@ -70,7 +69,6 @@ The initial Sesi 3 packages included workflow skills; version 1.0.1 below remove
 
 Focused verification now includes 13 MCP tests (including success/failure callback responses, PKCE, cancellation, secret boundaries, and local-only history), plus the 81 agent tests and 7 installer tests. See google-workspace-oauth-research.md for the prerequisite decision before sessions 4 and 5.
 
-
 ## Simpler account setup (2026-10-27)
 
 GitHub and Canva 1.0.1 are MCP-only plugins. There is no skill to fill in or maintain. MCP-only detail pages open directly on the MCP tab; listing cards show an MCP count instead of zero included skills. OAuth connections without credentials show Connect account as the primary action and do not show a redundant unauthenticated Test connection action.
@@ -84,3 +82,7 @@ GitHub's PAT path remains optional. Managed OAuth using the Const-owned app is n
 Google's developer registration is likewise a publisher task, not end-user onboarding. The target UI is Connect Google followed by browser consent; ordinary users do not enter .env values or create Cloud projects. Keep manual credentials in custom MCP/advanced settings. Google-specific code remains unimplemented. The later managed GitHub OAuth update adds the Accounts callback, token exchange, and refresh endpoints; see github-managed-oauth.md.
 
 Verification: 16 MCP/migration tests, existing bundled-registry checks, and desktop typecheck. Real provider account authorization remains pending.
+
+## Seven managed Google apps (2026-10-27)
+
+Google Drive, Docs, Sheets, Slides, Gmail, Calendar and Classroom are now optional MCP-only plugins with packaged logos and localized descriptions. Each plugin has Connect account in its detail page. Accounts provides the confidential Web OAuth callback/exchange/refresh and seven distinct REST-to-MCP endpoints, with a shared encrypted Google account per global/workspace scope and incremental app permissions. This supersedes the earlier unimplemented Google notes. See [Google deployment, scopes and limitations](google-managed-oauth.md).

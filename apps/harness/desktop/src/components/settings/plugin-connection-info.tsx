@@ -12,6 +12,13 @@ export const pluginDescriptionKeys: Record<string, string> = {
   tinyfish: "mcp.tinyfishDescription",
   github: "mcp.githubDescription",
   canva: "mcp.canvaDescription",
+  "google-drive": "mcp.googleDriveDescription",
+  "google-docs": "mcp.googleDocsDescription",
+  "google-sheets": "mcp.googleSheetsDescription",
+  "google-slides": "mcp.googleSlidesDescription",
+  gmail: "mcp.gmailDescription",
+  "google-calendar": "mcp.googleCalendarDescription",
+  "google-classroom": "mcp.googleClassroomDescription",
   hyperframes: "marketplace.hyperframesDescription",
 };
 

@@ -43,6 +43,14 @@ export interface McpSecrets {
   env?: Record<string, string>;
   tokens?: OAuthTokens;
   githubOAuth?: { grant?: string; expiresAt?: number };
+  googleAccountId?: string;
+  googleOAuth?: {
+    grant: string;
+    expiresAt: number;
+    subject: string;
+    email?: string;
+    scopes: string[];
+  };
   clientInformation?: OAuthClientInformationMixed;
 }
 export interface SecretCodec {

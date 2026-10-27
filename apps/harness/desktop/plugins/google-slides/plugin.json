@@ -1,0 +1,20 @@
+{
+  "interface": {
+    "displayName": "Google Slides",
+    "icon": "google-slides"
+  },
+  "description": "Read, create, and edit Google presentations.",
+  "name": "google-slides",
+  "version": "1.0.0",
+  "mcpServers": {
+    "slides": {
+      "auth": "oauth",
+      "transport": "http",
+      "oauthClientRequired": false,
+      "url": "https://accounts.const.web.id/mcp/google/slides"
+    }
+  },
+  "author": {
+    "name": "Const"
+  }
+}

@@ -34,7 +34,7 @@ type Ticket = {
   language?: string;
   tokenHash?: string;
 };
-class OAuthFailure extends Error {
+export class OAuthFailure extends Error {
   constructor(
     readonly code: string,
     readonly status = 400,
@@ -42,7 +42,7 @@ class OAuthFailure extends Error {
     super(code);
   }
 }
-function canonicalOrigin(value: string) {
+export function canonicalOrigin(value: string) {
   const url = new URL(value);
   if (
     url.username ||
@@ -132,7 +132,7 @@ function failurePage(language: string, status: number, incomplete = false) {
 function json(value: unknown, status = 200) {
   return Response.json(value, { status, headers });
 }
-async function body(request: Request): Promise<Record<string, unknown>> {
+export async function body(request: Request): Promise<Record<string, unknown>> {
   if (
     request.headers.get("content-type")?.split(";")[0] !== "application/json" ||
     !request.body
@@ -161,7 +161,7 @@ async function body(request: Request): Promise<Record<string, unknown>> {
     throw new OAuthFailure("invalid");
   }
 }
-function field(value: unknown, min = 1, max = 16384): string {
+export function field(value: unknown, min = 1, max = 16384): string {
   if (
     typeof value !== "string" ||
     value.length < min ||

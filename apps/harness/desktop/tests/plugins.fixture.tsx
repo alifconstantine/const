@@ -49,7 +49,17 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     managedOAuth:
       plugin.name === "github" && server.auth === "oauth"
         ? "github"
-        : undefined,
+        : [
+              "google-drive",
+              "google-docs",
+              "google-sheets",
+              "google-slides",
+              "gmail",
+              "google-calendar",
+              "google-classroom",
+            ].includes(plugin.name)
+          ? "google"
+          : undefined,
     setupUrl: server.setupUrl,
     enabled: true,
     timeoutMs: 30000,

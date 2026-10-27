@@ -1,6 +1,6 @@
 # Google Workspace: prerequisites before sessions 4 and 5
 
-Researched 2026-10-27. This is a decision record; Google plugins and a hosted OAuth service have not been implemented.
+Researched 2026-10-27. This records the initial alternatives. The implemented choice is now a Const REST-to-MCP adapter with a confidential Web OAuth client on Accounts, shared by seven Google plugins. See [the implementation and deployment guide](google-managed-oauth.md) for the current behavior and exact scopes; the alternatives below are historical research.
 
 ## Recommendation for Const
 

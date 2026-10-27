@@ -1,0 +1,20 @@
+{
+  "interface": {
+    "displayName": "Google Classroom",
+    "icon": "google-classroom"
+  },
+  "description": "Work with courses, assignments, submissions, and announcements.",
+  "name": "google-classroom",
+  "version": "1.0.0",
+  "mcpServers": {
+    "classroom": {
+      "auth": "oauth",
+      "transport": "http",
+      "oauthClientRequired": false,
+      "url": "https://accounts.const.web.id/mcp/google/classroom"
+    }
+  },
+  "author": {
+    "name": "Const"
+  }
+}

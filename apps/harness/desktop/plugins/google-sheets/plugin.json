@@ -1,0 +1,20 @@
+{
+  "interface": {
+    "displayName": "Google Sheets",
+    "icon": "google-sheets"
+  },
+  "description": "Read and edit spreadsheets, formulas, and formatting.",
+  "name": "google-sheets",
+  "version": "1.0.0",
+  "mcpServers": {
+    "sheets": {
+      "auth": "oauth",
+      "transport": "http",
+      "oauthClientRequired": false,
+      "url": "https://accounts.const.web.id/mcp/google/sheets"
+    }
+  },
+  "author": {
+    "name": "Const"
+  }
+}
