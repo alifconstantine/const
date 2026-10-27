@@ -18,6 +18,7 @@ interface MarkdownContentProps {
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
   onOpenBrowser?: (url: string) => void;
   variant?: "default" | "user";
+  isStreaming?: boolean;
 }
 
 export function MarkdownContent({
@@ -27,6 +28,7 @@ export function MarkdownContent({
   onOpenTrajectory,
   onOpenBrowser,
   variant = "default",
+  isStreaming = false,
 }: MarkdownContentProps) {
   if (!content) return null;
 
@@ -192,7 +194,7 @@ export function MarkdownContent({
       )}
     >
       {tokens.map((token, index) => (
-        <TokenRenderer key={index} token={token} variant={variant} />
+        <TokenRenderer key={index} token={token} variant={variant} isStreaming={isStreaming} />
       ))}
     </div>
   );
@@ -202,10 +204,12 @@ function TokenRenderer({
   token,
   isNested,
   variant = "default",
+  isStreaming = false,
 }: {
   token: Token;
   isNested?: boolean;
   variant?: "default" | "user";
+  isStreaming?: boolean;
 }) {
   switch (token.type) {
     case "heading": {
@@ -257,7 +261,7 @@ function TokenRenderer({
       const code = token as Tokens.Code;
       const lang = (code.lang || "text").toLowerCase().trim().split(/[\s:{]/)[0] || "";
       if (lang === "mermaid") {
-        return <MermaidBlock code={code.text} />;
+        return <MermaidBlock code={code.text} isStreaming={isStreaming} />;
       }
       return <CodeBlock code={code.text} language={code.lang || "text"} />;
     }
@@ -274,7 +278,7 @@ function TokenRenderer({
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0 cursor-text select-text">
-                  <ListItemContent item={item} />
+                  <ListItemContent item={item} isStreaming={isStreaming} />
                 </div>
               </li>
             ))}
@@ -301,7 +305,7 @@ function TokenRenderer({
                 </span>
               )}
               <div className="flex-1 min-w-0 cursor-text select-text">
-                <ListItemContent item={item} />
+                <ListItemContent item={item} isStreaming={isStreaming} />
               </div>
             </li>
           ))}
@@ -337,7 +341,13 @@ function TokenRenderer({
   }
 }
 
-function ListItemContent({ item }: { item: Tokens.ListItem }) {
+function ListItemContent({
+  item,
+  isStreaming = false,
+}: {
+  item: Tokens.ListItem;
+  isStreaming?: boolean;
+}) {
   if (!item.tokens || item.tokens.length === 0) {
     return <InlineRenderer text={item.text} />;
   }
@@ -367,11 +377,11 @@ function ListItemContent({ item }: { item: Tokens.ListItem }) {
         if (childToken.type === "list") {
           return (
             <div key={cIdx} className="mt-1 cursor-text select-text">
-              <TokenRenderer token={childToken} isNested />
+              <TokenRenderer token={childToken} isNested isStreaming={isStreaming} />
             </div>
           );
         }
-        return <TokenRenderer key={cIdx} token={childToken} isNested />;
+        return <TokenRenderer key={cIdx} token={childToken} isNested isStreaming={isStreaming} />;
       })}
     </div>
   );

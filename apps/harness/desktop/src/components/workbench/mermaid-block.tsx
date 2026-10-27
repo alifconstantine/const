@@ -97,6 +97,7 @@ interface DiagramCanvasProps {
   onReset: () => void;
   isFullscreen?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 function DiagramCanvas({
@@ -108,13 +109,14 @@ function DiagramCanvas({
   onReset,
   isFullscreen = false,
   className,
+  style,
 }: DiagramCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Left-click to drag/pan
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only drag with left mouse button / single touch
     if (e.button !== 0) return;
     setIsDragging(true);
     dragStartRef.current = {
@@ -123,20 +125,34 @@ function DiagramCanvas({
       panX: pan.x,
       panY: pan.y,
     };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
     onPanChange({
-      x: dragStartRef.current.panX + dx,
-      y: dragStartRef.current.panY + dy,
+      x: Math.round(dragStartRef.current.panX + dx),
+      y: Math.round(dragStartRef.current.panY + dy),
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      setIsDragging(false);
+      try {
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // ignore
+      }
+    }
   };
 
   // Wheel listener: trackpad pinch / Ctrl+wheel zooms, trackpad swipe pans
@@ -145,19 +161,19 @@ function DiagramCanvas({
     if (!el) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Zoom on pinch or Ctrl/Meta + wheel or in fullscreen
+      // Zoom on pinch (e.ctrlKey in browsers) or Ctrl/Meta + wheel or in fullscreen
       if (e.ctrlKey || e.metaKey || isFullscreen) {
         e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.08 : 0.92;
+        const factor = e.deltaY < 0 ? 1.06 : 0.94;
         onZoomChange((prev) => {
           const max = isFullscreen ? 4 : 3;
-          const next = Math.min(Math.max(0.3, Number((prev * factor).toFixed(2))), max);
+          const min = 0.25;
+          const next = Math.min(Math.max(min, Number((prev * factor).toFixed(2))), max);
           return next;
         });
       } else {
         // Trackpad 2-finger pan or horizontal scroll
         if (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) > 0) {
-          // If shift key or horizontal movement, pan horizontally
           if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
             e.preventDefault();
             onPanChange({
@@ -176,22 +192,29 @@ function DiagramCanvas({
   return (
     <div
       ref={containerRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onDoubleClick={onReset}
+      style={style}
       className={cn(
-        "relative w-full overflow-hidden select-none flex items-center justify-center",
+        "relative w-full overflow-hidden select-none flex items-center justify-center touch-none",
         isDragging ? "cursor-grabbing" : "cursor-grab",
         className,
       )}
       title="Drag to pan • Pinch / Ctrl+Scroll to zoom • Double-click to reset"
     >
       <div
-        className="w-full h-full flex items-center justify-center p-4 transition-transform duration-75 ease-out will-change-transform [&_svg]:max-w-none [&_svg]:pointer-events-none"
+        className={cn(
+          "w-full h-full flex items-center justify-center p-6 will-change-transform",
+          // Eliminates drag latency: disable transition while actively dragging for 1:1 instantaneous response
+          isDragging ? "transition-none" : "transition-transform duration-150 ease-out",
+          // Ensure SVG fits completely inside bounds without clipping or overflow on initial render
+          "[&_svg]:!max-w-full [&_svg]:!max-h-full [&_svg]:!w-auto [&_svg]:!h-auto [&_svg]:block [&_svg]:pointer-events-none [&_svg]:select-none",
+        )}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
           transformOrigin: "center center",
         }}
         dangerouslySetInnerHTML={{ __html: svgHtml }}
@@ -203,9 +226,14 @@ function DiagramCanvas({
 interface MermaidBlockProps {
   code: string;
   className?: string;
+  isStreaming?: boolean;
 }
 
-export function MermaidBlock({ code, className }: MermaidBlockProps) {
+export function MermaidBlock({
+  code,
+  className,
+  isStreaming = false,
+}: MermaidBlockProps) {
   const { t } = useTranslation();
   const reactId = useId().replace(/[:]/g, "-");
   const baseId = useMemo(
@@ -263,9 +291,20 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
     let cancelled = false;
     const renderId = `${baseId}-${Date.now()}`;
 
-    const renderDiagram = async () => {
+    // When streaming, debounce slightly so we don't spam mermaid.render on every single token.
+    // When stream completes (!isStreaming), render immediately (0ms).
+    const debounceMs = isStreaming ? 250 : 0;
+    const timer = setTimeout(async () => {
+      const trimmed = code.trim();
+      if (!trimmed) {
+        if (!cancelled) {
+          setIsRendering(false);
+          setSvgHtml(null);
+        }
+        return;
+      }
+
       setIsRendering(true);
-      setError(null);
 
       try {
         mermaid.initialize({
@@ -297,7 +336,7 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
               },
         });
 
-        const { svg } = await mermaid.render(renderId, code.trim());
+        const { svg } = await mermaid.render(renderId, trimmed);
         if (!cancelled) {
           setSvgHtml(svg);
           setError(null);
@@ -305,24 +344,48 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
         }
       } catch (err: any) {
         if (!cancelled) {
+          // If streaming, suppress error until generation is finalized
           setError(err?.message || "Failed to render diagram syntax");
           setIsRendering(false);
         }
       } finally {
-        // Clean up temporary DOM artifacts that Mermaid occasionally leaves behind
+        // Clean up temporary DOM artifacts left by Mermaid
         const el = document.getElementById(renderId);
         if (el) el.remove();
         const dEl = document.getElementById(`d${renderId}`);
         if (dEl) dEl.remove();
       }
-    };
-
-    renderDiagram();
+    }, debounceMs);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [code, isDark, baseId]);
+  }, [code, isDark, baseId, isStreaming]);
+
+  // Parse viewBox from svgHtml to compute adaptive container height
+  const viewBox = useMemo(() => {
+    if (!svgHtml) return null;
+    const match = svgHtml.match(
+      /viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i,
+    );
+    if (match && match[3] && match[4]) {
+      const w = parseFloat(match[3]);
+      const h = parseFloat(match[4]);
+      if (!Number.isNaN(w) && !Number.isNaN(h) && w > 0 && h > 0) {
+        return { w, h };
+      }
+    }
+    return null;
+  }, [svgHtml]);
+
+  const dynamicHeight = useMemo(() => {
+    if (!viewBox) return 380;
+    // Assume average chat column content width is ~680px
+    const estimated = Math.round((680 / viewBox.w) * viewBox.h) + 48;
+    // Clamp between 260px (compact) and 560px (comfortable inline ceiling)
+    return Math.min(Math.max(estimated, 260), 560);
+  }, [viewBox]);
 
   const handleResetInline = useCallback(() => {
     setZoom(1);
@@ -366,6 +429,11 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
 
   const diagramType = useMemo(() => getDiagramTypeLabel(code), [code]);
 
+  // If streaming and diagram isn't valid yet, show the streaming loading card instead of syntax error!
+  const isStreamingPlaceholder = isStreaming && !svgHtml;
+  // Only show the syntax error when streaming is done AND there's an error AND no SVG
+  const shouldShowError = !isStreaming && Boolean(error) && !svgHtml;
+
   return (
     <>
       <div
@@ -384,6 +452,12 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-[#666] dark:text-[#aaa]">
               Mermaid
             </span>
+            {isStreaming && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ff7a00] text-[10px] font-medium animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff7a00]" />
+                Streaming
+              </span>
+            )}
             {viewMode === "diagram" && !error && svgHtml && (
               <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-[#888] dark:text-[#777] ml-1">
                 <Hand className="w-3 h-3" />
@@ -425,13 +499,13 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
               </button>
             </div>
 
-            {/* Zoom Controls (only in diagram view) */}
+            {/* Zoom Controls (only in diagram view with active SVG) */}
             {viewMode === "diagram" && !error && svgHtml && (
               <div className="flex items-center gap-0.5 mr-1 text-[#666] dark:text-[#999]">
                 <button
                   type="button"
                   onClick={() =>
-                    setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))
+                    setZoom((z) => Math.max(0.25, Number((z - 0.15).toFixed(2))))
                   }
                   className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   title="Zoom Out"
@@ -514,8 +588,28 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
               <code>{code}</code>
             </pre>
           </ScrollArea>
-        ) : error ? (
-          <div className="p-4 space-y-3">
+        ) : isStreamingPlaceholder ? (
+          <div className="p-8 flex flex-col items-center justify-center gap-3 text-xs bg-white dark:bg-[#111113] min-h-[220px]">
+            <div className="relative flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-[#ff7a00]/10 dark:bg-[#ff7a00]/20 flex items-center justify-center">
+                <Workflow className="w-5 h-5 text-[#ff7a00] animate-pulse" />
+              </div>
+              <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff7a00] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#ff7a00]" />
+              </span>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-xs font-medium text-[#262626] dark:text-[#f0f0f0]">
+                Menyiapkan visualisasi {diagramType}...
+              </p>
+              <p className="text-[11px] text-[#888888] dark:text-[#888888]">
+                Diagram sedang di-stream oleh AI
+              </p>
+            </div>
+          </div>
+        ) : shouldShowError ? (
+          <div className="p-4 space-y-3 bg-white dark:bg-[#111113]">
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div className="space-y-1 min-w-0">
@@ -530,9 +624,9 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             </pre>
           </div>
         ) : isRendering && !svgHtml ? (
-          <div className="p-8 flex flex-col items-center justify-center gap-2 text-xs text-[#888]">
+          <div className="p-8 flex flex-col items-center justify-center gap-2 text-xs text-[#888] bg-white dark:bg-[#111113] min-h-[220px]">
             <Workflow className="w-6 h-6 animate-pulse text-[#ff7a00]" />
-            <span>Rendering diagram...</span>
+            <span>Rendering {diagramType}...</span>
           </div>
         ) : (
           <DiagramCanvas
@@ -542,7 +636,8 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
             pan={pan}
             onPanChange={setPan}
             onReset={handleResetInline}
-            className="h-[440px] bg-white dark:bg-[#111113]"
+            style={{ height: `${dynamicHeight}px` }}
+            className="bg-white dark:bg-[#111113]"
           />
         )}
       </div>
@@ -574,7 +669,7 @@ export function MermaidBlock({ code, className }: MermaidBlockProps) {
                   type="button"
                   onClick={() =>
                     setFullscreenZoom((z) =>
-                      Math.max(0.3, Number((z - 0.2).toFixed(2))),
+                      Math.max(0.25, Number((z - 0.2).toFixed(2))),
                     )
                   }
                   className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"

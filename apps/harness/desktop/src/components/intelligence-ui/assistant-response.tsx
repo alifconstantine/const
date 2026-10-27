@@ -59,6 +59,7 @@ export function AssistantResponse({
           <MarkdownContent
             key={part.id}
             content={part.content}
+            isStreaming={isStreaming}
             onOpenFilePreview={onOpenFilePreview}
             onOpenTrajectory={onOpenTrajectory}
             onOpenBrowser={onOpenBrowser}
