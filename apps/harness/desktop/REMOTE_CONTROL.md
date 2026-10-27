@@ -65,4 +65,5 @@ internet or change the QR to an external `/r/...` route before the relay exists.
 pnpm --filter @const/harness-desktop test:remote
 pnpm --filter @const/harness-desktop check-types
 pnpm --filter @const/harness-desktop build
+pnpm --filter @const/harness-desktop test:startup
 ```

@@ -13,6 +13,7 @@
     "test:models": "tsx --test src/lib/models.test.ts",
     "test:markdown": "tsx --test src/components/workbench/markdown-links.test.ts",
     "test:remote": "tsx --test electron/remote-daemon.test.ts",
+    "test:startup": "node scripts/test-startup.cjs",
     "test:telemetry": "tsx --test src/lib/chat-telemetry.test.ts electron/chat-telemetry.test.ts",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "node scripts/test-browser.cjs",

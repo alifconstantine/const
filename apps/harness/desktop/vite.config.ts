@@ -16,6 +16,9 @@ export default defineConfig({
         vite: {
           build: {
             outDir: "dist-electron",
+            // Keep ws's optional native addons inside its guarded Node require().
+            // Bundling them creates eager Vite error stubs and crashes Electron.
+            rollupOptions: { external: ["ws"] },
           },
           resolve: {
             alias: [
