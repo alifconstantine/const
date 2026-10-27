@@ -5040,7 +5040,9 @@ export default function App() {
     toast.success(t("toast.signedIn"));
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try { await window.electron?.remote?.stopSession(); }
+    catch { toast.error(t("remoteControl.actionError")); return; }
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
     localStorage.removeItem("const_custom_user_profile");
@@ -5050,6 +5052,8 @@ export default function App() {
   };
 
   const handleSwitchAccount = async () => {
+    try { await window.electron?.remote?.stopSession(); }
+    catch { toast.error(t("remoteControl.actionError")); return; }
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
     localStorage.removeItem("const_custom_user_profile");

@@ -66,6 +66,7 @@ import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/m
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
 import { AgentSessionRegistry } from "./agent-sessions";
 import { selectAgentAutosaveMessages } from "./agent-history";
+import { remoteDaemon } from "./remote-daemon";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -90,6 +91,7 @@ registerGlobalComputerToolHandler(async (toolName, args, context) => {
 });
 
 app.on("before-quit", () => computerController.shutdown());
+app.on("before-quit", () => { void remoteDaemon.stop(); });
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -531,6 +533,7 @@ function createWindow() {
 
   browserController.setParentWindow(win);
   win.on("closed", () => {
+    void remoteDaemon.stop();
     browserController.setParentWindow(null);
     win = null;
   });
@@ -607,6 +610,7 @@ function createWindow() {
   });
 
   win.webContents.on("render-process-gone", (_event, details) => {
+    void remoteDaemon.stop();
     console.error("[Electron Main] Render process gone:", details);
     if (details.reason !== "clean-exit") {
       win?.reload();
@@ -1183,6 +1187,98 @@ app.whenReady().then(() => {
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
   const pendingQuestions = new Map<string, { runId: string; resolve: (answer: any) => void }>();
 
+  // ---------------------------------------------------------------------------
+  // Mobile Remote Control Daemon & Bridges
+  // ---------------------------------------------------------------------------
+  remoteDaemon.onStatusChange((status) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("remote:status-changed", status);
+    }
+  });
+
+  remoteDaemon.onCommand(async (command, reply) => {
+    if (command.type === "state:get") {
+      const convos = conversationDb.listConversations(false);
+      const running = Array.from(activeSessions.keys());
+      reply({
+        deviceId: remoteDaemon.deviceId,
+        conversations: convos.map((c) => ({
+          id: c.id,
+          title: c.title,
+          project: c.project,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          model: c.model,
+          isRunning: running.includes(c.id),
+        })),
+        runningSessions: Array.from(activeSessions.values(), (session) => ({ conversationId: session.conversationId, runId: session.runId })),
+      });
+    } else if (command.type === "conversation:get") {
+      const convoId = command.payload?.conversationId;
+      const convo = convoId ? conversationDb.getConversation(convoId) : null;
+      reply({ conversation: convo });
+    } else if (command.type === "agent:abort") {
+      const convoId = command.payload?.conversationId;
+      if (convoId) {
+        const targetSession = activeSessions.get(convoId);
+        if (targetSession && targetSession.runId === command.payload.runId) {
+          for (const task of globalTaskManager.listTasks(convoId)) {
+            if (task.status === "running") globalTaskManager.killTask(task.id, convoId);
+          }
+          globalSubAgentManager.killAllRunningSubAgents((id) => {
+            const agent = globalSubAgentManager.getSubAgent(id, convoId);
+            const event = { type: "subagent_killed", agentId: id, agent };
+            if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { ...event, conversationId: convoId, runId: targetSession.runId });
+            remoteDaemon.broadcast({ type: "agent:stream-event", conversationId: convoId, runId: targetSession.runId, event });
+          }, convoId);
+          targetSession.agent.abort();
+          // Keep ownership until agent:send-message unwinds, preserving final tool results.
+          for (const [id, question] of pendingQuestions) {
+            if (question.runId !== targetSession.runId) continue;
+            pendingQuestions.delete(id);
+            question.resolve({ status: "cancelled", error: "User cancelled agent execution." });
+          }
+          reply({ success: true });
+          return;
+        }
+      }
+      reply({ success: false });
+    } else if (command.type === "agent:answer-question") {
+      const { toolCallId, answer, runId } = command.payload;
+      const pending = pendingQuestions.get(toolCallId);
+      if (pending && pending.runId === runId) {
+        pendingQuestions.delete(toolCallId);
+        pending.resolve(answer);
+        reply({ success: true });
+      } else {
+        reply({ success: false, error: "Question not found" });
+      }
+    }
+  });
+
+  const requireRemoteHost = (event: Electron.IpcMainInvokeEvent) => {
+    if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) {
+      throw new Error("REMOTE_HOST_ONLY");
+    }
+  };
+  ipcMain.handle("remote:start-session", async (event) => {
+    requireRemoteHost(event);
+    return await remoteDaemon.start();
+  });
+  ipcMain.handle("remote:stop-session", async (event) => {
+    requireRemoteHost(event);
+    await remoteDaemon.stop();
+    return remoteDaemon.getStatus();
+  });
+  ipcMain.handle("remote:refresh-session", async (event) => {
+    requireRemoteHost(event);
+    return await remoteDaemon.refresh();
+  });
+  ipcMain.handle("remote:get-status", (event) => {
+    requireRemoteHost(event);
+    return remoteDaemon.getStatus();
+  });
+
   const finishSession = (session: ActiveAgentSession) => {
     if (!activeSessions.release(session.conversationId, session.runId)) return;
     computerController.releaseSession(session.conversationId);
@@ -1194,6 +1290,11 @@ app.whenReady().then(() => {
     if (win && !win.isDestroyed()) {
       win.webContents.send("agent:session-ended", { conversationId: session.conversationId, runId: session.runId });
     }
+    remoteDaemon.broadcast({
+      type: "agent:session-ended",
+      conversationId: session.conversationId,
+      runId: session.runId,
+    });
   };
 
   // Subscribe to background tasks to push real-time events to renderer
@@ -1344,6 +1445,12 @@ app.whenReady().then(() => {
                 questions,
               });
             }
+            remoteDaemon.broadcast({
+              type: "agent:stream-event",
+              conversationId: convoId,
+              runId,
+              event: { type: "ask_question", toolCallId, questions },
+            });
           });
         },
         browserHandler: async (toolName, args) => {
@@ -1382,10 +1489,21 @@ app.whenReady().then(() => {
       if (win && !win.isDestroyed()) {
         win.webContents.send("agent:session-started", { conversationId: convoId, runId });
       }
+      remoteDaemon.broadcast({
+        type: "agent:session-started",
+        conversationId: convoId,
+        runId,
+      });
 
       const eventForwarder = createAgentEventForwarder((agentEvent) => {
-        if (!activeSessions.owns(convoId, runId) || !win || win.isDestroyed()) return false;
-        win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId, runId });
+        if (!activeSessions.owns(convoId, runId)) return false;
+        if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId, runId });
+        remoteDaemon.broadcast({
+          type: "agent:stream-event",
+          event: agentEvent,
+          conversationId: convoId,
+          runId,
+        });
         return true;
       });
       try {

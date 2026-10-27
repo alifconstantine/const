@@ -60,11 +60,13 @@ import {
   Globe,
   ZoomIn,
   BarChart2,
+  Smartphone,
   Check,
   PencilSparkles,
   Store,
 } from "lucide-react";
 import { AutoScrollTitle } from "./auto-scroll-title";
+import { RemoteControlModal } from "./remote-control-modal";
 import {
   type ConversationItem,
   formatRelativeTime,
@@ -265,6 +267,7 @@ export function Sidebar({
 
   // Archive Modal State
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isRemoteModalOpen, setIsRemoteModalOpen] = useState(false);
   const [archivedSessions, setArchivedSessions] = useState<ConversationItem[]>([]);
   const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
   const [isArchiveLoading, setIsArchiveLoading] = useState(false);
@@ -1319,6 +1322,14 @@ export function Sidebar({
               <span>{t("settings.usageStats")}</span>
             </DropdownMenuItem>
 
+            <DropdownMenuItem
+              className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+              onClick={() => setIsRemoteModalOpen(true)}
+            >
+              <Smartphone className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <span>{t("sidebar.remoteControl")}</span>
+            </DropdownMenuItem>
+
             {/* (Upgrade excluded as requested) */}
 
             <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#333333]" />
@@ -1587,6 +1598,7 @@ export function Sidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RemoteControlModal isOpen={isRemoteModalOpen} onClose={() => setIsRemoteModalOpen(false)} />
     </aside>
   );
 }

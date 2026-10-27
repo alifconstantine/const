@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import type { RemoteDaemonStatus } from "./lib/remote-control";
 
 declare module "*.jpg" {
   const src: string;
@@ -599,6 +600,13 @@ declare global {
           scope?: "user" | "workspace";
         } | null>;
       };
+      remote?: {
+        startSession: () => Promise<RemoteDaemonStatus>;
+        stopSession: () => Promise<RemoteDaemonStatus>;
+        refreshSession: () => Promise<RemoteDaemonStatus>;
+        getStatus: () => Promise<RemoteDaemonStatus>;
+        onStatusChange: (callback: (status: RemoteDaemonStatus) => void) => () => void;
+      };
     };
   }
 }
@@ -633,6 +641,7 @@ export interface ScheduledTaskItem {
   nextRunAt?: number | string;
   runCount: number;
 }
+export type { RemoteConnectedDevice, RemoteDaemonStatus } from "./lib/remote-control";
 
 export interface ScheduledTaskRunHistory {
   id: string;

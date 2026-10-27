@@ -1,5 +1,29 @@
 export interface TranslationDictionary {
   mcp: import("./mcp").McpTranslations;
+  remoteControl: {
+    title: string;
+    description: string;
+    scan: string;
+    loading: string;
+    waiting: string;
+    connected: string;
+    stopped: string;
+    start: string;
+    refresh: string;
+    copy: string;
+    qrAlt: string;
+    connectedCount: string;
+    network: string;
+    security: string;
+    scope: string;
+    startError: string;
+    actionError: string;
+    expired: string;
+    mobileConnecting: string;
+    mobileConnected: string;
+    mobileDisconnected: string;
+    mobileScope: string;
+  };
   common: {
     save: string;
     cancel: string;
@@ -115,6 +139,7 @@ export interface TranslationDictionary {
     darkTheme: string;
     signOut: string;
     switchAccount: string;
+    remoteControl: string;
     general: string;
     noConversations: string;
     noArchivedConversations: string;
