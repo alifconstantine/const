@@ -1,5 +1,6 @@
 import { shiftIntelligenceUiState } from "../components/intelligence-ui/protocol";
 import type { ChatTelemetry } from "./chat-telemetry";
+import { translate } from "./i18n";
 import { mergeTelemetry } from "./chat-telemetry";
 
 export interface ConversationItem {
@@ -64,7 +65,11 @@ export function isSideChatConversation(convo?: { id?: string } | string | null):
 
 export function normalizeUiMessages(rawMessages: any[]): any[] {
   if (!Array.isArray(rawMessages) || rawMessages.length === 0) return [];
-  rawMessages = rawMessages.filter(message => !message?.toolObservationId);
+  rawMessages = rawMessages.filter(message => !message?.toolObservationId).map(message => {
+    if (message?.role !== "user" || !message.sourceSideChatId) return message;
+    const content = message.sideInstruction || (typeof message.content === "string" ? message.content : Array.isArray(message.content) ? message.content.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n") : "");
+    return { ...message, sideInstruction: content, content: translate("rightPane.sideDirection") };
+  });
 
   const hasToolRole = rawMessages.some((m) => m && m.role === "tool");
   if (!hasToolRole) {

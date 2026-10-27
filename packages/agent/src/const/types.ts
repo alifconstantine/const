@@ -20,6 +20,8 @@ export interface AgentMessage {
   thinking?: string;
   timestamp?: number;
   toolObservationId?: string;
+  instructionId?: string;
+  sourceSideChatId?: string;
 }
 
 export interface ToolResultImage {
@@ -266,6 +268,8 @@ export interface AgentConfig {
   model: string;
   inputTypes?: string[];
   preset?: "harness" | "learn";
+  sessionKind?: "main" | "companion";
+  sessionTimeoutMs?: number;
   tools?: NativeToolDefinition[];
   externalTools?: (signal?: AbortSignal) => Promise<NativeToolDefinition[]>;
   externalToolHandler?: (name: string, args: Record<string, any>, signal?: AbortSignal) => Promise<ToolExecutionResult>;

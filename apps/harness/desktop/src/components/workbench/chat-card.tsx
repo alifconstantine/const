@@ -371,6 +371,7 @@ interface ChatCardProps {
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
   forceIconOnly?: boolean;
+  isolatedModel?: boolean;
   queuedMessages?: QueuedMessageItem[];
   onQueueMessage?: (payload: { prompt: string; attachments?: AttachedFile[] }) => void;
   onRemoveQueuedMessage?: (id: string) => void;
@@ -415,6 +416,7 @@ export function ChatCard({
   onOpenFilePreview,
   onOpenTrajectory,
   forceIconOnly = false,
+  isolatedModel = false,
   queuedMessages,
   onQueueMessage,
   onRemoveQueuedMessage,
@@ -827,13 +829,14 @@ export function ChatCard({
   });
 
   useEffect(() => {
+    if (isolatedModel) return;
     const onModelChanged = (event: Event) => {
       const modelId = (event as CustomEvent<{ modelId: string }>).detail?.modelId;
       if (modelId) setSelectedModel(modelId);
     };
     window.addEventListener("const:active-model-changed", onModelChanged);
     return () => window.removeEventListener("const:active-model-changed", onModelChanged);
-  }, []);
+  }, [isolatedModel]);
 
   // When switching conversations or projects, restore the appropriate model
   useEffect(() => {
@@ -1031,7 +1034,7 @@ export function ChatCard({
             setSelectedModel((prev) => {
               const requested = prev || getInitialResolvedModel(initialModel, initialProject);
               const modelId = requested ? resolveModelId(requested, deduped) : deduped[0]?.id || null;
-              if (modelId) localStorage.setItem("const_harness_active_model", modelId);
+              if (modelId && !isolatedModel) localStorage.setItem("const_harness_active_model", modelId);
               return modelId;
             });
           }
@@ -1118,6 +1121,7 @@ export function ChatCard({
   const handleSend = () => {
     let text = (editorRef.current?.getText() || prompt).trim();
     if (!text && attachments.length === 0) return;
+    if (isExecuting && !onQueueMessage && !onSteerDraft) return;
 
     if (!text && attachments.length > 0) {
       text = "Please analyze the attached media/file(s).";
@@ -1164,6 +1168,7 @@ export function ChatCard({
   };
 
   const handleSteerCurrentDraft = () => {
+    if (!onSteerDraft) return;
     let text = (editorRef.current?.getText() || prompt).trim();
     if (!text && attachments.length === 0) return;
 
@@ -2008,10 +2013,12 @@ export function ChatCard({
                                           type="button"
                                           onClick={() => {
                                             setSelectedModel(m.id);
-                                            localStorage.setItem("const_harness_active_model", m.id);
-                                            localStorage.setItem("const_llm_active_model", m.id);
-                                            window.electron?.saveConfig?.({ activeModel: m.id });
-                                            if (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]") {
+                                            if (!isolatedModel) {
+                                              localStorage.setItem("const_harness_active_model", m.id);
+                                              localStorage.setItem("const_llm_active_model", m.id);
+                                              window.electron?.saveConfig?.({ activeModel: m.id });
+                                            }
+                                            if (!isolatedModel && currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]") {
                                               try {
                                                 localStorage.setItem(`const_harness_workspace_model_${currentProject}`, m.id || m.name);
                                               } catch {}
@@ -2189,7 +2196,7 @@ export function ChatCard({
                   </button>
 
                   {/* Send/Queue Button when user has typed text or attached files during execution */}
-                  {(prompt.trim() || attachments.length > 0) && (
+                  {(onQueueMessage || onSteerDraft) && (prompt.trim() || attachments.length > 0) && (
                     <button
                       type="button"
                       onClick={handleSend}

@@ -860,15 +860,21 @@ export class ConstAgent {
     return this.config.maxTurns || 200;
   }
 
-  private steeringQueue: Array<{ content: string; attachments?: any[]; timestamp: number }> = [];
+  private steeringQueue: Array<{ content: string; attachments?: any[]; timestamp: number; instructionId?: string; sourceSideChatId?: string }> = [];
 
-  public steer(content: string, attachments?: any[]): boolean {
+  public steer(content: string, attachments?: any[], metadata?: { instructionId: string; sourceSideChatId: string }): boolean {
     if (!this.isRunning || this._isCancelled) return false;
     this.steeringQueue.push({
       content,
       attachments,
       timestamp: Date.now(),
+      ...metadata,
     });
+    if (metadata) {
+      for (const [approvalId, resolve] of this.pendingApprovals) {
+        resolve({ approvalId, decision: "deny", feedback: "A new instruction arrived; reconsider this action before proceeding." });
+      }
+    }
     return true;
   }
 
@@ -910,6 +916,9 @@ export class ConstAgent {
     this._isCancelled = false;
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
+    let deadlineReached = false;
+    const timeoutMs = this.config.sessionTimeoutMs ?? (this.config.sessionKind === "companion" ? 120_000 : 0);
+    const deadline = timeoutMs > 0 ? setTimeout(() => { deadlineReached = true; this.abortController?.abort(); }, timeoutMs) : undefined;
 
     const conversationHistory: AgentMessage[] = [...messages];
     let toolVisionUnavailable = false;
@@ -933,7 +942,7 @@ export class ConstAgent {
     let consecutivePlanningTurns = 0;
     let consecutiveDraftCutoffs = 0;
     let consecutiveEmptyRetries = 0;
-    const MAX_EMPTY_RETRIES = 5;
+    const MAX_EMPTY_RETRIES = this.config.sessionKind === "companion" ? 1 : 5;
     const STREAM_STALL_TIMEOUT_MS = 35_000;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
@@ -999,6 +1008,8 @@ export class ConstAgent {
               role: "user",
               content: steerMsgContent,
               timestamp: steer.timestamp,
+              instructionId: steer.instructionId,
+              sourceSideChatId: steer.sourceSideChatId,
             };
             conversationHistory.push(steerMsg);
             onEvent({
@@ -1011,17 +1022,19 @@ export class ConstAgent {
 
         onEvent({ type: "status", status: "thinking" });
 
-        const baseTools = this.config.tools ?? (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
+        const isCompanion = this.config.sessionKind === "companion";
+        const baseTools = isCompanion ? [] : this.config.tools ?? (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
         const activeTools = [...baseTools.filter((tool) => {
           const capability = tool.function.name.startsWith("browser_") ? "browser-use"
             : tool.function.name.startsWith("computer_") ? "computer-use" : undefined;
           return !capability || this.config.nativeCapabilityEnabled?.(capability) !== false;
-        }), ...await this.config.externalTools?.(signal) ?? []];
+        }), ...(isCompanion ? [] : await this.config.externalTools?.(signal) ?? [])];
         // Approval metadata is local policy, not part of a model provider's function schema.
         const requestTools = activeTools.map(({ requiresApproval: _approval, ...definition }) => definition);
 
-        const systemPrompt =
-          this.config.preset === "learn"
+        const systemPrompt = isCompanion
+          ? `You are the user's side chat companion. Answer questions directly using the supplied parent task snapshot and side chat history. The parent task may still be running. State when information is unavailable or may have changed. Do not claim to have changed files, sent instructions, or updated the parent task. The user can explicitly send an instruction to the main task through the interface.\n\n${this.config.systemPrompt || ""}`
+          : this.config.preset === "learn"
             ? buildLearnSystemPrompt(workspacePath, this.config.systemPrompt)
             : buildConstSystemPrompt(workspacePath, this.config.systemPrompt);
 
@@ -1032,7 +1045,7 @@ export class ConstAgent {
           : Array.isArray(latestUserMessage?.content)
             ? latestUserMessage.content.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n")
             : "";
-        const pluginInstructions = pluginInvocationInstructions(latestUserText, resolveSkillRegistry(workspacePath).plugins);
+        const pluginInstructions = isCompanion ? "" : pluginInvocationInstructions(latestUserText, resolveSkillRegistry(workspacePath).plugins);
         if (pluginInstructions) effectiveSystemPrompt += "\n\n" + pluginInstructions;
         const hasWriteTools = activeTools.some(
           (t) => t.function.name === "write" || t.function.name === "edit"
@@ -1142,7 +1155,7 @@ export class ConstAgent {
             body: JSON.stringify({
               model: this.config.model,
               messages: formattedMessages,
-              tools: requestTools,
+              ...(requestTools.length ? { tools: requestTools } : {}),
               ...(activeTools && activeTools.length > 0 ? { parallel_tool_calls: false } : {}),
               stream: true,
               stream_options: { include_usage: true },
@@ -1158,7 +1171,7 @@ export class ConstAgent {
           },
           {
             signal,
-            maxRetries: 4,
+            maxRetries: isCompanion ? 1 : 4,
             onRetry: (attempt, maxRetries, reason) => {
               onEvent({
                 type: "status",
@@ -1557,12 +1570,16 @@ export class ConstAgent {
           });
 
         // Fallback Tool Call Extraction: Recover tool calls from markdown code blocks or text
-        if (rawToolCalls.length === 0 && turnContent) {
+        if (!isCompanion && rawToolCalls.length === 0 && turnContent) {
           const fallback = extractFallbackToolCalls(turnContent, new Set(activeTools.map((tool) => tool.function.name.toLowerCase())));
           if (fallback.length > 0) {
             rawToolCalls.push(...fallback);
             turnContent = turnContent.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/gi, "").trim();
           }
+        }
+
+        if (isCompanion && rawToolCalls.length > 0) {
+          throw new Error("The side chat model requested an unavailable tool. Try another model or rephrase the question.");
         }
 
         // Sequential Deduplication of Tool Calls within the same turn
@@ -1608,7 +1625,7 @@ export class ConstAgent {
           consecutiveStreamRetries = 0;
         } else {
           // Model produced no actionable text and no tool calls!
-          if (hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
+          if (!isCompanion && hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
             consecutivePlanningTurns++;
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
@@ -1654,7 +1671,7 @@ export class ConstAgent {
 
           // Capped after MAX_EMPTY_RETRIES
           const exhaustedErrMsg =
-            `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
+            isCompanion ? "The side chat model returned an empty response. Please try again." : `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
           onEvent({ type: "error", error: exhaustedErrMsg });
           onEvent({ type: "status", status: "error", message: exhaustedErrMsg });
           conversationHistory.push({
@@ -1671,7 +1688,7 @@ export class ConstAgent {
         }
 
         if (toolCalls.length === 0) {
-          if (turnFinishReason === "length" && currentTurn < maxTurns && consecutiveDraftCutoffs < 3) {
+          if (!isCompanion && turnFinishReason === "length" && currentTurn < maxTurns && consecutiveDraftCutoffs < 3) {
             consecutiveDraftCutoffs++;
             // Response was truncated mid-turn while planning or drafting code!
             // Retract streaming tokens from the UI so partial draft doesn't pollute the chat card
@@ -1777,6 +1794,8 @@ export class ConstAgent {
                 role: "user",
                 content: steerMsgContent,
                 timestamp: steer.timestamp,
+                instructionId: steer.instructionId,
+                sourceSideChatId: steer.sourceSideChatId,
               };
               conversationHistory.push(steerMsg);
               onEvent({
@@ -1829,6 +1848,13 @@ export class ConstAgent {
         for (const [tcIdx, tc] of toolCalls.entries()) {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
+          }
+          if (this.steeringQueue.some((item) => item.sourceSideChatId)) {
+            const result = "This action was skipped because a new user instruction is waiting. Reassess it after reading the instruction.";
+            onEvent({ type: "tool_call", toolCallId: tc.id, toolName: tc.function.name, args: parseToolArguments(tc.function.arguments) });
+            onEvent({ type: "tool_result", toolCallId: tc.id, toolName: tc.function.name, result, isError: true, durationMs: 0 });
+            conversationHistory.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: result, timestamp: Date.now() });
+            continue;
           }
           const parsedArgs = parseToolArguments(tc.function.arguments);
           const argsHash = JSON.stringify(parsedArgs);
@@ -2282,12 +2308,13 @@ export class ConstAgent {
           if (this.steeringQueue.length > 0 && tcIdx < toolCalls.length - 1) {
             for (const skippedTc of toolCalls.slice(tcIdx + 1)) {
               const skipMsg = "[Tool execution stopped: User steered with a new instruction.]";
+              onEvent({ type: "tool_call", toolCallId: skippedTc.id, toolName: skippedTc.function.name, args: parseToolArguments(skippedTc.function.arguments) });
               onEvent({
                 type: "tool_result",
                 toolCallId: skippedTc.id,
                 toolName: skippedTc.function.name,
                 result: skipMsg,
-                isError: false,
+                isError: true,
               });
               conversationHistory.push({
                 role: "tool",
@@ -2401,6 +2428,13 @@ export class ConstAgent {
 
       return conversationHistory;
     } catch (err: any) {
+      if (deadlineReached) {
+        const error = new Error("The side chat request timed out. Please try again.");
+        activeRequest?.finish("failed");
+        onEvent({ type: "error", error: error.message });
+        onEvent({ type: "status", status: "error", message: error.message });
+        throw error;
+      }
       const isAborted =
         this._isCancelled ||
         signal?.aborted ||
@@ -2420,6 +2454,7 @@ export class ConstAgent {
       }
       return conversationHistory;
     } finally {
+      if (deadline) clearTimeout(deadline);
       this.isRunning = false;
       this.abortController = null;
       this.pendingApprovals.clear();

@@ -94,6 +94,7 @@ import {
   generateFallbackTitle,
   generateAiTitle,
   normalizeUiMessages,
+  isSideChatConversation,
   getDefaultAgentMode,
   type ConversationItem,
 } from "./lib/conversation-store";
@@ -149,6 +150,8 @@ interface ChatMessage {
   durationMs?: number;
   intelligenceUiState?: IntelligenceUiState;
   attachments?: AttachedFile[];
+  sideInstruction?: string;
+  sourceSideChatId?: string;
 }
 
 function formatChatMessageForLlm(
@@ -209,7 +212,7 @@ function formatChatMessageForLlm(
   }
 
   // Resolve @-mentioned sessions in user prompt
-  let textContent = resolveMentionedSessionsInPrompt(m.content || "", allConvos);
+  let textContent = resolveMentionedSessionsInPrompt(m.sideInstruction || m.content || "", allConvos);
 
   if (!m.attachments || m.attachments.length === 0) {
     return [
@@ -1170,11 +1173,15 @@ function AuthenticatedContent({
     };
   }, [handleOpenBrowser]);
 
-  const handleUpdateTab = (tabId: string, updates: Partial<RightPaneTab>) => {
-    setRightPaneTabs((prev) =>
-      prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
-    );
-  };
+  const handleUpdateTab = useCallback((tabId: string, updates: Partial<RightPaneTab>) => {
+    setRightPaneTabs((prev) => {
+      const index = prev.findIndex((tab) => tab.id === tabId);
+      if (index < 0 || Object.entries(updates).every(([key, value]) => prev[index]?.[key as keyof RightPaneTab] === value)) return prev;
+      const next = [...prev];
+      next[index] = { ...prev[index]!, ...updates };
+      return next;
+    });
+  }, []);
 
   const handleSelectElementForChat = (element: BrowserSelectedElement) => {
     const selectorLabel = element.id
@@ -2354,13 +2361,14 @@ function AuthenticatedContent({
     if (window.electron?.getRunningSessions) {
       window.electron.getRunningSessions().then((ids) => {
         if (ids && ids.length > 0) {
-          setRunningConvoIds(new Set(ids));
+          setRunningConvoIds(new Set(ids.filter((id) => !isSideChatConversation(id))));
         }
       });
     }
 
     const unsubStarted = window.electron?.onSessionStarted?.((data) => {
       if (data?.conversationId) {
+        if (isSideChatConversation(data.conversationId)) return;
         if (data.runId) activeRunIdsRef.current.set(data.conversationId, data.runId);
         setRunningConvoIds((prev) => new Set(prev).add(data.conversationId));
       }
@@ -2368,6 +2376,7 @@ function AuthenticatedContent({
 
     const unsubEnded = window.electron?.onSessionEnded?.((data) => {
       if (data?.conversationId) {
+        if (isSideChatConversation(data.conversationId)) return;
         const currentRunId = activeRunIdsRef.current.get(data.conversationId);
         if (data.runId && currentRunId && data.runId !== currentRunId) return;
         stoppingConversationsRef.current.delete(data.conversationId);
@@ -2447,6 +2456,7 @@ function AuthenticatedContent({
     const unsubscribe = window.electron.onAgentEvent((event: any) => {
       const targetConvoId = event.conversationId || conversationIdRef.current;
       if (!targetConvoId) return;
+      if (isSideChatConversation(targetConvoId)) return;
       const currentRunId = activeRunIdsRef.current.get(targetConvoId);
       if (event.runId && currentRunId && event.runId !== currentRunId) return;
 
@@ -2857,7 +2867,9 @@ function AuthenticatedContent({
           const steerMsg: ChatMessage = {
             id: `msg_${Date.now()}_steer`,
             role: "user",
-            content: event.message.content || "",
+            content: event.message.sourceSideChatId ? t("rightPane.sideDirection") : event.message.content || "",
+            sideInstruction: event.message.sourceSideChatId ? (typeof event.message.content === "string" ? event.message.content : event.message.content?.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n")) : undefined,
+            sourceSideChatId: event.message.sourceSideChatId,
             timestamp: event.message.timestamp || Date.now(),
             attachments: event.message.attachments,
           };

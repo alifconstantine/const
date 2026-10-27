@@ -316,6 +316,8 @@ declare global {
         authToken?: string;
         maxOutputTokens?: number;
         contextWindow?: number;
+        sessionKind?: "main" | "companion";
+        parentConversationId?: string;
       }) => Promise<{
         success: boolean;
         aborted?: boolean;
@@ -351,7 +353,16 @@ declare global {
         conversationId: string;
         prompt: string;
         attachments?: any[];
-      }) => Promise<{ success: boolean; notRunning?: boolean }>;
+        expectedRunId?: string;
+        instructionId?: string;
+        sourceSideChatId?: string;
+      }) => Promise<{ success: boolean; notRunning?: boolean; stale?: boolean; status?: "queued" | "consumed" | "plan_updated" }>;
+      getSessionSnapshot?: (conversationId: string) => Promise<{
+        conversationId: string; runId: string; startedAt: number; revision: number; updatedAt: number;
+        status: string; objective: string; activeTool?: string; lastResult?: string; recentOutput: string; todos?: unknown;
+      } | null>;
+      getSideReceipts?: (sideChatId: string) => Promise<Record<string, "queued" | "consumed" | "plan_updated" | "expired">>;
+      registerSideChat?: (payload: { sideChatId: string; parentConversationId: string }) => Promise<{ success: boolean }>;
       abortAgent: (conversationId?: string) => Promise<boolean>;
       updateMode?: (payload: {
         mode: "request_review" | "ask_before_changes" | "full_access";

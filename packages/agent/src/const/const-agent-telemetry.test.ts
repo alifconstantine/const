@@ -29,6 +29,60 @@ function stream(frames: unknown[], trailing = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("agent telemetry wiring", () => {
+  it("answers in companion mode without advertising tools or executing JSON examples", async () => {
+    const bodies: any[] = [];
+    const answer = 'Example: ```json\n{"name":"write","arguments":{"path":"example.txt","content":"hello"}}\n```';
+    vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return stream([{ choices: [{ delta: { content: answer }, finish_reason: "stop" }] }]);
+    }));
+    const events: AgentEvent[] = [];
+    const agent = new ConstAgent({ baseUrl: "https://example.invalid/v1", apiKey: "test", model: "custom", sessionKind: "companion", workspacePath: process.cwd() });
+    const history = await agent.run([{ role: "user", content: "Show an example" }], event => events.push(event));
+    expect(history.at(-1)?.content).toBe(answer);
+    expect(bodies[0].tools).toBeUndefined();
+    expect(events.some(event => event.type === "tool_call")).toBe(false);
+    expect(bodies[0].messages[0].content).not.toContain("CRITICAL CODE GENERATION");
+  });
+
+  it("rejects provider tool calls in companion mode before dispatch", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => stream([{ choices: [{ delta: { tool_calls: [{ index: 0, id: "bad", function: { name: "write", arguments: "{}" } }] }, finish_reason: "tool_calls" }] }])));
+    const events: AgentEvent[] = [];
+    const agent = new ConstAgent({ baseUrl: "https://example.invalid/v1", apiKey: "test", model: "custom", sessionKind: "companion", workspacePath: process.cwd() });
+    await expect(agent.run([{ role: "user", content: "Hi" }], event => events.push(event))).rejects.toThrow("unavailable tool");
+    expect(events.some(event => event.type === "tool_call")).toBe(false);
+  });
+
+  it("terminates a stalled companion request at its deadline", async () => {
+    vi.stubGlobal("fetch", vi.fn((_url: unknown, init: any) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    })));
+    const events: AgentEvent[] = [];
+    const agent = new ConstAgent({ baseUrl: "https://example.invalid/v1", apiKey: "test", model: "custom", sessionKind: "companion", sessionTimeoutMs: 30, workspacePath: process.cwd() });
+    await expect(agent.run([{ role: "user", content: "Hi" }], event => events.push(event))).rejects.toThrow("timed out");
+    expect(events.find(event => event.type === "error")).toMatchObject({ error: expect.stringContaining("timed out") });
+  });
+
+  it("skips the remaining tool batch before applying a side chat instruction", async () => {
+    let calls = 0;
+    const bodies: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: any) => {
+      bodies.push(JSON.parse(init.body));
+      return ++calls === 1 ? stream([{ choices: [{ delta: { tool_calls: [
+        { index: 0, id: "one", function: { name: "read", arguments: '{"path":"one"}' } },
+        { index: 1, id: "two", function: { name: "read", arguments: '{"path":"two"}' } },
+      ] }, finish_reason: "tool_calls" }] }]) : stream([{ choices: [{ delta: { content: "Understood" }, finish_reason: "stop" }] }]);
+    }));
+    const events: AgentEvent[] = [];
+    const agent = new ConstAgent({ baseUrl: "https://example.invalid/v1", apiKey: "test", model: "custom", workspacePath: process.cwd(), tools: [], mode: "full_access" });
+    await agent.run([{ role: "user", content: "Start" }], event => {
+      events.push(event);
+      if (event.type === "tool_result" && event.toolCallId === "one") agent.steer("Use a different approach", undefined, { instructionId: "i1", sourceSideChatId: "side_conversation_1" });
+    });
+    expect(events.find(event => event.type === "tool_result" && event.toolCallId === "two")).toMatchObject({ isError: true });
+    expect(events.find(event => event.type === "steer_message")).toMatchObject({ message: { instructionId: "i1", sourceSideChatId: "side_conversation_1" } });
+    expect(bodies[1].messages.some((message: any) => message.role === "user" && message.content === "Use a different approach")).toBe(true);
+  });
   it("records every model round through tools, final usage without newline, and the final compacted context", async () => {
     const bodies: any[] = [];
     const fetch = vi.fn(async (_url: unknown, init: any) => {

@@ -66,6 +66,7 @@ import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/m
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
 import { AgentSessionRegistry } from "./agent-sessions";
 import { selectAgentAutosaveMessages } from "./agent-history";
+import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
@@ -1183,9 +1184,24 @@ app.whenReady().then(() => {
     model: string;
     mode?: "request_review" | "ask_before_changes" | "full_access";
     startedAt: number;
+    snapshot: { revision: number; updatedAt: number; status: string; objective: string; activeTool?: string; lastResult?: string; recentOutput: string; todos?: unknown };
+    sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
+  const sideParents = new Map<string, string>();
+  const sideReceipts = new SideSteeringReceipts(path.join(constBrainDir, "side-steering-receipts.json"));
+  const recordSideReceipt = (sideChatId: string, instructionId: string, status: "queued" | "consumed" | "plan_updated" | "expired", runId: string) => {
+    sideReceipts.set(sideChatId, instructionId, status);
+    if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { type: "side_steer_receipt", conversationId: sideChatId, instructionId, status, runId });
+  };
   const pendingQuestions = new Map<string, { runId: string; resolve: (answer: any) => void }>();
+  ipcMain.handle("agent:register-side-chat", async (_event, payload: { sideChatId: string; parentConversationId: string }) => {
+    if (!/^(side_conversation_|side_chat_)/.test(payload?.sideChatId || "") || !payload.parentConversationId || /^(side_conversation_|side_chat_)/.test(payload.parentConversationId)) return { success: false };
+    const previous = sideParents.get(payload.sideChatId);
+    if (previous && previous !== payload.parentConversationId) return { success: false };
+    sideParents.set(payload.sideChatId, payload.parentConversationId);
+    return { success: true };
+  });
 
   // ---------------------------------------------------------------------------
   // Mobile Remote Control Daemon & Bridges
@@ -1281,6 +1297,9 @@ app.whenReady().then(() => {
 
   const finishSession = (session: ActiveAgentSession) => {
     if (!activeSessions.release(session.conversationId, session.runId)) return;
+    for (const [instructionId, instruction] of session.sideInstructions) {
+      if (instruction.status === "queued") recordSideReceipt(instruction.sideChatId, instructionId, "expired", session.runId);
+    }
     computerController.releaseSession(session.conversationId);
     for (const [id, question] of pendingQuestions) {
       if (question.runId !== session.runId) continue;
@@ -1359,6 +1378,8 @@ app.whenReady().then(() => {
         maxOutputTokens?: number;
         maxTurns?: number;
         contextWindow?: number;
+        sessionKind?: "main" | "companion";
+        parentConversationId?: string;
       }
     ) => {
       const config = loadUserConfig();
@@ -1381,6 +1402,12 @@ app.whenReady().then(() => {
       }
 
       const convoId = payload.conversationId || `session_${Date.now()}`;
+      if (payload.sessionKind === "companion") {
+        if (!payload.parentConversationId || !/^(side_conversation_|side_chat_)/.test(convoId) || /^(side_conversation_|side_chat_)/.test(payload.parentConversationId)) return { success: false, error: "Invalid side chat parent." };
+        const existingParent = sideParents.get(convoId);
+        if (existingParent && existingParent !== payload.parentConversationId) return { success: false, error: "Side chat belongs to another conversation." };
+        sideParents.set(convoId, payload.parentConversationId);
+      }
       if (activeSessions.has(convoId)) return { success: false, alreadyRunning: true };
       const runId = randomUUID();
 
@@ -1418,6 +1445,7 @@ app.whenReady().then(() => {
 
       const agent = createConstAgent({
         preset: "harness",
+        sessionKind: payload.sessionKind === "companion" ? "companion" : "main",
         baseUrl,
         apiKey,
         model,
@@ -1431,7 +1459,7 @@ app.whenReady().then(() => {
         systemPrompt,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
-        maxTurns: payload.maxTurns ?? 200,
+        maxTurns: payload.sessionKind === "companion" ? 4 : payload.maxTurns ?? 200,
         contextWindow: getModelContextLimit(model, payload.contextWindow ?? modelDef?.contextWindow),
         onAskQuestion: (toolCallId, questions) => {
           return new Promise((resolve) => {
@@ -1483,6 +1511,8 @@ app.whenReady().then(() => {
         model,
         mode: payload.mode || "ask_before_changes",
         startedAt: Date.now(),
+        snapshot: { revision: 0, updatedAt: Date.now(), status: "starting", objective: String([...payload.messages].reverse().find((message) => message.role === "user")?.content || "").slice(0, 4000), recentOutput: "" },
+        sideInstructions: new Map(),
       };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
 
@@ -1514,6 +1544,37 @@ app.whenReady().then(() => {
               conversationDb.recordTelemetry(convoId, agentEvent);
             }
             if (!activeSessions.owns(convoId, runId)) return;
+            const snapshot = agentSession.snapshot;
+            snapshot.revision++;
+            snapshot.updatedAt = Date.now();
+            if (agentEvent.type === "status") snapshot.status = agentEvent.status || snapshot.status;
+            if (agentEvent.type === "tool_call") { snapshot.activeTool = agentEvent.toolName || agentEvent.name; snapshot.status = "calling_tool"; }
+            if (agentEvent.type === "tool_result") {
+              snapshot.activeTool = undefined;
+              try { snapshot.lastResult = String(typeof agentEvent.result === "string" ? agentEvent.result : JSON.stringify(agentEvent.result ?? "")).slice(0, 2000); } catch { snapshot.lastResult = ""; }
+            }
+            if (agentEvent.type === "token") snapshot.recentOutput = (snapshot.recentOutput + (agentEvent.token || "")).slice(-4000);
+            if (agentEvent.type === "token_reset") snapshot.recentOutput = "";
+            if (agentEvent.type === "todo_update") {
+              snapshot.todos = agentEvent.todos;
+              for (const [instructionId, instruction] of agentSession.sideInstructions) {
+                if (instruction.status === "consumed") {
+                  instruction.status = "plan_updated";
+                  recordSideReceipt(instruction.sideChatId, instructionId, "plan_updated", runId);
+                }
+              }
+            }
+            if (agentEvent.type === "approval_request") snapshot.status = "waiting_approval";
+            if (agentEvent.type === "ask_question") snapshot.status = "waiting_question";
+            if (agentEvent.type === "error") snapshot.status = "error";
+            if (agentEvent.type === "done") snapshot.status = "done";
+            if (agentEvent.type === "steer_message" && agentEvent.message?.instructionId) {
+              const instruction = agentSession.sideInstructions.get(agentEvent.message.instructionId);
+              if (instruction) {
+                instruction.status = "consumed";
+                recordSideReceipt(instruction.sideChatId, agentEvent.message.instructionId, "consumed", runId);
+              }
+            }
             eventForwarder.forward(agentEvent);
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
@@ -1585,6 +1646,9 @@ app.whenReady().then(() => {
         conversationId?: string;
         prompt: string;
         attachments?: any[];
+        expectedRunId?: string;
+        instructionId?: string;
+        sourceSideChatId?: string;
       }
     ) => {
       const safeConvoId =
@@ -1598,7 +1662,20 @@ app.whenReady().then(() => {
       }
 
       if (targetSession) {
-        const steered = targetSession.agent.steer(payload.prompt, payload.attachments);
+        if (payload.sourceSideChatId) {
+          if (!payload.instructionId || !safeConvoId || sideParents.get(payload.sourceSideChatId) !== safeConvoId || payload.expectedRunId !== targetSession.runId) return { success: false, stale: true };
+          const prior = targetSession.sideInstructions.get(payload.instructionId);
+          if (prior) return { success: prior.sideChatId === payload.sourceSideChatId, status: prior.status };
+          targetSession.sideInstructions.set(payload.instructionId, { sideChatId: payload.sourceSideChatId, status: "queued" });
+        }
+        const steered = targetSession.agent.steer(payload.prompt, payload.attachments, payload.sourceSideChatId && payload.instructionId ? { instructionId: payload.instructionId, sourceSideChatId: payload.sourceSideChatId } : undefined);
+        if (!steered && payload.instructionId) targetSession.sideInstructions.delete(payload.instructionId);
+        if (steered && payload.sourceSideChatId) {
+          if (payload.instructionId) recordSideReceipt(payload.sourceSideChatId, payload.instructionId, "queued", targetSession.runId);
+          for (const [id, question] of pendingQuestions) {
+            if (question.runId === targetSession.runId) { pendingQuestions.delete(id); question.resolve({ status: "cancelled", error: "A new instruction arrived." }); }
+          }
+        }
         return { success: steered };
       }
 
@@ -1870,6 +1947,12 @@ app.whenReady().then(() => {
   ipcMain.handle("agent:get-running-sessions", async () => {
     return Array.from(activeSessions.keys());
   });
+
+  ipcMain.handle("agent:get-session-snapshot", async (_event, conversationId: string) => {
+    const session = activeSessions.get(conversationId);
+    return session ? { conversationId, runId: session.runId, startedAt: session.startedAt, ...session.snapshot } : null;
+  });
+  ipcMain.handle("agent:get-side-receipts", async (_event, sideChatId: string) => sideReceipts.get(sideChatId));
 
   // Conversations Database IPC Handlers
   ipcMain.handle("conversations:list", async (_event, includeArchived?: boolean) => {

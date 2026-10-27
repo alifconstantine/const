@@ -81,9 +81,14 @@ contextBridge.exposeInMainWorld("electron", {
     authToken?: string;
     maxOutputTokens?: number;
     contextWindow?: number;
+    sessionKind?: "main" | "companion";
+    parentConversationId?: string;
   }) => ipcRenderer.invoke("agent:send-message", payload),
-  steerAgent: (payload: { conversationId: string; prompt: string; attachments?: any[] }) =>
+  steerAgent: (payload: { conversationId: string; prompt: string; attachments?: any[]; expectedRunId?: string; instructionId?: string; sourceSideChatId?: string }) =>
     ipcRenderer.invoke("agent:steer", payload),
+  getSessionSnapshot: (conversationId: string) => ipcRenderer.invoke("agent:get-session-snapshot", conversationId),
+  getSideReceipts: (sideChatId: string) => ipcRenderer.invoke("agent:get-side-receipts", sideChatId),
+  registerSideChat: (payload: { sideChatId: string; parentConversationId: string }) => ipcRenderer.invoke("agent:register-side-chat", payload),
   abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
   updateMode: (payload: { mode: "request_review" | "ask_before_changes" | "full_access"; conversationId?: string }) =>
     ipcRenderer.invoke("agent:update-mode", payload),
