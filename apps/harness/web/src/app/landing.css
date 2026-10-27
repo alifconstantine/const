@@ -192,7 +192,18 @@ body:has(.ch-download-page) .ch-header-cta {
   background: var(--ch-surface-muted);
 }
 .ch-header .ch-icon-button {
-  border-color: currentColor;
+  border-color: var(--ch-line);
+}
+.dark .ch-header .ch-icon-button {
+  border-color: #262626;
+}
+.ch-theme-toggle {
+  border-color: var(--ch-line) !important;
+  color: var(--ch-ink) !important;
+}
+.dark .ch-theme-toggle {
+  border-color: #262626 !important;
+  color: #ffffff !important;
 }
 .ch-menu-toggle {
   display: none;
@@ -1809,9 +1820,6 @@ body:has(.ch-download-page) .ch-header-cta {
   }
 }
 @media (max-width: 1024px) {
-  .ch-download-panel {
-    padding-block: 180px;
-  }
   .ch-download-actions {
     flex-direction: column;
     align-items: flex-start;
