@@ -879,9 +879,11 @@ export class ConstAgent {
         this.abortController.abort();
       } catch {}
     }
-    // Immediately terminate any running subagents scoped to this conversation (or all if un-scoped)
+    // Child cancellation propagates through its signal; conversation-wide cleanup belongs to the root.
     try {
-      globalSubAgentManager.killAllRunningSubAgents(undefined, this.config.conversationId);
+      if (!this.config.parentAgentId) {
+        globalSubAgentManager.killAllRunningSubAgents(undefined, this.config.conversationId);
+      }
     } catch {}
     for (const [id, resolver] of this.pendingApprovals.entries()) {
       try {

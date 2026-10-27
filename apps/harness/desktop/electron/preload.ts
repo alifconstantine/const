@@ -196,8 +196,8 @@ contextBridge.exposeInMainWorld("electron", {
   },
   answerQuestion: (toolCallId: string, answer: any) =>
     ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
-  listBackgroundTasks: () => ipcRenderer.invoke("tasks:list"),
-  killBackgroundTask: (taskId: string) => ipcRenderer.invoke("tasks:kill", taskId),
+  listBackgroundTasks: (conversationId?: string) => ipcRenderer.invoke("tasks:list", conversationId),
+  killBackgroundTask: (taskId: string, conversationId?: string) => ipcRenderer.invoke("tasks:kill", taskId, conversationId),
   getBackgroundTaskLogs: (taskId: string) => ipcRenderer.invoke("tasks:get-output", taskId),
   killSubAgent: (agentId: string) => ipcRenderer.invoke("subagents:kill", agentId),
   onBackgroundTaskEvent: (callback: (event: any) => void) => {

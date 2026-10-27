@@ -100,11 +100,14 @@ export interface QuestionItem {
 
 export interface BackgroundTaskItem {
   id: string;
+  name?: string;
+  conversationId?: string;
   command: string;
   pid?: number;
   startTime: number;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "killed";
   output?: string[];
+  port?: number;
 }
 
 export interface SubAgentItem {
@@ -461,8 +464,8 @@ declare global {
         onExit: (callback: (data: { id: string; code: number | null }) => void) => () => void;
       };
       answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
-      listBackgroundTasks?: () => Promise<BackgroundTaskItem[]>;
-      killBackgroundTask?: (taskId: string) => Promise<boolean>;
+      listBackgroundTasks?: (conversationId?: string) => Promise<BackgroundTaskItem[]>;
+      killBackgroundTask?: (taskId: string, conversationId?: string) => Promise<boolean>;
       getBackgroundTaskLogs?: (taskId: string) => Promise<string[]>;
       killSubAgent?: (agentId: string) => Promise<boolean>;
       onBackgroundTaskEvent?: (

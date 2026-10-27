@@ -122,10 +122,11 @@ export interface QuestionItem {
 export interface BackgroundTaskItem {
   id: string;
   name?: string;
+  conversationId?: string;
   command: string;
   pid?: number;
   startTime: number;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "killed";
   output?: string[];
   port?: number;
 }

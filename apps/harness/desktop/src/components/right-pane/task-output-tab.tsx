@@ -42,7 +42,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
               return next.length > 3000 ? next.slice(-3000) : next;
             });
           } else if (event.type === "status") {
-            if (event.status === "completed" || event.status === "failed") {
+            if (event.status && event.status !== "running") {
               setIsRunning(false);
             }
           }

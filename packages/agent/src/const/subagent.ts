@@ -1393,18 +1393,18 @@ export class SubAgentManager {
   public getSubAgent(idOrName: string, conversationId?: string): SubAgentItem | undefined {
     const trimmed = idOrName.trim();
     const direct = this.subagents.get(trimmed);
-    if (direct) return direct;
+    if (direct) {
+      if (conversationId && direct.conversationId !== conversationId) {
+        return undefined;
+      }
+      return direct;
+    }
 
     const lower = trimmed.toLowerCase();
     const candidates = Array.from(this.subagents.values()).filter(
       (a) => !conversationId || a.conversationId === conversationId
     );
-    return (
-      candidates.find((a) => a.id === trimmed || a.name?.toLowerCase() === lower) ||
-      Array.from(this.subagents.values()).find(
-        (a) => a.id === trimmed || a.name?.toLowerCase() === lower
-      )
-    );
+    return candidates.find((a) => a.id === trimmed || a.name?.toLowerCase() === lower);
   }
 
   /**
@@ -1413,14 +1413,18 @@ export class SubAgentManager {
   public listSubAgents(conversationId?: string): SubAgentItem[] {
     const all = Array.from(this.subagents.values());
     if (!conversationId) return all;
-    return all.filter((a) => !a.conversationId || a.conversationId === conversationId);
+    return all.filter((a) => a.conversationId === conversationId);
   }
 
   /**
    * Terminate a running subagent immediately (aborts both controller and running child ConstAgent).
    */
-  public killSubAgent(idOrName: string, onKilled?: (agentId: string) => void): boolean {
-    const item = this.getSubAgent(idOrName);
+  public killSubAgent(
+    idOrName: string,
+    onKilled?: (agentId: string) => void,
+    conversationId?: string
+  ): boolean {
+    const item = this.getSubAgent(idOrName, conversationId);
     if (!item) return false;
 
     const child = this.childAgents.get(item.id);
@@ -1459,7 +1463,7 @@ export class SubAgentManager {
     for (const [id, item] of this.subagents.entries()) {
       if (
         item.status === "running" &&
-        (!conversationId || !item.conversationId || item.conversationId === conversationId)
+        (!conversationId || item.conversationId === conversationId)
       ) {
         const child = this.childAgents.get(id);
         if (child) {
@@ -1904,7 +1908,7 @@ export function executeKillAgent(
   const success = globalSubAgentManager.killSubAgent(resolvedId, (id) => {
     const ag = globalSubAgentManager.getSubAgent(id);
     onKilled?.(id, ag);
-  });
+  }, conversationId);
   if (success) {
     return {
       result: `Successfully terminated subagent '${agentId}' (${resolvedId}).`,

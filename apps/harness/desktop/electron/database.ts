@@ -335,7 +335,7 @@ export class ConversationDatabase {
       if (!fs.existsSync(logsDir)) {
         fs.mkdirSync(logsDir, { recursive: true });
       }
-      const transcriptPath = path.join(logsDir, "transcript.jsonl");
+      const transcriptPath = path.join(logsDir, "events.jsonl");
       const line = JSON.stringify({ timestamp: new Date().toISOString(), ...event }) + "\n";
       fs.appendFileSync(transcriptPath, line, "utf-8");
     } catch (err) {
@@ -452,6 +452,8 @@ export class ConversationDatabase {
               type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
               content: m.content || "",
               thinking: m.thinking || undefined,
+              trace_steps: m.traceSteps,
+              duration_ms: m.durationMs,
               tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
               tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
               mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,

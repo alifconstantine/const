@@ -59,6 +59,7 @@ import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { SkillsSettings } from "./components/settings/skills-settings";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { type QueuedMessageItem } from "./components/workbench/queue-dock";
+import { resolveConversationHistory } from "./lib/conversation-routing";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
 import { BottomPanel } from "./components/bottom-panel";
 import { LoginTitleBar } from "./components/login-titlebar";
@@ -515,6 +516,16 @@ function AuthenticatedContent({
   useEffect(() => {
     initConversationStore().then((list) => {
       setConversations(list);
+      // Hydrate messages from active conversation on initial mount if currently empty
+      if (messagesRef.current.length === 0 && !activeSessionMessagesRef.current.has(conversationIdRef.current)) {
+        const active = list.find((c) => c.id === conversationIdRef.current);
+        if (active && active.messages && active.messages.length > 0) {
+          messagesRef.current = normalizeUiMessages(active.messages);
+          setMessages(messagesRef.current);
+          if (active.title) setConversationTitle(active.title);
+          if (active.project) setCurrentProject(active.project);
+        }
+      }
     });
 
     if (window.electron?.onConversationsChanged) {
@@ -529,8 +540,10 @@ function AuthenticatedContent({
           }
           if (messagesRef.current.length === 0 && window.electron?.getConversation) {
             const activeConvo = await window.electron.getConversation(data.conversationId);
-            if (activeConvo && activeConvo.messages && activeConvo.messages.length > 0) {
-              setMessages(normalizeUiMessages(activeConvo.messages) as any);
+            if (data.conversationId === conversationIdRef.current && messagesRef.current.length === 0 &&
+                !activeSessionMessagesRef.current.has(data.conversationId) && activeConvo?.messages?.length) {
+              messagesRef.current = normalizeUiMessages(activeConvo.messages);
+              setMessages(messagesRef.current);
             }
           }
         }
@@ -539,12 +552,28 @@ function AuthenticatedContent({
     }
   }, []);
 
-  const [conversationId, setConversationId] = useState<string>(
-    () => `session_${Date.now()}`
-  );
+  const [conversationId, setConversationId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("const_harness_active_conversation_id");
+      if (saved && typeof saved === "string" && saved.startsWith("session_")) {
+        return saved;
+      }
+    } catch {}
+    const newId = `session_${Date.now()}`;
+    try {
+      localStorage.setItem("const_harness_active_conversation_id", newId);
+    } catch {}
+    return newId;
+  });
   const conversationIdRef = React.useRef(conversationId);
+  const navigationRevisionRef = useRef(0);
   useEffect(() => {
     conversationIdRef.current = conversationId;
+    try {
+      if (conversationId) {
+        localStorage.setItem("const_harness_active_conversation_id", conversationId);
+      }
+    } catch {}
   }, [conversationId]);
   const [conversationTitle, setConversationTitle] = useState<string>("");
   const [currentProject, setCurrentProject] = useState<string>(() => {
@@ -1009,26 +1038,22 @@ function AuthenticatedContent({
   const [runningTasks, setRunningTasks] = useState<BackgroundTaskItem[]>([]);
 
   useEffect(() => {
-    if (window.electron?.listBackgroundTasks) {
-      window.electron.listBackgroundTasks().then((tasks) => {
-        if (tasks) {
-          setRunningTasks(tasks.filter((t) => t.status === "running"));
+    let disposed = false;
+    let request = 0;
+    setRunningTasks([]);
+    const refresh = async () => {
+      const currentRequest = ++request;
+      try {
+        const tasks = await window.electron?.listBackgroundTasks?.(conversationId);
+        if (!disposed && currentRequest === request && tasks) {
+          setRunningTasks(tasks.filter((task) => task.status === "running"));
         }
-      });
-    }
-    if (window.electron?.onBackgroundTaskEvent) {
-      const unsub = window.electron.onBackgroundTaskEvent((event) => {
-        if (window.electron?.listBackgroundTasks) {
-          window.electron.listBackgroundTasks().then((tasks) => {
-            if (tasks) {
-              setRunningTasks(tasks.filter((t) => t.status === "running"));
-            }
-          });
-        }
-      });
-      return () => unsub();
-    }
-  }, []);
+      } catch {}
+    };
+    void refresh();
+    const unsubscribe = window.electron?.onBackgroundTaskEvent?.(() => { void refresh(); });
+    return () => { disposed = true; unsubscribe?.(); };
+  }, [conversationId]);
 
   const handleSelectRunningTask = (task: BackgroundTaskItem) => {
     const tabId = `task_${task.id}`;
@@ -1052,7 +1077,7 @@ function AuthenticatedContent({
 
   const handleStopBackgroundTask = async (taskId: string) => {
     if (window.electron?.killBackgroundTask) {
-      await window.electron.killBackgroundTask(taskId);
+      await window.electron.killBackgroundTask(taskId, conversationId);
       setRunningTasks((prev) => prev.filter((t) => t.id !== taskId));
     }
   };
@@ -1486,6 +1511,23 @@ function AuthenticatedContent({
   const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
 
+  // Save partial traces periodically so a renderer reload can resume the running chat.
+  useEffect(() => {
+    const persisted = new Map<string, ChatMessage[]>();
+    const checkpoint = () => {
+      for (const [id, snapshot] of activeSessionMessagesRef.current) {
+        if (!runningConvoIdsRef.current.has(id) || persisted.get(id) === snapshot) continue;
+        const target = loadConversations().find((item) => item.id === id);
+        if (target) {
+          saveConversation({ ...target, messages: snapshot, updatedAt: Date.now() });
+          persisted.set(id, snapshot);
+        }
+      }
+    };
+    const timer = window.setInterval(checkpoint, 1000);
+    return () => { window.clearInterval(timer); checkpoint(); };
+  }, []);
+
   const handleIntelligenceStateChange = useCallback((messageId: string, blockId: string, state: Record<string, unknown>) => {
     const target = loadConversations().find((item) => item.id === conversationId);
     const current = conversationIdRef.current === conversationId
@@ -1550,6 +1592,7 @@ function AuthenticatedContent({
               project: currentProjectRef.current || "Outside Project",
               mode: currentModeRef.current,
               attachments: item.attachments,
+              conversationId: item.conversationId,
             });
           }
         })
@@ -1586,6 +1629,7 @@ function AuthenticatedContent({
               project: currentProjectRef.current || "Outside Project",
               mode: currentModeRef.current,
               attachments: payload.attachments,
+              conversationId,
             });
           }
         })
@@ -1597,6 +1641,7 @@ function AuthenticatedContent({
   const [respondingApprovals, setRespondingApprovals] = useState<Set<string>>(new Set());
   const activeRunIdsRef = useRef(new Map<string, string>());
   const sendingConversationsRef = useRef(new Set<string>());
+  const stoppingConversationsRef = useRef(new Set<string>());
   const activeApproval = pendingApprovals.get(conversationId);
   const isRespondingApproval = Boolean(activeApproval && respondingApprovals.has(
     approvalResponseKey(conversationId, activeApproval.approvalId || activeApproval.id),
@@ -2309,6 +2354,7 @@ function AuthenticatedContent({
       if (data?.conversationId) {
         const currentRunId = activeRunIdsRef.current.get(data.conversationId);
         if (data.runId && currentRunId && data.runId !== currentRunId) return;
+        stoppingConversationsRef.current.delete(data.conversationId);
         setPendingApprovals((prev) => {
           const current = prev.get(data.conversationId);
           if (!current || (data.runId && current.runId && current.runId !== data.runId)) return prev;
@@ -2364,6 +2410,7 @@ function AuthenticatedContent({
                 project: currentProjectRef.current || "Outside Project",
                 mode: currentModeRef.current,
                 attachments: nextItem.attachments,
+                conversationId: data.conversationId,
               });
             }, 150);
           }
@@ -2443,6 +2490,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "token_reset") {
@@ -2460,6 +2508,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "thinking") {
@@ -2493,6 +2542,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "tool_call") {
@@ -2534,6 +2584,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "tool_result") {
@@ -2572,6 +2623,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "file_mutation") {
@@ -2603,6 +2655,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "approval_request") {
@@ -2670,6 +2723,7 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "ask_question") {
@@ -2714,10 +2768,11 @@ function AuthenticatedContent({
         }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
       } else if (event.type === "task_started") {
-        if (event.task) {
+        if (event.task && targetConvoId === conversationIdRef.current) {
           setRunningTasks((prev) => {
             const filtered = prev.filter((t) => t.id !== event.task.id);
             return [...filtered, event.task];
@@ -2803,6 +2858,7 @@ function AuthenticatedContent({
           targetMsgs = [...targetMsgs, steerMsg, nextAssistantPlaceholder];
           activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
           if (targetConvoId === conversationIdRef.current) {
+            messagesRef.current = targetMsgs;
             setMessages(targetMsgs);
           }
         }
@@ -2856,6 +2912,7 @@ function AuthenticatedContent({
         activeSessionMessagesRef.current.delete(targetConvoId);
 
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
 
@@ -2972,6 +3029,7 @@ function AuthenticatedContent({
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
 
         if (targetConvoId === conversationIdRef.current) {
+          messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
 
@@ -3005,6 +3063,7 @@ function AuthenticatedContent({
     thinkingLevel,
     attachments,
     maxOutputTokens,
+    conversationId: explicitConvoId,
   }: {
     prompt: string;
     project: string;
@@ -3013,11 +3072,23 @@ function AuthenticatedContent({
     thinkingLevel?: string;
     attachments?: AttachedFile[];
     maxOutputTokens?: number;
+    conversationId?: string;
   }) => {
-    if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting || sendingConversationsRef.current.has(conversationId)) return;
-    sendingConversationsRef.current.add(conversationId);
+    const targetConvoId = explicitConvoId || conversationIdRef.current;
+    if ((!prompt.trim() && (!attachments || attachments.length === 0)) || runningConvoIdsRef.current.has(targetConvoId) || sendingConversationsRef.current.has(targetConvoId) || stoppingConversationsRef.current.has(targetConvoId)) return;
+    sendingConversationsRef.current.add(targetConvoId);
 
-    setEditingPrompt("");
+    const existing = loadConversations().find((item) => item.id === targetConvoId);
+    const { isVisible, history } = resolveConversationHistory<ChatMessage>(
+      targetConvoId, conversationIdRef.current, messagesRef.current,
+      activeSessionMessagesRef.current, existing?.messages,
+    );
+    if (!isVisible && existing) {
+      project = existing.project || "Outside Project";
+      mode = existing.mode || mode;
+      model = existing.model || model;
+    }
+    if (isVisible) setEditingPrompt("");
 
     const effectivePrompt =
       prompt.trim() ||
@@ -3042,16 +3113,20 @@ function AuthenticatedContent({
       timestamp: Date.now(),
     };
 
-    const currentStreamMessages = [...messages, userMsg];
+    const currentStreamMessages = [...history, userMsg];
     const initialSessionMsgs = [...currentStreamMessages, assistantPlaceholder];
-    setMessages(initialSessionMsgs);
-    setRunningConvoIds((prev) => new Set(prev).add(conversationId));
-    executionStartTimeMapRef.current.set(conversationId, Date.now());
-    activeSessionMessagesRef.current.set(conversationId, initialSessionMsgs);
-    setLiveDurationMs(0);
+    if (isVisible) {
+      messagesRef.current = initialSessionMsgs;
+      setMessages(initialSessionMsgs);
+    }
+    setRunningConvoIds((prev) => new Set(prev).add(targetConvoId));
+    executionStartTimeMapRef.current.set(targetConvoId, Date.now());
+    activeSessionMessagesRef.current.set(targetConvoId, initialSessionMsgs);
+    runningConvoIdsRef.current.add(targetConvoId);
+    if (isVisible) setLiveDurationMs(0);
 
-    const isFirstMessage = messages.length === 0;
-    let titleToUse = conversationTitle;
+    const isFirstMessage = history.length === 0;
+    let titleToUse = existing?.title || (isVisible ? conversationTitle : "");
 
     if (isFirstMessage) {
       titleToUse = prompt.trim()
@@ -3059,18 +3134,18 @@ function AuthenticatedContent({
         : attachments && attachments[0]
         ? `Attachment: ${attachments[0].name}`
         : "New task";
-      setConversationTitle(titleToUse);
+      if (isVisible) setConversationTitle(titleToUse);
 
       // Asynchronously request AI to generate an ultra-clean title
       const modelForTitle = model || activeModelItem?.id || activeModelItem?.name || undefined;
       generateAiTitle(
         prompt || (attachments && attachments[0]?.name) || "New task",
         (aiTitle) => {
-          if (conversationIdRef.current === conversationId) {
+          if (conversationIdRef.current === targetConvoId) {
             setConversationTitle(aiTitle);
           }
           const stored = loadConversations();
-          const target = stored.find((c) => c.id === conversationId);
+          const target = stored.find((c) => c.id === targetConvoId);
           if (target) {
             target.title = aiTitle;
             target.updatedAt = Date.now();
@@ -3086,14 +3161,14 @@ function AuthenticatedContent({
     const effectiveMode = mode || currentMode;
     const chosenModel = model || activeModelItem?.id || activeModelItem?.name;
     const updatedConvo: ConversationItem = {
-      id: conversationId,
+      id: targetConvoId,
       title: titleToUse || "New task",
       project: project,
-      createdAt: Date.now(),
+      createdAt: existing?.createdAt || Date.now(),
       updatedAt: Date.now(),
-      messages: currentStreamMessages,
-      contextUsage,
-      telemetry: telemetryByConversationRef.current.get(conversationId) ?? activeTelemetry,
+      messages: initialSessionMsgs,
+      contextUsage: isVisible ? contextUsage : existing?.contextUsage,
+      telemetry: telemetryByConversationRef.current.get(targetConvoId) ?? existing?.telemetry ?? (isVisible ? activeTelemetry : undefined),
       mode: effectiveMode,
       model: chosenModel,
     };
@@ -3111,10 +3186,10 @@ function AuthenticatedContent({
           thinkingLevel,
           workspacePath: project,
           mode: effectiveMode,
-          conversationId,
+          conversationId: targetConvoId,
           authToken: token || undefined,
           maxOutputTokens,
-          contextWindow: activeModelItemRef.current?.contextWindow,
+          contextWindow: isVisible ? activeModelItemRef.current?.contextWindow : existing?.contextUsage?.totalTokens,
         });
 
         if (!res.success && res.error) {
@@ -3123,10 +3198,10 @@ function AuthenticatedContent({
           }
           setRunningConvoIds((prev) => {
             const next = new Set(prev);
-            next.delete(conversationId);
+            next.delete(targetConvoId);
             return next;
           });
-          activeSessionMessagesRef.current.delete(conversationId);
+          activeSessionMessagesRef.current.delete(targetConvoId);
         }
       } catch (err: any) {
         if (!err.message?.toLowerCase().includes("cancelled") && !err.message?.toLowerCase().includes("abort")) {
@@ -3134,16 +3209,17 @@ function AuthenticatedContent({
         }
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
-          next.delete(conversationId);
+          next.delete(targetConvoId);
           return next;
         });
-        activeSessionMessagesRef.current.delete(conversationId);
+        activeSessionMessagesRef.current.delete(targetConvoId);
       } finally {
-        sendingConversationsRef.current.delete(conversationId);
+        sendingConversationsRef.current.delete(targetConvoId);
       }
     } else {
-      sendingConversationsRef.current.delete(conversationId);
+      sendingConversationsRef.current.delete(targetConvoId);
       setTimeout(() => {
+        if (conversationIdRef.current !== targetConvoId) return;
         setMessages((prev) => {
           if (prev.length === 0) return prev;
           const lastIdx = prev.length - 1;
@@ -3159,10 +3235,10 @@ function AuthenticatedContent({
         });
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
-          next.delete(conversationId);
+          next.delete(targetConvoId);
           return next;
         });
-        activeSessionMessagesRef.current.delete(conversationId);
+        activeSessionMessagesRef.current.delete(targetConvoId);
       }, 600);
     }
   };
@@ -3252,26 +3328,21 @@ function AuthenticatedContent({
         : null;
     const currentId = conversationIdRef.current || conversationId;
     const idToAbort = rawTarget || currentId;
+    if (runningConvoIdsRef.current.has(idToAbort)) stoppingConversationsRef.current.add(idToAbort);
 
     // 1. Immediately transition UI out of executing mode
     setRunningConvoIds((prev) => {
       const next = new Set(prev);
-      if (rawTarget) next.delete(rawTarget);
-      if (currentId) next.delete(currentId);
       if (idToAbort) next.delete(idToAbort);
       return next;
     });
     setPendingApprovals((prev) => {
       const next = new Map(prev);
-      if (rawTarget) next.delete(rawTarget);
-      if (currentId) next.delete(currentId);
       if (idToAbort) next.delete(idToAbort);
       return next;
     });
     setPendingQuestions((prev) => {
       const next = new Map(prev);
-      if (rawTarget) next.delete(rawTarget);
-      if (currentId) next.delete(currentId);
       if (idToAbort) next.delete(idToAbort);
       return next;
     });
@@ -3279,10 +3350,10 @@ function AuthenticatedContent({
     // 1b. Immediately mark running subagents as killed in UI
     setConversationSubAgents((prev) => {
       const next = new Map(prev);
-      const list = next.get(currentId) || [];
+      const list = next.get(idToAbort) || [];
       if (list.length > 0) {
         next.set(
-          currentId,
+          idToAbort,
           list.map((a) =>
             a.status === "running"
               ? { ...a, status: "killed", endTime: Date.now() }
@@ -3293,28 +3364,16 @@ function AuthenticatedContent({
       return next;
     });
 
-    // Terminate running subagents via IPC
-    if (window.electron?.killSubAgent && activeSubAgents) {
-      for (const sa of activeSubAgents) {
-        if (sa.status === "running") {
-          window.electron.killSubAgent(sa.id).catch(() => {});
-        }
-      }
-    }
-
     // 2. Capture and freeze execution duration
     const startTime =
-      (idToAbort ? executionStartTimeMapRef.current.get(idToAbort) : undefined) ||
-      (currentId ? executionStartTimeMapRef.current.get(currentId) : undefined);
+      (idToAbort ? executionStartTimeMapRef.current.get(idToAbort) : undefined);
     const finalDuration = startTime ? Math.max(1000, Date.now() - startTime) : 1000;
     if (idToAbort) executionStartTimeMapRef.current.delete(idToAbort);
-    if (currentId) executionStartTimeMapRef.current.delete(currentId);
 
     // 3. Finalize assistant message and preserve execution trace
-    let sessionMsgs =
+    let sessionMsgs: ChatMessage[] =
       (idToAbort ? activeSessionMessagesRef.current.get(idToAbort) : undefined) ||
-      (currentId ? activeSessionMessagesRef.current.get(currentId) : undefined) ||
-      messagesRef.current ||
+      (idToAbort === currentId ? messagesRef.current : loadConversations().find((item) => item.id === idToAbort)?.messages) ||
       [];
     if (sessionMsgs && sessionMsgs.length > 0) {
       const lastIdx = sessionMsgs.length - 1;
@@ -3385,12 +3444,13 @@ function AuthenticatedContent({
       }
 
       if (idToAbort) activeSessionMessagesRef.current.set(idToAbort, sessionMsgs);
-      if (currentId) activeSessionMessagesRef.current.set(currentId, sessionMsgs);
-
-      setMessages(sessionMsgs);
+      if (idToAbort === currentId) {
+        messagesRef.current = sessionMsgs;
+        setMessages(sessionMsgs);
+      }
 
       const stored = loadConversations();
-      const target = stored.find((c) => c.id === idToAbort || c.id === currentId);
+      const target = stored.find((c) => c.id === idToAbort);
       if (target) {
         target.messages = sessionMsgs;
         target.updatedAt = Date.now();
@@ -3449,6 +3509,7 @@ function AuthenticatedContent({
   };
 
   const handleNewChat = (targetProject?: any) => {
+    navigationRevisionRef.current++;
     saveCurrentConversationRightPaneState();
 
     setIsScheduledTasksOpen(false);
@@ -3458,6 +3519,7 @@ function AuthenticatedContent({
     setIsTrajectoryOpen(false);
     setTrajectoryTargetConversationId(null);
     setEditingMessageId(null);
+    messagesRef.current = [];
     setMessages([]);
     setConversationTitle("");
     const newSessionId = `session_${Date.now()}`;
@@ -3529,6 +3591,7 @@ function AuthenticatedContent({
   };
 
   const handleSelectConversation = async (id: string) => {
+    const navigationRevision = ++navigationRevisionRef.current;
     if (id === conversationIdRef.current) return;
     setIsScheduledTasksOpen(false);
     setIsSkillsOpen(false);
@@ -3570,7 +3633,8 @@ function AuthenticatedContent({
           } catch {}
         }
       }
-      setMessages([...activeRunningMsgs]);
+      messagesRef.current = [...activeRunningMsgs];
+      setMessages(messagesRef.current);
       setEditingPrompt("");
       restoreConversationRightPaneState(id);
       return;
@@ -3579,9 +3643,11 @@ function AuthenticatedContent({
     let target = conversations.find((c) => c.id === id);
     if (!target && window.electron?.getConversation) {
       const diskConvo = await window.electron.getConversation(id);
+      if (navigationRevisionRef.current !== navigationRevision) return;
       if (diskConvo) {
         target = diskConvo;
         const refreshed = await refreshConversationsFromDisk();
+        if (navigationRevisionRef.current !== navigationRevision) return;
         setConversations(refreshed);
       }
     }
@@ -3615,7 +3681,8 @@ function AuthenticatedContent({
           } catch {}
         }
       }
-      setMessages(normalizeUiMessages(target.messages || []));
+      messagesRef.current = normalizeUiMessages(target.messages || []);
+      setMessages(messagesRef.current);
       setEditingPrompt("");
       restoreConversationRightPaneState(target.id);
     }

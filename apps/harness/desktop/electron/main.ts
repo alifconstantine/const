@@ -65,6 +65,7 @@ import { ROUTER_DEFAULT_MODELS as DEFAULT_MODELS, DEFAULT_ROUTER_MODEL_ID } from
 import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/model-identity";
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
 import { AgentSessionRegistry } from "./agent-sessions";
+import { selectAgentAutosaveMessages } from "./agent-history";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -1188,12 +1189,12 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("tasks:list", async () => {
-    return globalTaskManager.listTasks();
+  ipcMain.handle("tasks:list", async (_event, conversationId?: string) => {
+    return globalTaskManager.listTasks(conversationId);
   });
 
-  ipcMain.handle("tasks:kill", async (_event, taskId: string) => {
-    return globalTaskManager.killTask(taskId);
+  ipcMain.handle("tasks:kill", async (_event, taskId: string, conversationId?: string) => {
+    return globalTaskManager.killTask(taskId, conversationId);
   });
 
   ipcMain.handle("tasks:get-output", async (_event, taskId: string) => {
@@ -1372,41 +1373,48 @@ app.whenReady().then(() => {
           }
         );
 
-        if ((agent as any).isCancelled || !activeSessions.owns(convoId, runId)) {
+        // A replaced run must never overwrite its successor's history.
+        if (!activeSessions.owns(convoId, runId)) {
+          return { success: false, aborted: true, messages: updatedMessages };
+        }
+        const isCancelled = agent.isCancelled;
+
+        // Auto-save to SQLite conversation database even if cancelled, to ensure partial work is never lost
+        const isSideChat = convoId.startsWith("side_conversation_") || convoId.startsWith("side_chat_");
+        if (!isSideChat) {
+          try {
+            const existingConvo = conversationDb.getConversation(convoId);
+            const msgsToSave = selectAgentAutosaveMessages(existingConvo?.messages || [], updatedMessages);
+            if (msgsToSave.length > 0) {
+              conversationDb.saveConversation({
+                ...existingConvo,
+                id: convoId,
+                title: existingConvo?.title || "New Task",
+                project: payload.workspacePath || "Outside Project",
+                model,
+                mode: payload.mode || (activeSessions.get(convoId) as any)?.mode || existingConvo?.mode || "ask_before_changes",
+                updatedAt: Date.now(),
+                createdAt: existingConvo?.createdAt || Date.now(),
+                messages: msgsToSave,
+              });
+
+              // Notify renderer that conversations have changed
+              if (win && !win.isDestroyed()) {
+                win.webContents.send("conversations:changed", { conversationId: convoId });
+              }
+            }
+          } catch (dbErr) {
+            console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
+          }
+        }
+
+        if (isCancelled) {
           return {
             success: false,
             aborted: true,
             error: "User cancelled agent execution.",
             messages: updatedMessages,
           };
-        }
-
-        // Auto-save to SQLite conversation database ONLY IF not cancelled and not a Side Chat
-        const isSideChat = convoId.startsWith("side_conversation_") || convoId.startsWith("side_chat_");
-        if (!isSideChat) {
-          try {
-            const existingConvo = conversationDb.getConversation(convoId);
-            // Preserve rich UI messages with traceSteps/durationMs if already present
-            const hasRichMessages = existingConvo?.messages && existingConvo.messages.length > 0;
-            conversationDb.saveConversation({
-              ...existingConvo,
-              id: convoId,
-              title: existingConvo?.title || "New Task",
-              project: payload.workspacePath || "Outside Project",
-              model,
-              mode: payload.mode || (activeSessions.get(convoId) as any)?.mode || existingConvo?.mode || "ask_before_changes",
-              updatedAt: Date.now(),
-              createdAt: existingConvo?.createdAt || Date.now(),
-              messages: hasRichMessages ? existingConvo.messages : updatedMessages,
-            });
-
-            // Notify renderer that conversations have changed
-            if (win && !win.isDestroyed()) {
-              win.webContents.send("conversations:changed", { conversationId: convoId });
-            }
-          } catch (dbErr) {
-            console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
-          }
         }
 
         return {
@@ -1439,7 +1447,7 @@ app.whenReady().then(() => {
           : undefined;
 
       let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
-      if (!targetSession && activeSessions.size === 1) {
+      if (!safeConvoId && activeSessions.size === 1) {
         targetSession = activeSessions.values().next().value;
       }
 
@@ -1587,26 +1595,26 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
-    // Terminate any active background tasks
-    try {
-      const tasks = globalTaskManager.listTasks();
-      for (const t of tasks) {
-        if (t.status === "running") {
-          globalTaskManager.killTask(t.id);
-        }
-      }
-    } catch {}
-
     const safeConvoId =
       typeof targetConvoId === "string" && targetConvoId.trim().length > 0
         ? targetConvoId.trim()
         : undefined;
 
+    // Terminate any active background tasks scoped to this conversation (or all if un-scoped)
+    try {
+      const tasks = globalTaskManager.listTasks(safeConvoId);
+      for (const t of tasks) {
+        if (t.status === "running") {
+          globalTaskManager.killTask(t.id, safeConvoId);
+        }
+      }
+    } catch {}
+
     // Terminate any active sub-agents scoped to this conversation (or all if un-scoped)
     try {
       globalSubAgentManager.killAllRunningSubAgents((id) => {
         if (win && !win.isDestroyed()) {
-          const agent = globalSubAgentManager.getSubAgent(id);
+          const agent = globalSubAgentManager.getSubAgent(id, safeConvoId);
           win.webContents.send("agent:stream-event", {
             type: "subagent_killed",
             conversationId: agent?.conversationId || safeConvoId,
@@ -1622,14 +1630,17 @@ app.whenReady().then(() => {
       targetSession = activeSessions.values().next().value;
     }
 
-    if (targetSession) {
-      targetSession.agent.abort();
-      finishSession(targetSession);
-      return { success: true };
-    } else if (!safeConvoId) {
-      for (const session of activeSessions.values()) {
-        session.agent.abort();
-        finishSession(session);
+    // Abort the agent session but DO NOT prematurely call finishSession(targetSession).
+    // The finally block in agent:send-message will cleanly call finishSession when the agent run unwinds,
+    // allowing trailing tool results/telemetry to pass activeSessions.owns() checks.
+    const sessionsToAbort = targetSession ? [targetSession] : !safeConvoId ? [...activeSessions.values()] : [];
+    for (const session of sessionsToAbort) {
+      session.agent.abort();
+      // ask_question waits on these promises; resolve them without releasing run ownership.
+      for (const [id, question] of pendingQuestions) {
+        if (question.runId !== session.runId) continue;
+        pendingQuestions.delete(id);
+        question.resolve({ status: "cancelled", error: "User cancelled agent execution." });
       }
     }
     return { success: true };

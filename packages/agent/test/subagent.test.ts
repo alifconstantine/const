@@ -27,7 +27,7 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
       expect(normalizeAgentRole("explorer")).toBe("scout");
       expect(normalizeAgentRole("reviewer")).toBe("reviewer");
       expect(normalizeAgentRole("audit")).toBe("reviewer");
-      expect(normalizeAgentRole("security")).toBe("reviewer");
+      expect(normalizeAgentRole("security")).toBe("security-reviewer");
       expect(normalizeAgentRole("task")).toBe("task");
       expect(normalizeAgentRole("coder")).toBe("task");
       expect(normalizeAgentRole(undefined)).toBe("task");
@@ -59,6 +59,17 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
   });
 
   describe("SubAgentManager lifecycle", () => {
+    it("rejects cross-session IDs and names, and scopes cancellation", () => {
+      const a = globalSubAgentManager.spawnSubAgent({ prompt: "A", name: "worker", conversationId: "scope-a" }, { workspacePath: process.cwd() });
+      const b = globalSubAgentManager.spawnSubAgent({ prompt: "B", name: "worker", conversationId: "scope-b" }, { workspacePath: process.cwd() });
+      expect(globalSubAgentManager.getSubAgent(a.id, "scope-b")).toBeUndefined();
+      expect(globalSubAgentManager.getSubAgent(a.name!, "scope-b")?.id).toBe(b.id);
+      expect(globalSubAgentManager.killSubAgent(b.id, undefined, "scope-a")).toBe(false);
+      expect(globalSubAgentManager.killAllRunningSubAgents(undefined, "scope-a")).toBe(1);
+      expect(a.status).toBe("killed");
+      expect(b.status).toBe("running");
+    });
+
     it("should spawn a subagent and complete execution in background", async () => {
       let started = false;
       let finished = false;
@@ -174,7 +185,7 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
 
       expect(res.isError).toBe(false);
       expect(res.result).toContain('status="running"');
-      expect(res.result).toContain("<notice>Subagent is running in the background");
+      expect(res.result).toMatch(/<notice>Subagent .*is running in the background/);
       expect(res.agentId).toBeDefined();
 
       // Should be findable in agent_status
@@ -236,9 +247,9 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
       expect(spawnRes.result).toContain('agent="reviewer" status="completed"');
     });
 
-    it("should reject spawning more than 5 concurrent running subagents", async () => {
-      // Spawn 5 running background subagents
-      for (let i = 1; i <= 5; i++) {
+    it("should reject spawning more than 8 active subagents in a session", async () => {
+      // Spawn 8 active background subagents (5 execute concurrently, 3 queue)
+      for (let i = 1; i <= 8; i++) {
         const res = await executeTaskTool(
           {
             task: `Background worker ${i}`,
@@ -249,17 +260,17 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
         expect(res.isError).toBe(false);
       }
 
-      // 6th subagent attempt must be blocked
+      // 9th subagent attempt must be blocked
       const blockedRes = await executeTaskTool(
         {
-          task: "6th worker attempting to run",
+          task: "9th worker attempting to run",
           run_in_background: true,
         },
         process.cwd()
       );
 
       expect(blockedRes.isError).toBe(true);
-      expect(blockedRes.result).toContain("Maximum limit of 5 concurrent subagents reached");
+      expect(blockedRes.result).toContain("Maximum limit of 8 concurrent active subagents");
     });
 
     it("should terminate all running subagents at once when execution is stopped", async () => {

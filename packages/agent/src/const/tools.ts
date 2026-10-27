@@ -4820,6 +4820,9 @@ interface ProcessRunResult {
 
 export function killProcessTree(pid: number): void {
   if (process.platform === "win32") {
+    const killParent = () => {
+      try { process.kill(pid, "SIGKILL"); } catch {}
+    };
     try {
       const child = spawn(
         path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
@@ -4830,13 +4833,12 @@ export function killProcessTree(pid: number): void {
           windowsHide: true,
         }
       );
-      child.once("error", () => {});
+      // taskkill must discover descendants before the parent exits, otherwise they become orphans.
+      child.once("error", killParent);
+      child.once("exit", (code) => { if (code !== 0) killParent(); });
     } catch {
-      // Ignore errors if taskkill fails
+      killParent();
     }
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {}
   } else {
     // Unix: kill entire process group with negative PID
     try {
@@ -4892,18 +4894,23 @@ export interface ServiceReady {
 
 export interface StartTaskOptions {
   name?: string;
+  conversationId?: string;
+  signal?: AbortSignal;
 }
 
 export interface ActiveBackgroundTask {
   id: string;
   name?: string;
+  conversationId?: string;
+  logFilePath?: string;
   command: string;
   cwd: string;
   pid?: number;
   startTime: number;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "killed";
   exitCode: number | null;
   logs: string[];
+  outputRevision: number;
   child?: ChildProcess;
   port?: number;
 }
@@ -4912,7 +4919,7 @@ export type BackgroundTaskListener = (event: {
   type: "output" | "status";
   taskId: string;
   data?: string;
-  status?: "running" | "completed" | "failed";
+  status?: "running" | "completed" | "failed" | "killed";
   code?: number | null;
 }) => void;
 
@@ -4921,6 +4928,7 @@ export class BackgroundProcessManager {
   private listeners: Set<BackgroundTaskListener> = new Set();
 
   public startTask(command: string, cwd: string, options?: StartTaskOptions): ActiveBackgroundTask {
+    options?.signal?.throwIfAborted();
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const shellCfg = getShellConfig();
     const child = spawn(shellCfg.shell, [...shellCfg.args, command], {
@@ -4930,9 +4938,17 @@ export class BackgroundProcessManager {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
+    const logDir = path.join(os.homedir(), ".const", "tasks");
+    try {
+      fsSync.mkdirSync(logDir, { recursive: true });
+    } catch {}
+    const logFilePath = path.join(logDir, `${taskId}.log`);
+
     const task: ActiveBackgroundTask = {
       id: taskId,
       name: options?.name,
+      conversationId: options?.conversationId,
+      logFilePath,
       command,
       cwd,
       pid: child.pid,
@@ -4940,13 +4956,22 @@ export class BackgroundProcessManager {
       status: "running",
       exitCode: null,
       logs: [`[Process started: ${command} (PID: ${child.pid})]`],
+      outputRevision: 0,
       child,
     };
 
+    try {
+      fsSync.writeFileSync(logFilePath, `[Process started: ${command} (PID: ${child.pid})]` + "\n", "utf8");
+    } catch {}
+
     const appendLog = (chunk: string) => {
+      try {
+        fsSync.appendFileSync(logFilePath, chunk, "utf8");
+      } catch {}
       const lines = chunk.split(/\r?\n/);
       for (const line of lines) {
         if (line) {
+          task.outputRevision++;
           task.logs.push(line);
           if (task.logs.length > 5000) task.logs.shift();
 
@@ -4967,20 +4992,30 @@ export class BackgroundProcessManager {
     child.stdout?.on("data", (data) => appendLog(data.toString()));
     child.stderr?.on("data", (data) => appendLog(data.toString()));
 
+    const onAbort = () => { this.killTask(taskId, task.conversationId); };
     child.on("close", (code) => {
-      task.status = code === 0 ? "completed" : "failed";
+      options?.signal?.removeEventListener("abort", onAbort);
+      task.status = task.status === "killed" ? "killed" : (code === 0 ? "completed" : "failed");
       task.exitCode = code;
       task.logs.push(`[Process exited with code ${code}]`);
+      try {
+        fsSync.appendFileSync(logFilePath, `[Process exited with code ${code}]\n`, "utf8");
+      } catch {}
       this.emit({ type: "status", taskId, status: task.status, code });
     });
 
     child.on("error", (err) => {
-      task.status = "failed";
+      task.status = task.status === "killed" ? "killed" : "failed";
       task.logs.push(`[Process error: ${err.message}]`);
-      this.emit({ type: "status", taskId, status: "failed" });
+      try {
+        fsSync.appendFileSync(logFilePath, `[Process error: ${err.message}]\n`, "utf8");
+      } catch {}
+      this.emit({ type: "status", taskId, status: task.status });
     });
 
     this.tasks.set(taskId, task);
+    options?.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options?.signal?.aborted) onAbort();
     return task;
   }
 
@@ -4996,16 +5031,10 @@ export class BackgroundProcessManager {
     const targetHost = readyCfg?.host || "127.0.0.1";
 
     while (Date.now() - startTime < timeoutMs) {
-      if (task.status === "failed") {
+      if (task.status !== "running") {
         return {
           ready: false,
           error: task.logs.slice(-5).join("\n") || "Process failed to start",
-        };
-      }
-      if (task.status === "completed" && task.exitCode !== 0) {
-        return {
-          ready: false,
-          error: `Process exited with code ${task.exitCode}:\n${task.logs.slice(-5).join("\n")}`,
         };
       }
 
@@ -5013,7 +5042,7 @@ export class BackgroundProcessManager {
       const probePort = readyCfg?.port || task.port;
       if (probePort) {
         const isOpen = await checkPortOpen(probePort, targetHost, 300);
-        if (isOpen) {
+        if (isOpen && task.status === "running") {
           task.port = probePort;
           return { ready: true, port: probePort };
         }
@@ -5041,10 +5070,15 @@ export class BackgroundProcessManager {
     return { ready: task.status === "running", port: task.port };
   }
 
-  public listTasks(): BackgroundTaskItem[] {
-    return Array.from(this.tasks.values()).map((t) => ({
+  public listTasks(conversationId?: string): BackgroundTaskItem[] {
+    let all = Array.from(this.tasks.values());
+    if (conversationId) {
+      all = all.filter((t) => t.conversationId === conversationId);
+    }
+    return all.map((t) => ({
       id: t.id,
       name: t.name,
+      conversationId: t.conversationId,
       command: t.command,
       pid: t.pid,
       status: t.status,
@@ -5054,17 +5088,26 @@ export class BackgroundProcessManager {
     }));
   }
 
-  public getTask(taskIdOrName: string): ActiveBackgroundTask | undefined {
+  public getTask(taskIdOrName: string, conversationId?: string): ActiveBackgroundTask | undefined {
     const direct = this.tasks.get(taskIdOrName);
-    if (direct) return direct;
+    if (direct) {
+      if (conversationId && direct.conversationId !== conversationId) {
+        return undefined;
+      }
+      return direct;
+    }
     const lower = taskIdOrName.toLowerCase().trim();
-    return Array.from(this.tasks.values()).find(
-      (t) => t.id === taskIdOrName || (t.name && t.name.toLowerCase() === lower)
-    );
+    const matches = Array.from(this.tasks.values()).reverse().filter((t) => {
+      const match = t.id === taskIdOrName || (t.name && t.name.toLowerCase() === lower);
+      if (!match) return false;
+      if (conversationId && t.conversationId !== conversationId) return false;
+      return true;
+    });
+    return matches.find((task) => task.status === "running") || matches[0];
   }
 
-  public killTask(taskIdOrName: string): boolean {
-    const task = this.getTask(taskIdOrName);
+  public killTask(taskIdOrName: string, conversationId?: string): boolean {
+    const task = this.getTask(taskIdOrName, conversationId);
     if (!task) return false;
     if (task.status !== "running") return true;
 
@@ -5072,9 +5115,14 @@ export class BackgroundProcessManager {
       if (task.pid) {
         killProcessTree(task.pid);
       }
-      task.status = "completed";
+      task.status = "killed";
       task.logs.push("[Process terminated by user/AI request]");
-      this.emit({ type: "status", taskId: task.id, status: "completed", code: null });
+      if (task.logFilePath) {
+        try {
+          fsSync.appendFileSync(task.logFilePath, "[Process terminated by user/AI request]\n", "utf8");
+        } catch {}
+      }
+      this.emit({ type: "status", taskId: task.id, status: "killed", code: null });
       return true;
     } catch {
       return false;
@@ -5167,7 +5215,7 @@ export async function executeWaitTool(
       };
     }
 
-    const task = globalTaskManager.getTask(targetId);
+    const task = globalTaskManager.getTask(targetId, conversationId);
     if (!task) {
       return {
         result: `<task-result id="${targetId}" status="not_found">\n<error>Background task or subagent '${targetId}' not found.</error>\n</task-result>`,
@@ -5184,14 +5232,14 @@ export async function executeWaitTool(
     }
 
     // Wait until background shell task settles or new log arrives or timeout
-    const initialLogCount = task.logs.length;
+    const initialLogCount = task.outputRevision;
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
       if (signal?.aborted) {
         return { result: "[Wait aborted by signal]", isError: false };
       }
       const currentStatus: string = task.status;
-      if (currentStatus !== "running" || task.logs.length > initialLogCount + 2) {
+      if (currentStatus !== "running" || task.outputRevision > initialLogCount) {
         break;
       }
       await new Promise((r) => setTimeout(r, 250));
@@ -5256,7 +5304,7 @@ export async function executeWaitTool(
     }
   }
 
-  const allTasks = globalTaskManager.listTasks();
+  const allTasks = globalTaskManager.listTasks(conversationId);
   const runningTasks = allTasks.filter((t) => t.status === "running");
   const firstRunning = runningTasks[0];
   if (!firstRunning) {
@@ -5267,17 +5315,24 @@ export async function executeWaitTool(
   }
 
   const startTime = Date.now();
-  const initialCounts = new Map(runningTasks.map((t) => [t.id, t.output?.length || 0]));
+  const initialLogCounts = new Map(
+    runningTasks.map((t) => [t.id, globalTaskManager.getTask(t.id, conversationId)?.outputRevision || 0])
+  );
   let activeTask: BackgroundTaskItem = firstRunning;
 
   while (Date.now() - startTime < timeoutMs) {
     if (signal?.aborted) {
       return { result: "[Wait aborted by signal]", isError: false };
     }
-    const currentList = globalTaskManager.listTasks();
-    const settledOrNew = currentList.find(
-      (t) => t.status !== "running" || (t.output?.length || 0) > (initialCounts.get(t.id) || 0)
-    );
+    const currentList = globalTaskManager.listTasks(conversationId);
+    const settledOrNew = currentList.find((t) => {
+      if (!initialLogCounts.has(t.id)) return false;
+      if (t.status !== "running") return true;
+      const currentTaskObj = globalTaskManager.getTask(t.id, conversationId);
+      const curCount = currentTaskObj?.outputRevision || 0;
+      const prevCount = initialLogCounts.get(t.id) || 0;
+      return curCount > prevCount;
+    });
     if (settledOrNew) {
       activeTask = settledOrNew;
       break;
@@ -5286,7 +5341,7 @@ export async function executeWaitTool(
   }
 
   const durationSec = Math.round((Date.now() - activeTask.startTime) / 1000);
-  const taskObj = globalTaskManager.getTask(activeTask.id);
+  const taskObj = globalTaskManager.getTask(activeTask.id, conversationId);
   const output = taskObj?.logs.slice(-8).join("\n") || `Status: ${activeTask.status}`;
   return {
     result: `<task-result id="${activeTask.id}" name="${activeTask.name || ""}" status="${activeTask.status}" duration="${durationSec}s">\n<output>\n${output}\n</output>\n</task-result>`,
@@ -6039,10 +6094,12 @@ export async function executeNativeTool(
             }
           : undefined;
 
-        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName });
+        const effectiveConvoId = options.conversationId || options.parentConfig?.conversationId;
+        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName, conversationId: effectiveConvoId, signal: options.signal });
         options.onTaskStarted?.({
           id: bgTask.id,
           name: bgTask.name,
+          conversationId: bgTask.conversationId,
           command: bgTask.command,
           pid: bgTask.pid,
           startTime: bgTask.startTime,
@@ -6056,10 +6113,10 @@ export async function executeNativeTool(
           const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
           const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
 
-          if (!waitResult.ready && bgTask.status === "failed") {
+          if (!waitResult.ready && bgTask.status !== "running") {
             const errLogs = bgTask.logs.slice(-6).join("\n");
             return {
-              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="failed" duration="${durationSec}s">\n<error>\nService failed to start:\n${errLogs}\n</error>\n</task-result>`,
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService stopped before becoming ready:\n${errLogs}\n</error>\n</task-result>`,
               isError: true,
             };
           }
@@ -6424,10 +6481,12 @@ export async function executeNativeTool(
             }
           : undefined;
 
-        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName });
+        const effectiveConvoId = options.conversationId || options.parentConfig?.conversationId;
+        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName, conversationId: effectiveConvoId, signal: options.signal });
         options.onTaskStarted?.({
           id: bgTask.id,
           name: bgTask.name,
+          conversationId: bgTask.conversationId,
           command: bgTask.command,
           pid: bgTask.pid,
           startTime: bgTask.startTime,
@@ -6440,10 +6499,10 @@ export async function executeNativeTool(
           const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
           const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
 
-          if (!waitResult.ready && bgTask.status === "failed") {
+          if (!waitResult.ready && bgTask.status !== "running") {
             const errLogs = bgTask.logs.slice(-6).join("\n");
             return {
-              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="failed" duration="${durationSec}s">\n<error>\nService failed to start:\n${errLogs}\n</error>\n</task-result>`,
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService stopped before becoming ready:\n${errLogs}\n</error>\n</task-result>`,
               isError: true,
             };
           }
@@ -6680,9 +6739,10 @@ export async function executeNativeTool(
     ) {
       const action = String(args.action || "").toLowerCase().trim();
       const taskId = String(args.task_id || args.taskId || args.id || "").trim();
+      const convoId = options.conversationId || options.parentConfig?.conversationId;
 
       if (action === "list") {
-        const tasks = globalTaskManager.listTasks();
+        const tasks = globalTaskManager.listTasks(convoId);
         if (tasks.length === 0) {
           return {
             result: "(No active or recent background tasks)",
@@ -6709,7 +6769,7 @@ export async function executeNativeTool(
             isError: true,
           };
         }
-        const task = globalTaskManager.getTask(taskId);
+        const task = globalTaskManager.getTask(taskId, convoId);
         if (!task) {
           return {
             result: `<task-result id="${taskId}" status="not_found">\n<error>Background task '${taskId}' not found.</error>\n</task-result>`,
@@ -6731,13 +6791,13 @@ export async function executeNativeTool(
             isError: true,
           };
         }
-        const task = globalTaskManager.getTask(taskId);
+        const task = globalTaskManager.getTask(taskId, convoId);
         const resolvedId = task ? task.id : taskId;
-        const success = globalTaskManager.killTask(resolvedId);
+        const success = globalTaskManager.killTask(resolvedId, convoId);
         if (success) {
           options.onTaskStopped?.(resolvedId, null);
           return {
-            result: `<task-result id="${resolvedId}" status="completed">\n<output>Successfully stopped background task '${resolvedId}'.</output>\n</task-result>`,
+            result: `<task-result id="${resolvedId}" status="killed">\n<output>Successfully stopped background task '${resolvedId}'.</output>\n</task-result>`,
             isError: false,
           };
         }
