@@ -115,7 +115,7 @@ function Logs() {
         </form>
 
         {/* Filter Controls (Segmented groups) */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 max-w-full">
           {/* Tier Selector */}
           <div className="flex items-center gap-0.5 bg-secondary/50 p-1 rounded-xl border border-border/50">
             {tierOptions.map((opt) => (
@@ -191,120 +191,197 @@ function Logs() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Logs View: Responsive Mobile Cards + Desktop Table */}
       <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-        <ScrollArea orientation="horizontal">
-          <table className="w-full min-w-[1000px] text-left text-xs">
-            <thead className="text-muted-foreground bg-secondary/40 border-b border-border/40">
-              <tr>
-                {[
-                  "Model & Request",
-                  "Tier",
-                  "Status",
-                  "Input / Cached",
-                  "Output",
-                  "Cost",
-                  "Duration",
-                  "Timestamp",
-                ].map((v) => (
-                  <th key={v} className="px-5 py-3.5 font-normal">
-                    {v}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {logs.results.map((log) => {
-                return (
-                  <tr
-                    key={log._id}
-                    className="hover:bg-secondary/20 transition-colors"
+        {/* Mobile Cards (sm:hidden) */}
+        <div className="divide-y divide-border/40 sm:hidden">
+          {logs.results.map((log) => (
+            <div
+              key={log._id}
+              onClick={() => setSelected(log)}
+              className="p-3.5 space-y-2.5 hover:bg-secondary/20 transition-colors cursor-pointer"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono font-semibold text-xs text-foreground truncate">
+                    {log.model}
+                  </p>
+                  {log.resolvedModel && log.resolvedModel !== log.model && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      &rarr; {log.resolvedModel}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate">
+                    {log.requestId}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Badge variant="secondary" className="font-mono text-[9px] px-1.5 py-0">
+                    {log.billingTier ?? "Legacy"}
+                  </Badge>
+                  <Badge
+                    variant={log.status >= 400 ? "destructive" : "secondary"}
+                    className="font-mono text-[9px] px-1.5 py-0"
                   >
-                    <td className="p-4">
-                      <div className="flex items-center gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelected(log)}
-                          className="text-left group cursor-pointer"
-                        >
-                          <p className="font-mono font-medium text-foreground group-hover:underline">
-                            {log.model}
-                          </p>
-                          {log.resolvedModel && log.resolvedModel !== log.model && (
-                            <p className="text-[11px] text-muted-foreground">
-                              &rarr; {log.resolvedModel}
+                    {log.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/30 text-[11px] font-mono">
+                <div>
+                  <span className="text-[9px] text-muted-foreground uppercase block">Tokens</span>
+                  <span className="text-foreground">
+                    {(log.promptTokens + log.completionTokens).toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground uppercase block">Cost</span>
+                  <span className="text-foreground font-medium">
+                    {log.costNanoUsd === undefined
+                      ? "—"
+                      : "$" + (log.costNanoUsd / 1e9).toFixed(5)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground uppercase block">Duration</span>
+                  <span className="text-muted-foreground">
+                    {(log.durationMs / 1000).toFixed(2)}s
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[10px] font-mono text-muted-foreground/80 flex items-center justify-between">
+                <span>{new Date(log.createdAt).toLocaleString()}</span>
+                <span className="text-primary text-[10px] font-sans">Tap for JSON &rarr;</span>
+              </div>
+            </div>
+          ))}
+
+          {logs.results.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground text-xs">
+              {logs.status === "LoadingFirstPage"
+                ? "Loading usage logs…"
+                : "No requests match the selected filters."}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table (hidden sm:block) */}
+        <div className="hidden sm:block">
+          <ScrollArea orientation="horizontal">
+            <table className="w-full min-w-[1000px] text-left text-xs">
+              <thead className="text-muted-foreground bg-secondary/40 border-b border-border/40">
+                <tr>
+                  {[
+                    "Model & Request",
+                    "Tier",
+                    "Status",
+                    "Input / Cached",
+                    "Output",
+                    "Cost",
+                    "Duration",
+                    "Timestamp",
+                  ].map((v) => (
+                    <th key={v} className="px-5 py-3.5 font-normal">
+                      {v}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {logs.results.map((log) => {
+                  return (
+                    <tr
+                      key={log._id}
+                      className="hover:bg-secondary/20 transition-colors"
+                    >
+                      <td className="p-4">
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelected(log)}
+                            className="text-left group cursor-pointer"
+                          >
+                            <p className="font-mono font-medium text-foreground group-hover:underline">
+                              {log.model}
                             </p>
-                          )}
-                          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate max-w-[200px]">
-                            {log.requestId}
-                          </p>
-                        </button>
-                      </div>
-                    </td>
+                            {log.resolvedModel && log.resolvedModel !== log.model && (
+                              <p className="text-[11px] text-muted-foreground">
+                                &rarr; {log.resolvedModel}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate max-w-[200px]">
+                              {log.requestId}
+                            </p>
+                          </button>
+                        </div>
+                      </td>
 
-                    <td className="p-4">
-                      <Badge variant="secondary" className="font-mono text-[10px]">
-                        {log.billingTier ?? "Legacy"}
-                      </Badge>
-                    </td>
+                      <td className="p-4">
+                        <Badge variant="secondary" className="font-mono text-[10px]">
+                          {log.billingTier ?? "Legacy"}
+                        </Badge>
+                      </td>
 
-                    <td className="p-4">
-                      <Badge
-                        variant={log.status >= 400 ? "destructive" : "secondary"}
-                        className="font-mono text-[10px]"
-                      >
-                        {log.status}
-                      </Badge>
-                    </td>
+                      <td className="p-4">
+                        <Badge
+                          variant={log.status >= 400 ? "destructive" : "secondary"}
+                          className="font-mono text-[10px]"
+                        >
+                          {log.status}
+                        </Badge>
+                      </td>
 
-                    <td className="p-4 tabular-nums font-mono">
-                      <span>{log.promptTokens.toLocaleString()}</span>
-                      {log.cachedTokens ? (
-                        <span className="text-muted-foreground ml-1">
-                          ({log.cachedTokens.toLocaleString()})
-                        </span>
-                      ) : null}
-                    </td>
+                      <td className="p-4 tabular-nums font-mono">
+                        <span>{log.promptTokens.toLocaleString()}</span>
+                        {log.cachedTokens ? (
+                          <span className="text-muted-foreground ml-1">
+                            ({log.cachedTokens.toLocaleString()})
+                          </span>
+                        ) : null}
+                      </td>
 
-                    <td className="p-4 tabular-nums font-mono">
-                      <span>{log.completionTokens.toLocaleString()}</span>
-                      {log.usageEstimated && (
-                        <span className="block text-[10px] text-muted-foreground">Estimated</span>
-                      )}
-                    </td>
+                      <td className="p-4 tabular-nums font-mono">
+                        <span>{log.completionTokens.toLocaleString()}</span>
+                        {log.usageEstimated && (
+                          <span className="block text-[10px] text-muted-foreground">Estimated</span>
+                        )}
+                      </td>
 
-                    <td className="p-4 tabular-nums font-mono font-medium">
-                      {log.costNanoUsd === undefined
-                        ? "—"
-                        : "$" + (log.costNanoUsd / 1e9).toFixed(6)}
-                    </td>
+                      <td className="p-4 tabular-nums font-mono font-medium">
+                        {log.costNanoUsd === undefined
+                          ? "—"
+                          : "$" + (log.costNanoUsd / 1e9).toFixed(6)}
+                      </td>
 
-                    <td className="p-4 font-mono text-muted-foreground">
-                      {(log.durationMs / 1000).toFixed(2)}s
-                    </td>
+                      <td className="p-4 font-mono text-muted-foreground">
+                        {(log.durationMs / 1000).toFixed(2)}s
+                      </td>
 
-                    <td className="p-4 text-muted-foreground font-mono">
-                      {new Date(log.createdAt).toLocaleString()}
+                      <td className="p-4 text-muted-foreground font-mono">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {logs.results.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="p-12 text-center text-muted-foreground text-xs"
+                    >
+                      {logs.status === "LoadingFirstPage"
+                        ? "Loading usage logs…"
+                        : "No requests match the selected filters."}
                     </td>
                   </tr>
-                );
-              })}
-
-              {logs.results.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="p-12 text-center text-muted-foreground text-xs"
-                  >
-                    {logs.status === "LoadingFirstPage"
-                      ? "Loading usage logs…"
-                      : "No requests match the selected filters."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </ScrollArea>
+                )}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </div>
       </div>
 
       {/* Pagination Footer */}
@@ -332,7 +409,7 @@ function Logs() {
           if (!open) setSelected(null);
         }}
       >
-        <DialogContent className="max-w-2xl bg-card border-border/60">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl bg-card border-border/70 rounded-2xl p-5 sm:p-6">
           <DialogTitle className="text-base font-medium">Request Telemetry</DialogTitle>
           <ScrollArea orientation="both" className="max-h-[60vh] bg-secondary/30 rounded-lg p-3">
             <pre className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">

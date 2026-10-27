@@ -9,12 +9,6 @@ import { api } from "@const/backend/_generated/api";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage,
   ConstLogoIcon,
   Button,
   Sheet,
@@ -47,10 +41,11 @@ class SafeCreditBoundary extends React.Component<
           <Button
             variant="outline"
             size="sm"
-            className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
+            className="h-8 rounded-lg text-xs font-mono font-medium px-2 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
           >
             <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Balance unavailable</span>
+            <span className="hidden sm:inline">Balance unavailable</span>
+            <span className="sm:hidden">—</span>
           </Button>
         </Link>
       );
@@ -73,10 +68,10 @@ function HeaderCreditBalance() {
       <Button
         variant="outline"
         size="sm"
-        className="h-8 rounded-lg text-xs font-mono font-medium px-2.5 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
+        className="h-8 rounded-lg text-xs font-mono font-medium px-2 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
       >
         <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{credits ? `${balance.toFixed(4)}` : "Loading balance…"}</span>
+        <span>{credits ? `$${balance.toFixed(4)}` : "..."}</span>
       </Button>
     </Link>
   );
@@ -244,10 +239,10 @@ export default function DashboardLayout({
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
-          {/* Top Page Heading Bar: Breadcrumb (Left) + ThemeToggle, Notif, Create API Key (Right) */}
-          <header className="h-14 w-full border-b border-border/70 bg-card/60 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
-            {/* Left: Mobile Menu Toggle + Breadcrumbs */}
-            <div className="flex items-center gap-3">
+          {/* Top Page Heading Bar: Mobile Menu + Brand (Left) + ThemeToggle, Notif, Credit, Create Key (Right) */}
+          <header className="h-14 w-full border-b border-border/70 bg-card/60 backdrop-blur sticky top-0 z-30 px-3 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
+            {/* Left: Mobile Menu Toggle + Mobile Brand Logo */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <Button
                 variant="ghost"
                 size="icon"
@@ -258,28 +253,27 @@ export default function DashboardLayout({
                 <Menu className="h-4 w-4" />
               </Button>
 
-              <Breadcrumb>
-                <BreadcrumbList className="text-xs font-sans">
-                  <BreadcrumbItem>
-                    <BreadcrumbLink
-                      href="/dashboard"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Dashboard
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="text-muted-foreground/40" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage className="font-medium text-foreground">
-                      {currentTitle}
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
+              <Link
+                href="/dashboard"
+                className="md:hidden flex items-center gap-2 group min-w-0"
+              >
+                <ConstLogoIcon
+                  size="sm"
+                  className="w-5 h-5 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="font-serif text-base font-normal tracking-tight text-foreground">
+                    Const
+                  </span>
+                  <span className="text-[9px] font-mono tracking-wider uppercase px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
+                    Router
+                  </span>
+                </div>
+              </Link>
             </div>
 
             {/* Right: Controls & Actions */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               <ThemeToggle />
 
               <Button
@@ -302,9 +296,10 @@ export default function DashboardLayout({
               <Link href="/keys">
                 <Button
                   size="sm"
-                  className="h-8 rounded-lg text-xs font-medium px-3.5 bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-xs transition-colors"
+                  className="h-8 rounded-lg text-xs font-medium px-2.5 sm:px-3.5 bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-xs transition-colors shrink-0"
                 >
-                  Create API key
+                  <span className="hidden sm:inline">Create API key</span>
+                  <span className="sm:hidden">+ Key</span>
                 </Button>
               </Link>
             </div>
@@ -316,7 +311,7 @@ export default function DashboardLayout({
               "flex-1 min-w-0 w-full overflow-y-auto",
               isGeneration
                 ? "p-0 overflow-hidden flex flex-col h-full"
-                : "p-6 md:p-8",
+                : "p-4 sm:p-6 md:p-8",
             )}
           >
             {children}

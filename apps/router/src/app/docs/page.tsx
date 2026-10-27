@@ -154,20 +154,20 @@ export default function DocsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
       {/* Top Docs Bar */}
-      <div className="border-b border-border/60 bg-card/60 backdrop-blur sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-border/60 bg-card/60 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Dashboard</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
-          <span className="text-border">/</span>
-          <span className="text-xs font-medium text-foreground">Documentation</span>
+          <span className="text-border shrink-0">/</span>
+          <span className="text-xs font-medium text-foreground truncate">Documentation</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -181,11 +181,14 @@ export default function DocsPage() {
             )}
             <span>https://router.const.web.id/v1</span>
           </Button>
-          <Button asChild size="sm" variant="outline" className="h-8 text-xs rounded-lg">
-            <Link href="/keys">Create API Key</Link>
+          <Button asChild size="sm" variant="outline" className="h-8 text-xs rounded-lg px-2.5 sm:px-3">
+            <Link href="/keys">
+              <span className="sm:hidden">+ Key</span>
+              <span className="hidden sm:inline">Create API key</span>
+            </Link>
           </Button>
-          <Button asChild size="sm" className="h-8 text-xs rounded-lg">
-            <Link href="/models">View Pricing</Link>
+          <Button asChild size="sm" className="h-8 text-xs rounded-lg px-2.5 sm:px-3">
+            <Link href="/models">Pricing</Link>
           </Button>
         </div>
       </div>
@@ -619,8 +622,7 @@ data: [DONE]`,
               For reasoning models (such as DeepSeek R1, GLM thinking, and OpenAI reasoning architectures), pass the <code className="text-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded">reasoning_effort</code> parameter to modulate internal thought token budgets before generating answers.
             </p>
 
-            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-              <table className="w-full text-left text-xs">
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-xs min-w-[500px]">
                 <thead className="bg-secondary/40 text-muted-foreground border-b border-border/40 font-mono">
                   <tr>
                     <th className="px-4 py-3 font-normal">Effort Level</th>
@@ -665,9 +667,7 @@ data: [DONE]`,
                       Mission-critical bug audits and difficult logic puzzles
                     </td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
+                </tbody></table></div></div>
 
             <CodeSnippetTabs
               id="reasoning-snippet"
@@ -1260,8 +1260,7 @@ X-Const-Cost: 0`,
               Const Router preserves standard HTTP error codes and returns consistent OpenAI-compatible error objects:
             </p>
 
-            <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-              <table className="w-full text-left text-xs">
+            <div className="rounded-xl bg-card border border-border/60 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-xs min-w-[500px]">
                 <thead className="bg-secondary/40 text-muted-foreground border-b border-border/40 font-mono">
                   <tr>
                     <th className="px-4 py-3 font-normal">Code</th>
@@ -1302,6 +1301,7 @@ X-Const-Cost: 0`,
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
 
             <CodeSnippetTabs

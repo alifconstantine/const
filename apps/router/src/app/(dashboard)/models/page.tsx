@@ -75,7 +75,7 @@ export function ModelCatalog({
         </div>
 
         {/* Minimal segmented filter */}
-        <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl border border-border/50 self-start sm:self-auto">
+        <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl border border-border/50 self-start sm:self-auto overflow-x-auto no-scrollbar max-w-full pb-1">
           {categories.map((c) => (
             <button
               key={c.id}
@@ -113,113 +113,195 @@ export function ModelCatalog({
             </div>
 
             <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-              <ScrollArea orientation="horizontal">
-                <table className="w-full min-w-[820px] text-left text-sm">
-                  <thead className="bg-secondary/40 text-xs text-muted-foreground border-b border-border/40">
-                    <tr>
-                      <th className="px-5 py-3.5 font-normal">Model</th>
-                      <th className="px-5 py-3.5 font-normal">Context</th>
-                      <th className="px-5 py-3.5 font-normal text-right">Input / 1M</th>
-                      <th className="px-5 py-3.5 font-normal text-right">Cached Input</th>
-                      <th className="px-5 py-3.5 font-normal text-right">Output / 1M</th>
-                      <th className="px-5 py-3.5 font-normal text-right">You Save</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {items.map((model) => {
-                      const savings = MODEL_SAVINGS[model.modelId];
-                      const isFreeTier = model.tier === "free";
+              {/* Mobile Card List (sm:hidden) */}
+              <div className="divide-y divide-border/40 sm:hidden">
+                {items.map((model) => {
+                  const savings = MODEL_SAVINGS[model.modelId];
+                  const isFreeTier = model.tier === "free";
 
-                      return (
-                        <tr key={model.id} className="hover:bg-secondary/20 transition-colors">
-                          <td className="p-5">
-                            <div>
-                              <div className="font-medium flex gap-2 items-center text-foreground">
-                                {model.name}
-                                <Badge
-                                  variant="secondary"
-                                  className="font-mono text-[10px] px-1.5 py-0 uppercase"
+                  return (
+                    <div
+                      key={model.id}
+                      className="p-4 space-y-2.5 hover:bg-secondary/20 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm flex gap-1.5 items-center text-foreground flex-wrap">
+                            <span className="truncate">{model.name}</span>
+                            <Badge
+                              variant="secondary"
+                              className="font-mono text-[9px] px-1.5 py-0 uppercase shrink-0"
+                            >
+                              {model.category === "llm"
+                                ? "Chat"
+                                : model.category === "stt"
+                                  ? "Audio"
+                                  : "Search"}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copy(model.modelId)}
+                            className="text-xs text-muted-foreground font-mono flex gap-1 items-center mt-1 hover:text-foreground cursor-pointer group"
+                            title="Copy model ID"
+                          >
+                            <span className="truncate">{model.modelId}</span>
+                            <Copy className="h-3 w-3 opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                        </div>
+
+                        {isFreeTier ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-secondary text-foreground border border-border/60 shrink-0">
+                            100% Free
+                          </span>
+                        ) : savings?.savePercent ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                            Save {savings.savePercent}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-1.5 border-t border-border/30 text-[11px] font-mono">
+                        <div>
+                          <span className="text-[9px] text-muted-foreground uppercase block font-sans">
+                            Context
+                          </span>
+                          <span className="text-foreground">{model.contextWindow || "1M"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-muted-foreground uppercase block font-sans">
+                            Input / 1M
+                          </span>
+                          <span className="text-foreground font-medium">{model.pricing?.input}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-muted-foreground uppercase block font-sans">
+                            Output / 1M
+                          </span>
+                          <span className="text-foreground font-medium">{model.pricing?.output}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {!items.length && (
+                  <div className="p-8 text-center text-muted-foreground text-xs">
+                    No matching {tier} models.
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table (hidden sm:block) */}
+              <div className="hidden sm:block">
+                <ScrollArea orientation="horizontal">
+                  <table className="w-full min-w-[820px] text-left text-sm">
+                    <thead className="bg-secondary/40 text-xs text-muted-foreground border-b border-border/40">
+                      <tr>
+                        <th className="px-5 py-3.5 font-normal">Model</th>
+                        <th className="px-5 py-3.5 font-normal">Context</th>
+                        <th className="px-5 py-3.5 font-normal text-right">Input / 1M</th>
+                        <th className="px-5 py-3.5 font-normal text-right">Cached Input</th>
+                        <th className="px-5 py-3.5 font-normal text-right">Output / 1M</th>
+                        <th className="px-5 py-3.5 font-normal text-right">You Save</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {items.map((model) => {
+                        const savings = MODEL_SAVINGS[model.modelId];
+                        const isFreeTier = model.tier === "free";
+
+                        return (
+                          <tr key={model.id} className="hover:bg-secondary/20 transition-colors">
+                            <td className="p-5">
+                              <div>
+                                <div className="font-medium flex gap-2 items-center text-foreground">
+                                  {model.name}
+                                  <Badge
+                                    variant="secondary"
+                                    className="font-mono text-[10px] px-1.5 py-0 uppercase"
+                                  >
+                                    {model.category === "llm"
+                                      ? "Chat"
+                                      : model.category === "stt"
+                                        ? "Audio"
+                                        : "Search"}
+                                  </Badge>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => copy(model.modelId)}
+                                  className="text-xs text-muted-foreground font-mono flex gap-1.5 items-center mt-1 hover:text-foreground cursor-pointer group"
+                                  title="Copy model ID"
                                 >
-                                  {model.category === "llm"
-                                    ? "Chat"
-                                    : model.category === "stt"
-                                      ? "Audio"
-                                      : "Search"}
-                                </Badge>
+                                  <span>{model.modelId}</span>
+                                  <Copy className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => copy(model.modelId)}
-                                className="text-xs text-muted-foreground font-mono flex gap-1.5 items-center mt-1 hover:text-foreground cursor-pointer group"
-                                title="Copy model ID"
-                              >
-                                <span>{model.modelId}</span>
-                                <Copy className="h-3 w-3 opacity-60 group-hover:opacity-100" />
-                              </button>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="p-5 text-xs text-muted-foreground font-mono">
-                            {model.contextWindow || "1M"}
-                          </td>
+                            <td className="p-5 text-xs text-muted-foreground font-mono">
+                              {model.contextWindow || "1M"}
+                            </td>
 
-                          <td className="p-5 tabular-nums text-xs text-right">
-                            <span className="font-medium text-foreground">
-                              {model.pricing?.input}
-                            </span>
-                            {savings?.officialInput && (
-                              <span className="block text-[11px] text-muted-foreground line-through">
-                                {savings.officialInput}
+                            <td className="p-5 tabular-nums text-xs text-right">
+                              <span className="font-medium text-foreground">
+                                {model.pricing?.input}
                               </span>
-                            )}
-                          </td>
+                              {savings?.officialInput && (
+                                <span className="block text-[11px] text-muted-foreground line-through">
+                                  {savings.officialInput}
+                                </span>
+                              )}
+                            </td>
 
-                          <td className="p-5 tabular-nums text-xs text-right text-muted-foreground font-mono">
-                            {model.pricing?.cache ?? "—"}
-                          </td>
+                            <td className="p-5 tabular-nums text-xs text-right text-muted-foreground font-mono">
+                              {model.pricing?.cache ?? "—"}
+                            </td>
 
-                          <td className="p-5 tabular-nums text-xs text-right">
-                            <span className="font-medium text-foreground">
-                              {model.pricing?.output}
-                            </span>
-                            {savings?.officialOutput && (
-                              <span className="block text-[11px] text-muted-foreground line-through">
-                                {savings.officialOutput}
+                            <td className="p-5 tabular-nums text-xs text-right">
+                              <span className="font-medium text-foreground">
+                                {model.pricing?.output}
                               </span>
-                            )}
-                          </td>
+                              {savings?.officialOutput && (
+                                <span className="block text-[11px] text-muted-foreground line-through">
+                                  {savings.officialOutput}
+                                </span>
+                              )}
+                            </td>
 
-                          {/* "You Save" Column replacing Test button */}
-                          <td className="p-5 text-right">
-                            {isFreeTier ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-secondary text-foreground border border-border/60">
-                                100% Free
-                              </span>
-                            ) : savings?.savePercent ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                Save {savings.savePercent}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
+                            {/* "You Save" Column replacing Test button */}
+                            <td className="p-5 text-right">
+                              {isFreeTier ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-secondary text-foreground border border-border/60">
+                                  100% Free
+                                </span>
+                              ) : savings?.savePercent ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  Save {savings.savePercent}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {!items.length && (
+                        <tr>
+                          <td
+                            className="p-8 text-center text-muted-foreground text-xs"
+                            colSpan={6}
+                          >
+                            No matching {tier} models.
                           </td>
                         </tr>
-                      );
-                    })}
-
-                    {!items.length && (
-                      <tr>
-                        <td
-                          className="p-8 text-center text-muted-foreground text-xs"
-                          colSpan={6}
-                        >
-                          No matching {tier} models.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </ScrollArea>
+                      )}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              </div>
             </div>
           </section>
         );
@@ -239,7 +321,7 @@ function ConnectedCatalog() {
   return (
     <div className="max-w-7xl mx-auto space-y-7 pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Models & pricing</h1>
+        <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">Models & pricing</h1>
         <p className="text-sm text-muted-foreground">
           Call frontier models with wholesale rates or weekly free allowance. Copy the exact model ID into your SDK or agent config.
         </p>

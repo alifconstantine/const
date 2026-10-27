@@ -52,9 +52,9 @@ function Settings() {
   }
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
-      <header className="flex flex-wrap justify-between gap-4 items-start">
+      <header className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
         <div className="space-y-1">
-          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
             Settings & data
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -62,13 +62,13 @@ function Settings() {
             clients.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             disabled={saving || !settings}
             onClick={() => persist(DEFAULT_SETTINGS)}
-            className="rounded-lg text-xs h-8 px-3 border-border/60 hover:bg-secondary cursor-pointer transition-colors"
+            className="rounded-lg text-xs h-8 px-3 border-border/60 hover:bg-secondary cursor-pointer transition-colors flex-1 sm:flex-none"
           >
             Reset defaults
           </Button>
@@ -76,13 +76,13 @@ function Settings() {
             size="sm"
             disabled={saving || !settings || !dirty}
             onClick={() => persist()}
-            className="rounded-lg text-xs h-8 px-3.5 bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs cursor-pointer"
+            className="rounded-lg text-xs h-8 px-3.5 bg-foreground text-background hover:bg-foreground/90 transition-colors shadow-xs cursor-pointer flex-1 sm:flex-none"
           >
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </header>
-      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+      <section className="rounded-xl bg-card border border-border/60 p-4 sm:p-6 space-y-4 sm:space-y-5">
         <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
           Gateway defaults
         </h2>
@@ -150,7 +150,7 @@ function Settings() {
           change={(value) => change("enableStreaming", value)}
         />
       </section>
-      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+      <section className="rounded-xl bg-card border border-border/60 p-4 sm:p-6 space-y-4 sm:space-y-5">
         <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
           Privacy & request history
         </h2>
@@ -173,7 +173,7 @@ function Settings() {
           prompt retention applies to future requests.
         </p>
       </section>
-      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+      <section className="rounded-xl bg-card border border-border/60 p-4 sm:p-6 space-y-4 sm:space-y-5">
         <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
           Notifications
         </h2>
@@ -185,7 +185,7 @@ function Settings() {
           change={(value) => change("notifyLowQuota", value)}
         />
       </section>
-      <section className="rounded-xl bg-card border border-border/60 p-6 space-y-5">
+      <section className="rounded-xl bg-card border border-border/60 p-4 sm:p-6 space-y-4 sm:space-y-5">
         <h2 className="text-base font-serif font-normal text-foreground tracking-tight">
           Account
         </h2>
@@ -228,14 +228,14 @@ function SettingToggle({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center justify-between gap-6 rounded-xl bg-secondary/30 border border-border/40 p-4 cursor-pointer hover:bg-secondary/50 transition-colors">
-      <span>
+    <label className="flex items-start sm:items-center justify-between gap-4 rounded-xl bg-secondary/30 border border-border/40 p-3.5 sm:p-4 cursor-pointer hover:bg-secondary/50 transition-colors">
+      <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-foreground">{title}</span>
-        <span className="block text-xs text-muted-foreground mt-0.5 max-w-xl leading-relaxed">
+        <span className="block text-xs text-muted-foreground mt-1 max-w-xl leading-relaxed">
           {description}
         </span>
       </span>
-      <Switch checked={checked} onCheckedChange={change} disabled={disabled} />
+      <Switch checked={checked} onCheckedChange={change} disabled={disabled} className="shrink-0 mt-0.5 sm:mt-0" />
     </label>
   );
 }

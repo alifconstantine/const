@@ -360,179 +360,293 @@ export default function KeysPage() {
               )}
             </div>
           ) : (
-            /* Table of Keys */
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-secondary/30 border-b border-border/40">
-                  <TableRow className="border-border/40 hover:bg-transparent">
-                    <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-sans font-normal text-muted-foreground">
-                      Name
-                    </TableHead>
-                    <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-sans font-normal text-muted-foreground">
-                      Secret Key
-                    </TableHead>
-                    <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-sans font-normal text-muted-foreground">
-                      Created
-                    </TableHead>
-                    <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-sans font-normal text-muted-foreground">
-                      Status
-                    </TableHead>
-                    <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-sans font-normal text-muted-foreground">
-                      Action
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredKeys.map((keyItem) => {
-                    const isRevoked = keyItem.status === "revoked";
-                    const isActionLoading = actionLoadingId === keyItem._id;
+            /* Keys View: Responsive Mobile Cards + Desktop Table */
+            <>
+              {/* Mobile Card List (sm:hidden) */}
+              <div className="divide-y divide-border/40 sm:hidden">
+                {filteredKeys.map((keyItem) => {
+                  const isRevoked = keyItem.status === "revoked";
+                  const isActionLoading = actionLoadingId === keyItem._id;
 
-                    return (
-                      <TableRow
-                        key={keyItem._id}
-                        className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
-                      >
-                        {/* 1. Name */}
-                        <TableCell className="py-4 pl-6 pr-4 font-medium text-sm text-foreground font-sans">
-                          {keyItem.name}
-                        </TableCell>
+                  return (
+                    <div
+                      key={keyItem._id}
+                      className="p-4 space-y-3 hover:bg-secondary/20 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <h4 className="font-medium text-sm text-foreground truncate">
+                            {keyItem.name}
+                          </h4>
+                          <span className="text-[11px] text-muted-foreground font-sans tabular-nums block">
+                            Created {formatDate(keyItem.createdAt)}
+                          </span>
+                        </div>
+                        {isRevoked ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-[10px] font-sans font-medium text-muted-foreground border border-border shrink-0">
+                            Revoked
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-sans font-medium border border-emerald-500/20 shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
 
-                        {/* 2. Secret Key with Show/Hide and Copy button */}
-                        <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-1.5 max-w-[320px]">
-                            <span className="text-xs font-mono text-muted-foreground truncate select-all">
-                              {revealedKeyIds[keyItem._id] && keyItem.rawKey
-                                ? keyItem.rawKey
-                                : keyItem.keyPrefix}
-                            </span>
-                            {keyItem.rawKey && (
+                      {/* Secret key preview + actions */}
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-secondary/50 border border-border/50 text-xs font-mono">
+                        <span className="text-muted-foreground truncate select-all flex-1 min-w-0 pr-1">
+                          {revealedKeyIds[keyItem._id] && keyItem.rawKey
+                            ? keyItem.rawKey
+                            : keyItem.keyPrefix}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {keyItem.rawKey && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRevealedKeyIds((prev) => ({
+                                  ...prev,
+                                  [keyItem._id]: !prev[keyItem._id],
+                                }))
+                              }
+                              className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-background text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                              aria-label={
+                                revealedKeyIds[keyItem._id]
+                                  ? "Hide secret key"
+                                  : "Reveal secret key"
+                              }
+                            >
+                              {revealedKeyIds[keyItem._id] ? (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              ) : (
+                                <Eye className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyKey(keyItem)}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-background text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                            aria-label="Copy secret API key"
+                          >
+                            {copiedKeyId === keyItem._id ? (
+                              <Check className="h-3.5 w-3.5 text-foreground" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Card actions: Revoke / Delete */}
+                      <div className="flex items-center justify-end gap-2 pt-0.5">
+                        {!isRevoked && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRevoke(keyItem._id, keyItem.name)}
+                            disabled={isActionLoading}
+                            className="h-8 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            {isActionLoading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                            ) : (
+                              <Ban className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            <span>Revoke</span>
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(keyItem._id, keyItem.name)}
+                          disabled={isActionLoading}
+                          className="h-8 text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          <span>Delete</span>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table (hidden sm:block) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-secondary/30 border-b border-border/40">
+                    <TableRow className="border-border/40 hover:bg-transparent">
+                      <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-sans font-normal text-muted-foreground">
+                        Name
+                      </TableHead>
+                      <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-sans font-normal text-muted-foreground">
+                        Secret Key
+                      </TableHead>
+                      <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-sans font-normal text-muted-foreground">
+                        Created
+                      </TableHead>
+                      <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-sans font-normal text-muted-foreground">
+                        Status
+                      </TableHead>
+                      <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-sans font-normal text-muted-foreground">
+                        Action
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredKeys.map((keyItem) => {
+                      const isRevoked = keyItem.status === "revoked";
+                      const isActionLoading = actionLoadingId === keyItem._id;
+
+                      return (
+                        <TableRow
+                          key={keyItem._id}
+                          className="border-b border-border/40 hover:bg-secondary/20 transition-colors"
+                        >
+                          {/* 1. Name */}
+                          <TableCell className="py-4 pl-6 pr-4 font-medium text-sm text-foreground font-sans">
+                            {keyItem.name}
+                          </TableCell>
+
+                          {/* 2. Secret Key with Show/Hide and Copy button */}
+                          <TableCell className="py-4 px-4">
+                            <div className="flex items-center gap-1.5 max-w-[320px]">
+                              <span className="text-xs font-mono text-muted-foreground truncate select-all">
+                                {revealedKeyIds[keyItem._id] && keyItem.rawKey
+                                  ? keyItem.rawKey
+                                  : keyItem.keyPrefix}
+                              </span>
+                              {keyItem.rawKey && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setRevealedKeyIds((prev) => ({
+                                          ...prev,
+                                          [keyItem._id]: !prev[keyItem._id],
+                                        }))
+                                      }
+                                      className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shrink-0"
+                                      aria-label={
+                                        revealedKeyIds[keyItem._id]
+                                          ? "Hide secret key"
+                                          : "Reveal secret key"
+                                      }
+                                    >
+                                      {revealedKeyIds[keyItem._id] ? (
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                      ) : (
+                                        <Eye className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    {revealedKeyIds[keyItem._id]
+                                      ? "Hide secret key"
+                                      : "Reveal secret key"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      setRevealedKeyIds((prev) => ({
-                                        ...prev,
-                                        [keyItem._id]: !prev[keyItem._id],
-                                      }))
-                                    }
+                                    onClick={() => handleCopyKey(keyItem)}
                                     className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shrink-0"
-                                    aria-label={
-                                      revealedKeyIds[keyItem._id]
-                                        ? "Hide secret key"
-                                        : "Reveal secret key"
-                                    }
+                                    aria-label="Copy secret API key"
                                   >
-                                    {revealedKeyIds[keyItem._id] ? (
-                                      <EyeOff className="h-3.5 w-3.5" />
+                                    {copiedKeyId === keyItem._id ? (
+                                      <Check className="h-3.5 w-3.5 text-foreground" />
                                     ) : (
-                                      <Eye className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5" />
                                     )}
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
-                                  {revealedKeyIds[keyItem._id]
-                                    ? "Hide secret key"
-                                    : "Reveal secret key"}
+                                  Copy secret API key
                                 </TooltipContent>
                               </Tooltip>
+                            </div>
+                          </TableCell>
+
+                          {/* 3. Created Date */}
+                          <TableCell className="py-4 px-4 text-xs text-muted-foreground font-sans tabular-nums">
+                            {formatDate(keyItem.createdAt)}
+                          </TableCell>
+
+                          {/* 4. Status Badge */}
+                          <TableCell className="py-4 px-4">
+                            {isRevoked ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-[10px] font-sans font-medium text-muted-foreground border border-border">
+                                Revoked
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-sans font-medium border border-emerald-500/20">
+                                Active
+                              </span>
                             )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyKey(keyItem)}
-                                  className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shrink-0"
-                                  aria-label="Copy secret API key"
-                                >
-                                  {copiedKeyId === keyItem._id ? (
-                                    <Check className="h-3.5 w-3.5 text-foreground" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                Copy secret API key
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
+                          </TableCell>
 
-                        {/* 3. Created Date */}
-                        <TableCell className="py-4 px-4 text-xs text-muted-foreground font-sans tabular-nums">
-                          {formatDate(keyItem.createdAt)}
-                        </TableCell>
+                          {/* 5. Actions: Revoke or Delete */}
+                          <TableCell className="py-4 pl-4 pr-6 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {!isRevoked && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() =>
+                                        handleRevoke(keyItem._id, keyItem.name)
+                                      }
+                                      disabled={isActionLoading}
+                                      className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+                                      aria-label="Revoke key"
+                                    >
+                                      {isActionLoading ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Ban className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    Revoke key
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
 
-                        {/* 4. Status Badge */}
-                        <TableCell className="py-4 px-4">
-                          {isRevoked ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-[10px] font-sans font-medium text-muted-foreground border border-border">
-                              Revoked
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-sans font-medium border border-emerald-500/20">
-                              Active
-                            </span>
-                          )}
-                        </TableCell>
-
-                        {/* 5. Actions: Revoke or Delete */}
-                        <TableCell className="py-4 pl-4 pr-6 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {!isRevoked && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={() =>
-                                      handleRevoke(keyItem._id, keyItem.name)
+                                      handleDelete(keyItem._id, keyItem.name)
                                     }
                                     disabled={isActionLoading}
-                                    className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-                                    aria-label="Revoke key"
+                                    className="h-7 w-7 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                                    aria-label="Delete key"
                                   >
-                                    {isActionLoading ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Ban className="h-3.5 w-3.5" />
-                                    )}
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top">
-                                  Revoke key
+                                  Delete key permanently
                                 </TooltipContent>
                               </Tooltip>
-                            )}
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() =>
-                                    handleDelete(keyItem._id, keyItem.name)
-                                  }
-                                  disabled={isActionLoading}
-                                  className="h-7 w-7 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
-                                  aria-label="Delete key"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                Delete key permanently
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </Card>
 
@@ -540,7 +654,7 @@ export default function KeysPage() {
         {/* DIALOG 1: CREATE NEW SECRET KEY MODAL                     */}
         {/* ========================================================= */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="rounded-xl border border-border/60 bg-card max-w-md p-6 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-2xl border border-border/70 bg-card w-[calc(100vw-2rem)] sm:max-w-md p-5 sm:p-6 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
               <DialogTitle className="text-lg font-serif font-normal text-foreground tracking-tight">
                 Create new secret key
@@ -634,7 +748,7 @@ export default function KeysPage() {
             }
           }}
         >
-          <DialogContent className="rounded-xl border border-border/60 bg-card max-w-lg p-6 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-2xl border border-border/70 bg-card w-[calc(100vw-2rem)] sm:max-w-lg p-5 sm:p-6 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
               <DialogTitle className="text-lg font-serif font-normal text-foreground tracking-tight">
                 Save your secret key

@@ -96,16 +96,16 @@ function Overview() {
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
       {/* Header */}
-      <header className="flex flex-wrap justify-between gap-4 items-start">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 items-start">
         <div className="space-y-1">
-          <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Overview</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">Overview</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Requests, free allowance, and paid usage in one place.
           </p>
         </div>
 
         {/* Minimal Time Range Segmented Selector */}
-        <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl border border-border/50">
+        <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl border border-border/50 overflow-x-auto no-scrollbar max-w-full">
           {[
             ["24h", "today"],
             ["7 days", "7d"],
@@ -117,7 +117,7 @@ function Overview() {
               type="button"
               onClick={() => setRange(value!)}
               className={cn(
-                "px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer",
+                "px-2.5 sm:px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer shrink-0",
                 range === value
                   ? "bg-card text-foreground shadow-xs border border-border/60"
                   : "text-muted-foreground hover:text-foreground",
@@ -129,8 +129,8 @@ function Overview() {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards (Responsive 2-col on mobile, 4-col on desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           ["Paid usage", kpi ? dollars(kpi.costUsd) : undefined],
           ["Requests", kpi?.totalRequests.toLocaleString()],
@@ -145,13 +145,13 @@ function Overview() {
         ].map(([label, value]) => (
           <div
             key={label}
-            className="rounded-xl bg-card border border-border/60 p-5 space-y-2"
+            className="rounded-xl bg-card border border-border/60 p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 shadow-xs"
           >
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">{label}</p>
             {value === undefined ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 sm:h-8 w-20 sm:w-24" />
             ) : (
-              <p className="text-2xl font-medium tracking-tight tabular-nums">{value}</p>
+              <p className="text-xl sm:text-2xl font-medium tracking-tight tabular-nums truncate">{value}</p>
             )}
           </div>
         ))}
@@ -301,15 +301,15 @@ function Overview() {
         </div>
 
         {/* Base URL Pill */}
-        <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30 border border-border/40 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground font-mono">Base URL:</span>
-            <code className="font-mono text-foreground font-medium">https://router.const.web.id/v1</code>
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30 border border-border/40 text-xs gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-muted-foreground font-mono shrink-0">Base URL:</span>
+            <code className="font-mono text-foreground font-medium truncate">https://router.const.web.id/v1</code>
           </div>
           <button
             type="button"
             onClick={copyBaseUrl}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 font-mono cursor-pointer"
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 font-mono cursor-pointer shrink-0"
           >
             {copiedUrl ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
             <span>{copiedUrl ? "Copied" : "Copy URL"}</span>
@@ -341,16 +341,18 @@ function Overview() {
           {logs?.map((log) => (
             <div
               key={log._id}
-              className="p-4 flex flex-wrap items-center justify-between gap-3 text-xs hover:bg-secondary/20 transition-colors"
+              className="p-3.5 sm:p-4 flex items-center justify-between gap-2.5 text-xs hover:bg-secondary/20 transition-colors"
             >
-              <span className="font-mono font-medium text-foreground">{log.model}</span>
-              <span className="text-muted-foreground font-mono">
-                {log.totalTokens.toLocaleString()} tokens ·{" "}
-                {new Date(log.createdAt).toLocaleString()}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-mono font-medium text-foreground truncate">{log.model}</p>
+                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  {log.totalTokens.toLocaleString()} tokens ·{" "}
+                  {new Date(log.createdAt).toLocaleDateString()}
+                </p>
+              </div>
               <Badge
                 variant={log.status >= 400 ? "destructive" : "secondary"}
-                className="font-mono text-[10px]"
+                className="font-mono text-[10px] shrink-0"
               >
                 {log.status}
               </Badge>
@@ -422,13 +424,13 @@ function Overview() {
 
       {/* Bottom Actions */}
       <div className="flex flex-wrap gap-2.5 pt-2">
-        <Button asChild size="sm" className="rounded-lg">
+        <Button asChild size="sm" className="rounded-lg flex-1 sm:flex-none">
           <Link href="/generation">Open Playground</Link>
         </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-lg">
+        <Button asChild variant="outline" size="sm" className="rounded-lg flex-1 sm:flex-none">
           <Link href="/keys">Manage API keys</Link>
         </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-lg">
+        <Button asChild variant="outline" size="sm" className="rounded-lg w-full sm:w-auto">
           <Link href="/docs">Read documentation</Link>
         </Button>
       </div>

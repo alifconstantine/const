@@ -25,10 +25,10 @@ export default function EndpointsPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
           Endpoints
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Available APIs on Const Router. All execution endpoints require an active key or session.
         </p>
       </header>
@@ -89,7 +89,7 @@ export default function EndpointsPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border/40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-border/40">
         <p className="text-xs text-muted-foreground">
           OpenAI-compatible chat completions and transcription pass through with native telemetry.
         </p>

@@ -49,7 +49,7 @@ export function CreditsView({
   return (
     <div className="max-w-6xl mx-auto space-y-7 pb-12">
       <header className="space-y-1">
-        <h1 className="text-3xl font-serif font-normal text-foreground tracking-tight">Credits & balance</h1>
+        <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">Credits & balance</h1>
         <p className="text-sm text-muted-foreground">
           Paid model balance, reserved credit, and transaction settlement ledger.
         </p>
@@ -63,7 +63,7 @@ export function CreditsView({
           </div>
           {wallet ? (
             <div>
-              <p className="text-4xl font-medium tracking-tight tabular-nums">
+              <p className="text-3xl sm:text-4xl font-medium tracking-tight tabular-nums truncate">
                 ${money(wallet.availableUsd)}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
@@ -115,7 +115,7 @@ export function CreditsView({
         </section>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {[
           ["Total credited", wallet?.totalDepositedUsd],
           ["Total spent on paid models", wallet?.totalSpentUsd],
@@ -139,70 +139,120 @@ export function CreditsView({
         </div>
 
         <div className="rounded-xl bg-card border border-border/60 overflow-hidden">
-          <ScrollArea orientation="horizontal" className="w-full">
-            <table className="w-full min-w-[680px] text-xs text-left">
-              <thead className="text-muted-foreground bg-secondary/40 border-b border-border/40">
-                <tr>
-                  {[
-                    "Timestamp",
-                    "Description",
-                    "Amount",
-                    "Status",
-                    "Balance After",
-                  ].map((t) => (
-                    <th key={t} className="px-5 py-3.5 font-normal">
-                      {t}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {loading && !transactions.length ? (
+          {/* Mobile Card List (sm:hidden) */}
+          <div className="divide-y divide-border/40 sm:hidden">
+            {loading && !transactions.length ? (
+              <div className="p-6">
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : !transactions.length ? (
+              <div className="py-10 px-4 text-center">
+                <p className="text-xs text-muted-foreground">No transactions recorded yet.</p>
+                <p className="text-[11px] text-muted-foreground/80 mt-1">
+                  Settled usage and account balance changes will be itemized here.
+                </p>
+              </div>
+            ) : (
+              transactions.map((tx) => (
+                <div key={tx._id} className="p-4 space-y-2 hover:bg-secondary/20 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-xs text-foreground truncate">{tx.description}</p>
+                      {tx.requestId && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono truncate">
+                          {tx.requestId}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="secondary" className="font-mono text-[9px] shrink-0">
+                      {tx.status}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs font-mono pt-1 border-t border-border/30">
+                    <span className="tabular-nums font-medium">
+                      {tx.type === "deduction" ? "−" : "+"}${money(tx.amountUsd)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-sans">
+                      Bal: ${money(tx.balanceAfterUsd)}
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    {new Date(tx.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table (hidden sm:block) */}
+          <div className="hidden sm:block">
+            <ScrollArea orientation="horizontal" className="w-full">
+              <table className="w-full min-w-[680px] text-xs text-left">
+                <thead className="text-muted-foreground bg-secondary/40 border-b border-border/40">
                   <tr>
-                    <td colSpan={5} className="p-8">
-                      <Skeleton className="h-6 w-full" />
-                    </td>
+                    {[
+                      "Timestamp",
+                      "Description",
+                      "Amount",
+                      "Status",
+                      "Balance After",
+                    ].map((t) => (
+                      <th key={t} className="px-5 py-3.5 font-normal">
+                        {t}
+                      </th>
+                    ))}
                   </tr>
-                ) : !transactions.length ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 px-6 text-center">
-                      <p className="text-xs text-muted-foreground">No transactions recorded yet.</p>
-                      <p className="text-[11px] text-muted-foreground/80 mt-1">
-                        Settled usage and account balance changes will be itemized here.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx._id} className="hover:bg-secondary/20 transition-colors">
-                      <td className="p-4 text-muted-foreground font-mono">
-                        {new Date(tx.createdAt).toLocaleString()}
-                      </td>
-                      <td className="p-4">
-                        <p className="font-medium text-foreground">{tx.description}</p>
-                        {tx.requestId && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                            {tx.requestId}
-                          </p>
-                        )}
-                      </td>
-                      <td className="p-4 tabular-nums font-mono whitespace-nowrap">
-                        {tx.type === "deduction" ? "−" : "+"}${money(tx.amountUsd)}
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="secondary" className="font-mono text-[10px]">
-                          {tx.status}
-                        </Badge>
-                      </td>
-                      <td className="p-4 tabular-nums font-mono font-medium">
-                        ${money(tx.balanceAfterUsd)}
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {loading && !transactions.length ? (
+                    <tr>
+                      <td colSpan={5} className="p-8">
+                        <Skeleton className="h-6 w-full" />
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
+                  ) : !transactions.length ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 px-6 text-center">
+                        <p className="text-xs text-muted-foreground">No transactions recorded yet.</p>
+                        <p className="text-[11px] text-muted-foreground/80 mt-1">
+                          Settled usage and account balance changes will be itemized here.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map((tx) => (
+                      <tr key={tx._id} className="hover:bg-secondary/20 transition-colors">
+                        <td className="p-4 text-muted-foreground font-mono">
+                          {new Date(tx.createdAt).toLocaleString()}
+                        </td>
+                        <td className="p-4">
+                          <p className="font-medium text-foreground">{tx.description}</p>
+                          {tx.requestId && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                              {tx.requestId}
+                            </p>
+                          )}
+                        </td>
+                        <td className="p-4 tabular-nums font-mono whitespace-nowrap">
+                          {tx.type === "deduction" ? "−" : "+"}${money(tx.amountUsd)}
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="secondary" className="font-mono text-[10px]">
+                            {tx.status}
+                          </Badge>
+                        </td>
+                        <td className="p-4 tabular-nums font-mono font-medium">
+                          ${money(tx.balanceAfterUsd)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </ScrollArea>
+          </div>
         </div>
 
         {more && (

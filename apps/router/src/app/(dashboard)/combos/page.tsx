@@ -628,17 +628,17 @@ export default function CombosPage() {
 
       {/* 4. Multi-Step Creation Wizard Modal (OmniRoute 4-Stage Reference) */}
       <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-xl">
+        <DialogContent className="max-w-xl w-[calc(100vw-2rem)] sm:w-full p-0 overflow-hidden rounded-2xl border border-border/80 bg-card dark:bg-[#141416] shadow-2xl">
           {/* Top Modal Header: Clean Title + Built-in Close */}
-          <div className="px-6 pt-5 pb-3 bg-secondary/30">
+          <div className="px-5 sm:px-6 pt-5 pb-3.5 bg-secondary/50 dark:bg-zinc-900/80 border-b border-border/60">
             <div className="flex items-center justify-between pr-8">
-              <DialogTitle className="text-base font-serif font-normal text-foreground">
+              <DialogTitle className="text-base sm:text-lg font-serif font-normal text-foreground">
                 {editingComboId ? "Edit Combo" : "Create Combo"}
               </DialogTitle>
             </div>
 
             {/* Stage Indicator Pills */}
-            <div className="grid grid-cols-4 gap-2 pt-3">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 pt-3">
               {[
                 { s: 1, label: "Identity" },
                 { s: 2, label: "Models" },
@@ -658,22 +658,31 @@ export default function CombosPage() {
                     }}
                     disabled={isPending}
                     className={cn(
-                      "py-2 px-2.5 rounded-xl text-left transition-all",
+                      "py-2 px-2 sm:px-2.5 rounded-xl text-left transition-all",
                       isCurrent &&
-                        "bg-background shadow-sm ring-1 ring-primary/40",
+                        "bg-card dark:bg-zinc-800 text-foreground shadow-sm border border-border dark:border-zinc-700 font-semibold ring-1 ring-primary/20",
                       isCompleted &&
-                        "bg-secondary/40 hover:bg-secondary cursor-pointer",
+                        "bg-secondary/60 dark:bg-zinc-900/80 text-foreground/90 border border-border/70 hover:bg-secondary cursor-pointer",
                       isPending &&
-                        "bg-secondary/20 opacity-50 cursor-not-allowed",
+                        "bg-secondary/20 dark:bg-zinc-900/30 text-muted-foreground border border-border/30 opacity-60 cursor-not-allowed",
                     )}
                   >
-                    <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground truncate">
-                      {isCompleted && "DONE"}
+                    <div
+                      className={cn(
+                        "text-[9px] font-mono uppercase tracking-wider truncate",
+                        isCurrent && "text-primary font-bold",
+                        isCompleted &&
+                          "text-emerald-500 font-semibold flex items-center gap-0.5",
+                        isPending && "text-muted-foreground/70",
+                      )}
+                    >
+                      {isCompleted && "DONE ✓"}
                       {isCurrent && "CURRENT"}
                       {isPending && "PENDING"}
                     </div>
                     <div className="text-xs font-semibold font-sans text-foreground truncate mt-0.5">
-                      {item.s}. {item.label}
+                      <span className="sm:hidden">{item.s}. {item.label.slice(0, 4)}..</span>
+                      <span className="hidden sm:inline">{item.s}. {item.label}</span>
                     </div>
                   </button>
                 );
@@ -681,9 +690,9 @@ export default function CombosPage() {
             </div>
           </div>
 
-          {/* Stepper Body Container (Strictly Bounded Constant Height: 440px) */}
-          <div className="h-[430px] p-6 flex flex-col justify-between overflow-hidden font-sans">
-            <ScrollArea className="flex-1 -mr-3 pr-3">
+          {/* Stepper Body Container (Strictly Bounded Constant Height) */}
+          <div className="h-[430px] p-4 sm:p-6 flex flex-col justify-between overflow-hidden font-sans">
+            <ScrollArea className="flex-1 -mr-2 sm:-mr-3 pr-2 sm:pr-3">
               <div className="space-y-4 pr-1 py-1">
                 {/* ──── STAGE 1: NAME & DESCRIPTION ──── */}
                 {step === 1 && (
@@ -700,19 +709,19 @@ export default function CombosPage() {
                     {/* Combo Name */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground">
-                        Name <span className="text-foreground/70">*</span>
+                        Name <span className="text-primary">*</span>
                       </label>
                       <Input
                         value={comboName}
                         onChange={(e) => handleNameChange(e.target.value)}
                         placeholder="e.g. Production Fallback Route"
-                        className="h-10 text-sm bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 font-sans transition-colors"
+                        className="h-10 text-sm bg-card dark:bg-zinc-900/90 rounded-xl border border-input dark:border-zinc-700/80 hover:border-foreground/30 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/20 font-sans transition-colors shadow-xs"
                       />
-                      <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground pt-0.5">
-                        <span>API Identifier:</span>
-                        <span className="font-semibold text-foreground">
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-secondary/40 dark:bg-zinc-900/60 border border-border/60 text-xs font-mono mt-2">
+                        <span className="text-muted-foreground">API Identifier:</span>
+                        <code className="font-semibold text-foreground bg-card dark:bg-zinc-950 px-2 py-0.5 rounded border border-border/60">
                           combo/{comboSlug || "name"}
-                        </span>
+                        </code>
                       </div>
                     </div>
 
@@ -728,7 +737,7 @@ export default function CombosPage() {
                         value={comboDescription}
                         onChange={(e) => setComboDescription(e.target.value)}
                         placeholder="e.g. High availability route with sub-second failover"
-                        className="h-10 text-xs bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 font-sans transition-colors"
+                        className="h-10 text-xs bg-card dark:bg-zinc-900/90 rounded-xl border border-input dark:border-zinc-700/80 hover:border-foreground/30 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/20 font-sans transition-colors shadow-xs"
                       />
                     </div>
                   </div>
@@ -748,7 +757,7 @@ export default function CombosPage() {
                     </div>
 
                     {/* Builder Card with Direct Model Select */}
-                    <div className="p-4 rounded-2xl bg-secondary/30 space-y-3">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-secondary/40 dark:bg-zinc-900/60 border border-border/70 dark:border-zinc-800 space-y-3">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
                           Select Model
@@ -757,7 +766,7 @@ export default function CombosPage() {
                           value={builderModelId}
                           onValueChange={setBuilderModelId}
                         >
-                          <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
+                          <SelectTrigger className="h-10 rounded-xl bg-card dark:bg-zinc-950 border border-input dark:border-zinc-700 hover:border-foreground/30 focus:border-primary/50 focus:ring-1 focus:ring-inset focus:ring-primary/20 text-xs font-sans text-foreground transition-colors shadow-xs">
                             <SelectValue placeholder="Select Model" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-border bg-popover text-xs max-h-56">
@@ -780,7 +789,7 @@ export default function CombosPage() {
                       </div>
 
                       {/* Preview Box & Add Step Button */}
-                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background/60">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-card dark:bg-zinc-950/80 border border-border/60">
                         <div className="min-w-0 flex-1">
                           <div className="text-[10px] font-mono text-muted-foreground uppercase">
                             Selected Model
@@ -792,9 +801,9 @@ export default function CombosPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
                           {builderHasDuplicate && (
-                            <span className="text-[11px] text-amber-500">
+                            <span className="text-[11px] text-amber-500 font-medium">
                               Already in chain
                             </span>
                           )}
@@ -805,7 +814,7 @@ export default function CombosPage() {
                               !builderCandidateStep || builderHasDuplicate
                             }
                             onClick={handleAddBuilderStep}
-                            className="rounded-xl px-4 text-xs font-sans font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+                            className="rounded-lg px-3.5 h-8 text-xs font-sans font-medium cursor-pointer bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-colors shadow-xs"
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" />
                             <span>Add Step</span>
@@ -831,9 +840,8 @@ export default function CombosPage() {
                       <ScrollArea className="h-[150px] pr-2">
                         <div className="space-y-1.5 py-0.5">
                           {selectedModels.length === 0 ? (
-                            <div className="h-full min-h-[140px] flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-secondary/20 text-muted-foreground text-xs font-light">
-                              No models added yet. Select a provider and model
-                              above, then click &quot;Add Step&quot;.
+                            <div className="h-full min-h-[140px] flex flex-col items-center justify-center text-center p-4 rounded-xl bg-secondary/30 dark:bg-zinc-900/30 border border-dashed border-border/60 text-muted-foreground text-xs font-light">
+                              No models added yet. Select a model above, then click &quot;Add Step&quot;.
                             </div>
                           ) : (
                             selectedModels.map((model, idx) => (
@@ -844,16 +852,23 @@ export default function CombosPage() {
                                 onDragOver={(e) => handleDragOver(e, idx)}
                                 onDragEnd={handleDragEnd}
                                 className={cn(
-                                  "p-2.5 rounded-2xl flex items-center justify-between gap-3 bg-secondary/30 transition-all",
+                                  "p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2.5 sm:gap-3 bg-card dark:bg-zinc-900/90 border border-border/70 dark:border-zinc-800 hover:border-border transition-all shadow-xs",
                                   draggedIndex === idx && "opacity-40",
                                 )}
                               >
-                                <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                                   <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
                                     <GripVertical className="h-3.5 w-3.5" />
                                   </div>
 
-                                  <span className="w-4 text-xs font-mono font-bold text-foreground text-center shrink-0">
+                                  <span
+                                    className={cn(
+                                      "w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold shrink-0",
+                                      idx === 0
+                                        ? "bg-foreground text-background shadow-xs"
+                                        : "bg-secondary text-muted-foreground border border-border/60",
+                                    )}
+                                  >
                                     {idx + 1}
                                   </span>
 
@@ -874,7 +889,7 @@ export default function CombosPage() {
                                     type="button"
                                     onClick={() => moveUp(idx)}
                                     disabled={idx === 0}
-                                    className="p-1 rounded-md hover:bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                                    className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer transition-colors"
                                     title="Move up"
                                   >
                                     <ChevronUp className="h-3.5 w-3.5" />
@@ -883,7 +898,7 @@ export default function CombosPage() {
                                     type="button"
                                     onClick={() => moveDown(idx)}
                                     disabled={idx === selectedModels.length - 1}
-                                    className="p-1 rounded-md hover:bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                                    className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer transition-colors"
                                     title="Move down"
                                   >
                                     <ChevronDown className="h-3.5 w-3.5" />
@@ -891,7 +906,7 @@ export default function CombosPage() {
                                   <button
                                     type="button"
                                     onClick={() => removeModel(idx)}
-                                    className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer ml-1"
+                                    className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer ml-1 transition-colors"
                                     title="Remove step"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -924,7 +939,7 @@ export default function CombosPage() {
                         <label className="text-xs font-medium text-foreground">
                           Context Limit
                         </label>
-                        <span className="text-xs font-mono font-medium text-foreground">
+                        <span className="text-xs font-mono font-medium text-foreground bg-secondary/60 px-2 py-0.5 rounded border border-border/60">
                           {formatTokens(contextLength)} tokens
                         </span>
                       </div>
@@ -935,10 +950,10 @@ export default function CombosPage() {
                             type="button"
                             onClick={() => setContextLength(preset.value)}
                             className={cn(
-                              "px-3 py-1.5 rounded-xl text-xs font-sans transition-colors cursor-pointer",
+                              "px-3 py-1.5 rounded-xl text-xs font-sans transition-all cursor-pointer",
                               contextLength === preset.value
-                                ? "bg-foreground text-background font-medium shadow-sm"
-                                : "bg-secondary/40 text-muted-foreground hover:text-foreground",
+                                ? "bg-foreground text-background font-semibold shadow-xs border border-transparent"
+                                : "bg-card dark:bg-zinc-900 text-muted-foreground hover:text-foreground border border-border/70 dark:border-zinc-800 hover:border-border",
                             )}
                           >
                             {preset.label}
@@ -965,7 +980,7 @@ export default function CombosPage() {
                         onChange={(e) => setSystemMessage(e.target.value)}
                         placeholder="e.g. You are an expert engineer. Always return clean, type-safe solutions."
                         rows={4}
-                        className="text-xs bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 resize-none font-sans transition-colors"
+                        className="text-xs bg-card dark:bg-zinc-900/90 rounded-xl border border-input dark:border-zinc-700/80 hover:border-foreground/30 focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/20 resize-none font-sans transition-colors shadow-xs"
                       />
                     </div>
                   </div>
@@ -984,7 +999,7 @@ export default function CombosPage() {
                     </div>
 
                     {/* Summary Box */}
-                    <div className="p-4 rounded-2xl bg-secondary/30 space-y-3">
+                    <div className="p-4 rounded-xl bg-secondary/40 dark:bg-zinc-900/60 border border-border/70 dark:border-zinc-800 space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1019,7 +1034,7 @@ export default function CombosPage() {
                             {selectedModels.map((m, idx) => (
                               <div
                                 key={idx}
-                                className="flex items-center justify-between p-1.5 px-2.5 rounded-xl bg-background/60 text-xs font-sans"
+                                className="flex items-center justify-between p-2 px-3 rounded-lg bg-card dark:bg-zinc-950/80 border border-border/50 text-xs font-sans"
                               >
                                 <div className="flex items-center gap-2">
                                   <span
@@ -1047,20 +1062,20 @@ export default function CombosPage() {
                     </div>
 
                     {/* Validation Checklist */}
-                    <div className="p-3 rounded-2xl bg-secondary/20 space-y-1.5 text-xs">
-                      <div className="font-semibold text-foreground flex items-center gap-1.5 text-[11px]">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5 text-xs">
+                      <div className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 text-xs">
+                        <ShieldCheck className="h-4 w-4" />
                         <span>Ready to Deploy</span>
                       </div>
-                      <div className="space-y-1 font-sans text-muted-foreground text-[11px]">
+                      <div className="space-y-1 font-sans text-foreground/80 text-[11px] pl-5">
                         <div className="flex items-center gap-1.5">
                           <Check className="h-3 w-3 text-emerald-500" />
-                          <span>Identifier: combo/{comboSlug || "name"}</span>
+                          <span>Identifier: <code className="font-mono">combo/{comboSlug || "name"}</code></span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Check className="h-3 w-3 text-emerald-500" />
                           <span>
-                            {selectedModels.length} model step(s) in sequence
+                            {selectedModels.length} model step(s) in failover sequence
                           </span>
                         </div>
                       </div>
@@ -1071,14 +1086,14 @@ export default function CombosPage() {
             </ScrollArea>
 
             {/* Stepper Footer Navigation */}
-            <div className="pt-3 flex items-center justify-between">
+            <div className="pt-3.5 border-t border-border/60 flex items-center justify-between">
               {step === 1 && (
                 <>
                   <Button
                     variant="ghost"
                     type="button"
                     onClick={() => setIsWizardOpen(false)}
-                    className="rounded-full text-xs font-sans cursor-pointer"
+                    className="rounded-lg text-xs font-sans cursor-pointer h-9 px-4"
                   >
                     Cancel
                   </Button>
@@ -1091,7 +1106,7 @@ export default function CombosPage() {
                       }
                       setStep(2);
                     }}
-                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="rounded-lg text-xs font-sans gap-2 px-5 h-9 cursor-pointer bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs"
                   >
                     <span>Next: Models</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -1105,7 +1120,7 @@ export default function CombosPage() {
                     variant="ghost"
                     type="button"
                     onClick={() => setStep(1)}
-                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                    className="rounded-lg text-xs font-sans cursor-pointer gap-1.5 h-9 px-4"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span>Back</span>
@@ -1121,7 +1136,7 @@ export default function CombosPage() {
                       }
                       setStep(3);
                     }}
-                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="rounded-lg text-xs font-sans gap-2 px-5 h-9 cursor-pointer bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs"
                   >
                     <span>Next: Settings</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -1135,7 +1150,7 @@ export default function CombosPage() {
                     variant="ghost"
                     type="button"
                     onClick={() => setStep(2)}
-                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                    className="rounded-lg text-xs font-sans cursor-pointer gap-1.5 h-9 px-4"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span>Back</span>
@@ -1143,7 +1158,7 @@ export default function CombosPage() {
                   <Button
                     type="button"
                     onClick={() => setStep(4)}
-                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="rounded-lg text-xs font-sans gap-2 px-5 h-9 cursor-pointer bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs"
                   >
                     <span>Next: Review</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -1157,7 +1172,7 @@ export default function CombosPage() {
                     variant="ghost"
                     type="button"
                     onClick={() => setStep(3)}
-                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                    className="rounded-lg text-xs font-sans cursor-pointer gap-1.5 h-9 px-4"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span>Back</span>
@@ -1166,7 +1181,7 @@ export default function CombosPage() {
                     type="button"
                     disabled={isSubmitting}
                     onClick={handleSaveCombo}
-                    className="rounded-full text-xs font-sans gap-2 px-6 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="rounded-lg text-xs font-sans gap-2 px-6 h-9 cursor-pointer bg-foreground text-background hover:bg-foreground/90 font-medium shadow-xs"
                   >
                     {isSubmitting ? (
                       <span>Saving...</span>
