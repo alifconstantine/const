@@ -29,6 +29,7 @@ interface TrajectoryTabProps {
   onOpenFilePreview?: (filePath: string) => void;
   onOpenFileDiff?: (record: any) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 export function TrajectoryTab({
@@ -40,6 +41,7 @@ export function TrajectoryTab({
   onOpenFilePreview,
   onOpenFileDiff,
   onOpenTrajectory,
+  onOpenBrowser,
 }: TrajectoryTabProps) {
   const { t } = useTranslation();
   const [activeView, setActiveView] = useState<"timeline" | "raw">("timeline");
@@ -327,6 +329,7 @@ export function TrajectoryTab({
                     onOpenFilePreview={onOpenFilePreview}
                     onOpenFileDiff={onOpenFileDiff}
                     onOpenTrajectory={onOpenTrajectory}
+                    onOpenBrowser={onOpenBrowser}
                   />
                 ))
               )}
@@ -360,6 +363,7 @@ interface TrajectoryStepCardProps {
   onOpenFilePreview?: (filePath: string) => void;
   onOpenFileDiff?: (record: any) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 export function TrajectoryStepCard({
@@ -372,6 +376,7 @@ export function TrajectoryStepCard({
   onOpenFilePreview,
   onOpenFileDiff,
   onOpenTrajectory,
+  onOpenBrowser,
 }: TrajectoryStepCardProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -586,6 +591,7 @@ export function TrajectoryStepCard({
                 content={message.content}
                 onOpenFilePreview={onOpenFilePreview}
                 onOpenTrajectory={onOpenTrajectory}
+                onOpenBrowser={onOpenBrowser}
               />
             </div>
           )}

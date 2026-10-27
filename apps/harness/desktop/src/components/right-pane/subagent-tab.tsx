@@ -11,6 +11,7 @@ export interface SubagentTabProps {
   subagents?: SubAgentItem[];
   onKillAgent?: (agentId: string) => void;
   onOpenFilePreview?: (filePath: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 const KNOWN_TOOL_NAMES = new Set([
@@ -52,6 +53,7 @@ export function SubagentTab({
   subagents = [],
   onKillAgent,
   onOpenFilePreview,
+  onOpenBrowser,
 }: SubagentTabProps) {
   const { t } = useTranslation();
   const currentAgent: SubAgentItem | undefined =
@@ -253,6 +255,7 @@ export function SubagentTab({
           <ChatMessageItem
             message={userMessage}
             onOpenFilePreview={onOpenFilePreview}
+            onOpenBrowser={onOpenBrowser}
             isReadOnly={true}
             userBubbleWidthClass="max-w-[85%]"
           />
@@ -261,6 +264,7 @@ export function SubagentTab({
             isExecuting={isRunning}
             liveDurationMs={durationMs}
             onOpenFilePreview={onOpenFilePreview}
+            onOpenBrowser={onOpenBrowser}
             isReadOnly={true}
           />
         </div>

@@ -25,6 +25,7 @@ interface AssistantResponseProps {
   onSubmit?: (prompt: string) => void | Promise<void>;
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 class BlockBoundary extends React.Component<
@@ -53,6 +54,7 @@ export function AssistantResponse({
   onSubmit,
   onOpenFilePreview,
   onOpenTrajectory,
+  onOpenBrowser,
 }: AssistantResponseProps) {
   const { t } = useTranslation();
   const parts = useMemo(
@@ -68,6 +70,7 @@ export function AssistantResponse({
             content={part.content}
             onOpenFilePreview={onOpenFilePreview}
             onOpenTrajectory={onOpenTrajectory}
+            onOpenBrowser={onOpenBrowser}
           />
         ) : (
           <BlockBoundary

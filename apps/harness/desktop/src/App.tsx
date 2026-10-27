@@ -1154,6 +1154,22 @@ function AuthenticatedContent({
     };
   }, [handleOpenBrowser]);
 
+  useEffect(() => {
+    const handleCustomOpenBrowser = (e: Event) => {
+      const customEvent = e as CustomEvent<{ url: string; newTab?: boolean; tabId?: string }>;
+      if (customEvent.detail?.url) {
+        handleOpenBrowser(customEvent.detail.url, {
+          newTab: customEvent.detail.newTab,
+          tabId: customEvent.detail.tabId,
+        });
+      }
+    };
+    window.addEventListener("const:open-browser-tab", handleCustomOpenBrowser);
+    return () => {
+      window.removeEventListener("const:open-browser-tab", handleCustomOpenBrowser);
+    };
+  }, [handleOpenBrowser]);
+
   const handleUpdateTab = (tabId: string, updates: Partial<RightPaneTab>) => {
     setRightPaneTabs((prev) =>
       prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
@@ -4427,6 +4443,7 @@ function AuthenticatedContent({
                       onOpenFileDiff={handleOpenFileDiff}
                       onOpenFilePreview={handleOpenFilePreview}
                       onOpenTrajectory={handleOpenTrajectory}
+                      onOpenBrowser={handleOpenBrowser}
                       onOpenReview={handleOpenReview}
                       onOpenSubAgent={handleOpenSubAgentFromTrace}
                       renderAttachment={renderMessageAttachment}
@@ -4654,6 +4671,7 @@ function AuthenticatedContent({
                   }
                   onOpenFilePreview={handleOpenFilePreview}
                   onOpenTrajectory={handleOpenTrajectory}
+                  onOpenBrowser={handleOpenBrowser}
                   conversations={conversations}
                   onInsertToMainPrompt={(text) => {
                     setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));

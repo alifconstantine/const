@@ -535,6 +535,33 @@ function createWindow() {
     win = null;
   });
 
+  // Intercept and prevent in-app navigation that would replace the Harness UI with full-screen websites.
+  // Instead, route external web links to the sidepanel browser tab.
+  win.webContents.on("will-navigate", (event, navigationUrl) => {
+    if (
+      process.env.VITE_DEV_SERVER_URL &&
+      navigationUrl.startsWith(process.env.VITE_DEV_SERVER_URL)
+    ) {
+      return;
+    }
+    if (navigationUrl.startsWith("file://")) {
+      return;
+    }
+
+    event.preventDefault();
+    if (navigationUrl.startsWith("http://") || navigationUrl.startsWith("https://")) {
+      win?.webContents.send("browser:open-tab-request", { url: navigationUrl, newTab: true });
+    }
+  });
+
+  // Intercept target="_blank" and window.open to open in the sidepanel browser tab instead of a full new window.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      win?.webContents.send("browser:open-tab-request", { url, newTab: true });
+    }
+    return { action: "deny" };
+  });
+
   win.on("maximize", () => {
     win?.webContents.send("window:maximized-change", true);
   });
@@ -2503,6 +2530,14 @@ app.whenReady().then(() => {
       return true;
     }
   );
+
+  ipcMain.handle("browser:open-tab", async (_event, payload: { url: string; tabId?: string; newTab?: boolean }) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("browser:open-tab-request", payload);
+      return true;
+    }
+    return false;
+  });
 
   ipcMain.handle("browser:unregister-tab", async (_event, tabId: string) => {
     browserController.unregisterWebview(tabId);

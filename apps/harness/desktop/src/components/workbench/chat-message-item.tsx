@@ -51,6 +51,7 @@ export interface ChatMessageItemProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenFilePreview?: (filePath: string, content?: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
   onOpenReview?: (mutations?: FileMutationRecord[]) => void;
   onOpenSubAgent?: (step: TraceStep) => void;
   renderAttachment?: (att: any) => React.ReactNode;
@@ -102,6 +103,7 @@ export function ChatMessageItem({
   onOpenFileDiff,
   onOpenFilePreview,
   onOpenTrajectory,
+  onOpenBrowser,
   onOpenReview,
   onOpenSubAgent,
   renderAttachment,
@@ -181,6 +183,7 @@ export function ChatMessageItem({
                   content={message.content}
                   onOpenFilePreview={onOpenFilePreview}
                   onOpenTrajectory={onOpenTrajectory}
+                  onOpenBrowser={onOpenBrowser}
                   variant="user"
                 />
               </div>
@@ -190,6 +193,7 @@ export function ChatMessageItem({
               content={message.content}
               onOpenFilePreview={onOpenFilePreview}
               onOpenTrajectory={onOpenTrajectory}
+              onOpenBrowser={onOpenBrowser}
               variant="user"
             />
           )}
@@ -260,6 +264,7 @@ export function ChatMessageItem({
         onOpenFilePreview={onOpenFilePreview}
         onOpenReview={onOpenReview ? () => onOpenReview(message.mutations) : undefined}
         onOpenSubAgent={onOpenSubAgent}
+        onOpenBrowser={onOpenBrowser}
       />
 
       {/* Formatted Markdown Content */}
@@ -274,6 +279,7 @@ export function ChatMessageItem({
             onSubmit={onIntelligenceSubmit}
             onOpenFilePreview={onOpenFilePreview}
             onOpenTrajectory={onOpenTrajectory}
+            onOpenBrowser={onOpenBrowser}
           />
         </div>
       ) : null}

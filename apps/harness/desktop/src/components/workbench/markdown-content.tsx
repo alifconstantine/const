@@ -6,12 +6,16 @@ import { ResponseTable } from "../intelligence-ui/response-table";
 import { FileIcon } from "./file-icon";
 import { renderMentionBadgeHtml } from "./rich-mention-editor";
 import { useTranslation } from "../../lib/i18n";
+import { resolveMarkdownLink, type ResolvedMarkdownLink } from "./markdown-links";
+
+export { resolveMarkdownLink, type ResolvedMarkdownLink };
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
   variant?: "default" | "user";
 }
 
@@ -20,6 +24,7 @@ export function MarkdownContent({
   className = "",
   onOpenFilePreview,
   onOpenTrajectory,
+  onOpenBrowser,
   variant = "default",
 }: MarkdownContentProps) {
   if (!content) return null;
@@ -122,43 +127,55 @@ export function MarkdownContent({
     if (!target) return;
 
     const href = target.getAttribute("href") || "";
-    if (href.startsWith("plugin://")) { e.preventDefault(); return; }
+    const resolved = resolveMarkdownLink(href);
 
-    // Trajectory / Conversation links
-    if (href.startsWith("trajectory://") || href.startsWith("conversation://")) {
+    if (resolved.type === "plugin") {
       e.preventDefault();
-      const targetIdOrPath = href.replace(/^(?:trajectory|conversation):\/\/\/?/i, "");
-      onOpenTrajectory?.(targetIdOrPath);
       return;
     }
 
-    // Folder links
-    if (href.startsWith("folder://") || href.endsWith("/")) {
+    if (resolved.type === "external") {
       e.preventDefault();
-      let cleanDir = href.replace(/^folder:\/\/\/?/i, "").replace(/^file:\/\/\/?/i, "");
-      if (/^\/[a-zA-Z]:/i.test(cleanDir)) {
-        cleanDir = cleanDir.slice(1);
+      if (window.electron?.openExternal) {
+        window.electron.openExternal(resolved.url);
+      } else {
+        window.open(resolved.url);
       }
-      onOpenFilePreview?.(cleanDir);
       return;
     }
 
-    // File links
-    if (
-      href.startsWith("file://") ||
-      href.startsWith("file;file://") ||
-      href.startsWith("file;") ||
-      /^[a-zA-Z]:[\\/]/.test(href)
-    ) {
+    if (resolved.type === "web") {
       e.preventDefault();
-      let cleaned = href
-        .replace(/^file;file:\/\/\/?/i, "")
-        .replace(/^file:\/\/\/?/i, "")
-        .replace(/^file;/i, "");
-      if (/^\/[a-zA-Z]:/i.test(cleaned)) {
-        cleaned = cleaned.slice(1);
+      e.stopPropagation();
+
+      if (onOpenBrowser) {
+        onOpenBrowser(resolved.url);
+      } else {
+        window.dispatchEvent(
+          new CustomEvent("const:open-browser-tab", {
+            detail: { url: resolved.url },
+          })
+        );
       }
-      onOpenFilePreview?.(cleaned);
+      return;
+    }
+
+    if (resolved.type === "trajectory") {
+      e.preventDefault();
+      onOpenTrajectory?.(resolved.idOrPath);
+      return;
+    }
+
+    if (resolved.type === "folder") {
+      e.preventDefault();
+      onOpenFilePreview?.(resolved.path);
+      return;
+    }
+
+    if (resolved.type === "file") {
+      e.preventDefault();
+      onOpenFilePreview?.(resolved.path);
+      return;
     }
   };
 

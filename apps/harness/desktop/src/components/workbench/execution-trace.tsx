@@ -46,6 +46,7 @@ export interface ExecutionTraceProps {
   onOpenFilePreview?: (filePath: string, content?: string) => void;
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
   onOpenSubAgent?: (step: TraceStep) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,7 @@ export function ExecutionTrace({
   onOpenFilePreview,
   onAnswerQuestion,
   onOpenSubAgent,
+  onOpenBrowser,
 }: ExecutionTraceProps) {
   const { t } = useTranslation();
   // Default: Open while executing to view progress live; automatically closed when worked/finished
@@ -205,6 +207,7 @@ export function ExecutionTrace({
                   durationMs={step.durationMs}
                   startTime={step.startTime}
                   isExecuting={isExecuting && idx === steps.length - 1 && !step.durationMs}
+                  onOpenBrowser={onOpenBrowser}
                 />
               );
             }
@@ -464,11 +467,13 @@ function ThoughtItem({
   isExecuting,
   durationMs,
   startTime,
+  onOpenBrowser,
 }: {
   thinking: string;
   isExecuting?: boolean;
   durationMs?: number;
   startTime?: number;
+  onOpenBrowser?: (url: string) => void;
 }) {
   const { t } = useTranslation();
   // 1. Auto open when thinking starts, and auto close when thinking completes
@@ -533,6 +538,7 @@ function ThoughtItem({
           <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
             <MarkdownContent
               content={thinking}
+              onOpenBrowser={onOpenBrowser}
               className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
             />
           </ScrollArea>

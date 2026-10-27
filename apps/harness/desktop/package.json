@@ -11,6 +11,7 @@
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
     "test:plugins:preview": "vite --config tests/vite.config.ts --port 5190",
     "test:models": "tsx --test src/lib/models.test.ts",
+    "test:markdown": "tsx --test src/components/workbench/markdown-links.test.ts",
     "test:telemetry": "tsx --test src/lib/chat-telemetry.test.ts electron/chat-telemetry.test.ts",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "node scripts/test-browser.cjs",

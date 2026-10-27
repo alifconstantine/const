@@ -61,6 +61,7 @@ interface SideChatTabProps {
   onInsertToMainPrompt?: (text: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
   conversations?: ConversationItem[];
 }
 
@@ -87,6 +88,7 @@ export function SideChatTab({
   onInsertToMainPrompt,
   onUpdateTab,
   onOpenTrajectory,
+  onOpenBrowser,
   conversations: propConversations,
 }: SideChatTabProps) {
   const { t } = useTranslation();
@@ -620,6 +622,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                       content={msg.content}
                       onOpenFilePreview={onOpenFilePreview}
                       onOpenTrajectory={onOpenTrajectory}
+                      onOpenBrowser={onOpenBrowser}
                       variant="user"
                     />
                   </div>
@@ -653,6 +656,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                     onRollbackAll={onRollbackAll}
                     onOpenFileDiff={onOpenFileDiff}
                     onOpenFilePreview={onOpenFilePreview}
+                    onOpenBrowser={onOpenBrowser}
                   />
 
                   {msg.content && (
@@ -666,6 +670,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                         onSubmit={(prompt) => handleSendMessage({ prompt, project: tab.project || "Outside Project", mode: activeMode, model: activeModel })}
                         onOpenFilePreview={onOpenFilePreview}
                         onOpenTrajectory={onOpenTrajectory}
+                        onOpenBrowser={onOpenBrowser}
                       />
                     </div>
                   )}

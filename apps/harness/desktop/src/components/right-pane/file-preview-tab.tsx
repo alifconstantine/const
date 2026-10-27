@@ -29,6 +29,7 @@ interface FilePreviewTabProps {
   tab: RightPaneTab;
   workspacePath?: string;
   onOpenFilePreview?: (filePath: string) => void;
+  onOpenBrowser?: (url: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
 }
 
@@ -49,6 +50,7 @@ export function FilePreviewTab({
   tab,
   workspacePath: propWorkspacePath,
   onOpenFilePreview,
+  onOpenBrowser,
   onUpdateTab,
 }: FilePreviewTabProps) {
   const { t } = useTranslation();
@@ -1086,7 +1088,11 @@ export function FilePreviewTab({
           ) : isMarkdown && mode === "formatted" ? (
             /* Formatted Markdown Rendering */
             <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto font-sans select-text leading-relaxed text-[#d4d4d4]">
-              <MarkdownContent content={content} />
+              <MarkdownContent
+                content={content}
+                onOpenFilePreview={onOpenFilePreview}
+                onOpenBrowser={onOpenBrowser}
+              />
             </div>
           ) : (
             /* Monospace Code Viewer matching Image 2 with Line Numbers & Fold chevrons */

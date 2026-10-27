@@ -516,6 +516,10 @@ declare global {
         onOpenTabRequest?: (
           callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void
         ) => () => void;
+        openTab?: (
+          url: string,
+          options?: { tabId?: string; newTab?: boolean }
+        ) => Promise<boolean>;
       };
       computer?: {
         getCapabilities: () => Promise<{

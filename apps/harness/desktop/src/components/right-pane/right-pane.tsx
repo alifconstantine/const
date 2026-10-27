@@ -36,6 +36,7 @@ interface RightPaneProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenFilePreview?: (filePath: string) => void;
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  onOpenBrowser?: (url: string) => void;
   conversations?: ConversationItem[];
   onStopTask?: (taskId: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
@@ -73,6 +74,7 @@ export function RightPane({
   onOpenFileDiff,
   onOpenFilePreview,
   onOpenTrajectory,
+  onOpenBrowser,
   conversations,
   onStopTask,
   onUpdateTab,
@@ -117,6 +119,7 @@ export function RightPane({
             tab={tab}
             workspacePath={workspacePath}
             onOpenFilePreview={onOpenFilePreview}
+            onOpenBrowser={onOpenBrowser}
             onUpdateTab={onUpdateTab}
           />
         );
@@ -127,6 +130,7 @@ export function RightPane({
             subagents={subagents}
             onKillAgent={onKillAgent}
             onOpenFilePreview={onOpenFilePreview}
+            onOpenBrowser={onOpenBrowser}
           />
         );
       case "side_conversation":
@@ -144,6 +148,7 @@ export function RightPane({
             onInsertToMainPrompt={onInsertToMainPrompt}
             onUpdateTab={onUpdateTab}
             onOpenTrajectory={onOpenTrajectory}
+            onOpenBrowser={onOpenBrowser}
             conversations={conversations}
           />
         );
@@ -158,6 +163,7 @@ export function RightPane({
             onOpenFilePreview={onOpenFilePreview}
             onOpenFileDiff={onOpenFileDiff}
             onOpenTrajectory={onOpenTrajectory}
+            onOpenBrowser={onOpenBrowser}
           />
         );
       case "browser":

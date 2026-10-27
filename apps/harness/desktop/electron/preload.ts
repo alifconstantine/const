@@ -269,6 +269,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("browser:open-tab-request", handler);
       return () => ipcRenderer.removeListener("browser:open-tab-request", handler);
     },
+    openTab: (url: string, options?: { tabId?: string; newTab?: boolean }) =>
+      ipcRenderer.invoke("browser:open-tab", { url, ...options }),
   },
   computer: {
     getCapabilities: () => ipcRenderer.invoke("computer:get-capabilities"),
