@@ -944,7 +944,7 @@ export function ChatCard({
       setIsModelClosing(false);
       setModelPopoverView("overview");
       closeModelTimeoutRef.current = null;
-    }, 140);
+    }, 200);
   }, [isModelClosing, isModelOpen]);
 
   const handleOpenModelPopover = useCallback(() => {
@@ -2087,10 +2087,10 @@ export function ChatCard({
                 {(isModelOpen || isModelClosing) && (
                   <div
                     className={cn(
-                      "absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none origin-bottom-right",
+                      "absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none",
                       isModelClosing
-                        ? "animate-out fade-out-0 zoom-out-95 slide-out-to-bottom-1 duration-150 fill-mode-forwards pointer-events-none"
-                        : "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150",
+                        ? "animate-out fade-out-0 slide-out-to-bottom-3.5 duration-200 ease-in fill-mode-forwards pointer-events-none"
+                        : "animate-in fade-in-0 slide-in-from-bottom-3.5 duration-200 ease-out",
                       modelPopoverView === "overview" ? "p-3.5" : "p-2"
                     )}
                   >
@@ -2098,7 +2098,7 @@ export function ChatCard({
                       /* Image 1: Overview with Thinking Level Title, Model Selector Trigger, Gear Icon, and Thinking Slider */
                       <div
                         key="overview"
-                        className="relative flex flex-col animate-in fade-in-0 slide-in-from-left-2 duration-150 ease-out"
+                        className="relative flex flex-col animate-in fade-in-0 duration-150 ease-out"
                       >
                         {/* Manage Models Gear Button (top-right corner with hover) */}
                         <button
@@ -2180,7 +2180,7 @@ export function ChatCard({
                       /* Image 2: Model Search and List */
                       <div
                         key="select-model"
-                        className="flex flex-col text-left animate-in fade-in-0 slide-in-from-right-2 duration-150 ease-out"
+                        className="flex flex-col text-left animate-in fade-in-0 duration-150 ease-out"
                       >
                         {models.length > 0 ? (
                           <>
