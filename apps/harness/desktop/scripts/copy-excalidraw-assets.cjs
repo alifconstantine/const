@@ -6,5 +6,7 @@ const source = path.join(
   "fonts",
 );
 const target = path.join(root, "public", "excalidraw-assets", "fonts");
-fs.mkdirSync(target, { recursive: true });
-fs.cpSync(source, target, { recursive: true, force: true });
+if (!fs.existsSync(target) || fs.readdirSync(target).length === 0) {
+  fs.mkdirSync(target, { recursive: true });
+  fs.cpSync(source, target, { recursive: true, force: true });
+}

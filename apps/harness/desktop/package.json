@@ -31,7 +31,8 @@
     "package:linux:pacman": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --linux pacman",
     "build:native": "node scripts/build-computer-use-macos.cjs",
     "package:mac": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --mac --x64 --arm64",
-    "build:remote": "node scripts/copy-excalidraw-assets.cjs && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build --config vite.remote.config.ts"
+    "build:remote": "node scripts/copy-excalidraw-assets.cjs && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build --config vite.remote.config.ts",
+    "generate:intelligence-prompt": "node scripts/generate-intelligence-prompt.cjs"
   },
   "dependencies": {
     "@const/agent": "workspace:*",
