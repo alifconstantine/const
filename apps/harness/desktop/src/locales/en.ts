@@ -4,6 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const en: TranslationDictionary = {
   mcp: mcpTranslations.en,
   remoteControl: {
+    renderError: "The remote workspace could not be displayed",
+    renderErrorHint: "Refresh to reconnect to your desktop. Your chats remain on the desktop.",
+    pullToRefresh: "Pull down to refresh",
+    releaseToRefresh: "Release to refresh",
     loginRequired: "Sign in to use remote control.",
     target: "Destination: {host}",
     encryption: "AES-GCM E2E",

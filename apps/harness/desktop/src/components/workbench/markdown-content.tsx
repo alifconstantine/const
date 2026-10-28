@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { sanitizeInlineMarkdown } from "../../lib/safe-markdown";
 import { Check, Copy } from "lucide-react";
@@ -22,22 +22,8 @@ interface MarkdownContentProps {
   isStreaming?: boolean;
 }
 
-export function MarkdownContent({
-  content,
-  className = "",
-  onOpenFilePreview,
-  onOpenTrajectory,
-  onOpenBrowser,
-  variant = "default",
-  isStreaming = false,
-}: MarkdownContentProps) {
-  if (!content) return null;
-
-  // Configure marked for GitHub Flavored Markdown
-  marked.setOptions({
-    gfm: true,
-    breaks: true,
-  });
+function tokenizeMarkdown(content: string) {
+  if (!content) return [];
 
   // 1. Normalize @[Title](path) mentions into native badge pills matching AI input
   let processed = content.replace(/@\[([^\]]+)\](?:\(([^)]+)\))/g, (_, label, path) => {
@@ -124,7 +110,21 @@ export function MarkdownContent({
     return spaces.length === 1 ? `\n  ${bullet} ` : match;
   });
 
-  const tokens = marked.lexer(normalizedContent);
+  return marked.lexer(normalizedContent, { gfm: true, breaks: true });
+}
+
+export function MarkdownContent({
+  content,
+  className = "",
+  onOpenFilePreview,
+  onOpenTrajectory,
+  onOpenBrowser,
+  variant = "default",
+  isStreaming = false,
+}: MarkdownContentProps) {
+  // Layout changes and panel controls must not reparse the entire transcript.
+  const tokens = useMemo(() => tokenizeMarkdown(content), [content]);
+  if (!content) return null;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = (e.target as HTMLElement).closest("a");
@@ -201,7 +201,7 @@ export function MarkdownContent({
   );
 }
 
-function TokenRenderer({
+const TokenRenderer = React.memo(function TokenRenderer({
   token,
   isNested,
   variant = "default",
@@ -340,7 +340,7 @@ function TokenRenderer({
       return null;
     }
   }
-}
+});
 
 function ListItemContent({
   item,
@@ -446,16 +446,19 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   );
 }
 
-function InlineRenderer({ text }: { text: string }) {
+const InlineRenderer = React.memo(function InlineRenderer({ text }: { text: string }) {
   // Parse inline markdown: bold, italic, inline code, links
-  const html = marked.parseInline(text);
+  const html = useMemo(() => {
+    const parsed = marked.parseInline(text, { gfm: true, breaks: true });
+    return typeof parsed === "string" ? sanitizeInlineMarkdown(parsed) : null;
+  }, [text]);
   if (typeof html === "string") {
     return (
       <span
-        dangerouslySetInnerHTML={{ __html: sanitizeInlineMarkdown(html) }}
+        dangerouslySetInnerHTML={{ __html: html }}
         className="cursor-text select-text [&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:cursor-pointer [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium"
       />
     );
   }
   return <span className="cursor-text select-text">{text}</span>;
-}
+});

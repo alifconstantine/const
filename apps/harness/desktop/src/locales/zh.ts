@@ -4,6 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const zh: TranslationDictionary = {
   mcp: mcpTranslations.zh,
   remoteControl: {
+    renderError: "无法显示远程工作区",
+    renderErrorHint: "请刷新以重新连接桌面。聊天记录仍保存在桌面上。",
+    pullToRefresh: "下拉刷新",
+    releaseToRefresh: "松开刷新",
     loginRequired: "请登录以使用远程控制。",
     target: "连接地址：{host}",
     encryption: "AES-GCM E2E",

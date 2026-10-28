@@ -4,6 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const ja: TranslationDictionary = {
   mcp: mcpTranslations.ja,
   remoteControl: {
+    renderError: "リモートワークスペースを表示できませんでした",
+    renderErrorHint: "再読み込みしてデスクトップに再接続してください。チャットはデスクトップに保存されています。",
+    pullToRefresh: "下に引いて再読み込み",
+    releaseToRefresh: "離して再読み込み",
     loginRequired: "リモートコントロールを使用するにはログインしてください。",
     target: "接続先: {host}",
     encryption: "AES-GCM E2E",

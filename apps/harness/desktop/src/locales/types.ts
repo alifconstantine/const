@@ -1,6 +1,10 @@
 export interface TranslationDictionary {
   mcp: import("./mcp").McpTranslations;
   remoteControl: {
+    renderError: string;
+    renderErrorHint: string;
+    pullToRefresh: string;
+    releaseToRefresh: string;
     loginRequired: string;
     target: string;
     encryption: string;

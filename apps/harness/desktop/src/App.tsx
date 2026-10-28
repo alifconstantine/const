@@ -118,6 +118,9 @@ import type {
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
+const SIDE_PANEL_DURATION_MS = 280;
+const SIDE_PANEL_MOTION = `${SIDE_PANEL_DURATION_MS}ms cubic-bezier(0.22,1,0.36,1)`;
+
 const emptyConversationMetrics: ConversationMetrics = { turns: 0, steps: 0, modelRequests: 0, toolCalls: 0, hasUsage: false, incompleteUsage: false, workingDurationMs: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
 function getGreeting(t: (key: any) => string): string {
@@ -580,10 +583,14 @@ export function AuthenticatedContent({
           const activeConvo = data?.remoteConversation || (data?.conversationId ? await window.electron?.getConversation?.(data.conversationId) : null);
           if (disposed) return;
           if (activeConvo) {
+            // Own UI writes are echoed by the host. Reapplying them resets
+            // transient panel state and needlessly rebuilds the tab stack.
+            const unchangedPane = data?.uiOnly && activeConvo.rightPaneState &&
+              JSON.stringify(getStoredRightPaneState(activeConvo.id)) === JSON.stringify(activeConvo.rightPaneState);
             cacheConversation(activeConvo);
             hydrateConversationTelemetry(activeConvo);
             syncConversationUi(activeConvo);
-            if (activeConvo.id === conversationIdRef.current && activeConvo.rightPaneState) {
+            if (activeConvo.id === conversationIdRef.current && activeConvo.rightPaneState && !unchangedPane) {
               restoreConversationRightPaneState(activeConvo.id, activeConvo.rightPaneState);
             }
           }
@@ -965,28 +972,19 @@ export function AuthenticatedContent({
     return () => ro.disconnect();
   }, []);
 
+  // Cancel the pending collapse if the panel is reopened during its exit.
+  useEffect(() => {
+    if (isRightSidebarOpen || !isRightSidebarExpanded) return;
+    const timer = setTimeout(() => setIsRightSidebarExpanded(false), SIDE_PANEL_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [isRightSidebarOpen, isRightSidebarExpanded]);
+
   const handleCloseRightSidebar = useCallback(() => {
     setIsRightSidebarOpen(false);
-    if (isRightSidebarExpandedRef.current) {
-      setTimeout(() => {
-        setIsRightSidebarExpanded(false);
-      }, 320);
-    }
   }, []);
 
   const handleToggleRightSidebar = useCallback(() => {
-    setIsRightSidebarOpen((prev) => {
-      if (prev) {
-        if (isRightSidebarExpandedRef.current) {
-          setTimeout(() => {
-            setIsRightSidebarExpanded(false);
-          }, 320);
-        }
-        return false;
-      } else {
-        return true;
-      }
-    });
+    setIsRightSidebarOpen((prev) => !prev);
   }, []);
 
   const handleToggleBottomPanel = useCallback(async () => {
@@ -4342,14 +4340,12 @@ export function AuthenticatedContent({
           <>
             {/* Center Main Chat Panel Card */}
             <div
-              className={cn(
-                "workspace-chat h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px]",
-                !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
-              )}
+              className="workspace-chat h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px] motion-reduce:!transition-none"
               style={{
                 width: !isRightSidebarOpen
                   ? "100%"
                   : `calc(100% - ${rightSidebarWidth + 10}px)`,
+                transition: isDraggingRightSidebar ? "none" : `width ${SIDE_PANEL_MOTION}`,
               }}
             >
               {(() => {
@@ -4712,7 +4708,7 @@ export function AuthenticatedContent({
               onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
               className={cn(
                 "absolute top-0 bottom-0 cursor-col-resize select-none flex items-center justify-center z-25 overflow-hidden",
-                !isDraggingRightSidebar && "transition-[right,opacity] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                "motion-reduce:!transition-none",
                 isRightSidebarOpen && !isRightSidebarExpanded
                   ? "opacity-100 pointer-events-auto"
                   : "opacity-0 pointer-events-none"
@@ -4720,26 +4716,30 @@ export function AuthenticatedContent({
               style={{
                 right: !isRightSidebarOpen ? 0 : `${rightSidebarWidth}px`,
                 width: "10px",
+                transition: isDraggingRightSidebar ? "none" : `right ${SIDE_PANEL_MOTION}, opacity ${SIDE_PANEL_MOTION}`,
               }}
               title={t("rightPane.dragToResize")}
             >
               <div className="w-[1px] h-full bg-transparent group-hover:bg-[#dedee2] dark:group-hover:bg-[#282828] transition-colors" />
             </div>
 
-            {/* Right SidePanel Card: Anchored to the right edge, smoothly expands from right to left */}
+            {/* Keep tab contents at their final size while panel and chat edges move together. */}
             <div
+              aria-hidden={!isRightSidebarOpen}
+              inert={!isRightSidebarOpen}
               className={cn(
-                "workspace-right-pane absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30",
-                !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+                "workspace-right-pane absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30 motion-reduce:!transition-none",
                 isRightSidebarOpen ? "pointer-events-auto" : "pointer-events-none"
               )}
               style={{
-                width: !isRightSidebarOpen
-                  ? 0
-                  : remote?.mobile ? "100%"
+                width: remote?.mobile ? "100%"
                   : isRightSidebarExpanded
                   ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                   : `${rightSidebarWidth}px`,
+                transform: isRightSidebarOpen ? "translateX(0)" : "translateX(calc(100% + 10px))",
+                visibility: isRightSidebarOpen ? "visible" : "hidden",
+                transition: isDraggingRightSidebar ? "none"
+                  : `transform ${SIDE_PANEL_MOTION}, visibility 0s linear ${isRightSidebarOpen ? 0 : SIDE_PANEL_DURATION_MS}ms`,
               }}
             >
               <div
@@ -4751,9 +4751,6 @@ export function AuthenticatedContent({
                   minWidth: remote?.mobile ? "100%" : isRightSidebarExpanded
                     ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                     : `${rightSidebarWidth}px`,
-                  transition: !isDraggingRightSidebar
-                    ? "width 300ms cubic-bezier(0.16,1,0.3,1), min-width 300ms cubic-bezier(0.16,1,0.3,1)"
-                    : "none",
                 }}
               >
                 <RightPane

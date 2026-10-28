@@ -1,8 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
+  define: command === "build" ? { "process.env": JSON.stringify({ NODE_ENV: "production" }) } : undefined,
+  build: {
+    rollupOptions: { input: path.resolve(import.meta.dirname, "remote-workspace.html") },
+    reportCompressedSize: false,
+  },
   optimizeDeps: { entries: ["tests/remote-workspace.html"] },
   resolve: {
     alias: [
@@ -31,4 +36,4 @@ export default defineConfig({
     ],
   },
   server: { host: "127.0.0.1", port: 5198, strictPort: true },
-});
+}));

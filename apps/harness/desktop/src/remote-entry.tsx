@@ -17,6 +17,9 @@ import { installRemoteAssets } from "./lib/remote-assets";
 import "./index.css";
 import "./remote.css";
 import { RemoteDirectoryPicker } from "./components/remote-directory-picker";
+import { RemoteWorkspaceBoundary } from "./components/remote-workspace-boundary";
+import { RemotePullToRefresh } from "./components/remote-pull-to-refresh";
+import { scopedRemoteStorage } from "./lib/remote-storage";
 
 type Options = { sessionId: string; convexUrl: string; accountsUrl: string };
 function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
@@ -207,10 +210,12 @@ function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
         <div
           className={`remote-client ${mobile ? "remote-mobile" : "remote-desktop"}`}
         >
-          <AuthenticatedContent
-            onSignOut={() => void exit()}
-            onSwitchAccount={() => void exit(true)}
-          />
+          <RemotePullToRefresh enabled={mobile}>
+            <AuthenticatedContent
+              onSignOut={() => void exit()}
+              onSwitchAccount={() => void exit(true)}
+            />
+          </RemotePullToRefresh>
           {directoryPicker && (
             <RemoteDirectoryPicker
               initialPath={directoryRoot}
@@ -241,45 +246,8 @@ function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
   );
 }
 
-/** Keep desktop caches tab-scoped and separate for each paired host session. */
-function scopedStorage(sessionId: string) {
-  const original = Object.getOwnPropertyDescriptor(window, "localStorage");
-  const prefix = `const_remote_ui:${sessionId}:`;
-  const storage = new Proxy({} as Storage, {
-    get(_target, key) {
-      const keys = () =>
-        Object.keys(sessionStorage).filter((item) => item.startsWith(prefix));
-      if (key === "getItem")
-        return (name: string) => sessionStorage.getItem(prefix + name);
-      if (key === "setItem")
-        return (name: string, value: string) =>
-          sessionStorage.setItem(prefix + name, value);
-      if (key === "removeItem")
-        return (name: string) => sessionStorage.removeItem(prefix + name);
-      if (key === "clear")
-        return () => keys().forEach((item) => sessionStorage.removeItem(item));
-      if (key === "length") return keys().length;
-      if (key === "key")
-        return (index: number) => keys()[index]?.slice(prefix.length) ?? null;
-      return typeof key === "string"
-        ? sessionStorage.getItem(prefix + key)
-        : undefined;
-    },
-    set(_target, key, value) {
-      sessionStorage.setItem(prefix + String(key), String(value));
-      return true;
-    },
-  });
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: storage,
-  });
-  return () => {
-    if (original) Object.defineProperty(window, "localStorage", original);
-  };
-}
 export function mountRemoteWorkspace(element: HTMLElement, options: Options) {
-  const restore = scopedStorage(options.sessionId);
+  const restore = scopedRemoteStorage(options.sessionId);
   const old = (globalThis as Record<symbol, unknown>)[
     Symbol.for("openui.devtools.autoMount")
   ];
@@ -291,7 +259,9 @@ export function mountRemoteWorkspace(element: HTMLElement, options: Options) {
   const root = createRoot(element);
   root.render(
     <I18nProvider>
-      <Workspace {...options} />
+      <RemoteWorkspaceBoundary>
+        <Workspace {...options} />
+      </RemoteWorkspaceBoundary>
     </I18nProvider>,
   );
   return () => {

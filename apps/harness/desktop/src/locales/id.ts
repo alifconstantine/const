@@ -4,6 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const id: TranslationDictionary = {
   mcp: mcpTranslations.id,
   remoteControl: {
+    renderError: "Workspace remote tidak dapat ditampilkan",
+    renderErrorHint: "Muat ulang untuk tersambung kembali ke desktop. Chat tetap tersimpan di desktop.",
+    pullToRefresh: "Tarik ke bawah untuk memuat ulang",
+    releaseToRefresh: "Lepaskan untuk memuat ulang",
     loginRequired: "Masuk untuk menggunakan kendali jarak jauh.",
     target: "Tujuan: {host}",
     encryption: "AES-GCM E2E",

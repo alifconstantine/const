@@ -4,6 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const es: TranslationDictionary = {
   mcp: mcpTranslations.es,
   remoteControl: {
+    renderError: "No se pudo mostrar el espacio de trabajo remoto",
+    renderErrorHint: "Actualiza para volver a conectarte al escritorio. Tus chats permanecen en el escritorio.",
+    pullToRefresh: "Desliza hacia abajo para actualizar",
+    releaseToRefresh: "Suelta para actualizar",
     loginRequired: "Inicia sesión para usar el control remoto.",
     target: "Destino: {host}",
     encryption: "AES-GCM E2E",

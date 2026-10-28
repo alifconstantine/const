@@ -9,10 +9,22 @@ import { createDesktopBridge } from "../src/lib/desktop-bridge";
 import { initThemeListener } from "../src/lib/theme";
 import { Toaster } from "@const/ui";
 import { RemoteDirectoryPicker } from "../src/components/remote-directory-picker";
+import { RemoteWorkspaceBoundary } from "../src/components/remote-workspace-boundary";
+import { RemotePullToRefresh } from "../src/components/remote-pull-to-refresh";
+import { scopedRemoteStorage } from "../src/lib/remote-storage";
+import { installRemotePullToRefresh } from "../src/lib/remote-pull-to-refresh";
+import { marked } from "marked";
 import "../src/index.css";
 import "../src/remote.css";
 
 const listeners = new Map<string, Set<(...args: any[]) => void>>();
+// Count actual parser work to catch expensive history renders on panel toggles.
+const markdownWork = { blocks: 0, inline: 0 };
+const lex = marked.lexer.bind(marked);
+const parseInline = marked.parseInline.bind(marked);
+marked.lexer = (...args) => { markdownWork.blocks++; return lex(...args); };
+marked.parseInline = (...args) => { markdownWork.inline++; return parseInline(...args); };
+scopedRemoteStorage("fixture");
 let directoryResolver: ((path: string | null) => void) | undefined;
 const emit = (channel: string, ...args: any[]) => {
   for (const listener of listeners.get(channel) || []) listener({}, ...args);
@@ -223,6 +235,8 @@ api = createDesktopBridge(
 );
 window.electron = api;
 (window as any).__remoteFixture = {
+  markdownWork,
+  installRemotePullToRefresh,
   updateConversation(id: string, patch: any) {
     const conversation = conversations.find(c => c.id === id);
     if (!conversation) throw new Error("Unknown fixture conversation");
@@ -241,6 +255,12 @@ document.documentElement.classList.add("dark");
 function Preview() {
   const [mobile, setMobile] = React.useState(innerWidth < 768);
   const [directoryPicker, setDirectoryPicker] = React.useState(false);
+  const [crash, setCrash] = React.useState(false);
+  React.useEffect(() => {
+    const fail = () => setCrash(true);
+    addEventListener("fixture:crash", fail);
+    return () => removeEventListener("fixture:crash", fail);
+  }, []);
   React.useEffect(() => {
     const open = () => setDirectoryPicker(true);
     addEventListener("fixture:open-directory", open);
@@ -269,10 +289,12 @@ function Preview() {
           <div
             className={`remote-client ${mobile ? "remote-mobile" : "remote-desktop"}`}
           >
-            <AuthenticatedContent
-              onSignOut={() => {}}
-              onSwitchAccount={() => {}}
-            />
+            <RemotePullToRefresh enabled={mobile}>
+              {crash ? <Crash /> : <AuthenticatedContent
+                onSignOut={() => {}}
+                onSwitchAccount={() => {}}
+              />}
+            </RemotePullToRefresh>
             {directoryPicker && <RemoteDirectoryPicker initialPath="/workspace" select={async path => {
               directoryResolver?.(path); directoryResolver = undefined; setDirectoryPicker(false);
             }} close={() => { directoryResolver?.(null); directoryResolver = undefined; setDirectoryPicker(false); }} />}
@@ -283,4 +305,7 @@ function Preview() {
     </I18nProvider>
   );
 }
-createRoot(document.getElementById("root")!).render(<Preview />);
+function Crash(): React.ReactNode { throw new Error("Fixture render failure"); }
+createRoot(document.getElementById("root")!).render(
+  <I18nProvider><RemoteWorkspaceBoundary><Preview /></RemoteWorkspaceBoundary></I18nProvider>,
+);

@@ -32,6 +32,11 @@
 .remote-client [data-native-control] {
   display: none !important;
 }
+/* Native window drag regions must not consume browser pointer/context-menu input. */
+.remote-client,
+.remote-client * {
+  -webkit-app-region: no-drag !important;
+}
 .remote-mobile .workspace-shell {
   padding: 0;
   gap: 0;
