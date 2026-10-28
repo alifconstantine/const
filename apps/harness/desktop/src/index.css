@@ -48,4 +48,38 @@ div[data-openui-devtools-auto-mount],
   pointer-events: none !important;
 }
 
+/* Model popover vertical slide in/out animations */
+@keyframes modelPopoverSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modelPopoverSlideDown {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.animate-popover-slide-in {
+  animation: modelPopoverSlideUp 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  will-change: transform, opacity;
+}
+
+.animate-popover-slide-out {
+  animation: modelPopoverSlideDown 180ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  pointer-events: none !important;
+  will-change: transform, opacity;
+}
+
 

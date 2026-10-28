@@ -944,7 +944,7 @@ export function ChatCard({
       setIsModelClosing(false);
       setModelPopoverView("overview");
       closeModelTimeoutRef.current = null;
-    }, 200);
+    }, 180);
   }, [isModelClosing, isModelOpen]);
 
   const handleOpenModelPopover = useCallback(() => {
@@ -2089,8 +2089,8 @@ export function ChatCard({
                     className={cn(
                       "absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none",
                       isModelClosing
-                        ? "animate-out fade-out-0 slide-out-to-bottom-3.5 duration-200 ease-in fill-mode-forwards pointer-events-none"
-                        : "animate-in fade-in-0 slide-in-from-bottom-3.5 duration-200 ease-out",
+                        ? "animate-popover-slide-out"
+                        : "animate-popover-slide-in",
                       modelPopoverView === "overview" ? "p-3.5" : "p-2"
                     )}
                   >
