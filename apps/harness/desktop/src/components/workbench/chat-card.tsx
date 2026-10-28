@@ -6,6 +6,8 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import {
   Folder,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   Hand,
   ArrowUp,
@@ -929,8 +931,84 @@ export function ChatCard({
   const [thinkingLevel, setThinkingLevel] = useState<string>(() => {
     return localStorage.getItem("const_harness_thinking_level") || "medium";
   });
-  const [isThinkingOpen, setIsThinkingOpen] = useState(false);
-  const thinkingMenuRef = useRef<HTMLDivElement>(null);
+  const [modelPopoverView, setModelPopoverView] = useState<"overview" | "select-model">("overview");
+
+  const handleSelectLevelByIndex = useCallback(
+    (index: number) => {
+      const clamped = Math.max(0, Math.min(supportedThinkingLevels.length - 1, index));
+      const nextLvl = supportedThinkingLevels[clamped];
+      if (nextLvl) {
+        setThinkingLevel(nextLvl);
+        localStorage.setItem("const_harness_thinking_level", nextLvl);
+        localStorage.setItem("const_harness_user_thinking_override", "true");
+      }
+    },
+    [supportedThinkingLevels]
+  );
+
+  const activeThinkingIndex = useMemo(() => {
+    const idx = supportedThinkingLevels.indexOf(thinkingLevel);
+    return idx >= 0 ? idx : Math.max(0, supportedThinkingLevels.indexOf("medium"));
+  }, [supportedThinkingLevels, thinkingLevel]);
+
+  const totalLevels = supportedThinkingLevels.length || 1;
+
+  const getDotPositionStyle = useCallback(
+    (i: number) => {
+      if (totalLevels <= 1) return { left: "50%" };
+      const pct = (i / (totalLevels - 1)) * 100;
+      const offset = 11 - 22 * (i / (totalLevels - 1));
+      return { left: `calc(${pct}% + ${offset}px)` };
+    },
+    [totalLevels]
+  );
+
+  const fillWidthStyle = useMemo(() => {
+    if (totalLevels <= 1) return "100%";
+    const dotPos = getDotPositionStyle(activeThinkingIndex).left;
+    return `calc(${dotPos} + 10px)`;
+  }, [totalLevels, getDotPositionStyle, activeThinkingIndex]);
+
+  const handleSliderPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isThinkingSupported || supportedThinkingLevels.length === 0) return;
+    const track = e.currentTarget;
+    try {
+      track.setPointerCapture(e.pointerId);
+    } catch {}
+
+    const update = (clientX: number) => {
+      const rect = track.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const pad = 11;
+      const usable = rect.width - pad * 2;
+      const ratio = Math.max(0, Math.min(1, (x - pad) / usable));
+      const index = Math.round(ratio * (totalLevels - 1));
+      handleSelectLevelByIndex(index);
+    };
+
+    update(e.clientX);
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      update(moveEvent.clientX);
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      try {
+        track.releasePointerCapture(upEvent.pointerId);
+      } catch {}
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+
+  const thinkingLabel = useMemo(() => {
+    if (!isThinkingSupported) return "Off";
+    if (thinkingLevel === "xhigh") return "XHigh";
+    return thinkingLevel.charAt(0).toUpperCase() + thinkingLevel.slice(1);
+  }, [isThinkingSupported, thinkingLevel]);
 
   useEffect(() => {
     if (isThinkingSupported && supportedThinkingLevels.length > 0) {
@@ -950,7 +1028,11 @@ export function ChatCard({
   // Global Keyboard Shortcuts: Open Model Menu (Ctrl+M) & Cycle Thought Level (Ctrl+T)
   useEffect(() => {
     const handleOpenModelMenu = () => {
-      setIsModelOpen((v) => !v);
+      setIsModelOpen((v) => {
+        const next = !v;
+        if (next) setModelPopoverView("overview");
+        return next;
+      });
     };
 
     const handleCycleThoughtLevel = () => {
@@ -1071,9 +1153,7 @@ export function ChatCard({
       }
       if (modelMenuRef.current && !modelMenuRef.current.contains(target)) {
         setIsModelOpen(false);
-      }
-      if (thinkingMenuRef.current && !thinkingMenuRef.current.contains(target)) {
-        setIsThinkingOpen(false);
+        setModelPopoverView("overview");
       }
       if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
         setIsPlusOpen(false);
@@ -1085,9 +1165,9 @@ export function ChatCard({
         setIsProjectOpen(false);
         setIsModeOpen(false);
         setIsModelOpen(false);
-        setIsThinkingOpen(false);
         setIsContextOpen(false);
         setIsPlusOpen(false);
+        setModelPopoverView("overview");
       }
     };
 
@@ -1233,11 +1313,11 @@ export function ChatCard({
     setIsProjectOpen(false);
     setIsModeOpen(false);
     setIsModelOpen(false);
-    setIsThinkingOpen(false);
     setIsContextOpen(false);
     setIsPlusOpen(false);
     setMentionToken(null);
     setSlashToken(null);
+    setModelPopoverView("overview");
   };
 
   const isAnyBottomMenuOpen =
@@ -1245,7 +1325,6 @@ export function ChatCard({
     isModeOpen ||
     isContextOpen ||
     isModelOpen ||
-    isThinkingOpen ||
     Boolean(mentionToken) ||
     Boolean(slashToken);
 
@@ -1941,7 +2020,10 @@ export function ChatCard({
                   onClick={() => {
                     const next = !isModelOpen;
                     closeAllMenus();
-                    if (next) setSearchModelQuery("");
+                    if (next) {
+                      setSearchModelQuery("");
+                      setModelPopoverView("overview");
+                    }
                     setIsModelOpen(next);
                   }}
                   className={cn(
@@ -1962,220 +2044,267 @@ export function ChatCard({
                   )}
                 </button>
 
-                {/* Model Selector Popover */}
+                {/* Unified Model & Thinking Level Popover */}
                 {isModelOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                    {models.length > 0 ? (
-                      <>
-                        {/* Search Input at the top (pinned, outside scroll) */}
-                        <div className="flex-none flex items-center gap-2 px-2.5 py-1.5 mb-1 border-b border-[#e2e2e4]/60 dark:border-[#383838]/60">
-                          <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                          <input
-                            type="text"
-                            value={searchModelQuery}
-                            onChange={(e) => setSearchModelQuery(e.target.value)}
-                            placeholder={t("workbench.searchModels")}
-                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#777777] outline-none font-sans"
-                            autoFocus
-                          />
-                          {searchModelQuery && (
+                  <div
+                    className={cn(
+                      "absolute bottom-full mb-2 right-0 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100",
+                      modelPopoverView === "overview" ? "w-[240px] p-3" : "w-[270px] p-1.5"
+                    )}
+                  >
+                    {modelPopoverView === "overview" ? (
+                      /* Image 1: Overview with Thinking Level Title, Model Selector Trigger, Gear Icon, and Thinking Slider */
+                      <div>
+                        {/* Top Row: Spacer (left) | Thinking Title + Model Trigger (center) | Gear Button (right) */}
+                        <div className="grid grid-cols-[28px_1fr_28px] items-center mb-2.5">
+                          <div className="w-7 h-7" />
+                          <div className="flex flex-col items-center min-w-0">
+                            <span className="text-[13px] font-semibold text-[#3b82f6] leading-tight select-none">
+                              {thinkingLabel}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => setSearchModelQuery("")}
-                              className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                              onClick={() => setModelPopoverView("select-model")}
+                              className="inline-flex items-center justify-center gap-0.5 text-[12px] text-[#a9a9a9] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white transition-colors cursor-pointer group mt-0.5 max-w-[160px]"
+                              title={currentModelItem?.name || selectedModel || "Select Model"}
                             >
-                              <X className="w-3 h-3" />
+                              <span className="truncate font-normal">
+                                {currentModelItem?.name || selectedModel || "Select Model"}
+                              </span>
+                              <ChevronRight className="w-3 h-3 text-[#71717a] group-hover:text-black dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
                             </button>
-                          )}
-                        </div>
-
-                        {/* Models categorized with ScrollArea */}
-                        {filteredGroupedModels.length > 0 ? (
-                          <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0">
-                            <div className="space-y-1.5 py-0.5">
-                              {filteredGroupedModels.map((group) => (
-                                <div key={group.providerId} className="flex flex-col">
-                                  {/* Category Header */}
-                                  <div className="px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider select-none">
-                                    {group.providerName}
-                                  </div>
-
-                                  {/* Model Items */}
-                                  <div className="flex flex-col space-y-0.5">
-                                    {group.items.map((m) => {
-                                      const isSelected =
-                                        currentModelItem?.id === m.id ||
-                                        selectedModel === m.name ||
-                                        selectedModel === m.id;
-                                      return (
-                                        <button
-                                          key={m.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedModel(m.id);
-                                            if (!isolatedModel) {
-                                              localStorage.setItem("const_harness_active_model", m.id);
-                                              localStorage.setItem("const_llm_active_model", m.id);
-                                              window.electron?.saveConfig?.({ activeModel: m.id });
-                                            }
-                                            if (!isolatedModel && currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]") {
-                                              try {
-                                                localStorage.setItem(`const_harness_workspace_model_${currentProject}`, m.id || m.name);
-                                              } catch {}
-                                            }
-                                            // Retain user's current thinking level if supported by the newly selected model
-                                            const targetLevels = m.thinkingLevels && m.thinkingLevels.length > 0
-                                              ? m.thinkingLevels
-                                              : ["low", "medium", "high", "xhigh", "max"];
-
-                                            if (m.supportsThinking !== false && m.id !== "combo/fast") {
-                                              if (!targetLevels.includes(thinkingLevel)) {
-                                                const fallback = (m.defaultThinkingLevel && targetLevels.includes(m.defaultThinkingLevel))
-                                                  ? m.defaultThinkingLevel
-                                                  : (targetLevels.includes("medium") ? "medium" : targetLevels[targetLevels.length - 1]!);
-                                                setThinkingLevel(fallback);
-                                                localStorage.setItem("const_harness_thinking_level", fallback);
-                                              }
-                                            }
-                                            setIsModelOpen(false);
-                                          }}
-                                          className={cn(
-                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
-                                            isSelected
-                                              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
-                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                                          )}
-                                        >
-                                          <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                                            <span className="truncate font-normal">{m.name}</span>
-                                          </div>
-                                          {isSelected && (
-                                            <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        ) : (
-                          <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
-                            {t("workbench.noModelsFound")}
                           </div>
-                        )}
-
-                        {/* Bottom Footer: Manage models (pinned, outside scroll) */}
-                        <div className="flex-none pt-1 mt-1 border-t border-[#e2e2e4]/60 dark:border-[#383838]/60">
                           <button
                             type="button"
                             onClick={() => {
                               setIsModelOpen(false);
+                              setModelPopoverView("overview");
                               onOpenSettings?.("model-settings");
                             }}
-                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                            title={t("workbench.manageModels")}
+                            aria-label={t("workbench.manageModels")}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#71717a] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                           >
-                            <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                            <span>{t("workbench.manageModels")}</span>
+                            <Settings className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      </>
-                    ) : (
-                      <div className="p-3.5 flex flex-col items-center text-center">
-                        <div className="w-9 h-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2a2a2a] border border-[#e2e2e4] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-[#d4d4d4] mb-2.5 shadow-sm">
-                          <Cpu className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75]" />
-                        </div>
-                        <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                          {t("workbench.noModelsConfigured")}
-                        </div>
-                        <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
-                          {t("workbench.connectModelsDesc")}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsModelOpen(false);
-                            onOpenSettings?.("model-settings");
+
+                        {/* Bottom Row: Thinking Level Slider */}
+                        <div
+                          className={cn(
+                            "relative w-full h-6 bg-[#2a2a2e] rounded-full cursor-pointer select-none overflow-hidden touch-none",
+                            (!isThinkingSupported || supportedThinkingLevels.length === 0) &&
+                              "opacity-40 cursor-not-allowed pointer-events-none"
+                          )}
+                          onPointerDown={handleSliderPointerDown}
+                          role="slider"
+                          aria-valuemin={0}
+                          aria-valuemax={totalLevels - 1}
+                          aria-valuenow={activeThinkingIndex}
+                          aria-valuetext={thinkingLabel}
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+                              e.preventDefault();
+                              handleSelectLevelByIndex(activeThinkingIndex - 1);
+                            } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+                              e.preventDefault();
+                              handleSelectLevelByIndex(activeThinkingIndex + 1);
+                            }
                           }}
-                          className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          <Plus className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                          <span>{t("workbench.manageModels")}</span>
-                        </button>
+                          {/* Active Blue Fill */}
+                          <div
+                            className="absolute left-0 top-0 bottom-0 bg-[#3b82f6] rounded-full transition-all duration-100 pointer-events-none"
+                            style={{ width: fillWidthStyle }}
+                          />
+                          {/* Step Dots */}
+                          {supportedThinkingLevels.map((lvl, i) => (
+                            <div
+                              key={lvl}
+                              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[3.5px] h-[3.5px] rounded-full bg-white/45 pointer-events-none z-[2]"
+                              style={getDotPositionStyle(i)}
+                            />
+                          ))}
+                          {/* White Thumb Knob */}
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white shadow-md pointer-events-none z-[3] transition-all duration-100"
+                            style={getDotPositionStyle(activeThinkingIndex)}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      /* Image 2: Model Search and List */
+                      <div className="flex flex-col text-left">
+                        {models.length > 0 ? (
+                          <>
+                            {/* Header: Back Button + Search Input */}
+                            <div className="flex-none flex items-center gap-1.5 px-2 py-1.5 mb-1 border-b border-[#e2e2e4]/60 dark:border-[#383838]/60">
+                              <button
+                                type="button"
+                                onClick={() => setModelPopoverView("overview")}
+                                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-md text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer shrink-0"
+                                title={t("common.back") || "Back"}
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                              <input
+                                type="text"
+                                value={searchModelQuery}
+                                onChange={(e) => setSearchModelQuery(e.target.value)}
+                                placeholder={t("workbench.searchModels")}
+                                className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#777777] outline-none font-sans"
+                                autoFocus
+                              />
+                              {searchModelQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSearchModelQuery("")}
+                                  className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Models categorized with ScrollArea */}
+                            {filteredGroupedModels.length > 0 ? (
+                              <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0">
+                                <div className="space-y-1.5 py-0.5">
+                                  {filteredGroupedModels.map((group) => (
+                                    <div key={group.providerId} className="flex flex-col">
+                                      {/* Category Header */}
+                                      <div className="px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider select-none">
+                                        {group.providerName}
+                                      </div>
+
+                                      {/* Model Items */}
+                                      <div className="flex flex-col space-y-0.5">
+                                        {group.items.map((m) => {
+                                          const isSelected =
+                                            currentModelItem?.id === m.id ||
+                                            selectedModel === m.name ||
+                                            selectedModel === m.id;
+                                          return (
+                                            <button
+                                              key={m.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedModel(m.id);
+                                                if (!isolatedModel) {
+                                                  localStorage.setItem("const_harness_active_model", m.id);
+                                                  localStorage.setItem("const_llm_active_model", m.id);
+                                                  window.electron?.saveConfig?.({ activeModel: m.id });
+                                                }
+                                                if (
+                                                  !isolatedModel &&
+                                                  currentProject &&
+                                                  currentProject !== "Outside Project" &&
+                                                  currentProject !== "[object Object]"
+                                                ) {
+                                                  try {
+                                                    localStorage.setItem(
+                                                      `const_harness_workspace_model_${currentProject}`,
+                                                      m.id || m.name
+                                                    );
+                                                  } catch {}
+                                                }
+                                                // Retain user's current thinking level if supported by the newly selected model
+                                                const targetLevels =
+                                                  m.thinkingLevels && m.thinkingLevels.length > 0
+                                                    ? m.thinkingLevels
+                                                    : ["low", "medium", "high", "xhigh", "max"];
+
+                                                if (m.supportsThinking !== false && m.id !== "combo/fast") {
+                                                  if (!targetLevels.includes(thinkingLevel)) {
+                                                    const fallback =
+                                                      m.defaultThinkingLevel &&
+                                                      targetLevels.includes(m.defaultThinkingLevel)
+                                                        ? m.defaultThinkingLevel
+                                                        : targetLevels.includes("medium")
+                                                        ? "medium"
+                                                        : targetLevels[targetLevels.length - 1]!;
+                                                    setThinkingLevel(fallback);
+                                                    localStorage.setItem("const_harness_thinking_level", fallback);
+                                                  }
+                                                }
+                                                setIsModelOpen(false);
+                                                setModelPopoverView("overview");
+                                              }}
+                                              className={cn(
+                                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
+                                                isSelected
+                                                  ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
+                                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                                              )}
+                                            >
+                                              <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                                <span className="truncate font-normal">{m.name}</span>
+                                              </div>
+                                              {isSelected && (
+                                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto" />
+                                              )}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            ) : (
+                              <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
+                                {t("workbench.noModelsFound")}
+                              </div>
+                            )}
+
+                            {/* Bottom Footer: Manage models */}
+                            <div className="flex-none pt-1 mt-1 border-t border-[#e2e2e4]/60 dark:border-[#383838]/60">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsModelOpen(false);
+                                  setModelPopoverView("overview");
+                                  onOpenSettings?.("model-settings");
+                                }}
+                                className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                                <span>{t("workbench.manageModels")}</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="p-3.5 flex flex-col items-center text-center">
+                            <div className="w-9 h-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2a2a2a] border border-[#e2e2e4] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-[#d4d4d4] mb-2.5 shadow-sm">
+                              <Cpu className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75]" />
+                            </div>
+                            <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
+                              {t("workbench.noModelsConfigured")}
+                            </div>
+                            <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
+                              {t("workbench.connectModelsDesc")}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsModelOpen(false);
+                                setModelPopoverView("overview");
+                                onOpenSettings?.("model-settings");
+                              }}
+                              className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              <Plus className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
+                              <span>{t("workbench.manageModels")}</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* 2.5 Thinking / Reasoning Level Selector (Right next to Model Selector, shown when model supports thinking) */}
-              {isThinkingSupported && supportedThinkingLevels.length > 0 && (
-                <div className="relative" ref={thinkingMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !isThinkingOpen;
-                      closeAllMenus();
-                      setIsThinkingOpen(next);
-                    }}
-                    className={cn(
-                      "inline-flex items-center transition-colors cursor-pointer text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal shrink-0",
-                      isNarrow
-                        ? "w-7 h-7 justify-center rounded-md"
-                        : "gap-1 px-1.5 py-1 rounded-md"
-                    )}
-                    title={`Thinking effort: ${thinkingLevel}`}
-                    aria-label={`Thinking effort: ${thinkingLevel}`}
-                  >
-                    <Brain className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
-                    {!isNarrow && (
-                      <>
-                        <span className="capitalize">{thinkingLevel === "xhigh" ? "XHigh" : thinkingLevel}</span>
-                        <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
-                      </>
-                    )}
-                  </button>
-
-                  {/* Thinking Level Popover Dropdown */}
-                  {isThinkingOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-36 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-0.5">
-                        {t("workbench.thinking")}
-                      </div>
-                      <div className="flex flex-col gap-0.5">
-                        {supportedThinkingLevels.map((lvl) => {
-                          const isSelected = thinkingLevel === lvl;
-                          const label = lvl === "xhigh" ? "XHigh" : lvl.charAt(0).toUpperCase() + lvl.slice(1);
-                          return (
-                            <button
-                              key={lvl}
-                              type="button"
-                              onClick={() => {
-                                setThinkingLevel(lvl);
-                                localStorage.setItem("const_harness_thinking_level", lvl);
-                                localStorage.setItem("const_harness_user_thinking_override", "true");
-                                setIsThinkingOpen(false);
-                              }}
-                              className={cn(
-                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
-                                isSelected
-                                  ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
-                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                              )}
-                            >
-                              <span className="font-normal">{label}</span>
-                              {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-2" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* 3. Send or Stop Generation Button */}
               {isExecuting ? (
