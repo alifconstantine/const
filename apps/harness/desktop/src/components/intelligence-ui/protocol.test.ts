@@ -191,6 +191,26 @@ test("the agent prompt derives from the same allowed component contracts", () =>
   assert.ok(INTELLIGENCE_UI_PROMPT.includes("permission flow"));
 });
 
+test("chat prompt requests independent replacement programs rather than incremental patches", () => {
+  assert.ok(INTELLIGENCE_UI_PROMPT.includes("complete replacement program"));
+  assert.ok(!INTELLIGENCE_UI_PROMPT.includes("## Inline Mode"));
+  assert.ok(!INTELLIGENCE_UI_PROMPT.includes("## Edit Mode"));
+  assert.ok(!INTELLIGENCE_UI_PROMPT.includes("output ONLY the changed/new statements"));
+  assert.ok(!INTELLIGENCE_UI_PROMPT.includes("or root = Card"));
+  assert.ok(!INTELLIGENCE_UI_PROMPT.includes("generate realistic/plausible data"));
+  assert.ok(INTELLIGENCE_UI_PROMPT.includes("Label sample data explicitly"));
+  // A revised block must work without the preceding block's declarations.
+  const revised = 'root = Stack([heading, table])\nheading = TextContent("Updated")\ntable = Table([col])\ncol = Col("Status", ["Ready"])';
+  for (const part of splitAssistantResponse(`${fenced(program)}\n\n${fenced(revised)}`)) {
+    if (part.kind !== "ui") continue;
+    const parser = createParser(intelligenceLibrary.toJSONSchema(), intelligenceLibrary.root);
+    const parsed = parser.parse(part.content);
+    assert.equal(parsed.root?.typeName, "Stack");
+    assert.deepEqual(parsed.meta.errors, []);
+    assert.deepEqual(parsed.meta.unresolved, []);
+  }
+});
+
 test("history normalization retains form state when assistant and tool turns merge", () => {
   const prefix = "Tool analysis";
   const normalized = normalizeUiMessages([

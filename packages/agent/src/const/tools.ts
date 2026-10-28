@@ -1498,7 +1498,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "write",
       description:
-        "Create or overwrite a file with the specified content. Automatically creates any parent directories if they do not exist.",
+        "Create a new file or intentionally replace an entire file with complete content. For partial changes to existing files, use 'edit' to preserve unrelated code. Before an intentional full rewrite, read the existing file and preserve required content; never use placeholders for omitted sections. Automatically creates parent directories.",
       parameters: {
         type: "object",
         properties: {
@@ -1520,7 +1520,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "edit",
       description:
-        "Edit an existing file by replacing an exact existing text substring (old_content) with new content (new_content). Automatically normalizes CRLF/LF line endings.",
+        "Preferred tool for partial changes to existing files: replace an exact existing text substring (old_content) with new content (new_content), preserving all other content. Read the current file first. Automatically normalizes CRLF/LF line endings.",
       parameters: {
         type: "object",
         properties: {
@@ -2545,7 +2545,7 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "write",
       description:
-        "Create or overwrite a file with the specified content. Automatically creates any parent directories if they do not exist. Essential for generating learning artifacts such as slides (slides.html), interactive simulators (simulator.html), study summaries, notes, and calculation scripts.",
+        "Create a new study file or intentionally replace an entire file with complete content. For partial changes to existing files, use 'edit' to preserve unrelated content. Read the existing file before a full rewrite; never omit required sections. Automatically creates parent directories. Use for slides, simulators, summaries, notes, and scripts.",
       parameters: {
         type: "object",
         properties: {
