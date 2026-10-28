@@ -878,6 +878,8 @@ export function ChatCard({
   }, [initialModel, initialProject]);
 
   const [isModelOpen, setIsModelOpen] = useState(false);
+  const [isModelClosing, setIsModelClosing] = useState(false);
+  const closeModelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
   // Active Model Object & Dynamic Thinking Level Support
@@ -932,6 +934,54 @@ export function ChatCard({
     return localStorage.getItem("const_harness_thinking_level") || "medium";
   });
   const [modelPopoverView, setModelPopoverView] = useState<"overview" | "select-model">("overview");
+
+  const handleCloseModelPopover = useCallback(() => {
+    if (isModelClosing || !isModelOpen) return;
+    setIsModelClosing(true);
+    if (closeModelTimeoutRef.current) clearTimeout(closeModelTimeoutRef.current);
+    closeModelTimeoutRef.current = setTimeout(() => {
+      setIsModelOpen(false);
+      setIsModelClosing(false);
+      setModelPopoverView("overview");
+      closeModelTimeoutRef.current = null;
+    }, 140);
+  }, [isModelClosing, isModelOpen]);
+
+  const handleOpenModelPopover = useCallback(() => {
+    if (closeModelTimeoutRef.current) {
+      clearTimeout(closeModelTimeoutRef.current);
+      closeModelTimeoutRef.current = null;
+    }
+    setIsModelClosing(false);
+    setIsModelOpen(true);
+    setModelPopoverView("overview");
+  }, []);
+
+  const handleToggleModelPopover = useCallback(() => {
+    if (isModelOpen && !isModelClosing) {
+      handleCloseModelPopover();
+    } else {
+      handleOpenModelPopover();
+    }
+  }, [isModelOpen, isModelClosing, handleCloseModelPopover, handleOpenModelPopover]);
+
+  const handleCloseModelPopoverRef = useRef(handleCloseModelPopover);
+  useEffect(() => {
+    handleCloseModelPopoverRef.current = handleCloseModelPopover;
+  }, [handleCloseModelPopover]);
+
+  const handleToggleModelPopoverRef = useRef(handleToggleModelPopover);
+  useEffect(() => {
+    handleToggleModelPopoverRef.current = handleToggleModelPopover;
+  }, [handleToggleModelPopover]);
+
+  useEffect(() => {
+    return () => {
+      if (closeModelTimeoutRef.current) {
+        clearTimeout(closeModelTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSelectLevelByIndex = useCallback(
     (index: number) => {
@@ -1028,11 +1078,7 @@ export function ChatCard({
   // Global Keyboard Shortcuts: Open Model Menu (Ctrl+M) & Cycle Thought Level (Ctrl+T)
   useEffect(() => {
     const handleOpenModelMenu = () => {
-      setIsModelOpen((v) => {
-        const next = !v;
-        if (next) setModelPopoverView("overview");
-        return next;
-      });
+      handleToggleModelPopoverRef.current();
     };
 
     const handleCycleThoughtLevel = () => {
@@ -1152,8 +1198,7 @@ export function ChatCard({
         setIsModeOpen(false);
       }
       if (modelMenuRef.current && !modelMenuRef.current.contains(target)) {
-        setIsModelOpen(false);
-        setModelPopoverView("overview");
+        handleCloseModelPopoverRef.current();
       }
       if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
         setIsPlusOpen(false);
@@ -1164,10 +1209,9 @@ export function ChatCard({
       if (e.key === "Escape") {
         setIsProjectOpen(false);
         setIsModeOpen(false);
-        setIsModelOpen(false);
+        handleCloseModelPopoverRef.current();
         setIsContextOpen(false);
         setIsPlusOpen(false);
-        setModelPopoverView("overview");
       }
     };
 
@@ -1313,6 +1357,7 @@ export function ChatCard({
     setIsProjectOpen(false);
     setIsModeOpen(false);
     setIsModelOpen(false);
+    setIsModelClosing(false);
     setIsContextOpen(false);
     setIsPlusOpen(false);
     setMentionToken(null);
@@ -1325,6 +1370,7 @@ export function ChatCard({
     isModeOpen ||
     isContextOpen ||
     isModelOpen ||
+    isModelClosing ||
     Boolean(mentionToken) ||
     Boolean(slashToken);
 
@@ -2017,17 +2063,10 @@ export function ChatCard({
               <div className="relative min-w-0 shrink" ref={modelMenuRef}>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !isModelOpen;
-                    closeAllMenus();
-                    if (next) {
-                      setSearchModelQuery("");
-                      setModelPopoverView("overview");
-                    }
-                    setIsModelOpen(next);
-                  }}
+                  onClick={handleToggleModelPopover}
                   className={cn(
                     "inline-flex items-center transition-colors cursor-pointer text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal",
+                    (isModelOpen || isModelClosing) && "bg-black/5 dark:bg-white/10 text-black dark:text-white",
                     isNarrow
                       ? "w-7 h-7 justify-center rounded-md"
                       : "gap-1 px-1.5 py-1 rounded-md min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
@@ -2045,54 +2084,58 @@ export function ChatCard({
                 </button>
 
                 {/* Unified Model & Thinking Level Popover */}
-                {isModelOpen && (
+                {(isModelOpen || isModelClosing) && (
                   <div
                     className={cn(
-                      "absolute bottom-full mb-2 right-0 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100",
-                      modelPopoverView === "overview" ? "w-[240px] p-3" : "w-[270px] p-1.5"
+                      "absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none origin-bottom-right",
+                      isModelClosing
+                        ? "animate-out fade-out-0 zoom-out-95 slide-out-to-bottom-1 duration-150 fill-mode-forwards pointer-events-none"
+                        : "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150",
+                      modelPopoverView === "overview" ? "p-3.5" : "p-2"
                     )}
                   >
                     {modelPopoverView === "overview" ? (
                       /* Image 1: Overview with Thinking Level Title, Model Selector Trigger, Gear Icon, and Thinking Slider */
-                      <div>
-                        {/* Top Row: Spacer (left) | Thinking Title + Model Trigger (center) | Gear Button (right) */}
-                        <div className="grid grid-cols-[28px_1fr_28px] items-center mb-2.5">
-                          <div className="w-7 h-7" />
-                          <div className="flex flex-col items-center min-w-0">
-                            <span className="text-[13px] font-semibold text-[#3b82f6] leading-tight select-none">
-                              {thinkingLabel}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setModelPopoverView("select-model")}
-                              className="inline-flex items-center justify-center gap-0.5 text-[12px] text-[#a9a9a9] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white transition-colors cursor-pointer group mt-0.5 max-w-[160px]"
-                              title={currentModelItem?.name || selectedModel || "Select Model"}
-                            >
-                              <span className="truncate font-normal">
-                                {currentModelItem?.name || selectedModel || "Select Model"}
-                              </span>
-                              <ChevronRight className="w-3 h-3 text-[#71717a] group-hover:text-black dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
-                            </button>
-                          </div>
+                      <div
+                        key="overview"
+                        className="relative flex flex-col animate-in fade-in-0 slide-in-from-left-2 duration-150 ease-out"
+                      >
+                        {/* Manage Models Gear Button (top-right corner with hover) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleCloseModelPopover();
+                            onOpenSettings?.("model-settings");
+                          }}
+                          title={t("workbench.manageModels")}
+                          aria-label={t("workbench.manageModels")}
+                          className="absolute -top-0.5 -right-0.5 w-6 h-6 flex items-center justify-center rounded-md text-[#71717a] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer z-10"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Centered Header: Thinking Level Title + Model Selector Trigger */}
+                        <div className="flex flex-col items-center justify-center px-6 mb-3.5 text-center">
+                          <span className="text-[13px] font-semibold text-[#3b82f6] leading-none select-none tracking-tight">
+                            {thinkingLabel}
+                          </span>
                           <button
                             type="button"
-                            onClick={() => {
-                              setIsModelOpen(false);
-                              setModelPopoverView("overview");
-                              onOpenSettings?.("model-settings");
-                            }}
-                            title={t("workbench.manageModels")}
-                            aria-label={t("workbench.manageModels")}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#71717a] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            onClick={() => setModelPopoverView("select-model")}
+                            className="mt-1 inline-flex items-center justify-center gap-0.5 text-[12px] text-[#8e8e93] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white transition-colors cursor-pointer group max-w-[190px] leading-tight font-normal"
+                            title={currentModelItem?.name || selectedModel || "Select Model"}
                           >
-                            <Settings className="w-3.5 h-3.5" />
+                            <span className="truncate">
+                              {currentModelItem?.name || selectedModel || "Select Model"}
+                            </span>
+                            <ChevronRight className="w-3 h-3 text-[#71717a] group-hover:text-black dark:group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
                           </button>
                         </div>
 
-                        {/* Bottom Row: Thinking Level Slider */}
+                        {/* Bottom Row: Thinking Level Slider Track */}
                         <div
                           className={cn(
-                            "relative w-full h-6 bg-[#2a2a2e] rounded-full cursor-pointer select-none overflow-hidden touch-none",
+                            "relative w-full h-[26px] bg-[#242426] dark:bg-[#2a2a2e] rounded-full cursor-pointer select-none overflow-hidden touch-none",
                             (!isThinkingSupported || supportedThinkingLevels.length === 0) &&
                               "opacity-40 cursor-not-allowed pointer-events-none"
                           )}
@@ -2128,40 +2171,43 @@ export function ChatCard({
                           ))}
                           {/* White Thumb Knob */}
                           <div
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white shadow-md pointer-events-none z-[3] transition-all duration-100"
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.4)] pointer-events-none z-[3] transition-all duration-100"
                             style={getDotPositionStyle(activeThinkingIndex)}
                           />
                         </div>
                       </div>
                     ) : (
                       /* Image 2: Model Search and List */
-                      <div className="flex flex-col text-left">
+                      <div
+                        key="select-model"
+                        className="flex flex-col text-left animate-in fade-in-0 slide-in-from-right-2 duration-150 ease-out"
+                      >
                         {models.length > 0 ? (
                           <>
                             {/* Header: Back Button + Search Input */}
-                            <div className="flex-none flex items-center gap-1.5 px-2 py-1.5 mb-1 border-b border-[#e2e2e4]/60 dark:border-[#383838]/60">
+                            <div className="flex-none flex items-center gap-1.5 px-2.5 py-1.5 mb-1.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus-within:border-[#3b82f6]/40 transition-colors">
                               <button
                                 type="button"
                                 onClick={() => setModelPopoverView("overview")}
-                                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-md text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer shrink-0"
+                                className="p-1 -ml-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-md text-[#71717a] hover:text-black dark:hover:text-white transition-colors cursor-pointer shrink-0"
                                 title={t("common.back") || "Back"}
                               >
                                 <ChevronLeft className="w-3.5 h-3.5" />
                               </button>
-                              <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                              <Search className="w-3.5 h-3.5 text-[#71717a] shrink-0" />
                               <input
                                 type="text"
                                 value={searchModelQuery}
                                 onChange={(e) => setSearchModelQuery(e.target.value)}
                                 placeholder={t("workbench.searchModels")}
-                                className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#777777] outline-none font-sans"
+                                className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#71717a] outline-none font-sans"
                                 autoFocus
                               />
                               {searchModelQuery && (
                                 <button
                                   type="button"
                                   onClick={() => setSearchModelQuery("")}
-                                  className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                                  className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#71717a] hover:text-black dark:hover:text-white transition-colors cursor-pointer shrink-0"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
@@ -2170,12 +2216,12 @@ export function ChatCard({
 
                             {/* Models categorized with ScrollArea */}
                             {filteredGroupedModels.length > 0 ? (
-                              <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0">
+                              <ScrollArea className="max-h-[240px] w-full flex-1 min-h-0">
                                 <div className="space-y-1.5 py-0.5">
                                   {filteredGroupedModels.map((group) => (
                                     <div key={group.providerId} className="flex flex-col">
                                       {/* Category Header */}
-                                      <div className="px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider select-none">
+                                      <div className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold text-[#71717a] uppercase tracking-wider select-none">
                                         {group.providerName}
                                       </div>
 
@@ -2229,21 +2275,20 @@ export function ChatCard({
                                                     localStorage.setItem("const_harness_thinking_level", fallback);
                                                   }
                                                 }
-                                                setIsModelOpen(false);
-                                                setModelPopoverView("overview");
+                                                handleCloseModelPopover();
                                               }}
                                               className={cn(
-                                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
+                                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12.5px] rounded-lg transition-colors cursor-pointer text-left",
                                                 isSelected
                                                   ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
-                                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                                                  : "text-[#3f3f46] dark:text-[#a1a1aa] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                                               )}
                                             >
                                               <div className="flex items-center gap-1.5 min-w-0 pr-2">
                                                 <span className="truncate font-normal">{m.name}</span>
                                               </div>
                                               {isSelected && (
-                                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto" />
+                                                <Check className="w-3.5 h-3.5 text-black dark:text-white shrink-0 ml-auto" />
                                               )}
                                             </button>
                                           );
@@ -2254,23 +2299,22 @@ export function ChatCard({
                                 </div>
                               </ScrollArea>
                             ) : (
-                              <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
+                              <div className="py-6 px-3 text-center text-xs text-[#71717a]">
                                 {t("workbench.noModelsFound")}
                               </div>
                             )}
 
                             {/* Bottom Footer: Manage models */}
-                            <div className="flex-none pt-1 mt-1 border-t border-[#e2e2e4]/60 dark:border-[#383838]/60">
+                            <div className="flex-none pt-1.5 mt-1 border-t border-[#e2e2e4]/60 dark:border-[#2c2c2e]">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setIsModelOpen(false);
-                                  setModelPopoverView("overview");
+                                  handleCloseModelPopover();
                                   onOpenSettings?.("model-settings");
                                 }}
-                                className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                                className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#71717a] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left"
                               >
-                                <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                                <Settings className="w-3.5 h-3.5 text-[#71717a] shrink-0" />
                                 <span>{t("workbench.manageModels")}</span>
                               </button>
                             </div>
@@ -2283,14 +2327,13 @@ export function ChatCard({
                             <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
                               {t("workbench.noModelsConfigured")}
                             </div>
-                            <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
+                            <p className="text-[11px] text-[#71717a] leading-relaxed mt-1 mb-3.5">
                               {t("workbench.connectModelsDesc")}
                             </p>
                             <button
                               type="button"
                               onClick={() => {
-                                setIsModelOpen(false);
-                                setModelPopoverView("overview");
+                                handleCloseModelPopover();
                                 onOpenSettings?.("model-settings");
                               }}
                               className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
