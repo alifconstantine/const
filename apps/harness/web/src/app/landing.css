@@ -257,11 +257,13 @@ body:has(.ch-download-page) .ch-header-cta {
 
 .dark .ch-hero {
   background:
-    linear-gradient(180deg, rgba(10, 10, 10, 0) 72%, var(--ch-canvas) 100%),
+    linear-gradient(180deg, rgba(3, 7, 18, 0) 65%, var(--ch-canvas) 100%),
     radial-gradient(
       ellipse 140% 85% at 50% 15%,
-      #1e293b 0%,
-      #0f172a 50%,
+      #133e75 0%,
+      #0d2b54 30%,
+      #081b37 60%,
+      #040d1c 85%,
       #020617 100%
     );
 }
@@ -281,10 +283,11 @@ body:has(.ch-download-page) .ch-header-cta {
 .dark .ch-hero-backdrop-glow {
   background: radial-gradient(
     circle at 50% 18%,
-    rgba(56, 189, 248, 0.12) 0%,
-    rgba(0, 0, 0, 0) 60%
+    rgba(37, 99, 235, 0.32) 0%,
+    rgba(29, 78, 216, 0.14) 42%,
+    rgba(0, 0, 0, 0) 68%
   );
-  opacity: 0.8;
+  opacity: 0.95;
 }
 
 .ch-hero-shell {
@@ -393,7 +396,8 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 /* =========================================================================
- * Desktop App Window Mockup (Audited from apps/harness/desktop - Image 1 Reference)
+ * Desktop App Window Mockup (Audited from apps/harness/desktop - Image 1/2/3 Reference)
+ * Supports both Light Mode & Dark Mode with authentic desktop app fidelity
  * ========================================================================= */
 .ch-desk-window {
   width: 100%;
@@ -403,26 +407,140 @@ body:has(.ch-download-page) .ch-header-cta {
   max-height: 660px;
   display: flex;
   flex-direction: column;
-  background: #161616;
-  color: #d4d4d4;
-  border-radius: 14px;
-  border: 1px solid #2a2a2a;
-  box-shadow:
-    0 24px 70px -15px rgba(0, 0, 0, 0.85),
-    0 10px 30px -10px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
   overflow: hidden;
   position: relative;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  border-radius: 14px;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+
+  /* --- Light Mode Variables (Desktop App Theme) --- */
+  --ch-desk-win-bg: #f8f8f8;
+  --ch-desk-win-border: #dedee2;
+  --ch-desk-win-shadow:
+    0 24px 70px -15px rgba(0, 0, 0, 0.16),
+    0 10px 30px -10px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+
+  --ch-desk-sidebar-bg: #ececee;
+  --ch-desk-sidebar-border: #dedee2;
+  --ch-desk-canvas-bg: #f8f8f8;
+
+  --ch-desk-text-primary: #161616;
+  --ch-desk-text-secondary: #666666;
+  --ch-desk-text-muted: #888888;
+  --ch-desk-text-faint: #a9a9a9;
+
+  --ch-desk-badge-bg: #dedee2;
+  --ch-desk-badge-border: #d4d4d8;
+  --ch-desk-badge-text: #666666;
+
+  --ch-desk-btn-hover-bg: #dedee2;
+  --ch-desk-btn-hover-text: #161616;
+
+  --ch-desk-new-chat-bg: #ffffff;
+  --ch-desk-new-chat-border: #dedee2;
+  --ch-desk-new-chat-text: #161616;
+  --ch-desk-new-chat-hover: #f5f5f7;
+
+  --ch-desk-item-hover-bg: rgba(0, 0, 0, 0.05);
+  --ch-desk-item-active-bg: #dedee2;
+  --ch-desk-item-active-text: #161616;
+  --ch-desk-item-time: #888888;
+
+  --ch-desk-avatar-bg: #dedee2;
+  --ch-desk-avatar-text: #161616;
+
+  --ch-desk-card-tier1-bg: #f0f0f3;
+  --ch-desk-card-border: #dedee2;
+  --ch-desk-card-tier2-bg: #ffffff;
+  --ch-desk-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --ch-desk-card-shadow-focus: 0 12px 36px rgba(0, 0, 0, 0.12);
+
+  --ch-desk-input-text: #161616;
+  --ch-desk-input-placeholder: #8e8e93;
+
+  --ch-desk-pill-text: #555555;
+  --ch-desk-pill-icon: #777777;
+  --ch-desk-pill-hover-bg: rgba(0, 0, 0, 0.06);
+  --ch-desk-pill-hover-text: #161616;
+
+  --ch-desk-send-bg: #e2e2e5;
+  --ch-desk-send-text: #8e8e93;
+  --ch-desk-send-active-bg: #161616;
+  --ch-desk-send-active-text: #ffffff;
+
+  --ch-desk-drawer-bg: #f8f8f8;
+  --ch-desk-drawer-border: #dedee2;
+
+  background: var(--ch-desk-win-bg);
+  border: 1px solid var(--ch-desk-win-border);
+  box-shadow: var(--ch-desk-win-shadow);
+  color: var(--ch-desk-text-primary);
 }
 
 .dark .ch-desk-window {
-  background: #161616;
-  border-color: #2a2a2a;
-  box-shadow:
+  /* --- Dark Mode Variables (Desktop App Theme - Image 1/2/3) --- */
+  --ch-desk-win-bg: #161616;
+  --ch-desk-win-border: #2a2a2a;
+  --ch-desk-win-shadow:
     0 30px 80px -15px rgba(0, 0, 0, 0.95),
     0 12px 35px -8px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  --ch-desk-sidebar-bg: #101011;
+  --ch-desk-sidebar-border: #1c1c1c;
+  --ch-desk-canvas-bg: #161616;
+
+  --ch-desk-text-primary: #d4d4d4;
+  --ch-desk-text-secondary: #999999;
+  --ch-desk-text-muted: #777777;
+  --ch-desk-text-faint: #5d5d5d;
+
+  --ch-desk-badge-bg: #242424;
+  --ch-desk-badge-border: #333333;
+  --ch-desk-badge-text: #8e8e93;
+
+  --ch-desk-btn-hover-bg: #242424;
+  --ch-desk-btn-hover-text: #ffffff;
+
+  --ch-desk-new-chat-bg: #222222;
+  --ch-desk-new-chat-border: #303030;
+  --ch-desk-new-chat-text: #ffffff;
+  --ch-desk-new-chat-hover: #2a2a2a;
+
+  --ch-desk-item-hover-bg: #202020;
+  --ch-desk-item-active-bg: #262626;
+  --ch-desk-item-active-text: #ffffff;
+  --ch-desk-item-time: #666666;
+
+  --ch-desk-avatar-bg: #383838;
+  --ch-desk-avatar-text: #ffffff;
+
+  --ch-desk-card-tier1-bg: #222222;
+  --ch-desk-card-border: #383838;
+  --ch-desk-card-tier2-bg: #2b2b2b;
+  --ch-desk-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --ch-desk-card-shadow-focus: 0 12px 36px rgba(0, 0, 0, 0.55);
+
+  --ch-desk-input-text: #d4d4d4;
+  --ch-desk-input-placeholder: #777777;
+
+  --ch-desk-pill-text: #a9a9a9;
+  --ch-desk-pill-icon: #a9a9a9;
+  --ch-desk-pill-hover-bg: rgba(255, 255, 255, 0.06);
+  --ch-desk-pill-hover-text: #ffffff;
+
+  --ch-desk-send-bg: rgba(72, 72, 78, 0.6);
+  --ch-desk-send-text: #888888;
+  --ch-desk-send-active-bg: #d4d4d4;
+  --ch-desk-send-active-text: #161616;
+
+  --ch-desk-drawer-bg: #141414;
+  --ch-desk-drawer-border: #242424;
+
+  background: var(--ch-desk-win-bg);
+  border-color: var(--ch-desk-win-border);
+  box-shadow: var(--ch-desk-win-shadow);
+  color: var(--ch-desk-text-primary);
 }
 
 /* Sidebar Top Header (Const Logo + HARNESS Badge + Collapse Button) */
@@ -435,17 +553,18 @@ body:has(.ch-download-page) .ch-header-cta {
   margin-bottom: 8px;
   flex-shrink: 0;
   user-select: none;
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-harness-badge {
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.06em;
-  color: #8e8e93;
-  background: #242424;
+  color: var(--ch-desk-badge-text);
+  background: var(--ch-desk-badge-bg);
   padding: 1.5px 5.5px;
   border-radius: 4px;
-  border: 1px solid #333333;
+  border: 1px solid var(--ch-desk-badge-border);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -458,14 +577,14 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 6px;
   background: transparent;
   border: none;
-  color: #888888;
+  color: var(--ch-desk-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-panel-btn:hover {
-  background: #242424;
-  color: #ffffff;
+  background: var(--ch-desk-btn-hover-bg);
+  color: var(--ch-desk-btn-hover-text);
 }
 
 .ch-desk-utility-tools {
@@ -483,14 +602,14 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 6px;
   background: transparent;
   border: none;
-  color: #888888;
+  color: var(--ch-desk-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-tool-btn:hover {
-  background: #242424;
-  color: #ffffff;
+  background: var(--ch-desk-btn-hover-bg);
+  color: var(--ch-desk-btn-hover-text);
 }
 
 .ch-desk-win-controls {
@@ -499,7 +618,7 @@ body:has(.ch-download-page) .ch-header-cta {
   gap: 2px;
   margin-left: 4px;
   padding-left: 8px;
-  border-left: 1px solid #282828;
+  border-left: 1px solid var(--ch-desk-sidebar-border);
 }
 
 .ch-desk-win-btn {
@@ -511,14 +630,14 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: #888888;
+  color: var(--ch-desk-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-win-btn:hover {
-  background: #242424;
-  color: #ffffff;
+  background: var(--ch-desk-btn-hover-bg);
+  color: var(--ch-desk-btn-hover-text);
 }
 
 .ch-desk-win-btn.close:hover {
@@ -533,15 +652,15 @@ body:has(.ch-download-page) .ch-header-cta {
   height: 100%;
   overflow: hidden;
   position: relative;
-  background: #161616;
+  background: var(--ch-desk-canvas-bg);
 }
 
 /* Desktop Sidebar */
 .ch-desk-sidebar {
   width: 250px;
   height: 100%;
-  background: #101011;
-  border-right: 1px solid #1c1c1c;
+  background: var(--ch-desk-sidebar-bg);
+  border-right: 1px solid var(--ch-desk-sidebar-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -568,22 +687,21 @@ body:has(.ch-download-page) .ch-header-cta {
   justify-content: space-between;
   padding: 0 10px;
   border-radius: 8px;
-  background: #222222;
-  border: 1px solid #303030;
-  color: #ffffff;
+  background: var(--ch-desk-new-chat-bg);
+  border: 1px solid var(--ch-desk-new-chat-border);
+  color: var(--ch-desk-new-chat-text);
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
   transition: all 0.15s ease;
 }
 
 .ch-desk-new-chat-btn:hover {
-  background: #2a2a2a;
-  border-color: #3d3d3d;
+  background: var(--ch-desk-new-chat-hover);
 }
 
 .ch-desk-kbd-shortcut {
   font-size: 11px;
-  color: #777777;
+  color: var(--ch-desk-text-muted);
   letter-spacing: -0.01em;
 }
 
@@ -604,7 +722,7 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 7px;
   background: transparent;
   border: none;
-  color: #999999;
+  color: var(--ch-desk-text-secondary);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
@@ -612,8 +730,8 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-nav-btn:hover {
-  background: #202020;
-  color: #ffffff;
+  background: var(--ch-desk-item-hover-bg);
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-projects-container {
@@ -623,7 +741,7 @@ body:has(.ch-download-page) .ch-header-cta {
   overflow-y: auto;
   min-height: 0;
   scrollbar-width: thin;
-  scrollbar-color: #2b2b2b transparent;
+  scrollbar-color: var(--ch-desk-sidebar-border) transparent;
 }
 
 .ch-desk-section-header {
@@ -640,7 +758,7 @@ body:has(.ch-download-page) .ch-header-cta {
   gap: 6px;
   background: transparent;
   border: none;
-  color: #999999;
+  color: var(--ch-desk-text-secondary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -648,7 +766,7 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-section-trigger:hover {
-  color: #ffffff;
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-icon-btn {
@@ -660,14 +778,14 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: #777777;
+  color: var(--ch-desk-text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-icon-btn:hover {
-  color: #ffffff;
-  background: #242424;
+  color: var(--ch-desk-text-primary);
+  background: var(--ch-desk-btn-hover-bg);
 }
 
 .ch-desk-folder-list {
@@ -691,7 +809,7 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 6px;
   background: transparent;
   border: none;
-  color: #999999;
+  color: var(--ch-desk-text-secondary);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
@@ -699,8 +817,8 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-folder-header:hover {
-  background: #202020;
-  color: #ffffff;
+  background: var(--ch-desk-item-hover-bg);
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-folder-children {
@@ -709,7 +827,7 @@ body:has(.ch-download-page) .ch-header-cta {
   gap: 1px;
   padding-left: 10px;
   margin-left: 8px;
-  border-left: 1px solid #262626;
+  border-left: 1px solid var(--ch-desk-sidebar-border);
   margin-top: 1px;
   margin-bottom: 3px;
 }
@@ -724,7 +842,7 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 5px;
   background: transparent;
   border: none;
-  color: #8e8e8e;
+  color: var(--ch-desk-text-secondary);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
@@ -732,19 +850,19 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-chat-item:hover {
-  background: #202020;
-  color: #ffffff;
+  background: var(--ch-desk-item-hover-bg);
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-chat-item.active {
-  background: #262626;
-  color: #ffffff;
+  background: var(--ch-desk-item-active-bg);
+  color: var(--ch-desk-item-active-text);
   font-weight: 500;
 }
 
 .ch-desk-chat-time {
   font-size: 11px;
-  color: #666666;
+  color: var(--ch-desk-item-time);
   margin-left: 6px;
   flex-shrink: 0;
   font-weight: 400;
@@ -758,7 +876,7 @@ body:has(.ch-download-page) .ch-header-cta {
   padding: 0 8px;
   border-radius: 5px;
   font-size: 11.5px;
-  color: #666666;
+  color: var(--ch-desk-text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -767,11 +885,11 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-see-all-btn:hover {
-  color: #d4d4d4;
-  background: #202020;
+  color: var(--ch-desk-text-primary);
+  background: var(--ch-desk-item-hover-bg);
 }
 
-/* Outside Project Group matching Image 1 */
+/* Outside Project Group */
 .ch-desk-outside-group {
   margin-top: 4px;
   display: flex;
@@ -788,7 +906,7 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 6px;
   background: transparent;
   border: none;
-  color: #999999;
+  color: var(--ch-desk-text-secondary);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
@@ -796,8 +914,8 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-outside-header:hover {
-  background: #202020;
-  color: #ffffff;
+  background: var(--ch-desk-item-hover-bg);
+  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-user-footer {
@@ -805,7 +923,7 @@ body:has(.ch-download-page) .ch-header-cta {
   align-items: center;
   gap: 9px;
   padding: 10px 6px 4px;
-  border-top: 1px solid #222222;
+  border-top: 1px solid var(--ch-desk-sidebar-border);
   margin-top: auto;
   flex-shrink: 0;
 }
@@ -814,8 +932,8 @@ body:has(.ch-download-page) .ch-header-cta {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #383838;
-  color: #ffffff;
+  background: var(--ch-desk-avatar-bg);
+  color: var(--ch-desk-avatar-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -835,7 +953,7 @@ body:has(.ch-download-page) .ch-header-cta {
 .ch-desk-user-name {
   font-size: 12px;
   font-weight: 500;
-  color: #e5e5e5;
+  color: var(--ch-desk-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -843,7 +961,7 @@ body:has(.ch-download-page) .ch-header-cta {
 
 .ch-desk-user-email {
   font-size: 10.5px;
-  color: #777777;
+  color: var(--ch-desk-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -852,7 +970,7 @@ body:has(.ch-download-page) .ch-header-cta {
 /* Canvas Area (Seamless Top Toolbar + Centered Workspace) */
 .ch-desk-canvas {
   flex: 1;
-  background: #161616;
+  background: var(--ch-desk-canvas-bg);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -905,27 +1023,26 @@ body:has(.ch-download-page) .ch-header-cta {
 .ch-desk-greeting {
   font-size: 20px;
   font-weight: 500;
-  color: #d4d4d4;
+  color: var(--ch-desk-text-primary);
   letter-spacing: -0.02em;
   margin: 0 0 16px;
   text-align: center;
   font-family: inherit;
 }
 
-/* Two-Tier ChatCard (Exact design from apps/harness/desktop/src/components/workbench/chat-card.tsx & Image 1) */
+/* Two-Tier ChatCard (Exact design from apps/harness/desktop/src/components/workbench/chat-card.tsx & Image 1/2) */
 .ch-desk-chat-card {
   width: 100%;
-  background: #222222;
-  border: 1px solid #383838;
+  background: var(--ch-desk-card-tier1-bg);
+  border: 1px solid var(--ch-desk-card-border);
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--ch-desk-card-shadow);
   overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .ch-desk-chat-card:focus-within {
-  border-color: #4a4a4a;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--ch-desk-card-shadow-focus);
 }
 
 .ch-desk-card-top-strip {
@@ -940,7 +1057,7 @@ body:has(.ch-download-page) .ch-header-cta {
   gap: 6px;
   background: transparent;
   border: none;
-  color: #d4d4d4;
+  color: var(--ch-desk-text-primary);
   font-size: 13px;
   font-weight: 400;
   cursor: pointer;
@@ -949,19 +1066,23 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-project-btn:hover {
-  color: #ffffff;
+  color: var(--ch-desk-pill-hover-text);
 }
 
-/* Inner Box Tier: lighter charcoal #2b2b2b with its own border & rounded-14px */
+.ch-desk-project-btn svg {
+  color: var(--ch-desk-pill-icon);
+}
+
+/* Inner Box Tier: lighter container with its own border & rounded-14px */
 .ch-desk-card-inner-box {
-  background: #2b2b2b;
-  border: 1px solid #383838;
+  background: var(--ch-desk-card-tier2-bg);
+  border: 1px solid var(--ch-desk-card-border);
   border-radius: 14px;
   margin: 0 -1px -1px -1px;
   padding: 10px 14px 8px;
   display: flex;
   flex-direction: column;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .ch-desk-input-container {
@@ -974,7 +1095,7 @@ body:has(.ch-download-page) .ch-header-cta {
   border: none;
   outline: none;
   background: transparent;
-  color: #d4d4d4;
+  color: var(--ch-desk-input-text);
   font-size: 13px;
   line-height: 1.4;
   resize: none;
@@ -983,7 +1104,7 @@ body:has(.ch-download-page) .ch-header-cta {
 }
 
 .ch-desk-input::placeholder {
-  color: #777777;
+  color: var(--ch-desk-input-placeholder);
 }
 
 .ch-desk-card-bottom-row {
@@ -1008,14 +1129,14 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: #a9a9a9;
+  color: var(--ch-desk-pill-text);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-plus-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ch-desk-pill-hover-text);
+  background: var(--ch-desk-pill-hover-bg);
 }
 
 .ch-desk-mode-btn {
@@ -1026,15 +1147,19 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: #a9a9a9;
+  color: var(--ch-desk-pill-text);
   font-size: 12.5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-mode-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ch-desk-pill-hover-text);
+  background: var(--ch-desk-pill-hover-bg);
+}
+
+.ch-desk-mode-btn svg {
+  color: var(--ch-desk-pill-icon);
 }
 
 .ch-desk-actions-right {
@@ -1051,15 +1176,19 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 4px;
   background: transparent;
   border: none;
-  color: #a9a9a9;
+  color: var(--ch-desk-pill-text);
   font-size: 12.5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ch-desk-action-pill:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ch-desk-pill-hover-text);
+  background: var(--ch-desk-pill-hover-bg);
+}
+
+.ch-desk-action-pill svg {
+  color: var(--ch-desk-pill-icon);
 }
 
 .ch-desk-send-btn {
@@ -1069,21 +1198,21 @@ body:has(.ch-download-page) .ch-header-cta {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(72, 72, 78, 0.6);
+  background: var(--ch-desk-send-bg);
   border: none;
-  color: #888888;
+  color: var(--ch-desk-send-text);
   cursor: not-allowed;
   transition: all 0.15s ease;
 }
 
 .ch-desk-send-btn.active {
-  background: #d4d4d4;
-  color: #161616;
+  background: var(--ch-desk-send-active-bg);
+  color: var(--ch-desk-send-active-text);
   cursor: pointer;
 }
 
 .ch-desk-send-btn.active:hover {
-  background: #ffffff;
+  opacity: 0.92;
   transform: scale(1.02);
 }
 
@@ -1103,7 +1232,7 @@ body:has(.ch-download-page) .ch-header-cta {
   width: 270px;
   max-width: 82vw;
   height: 100%;
-  background: #141414;
+  background: var(--ch-desk-drawer-bg);
   box-shadow: 6px 0 24px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
@@ -1125,7 +1254,7 @@ body:has(.ch-download-page) .ch-header-cta {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px 6px;
-  border-bottom: 1px solid #242424;
+  border-bottom: 1px solid var(--ch-desk-drawer-border);
 }
 
 .ch-desk-drawer-close {
@@ -1137,13 +1266,13 @@ body:has(.ch-download-page) .ch-header-cta {
   border-radius: 6px;
   background: transparent;
   border: none;
-  color: #888888;
+  color: var(--ch-desk-text-secondary);
   cursor: pointer;
 }
 
 .ch-desk-drawer-close:hover {
-  background: #242424;
-  color: #ffffff;
+  background: var(--ch-desk-btn-hover-bg);
+  color: var(--ch-desk-btn-hover-text);
 }
 
 /* Compact Mode (for Capability section or narrow embeds) */

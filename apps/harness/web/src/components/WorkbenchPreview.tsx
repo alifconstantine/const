@@ -227,7 +227,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center gap-2 px-0.5">
           <ConstLogoIcon
             size={18}
-            variant="dark-transparent"
+            variant="transparent"
             className="w-[18px] h-[18px] shrink-0"
           />
           <div className="flex items-center gap-1.5">
@@ -251,7 +251,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
           title="Collapse Sidebar"
           aria-label="Collapse Sidebar"
         >
-          <PanelLeft className="w-4 h-4 text-[#888888]" />
+          <PanelLeft className="w-4 h-4" />
         </button>
       </div>
 
@@ -264,8 +264,8 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
           title="New chat (Ctrl+N)"
         >
           <div className="flex items-center gap-2.5">
-            <MessageCirclePlus className="w-4 h-4 text-white stroke-[1.8]" />
-            <span className="font-medium text-xs text-white">New Chat</span>
+            <MessageCirclePlus className="w-4 h-4 stroke-[1.8]" />
+            <span className="font-medium text-xs">New Chat</span>
           </div>
           <span className="ch-desk-kbd-shortcut">Ctrl+N</span>
         </button>
@@ -275,7 +275,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
       <nav className="ch-desk-nav" aria-label="Desktop Navigation">
         <button type="button" className="ch-desk-nav-btn">
           <div className="flex items-center gap-2.5">
-            <Search className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+            <Search className="w-4 h-4" />
             <span>Search</span>
           </div>
           <span className="ch-desk-kbd-shortcut">Ctrl+K</span>
@@ -283,14 +283,14 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
 
         <button type="button" className="ch-desk-nav-btn">
           <div className="flex items-center gap-2.5">
-            <CalendarClock className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+            <CalendarClock className="w-4 h-4" />
             <span>Scheduled Tasks</span>
           </div>
         </button>
 
         <button type="button" className="ch-desk-nav-btn">
           <div className="flex items-center gap-2.5">
-            <Store className="w-4 h-4 text-[#777777] dark:text-[#888888]" />
+            <Store className="w-4 h-4" />
             <span>Marketplace</span>
           </div>
         </button>
@@ -304,11 +304,11 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
             className="ch-desk-section-trigger"
             onClick={toggleAllFolders}
           >
-            <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0" />
+            <Folder className="w-3.5 h-3.5 shrink-0" />
             <span>Projects</span>
-            <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] ml-0.5 shrink-0" />
+            <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
           </button>
-          <div className="flex items-center gap-1 text-[#777777] dark:text-[#888888]">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               className="ch-desk-icon-btn"
@@ -344,9 +344,9 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {folder.open ? (
-                      <FolderOpen className="w-4 h-4 text-[#777777] dark:text-[#888888] shrink-0" />
+                      <FolderOpen className="w-4 h-4 shrink-0" />
                     ) : (
-                      <Folder className="w-4 h-4 text-[#777777] dark:text-[#888888] shrink-0" />
+                      <Folder className="w-4 h-4 shrink-0" />
                     )}
                     <span className="truncate">{folder.name}</span>
                   </div>
@@ -399,11 +399,11 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
             onClick={() => setOutsideOpen((prev) => !prev)}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <MessageSquare className="w-4 h-4 text-[#777777] dark:text-[#888888] shrink-0" />
+              <MessageSquare className="w-4 h-4 shrink-0" />
               <span className="truncate">Outside Project</span>
             </div>
             <ChevronDown
-              className={`w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0 transition-transform ${
+              className={`w-3.5 h-3.5 shrink-0 transition-transform ${
                 outsideOpen ? "" : "-rotate-90"
               }`}
             />
@@ -449,7 +449,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
           <span className="ch-desk-user-name">Alif Constantine 2</span>
           <span className="ch-desk-user-email">alifconstantine2@gmail.com</span>
         </div>
-        <ChevronsUpDown className="w-4 h-4 text-[#777777] dark:text-[#888888] shrink-0 ml-auto" />
+        <ChevronsUpDown className="w-4 h-4 shrink-0 ml-auto" />
       </div>
     </div>
   );
@@ -483,7 +483,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="ch-desk-drawer-top">
-                <span className="text-xs font-semibold text-neutral-300">Navigation</span>
+                <span className="text-xs font-semibold text-foreground">Navigation</span>
                 <button
                   type="button"
                   className="ch-desk-drawer-close"
@@ -518,7 +518,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                     title="Expand Sidebar (Ctrl+B)"
                     aria-label="Expand Sidebar"
                   >
-                    <PanelLeft className="w-4 h-4 text-[#888888]" />
+                    <PanelLeft className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
@@ -527,7 +527,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                     title="New Chat (Ctrl+N)"
                     aria-label="New Chat"
                   >
-                    <MessageCirclePlus className="w-4 h-4 text-[#888888]" />
+                    <MessageCirclePlus className="w-4 h-4" />
                   </button>
                 </>
               )}
@@ -537,13 +537,13 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
             <div className="ch-desk-canvas-topbar-right">
               <div className="ch-desk-utility-tools">
                 <button type="button" className="ch-desk-tool-btn" title="Open Browser">
-                  <Globe className="w-4 h-4 text-[#999999]" />
+                  <Globe className="w-4 h-4" />
                 </button>
                 <button type="button" className="ch-desk-tool-btn" title="Toggle Terminal / Messages">
-                  <SquareTerminal className="w-4 h-4 text-[#999999]" />
+                  <SquareTerminal className="w-4 h-4" />
                 </button>
                 <button type="button" className="ch-desk-tool-btn" title="Split Layout">
-                  <Columns2 className="w-4 h-4 text-[#999999]" />
+                  <Columns2 className="w-4 h-4" />
                 </button>
               </div>
 
@@ -579,13 +579,13 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                     onClick={toggleContext}
                     title="Choose project context"
                   >
-                    <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
+                    <Folder className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{selectedContext}</span>
-                    <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                    <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
                   </button>
                 </div>
 
-                {/* Tier 2 (Inner Card): Lighter charcoal container with rounded-14px & border */}
+                {/* Tier 2 (Inner Card): Lighter container with rounded-14px & border */}
                 <div className="ch-desk-card-inner-box">
                   {/* Input Area */}
                   <div className="ch-desk-input-container">
@@ -619,9 +619,9 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                         onClick={toggleAuthMode}
                         title="Permission Mode: Ask before changes"
                       >
-                        <Hand className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
+                        <Hand className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
                         <span className="hidden sm:inline truncate max-w-[120px]">{authMode}</span>
-                        <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                        <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
                       </button>
                     </div>
 
@@ -635,7 +635,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                       >
                         <span className="hidden sm:inline truncate max-w-[150px]">{model}</span>
                         <span className="sm:hidden truncate max-w-[75px] text-[11.5px]">DeepSeek</span>
-                        <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                        <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
                       </button>
 
                       <button
@@ -644,9 +644,9 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                         onClick={toggleEffort}
                         title="Thinking effort: High"
                       >
-                        <ThinkingEffortIcon className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#d4d4d4] shrink-0" />
+                        <ThinkingEffortIcon className="w-3.5 h-3.5 shrink-0" />
                         <span className="hidden sm:inline">{effort}</span>
-                        <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                        <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
                       </button>
 
                       <button
