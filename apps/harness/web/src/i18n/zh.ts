@@ -4,7 +4,7 @@ export const zh: Copy = {
     "无法加载已发布的下载文件。请查看发布页面或从源码构建。",
   "meta.title": "Const Harness — 面向开发者的本地优先 AI 智能体工作台",
   "meta.description":
-    "面向编程、研究与创作的桌面 AI 工作台。连接项目、选择模型，在同一界面使用终端、浏览器和文件审查。",
+    "面向编程、研究与创作的桌面 AI 工作台。连接项目、选择模型，并在同一个界面中使用自主子智能体、浏览器与文件审查。",
   "nav.product": "产品",
   "nav.docs": "文档",
   "nav.changelog": "更新日志",
@@ -38,19 +38,20 @@ export const zh: Copy = {
   "capabilities.2.title": "浏览器控制",
   "capabilities.2.description":
     "在工作台内的真实浏览器中研究、浏览与测试。检查页面结构、截取屏幕并验证正在构建的网站。",
-  "capabilities.3.title": "创作图像、视频与音频",
+  "capabilities.3.title": "自主子智能体",
   "capabilities.3.description":
-    "将创作技能与已配置的图像、视频和语音服务结合，制作演示文稿和动态项目，并与其他工作成果一同保存。",
-  "capabilities.4.title": "用于实际工作的终端",
+    "将复杂项目拆解为并行任务。启动代码探索 scout、逻辑审查 reviewer 与快速修改 sonic 等专业子智能体，并实时追踪执行过程。",
+  "capabilities.4.title": "远程控制",
   "capabilities.4.description":
-    "无需离开工作台即可运行命令、构建和长任务。跟踪后台任务与子代理、查看输出，并在需要时停止。",
+    "随时随地控制桌面工作台。通过端到端加密的中继会话，安全配对网页与移动设备，移动中也能下发指令、审查 diff 与审批操作。",
+  "capabilities.4.cta": "打开远程工作空间",
   "platform.title": "在任何地方使用 Const Harness",
-  "platform.0.title": "桌面",
+  "platform.0.title": "桌面端应用",
   "platform.0.description":
-    "面向 Windows、macOS 与 Linux 的原生工作台，把聊天、终端、浏览器、差异对比与审查面板收进一个窗口。",
-  "platform.1.title": "终端",
+    "面向 Windows、macOS 与 Linux 的原生工作台，在同一个窗口中整合对话、浏览器、差异对比和审查面板。",
+  "platform.1.title": "远程控制",
   "platform.1.description":
-    "在项目、对话和审查面板旁使用内置终端，将现有脚本与开发工具融入同一流程。",
+    "从任意网页浏览器或移动手机访问桌面工作空间。实时监控智能体任务、审查文件变更并批准修改。",
   "platform.2.title": "定时任务",
   "platform.2.description":
     "安排定期研究、报告与项目检查。应用运行时在本机执行，并将结果保存到对话。",
@@ -84,7 +85,7 @@ export const zh: Copy = {
     "安装桌面版本或从源码构建，通过 Const Accounts 登录并选择项目文件夹。配置 Const Router 或受支持的模型服务，然后描述任务并选择权限模式。",
   "faq.1.q": "Const Harness 只能编程吗？",
   "faq.1.a":
-    "不只是编程。技能与插件还支持研究、数据分析、文档、演示和创作。图像、视频与语音流程需要配置相应服务或工具。",
+    "不仅如此。技能与插件还支持研究、数据分析、文档、演示、创作以及自主子智能体并行调度。",
   "faq.2.q": "技能和插件有何区别？",
   "faq.2.a":
     "技能是一类工作的可复用说明；插件打包技能、服务连接等能力。MCP 连接让代理使用已配置服务器提供的工具。",
@@ -96,7 +97,7 @@ export const zh: Copy = {
     "可以。设置指令、工作区、模型、权限和重复时间，运行历史与结果会被保存。任务在本地执行，需要保持桌面应用运行且电脑处于唤醒状态。",
   "faq.5.q": "支持哪些平台和模型？",
   "faq.5.a":
-    "桌面项目包含 Windows、macOS 和 Linux 打包配置；可下载的二进制以已发布版本为准。可配置 Const Router 或兼容 OpenAI、Anthropic 的服务。独立 CLI 仍是脚手架，请使用桌面内置终端执行任务。",
+    "桌面端项目支持打包至 Windows、macOS 和 Linux。配置 Const Router 或兼容的模型服务，也可以通过网页和移动端进行远程控制。",
   "footer.col.product": "产品",
   "footer.col.ecosystem": "生态",
   "footer.col.company": "公司",
@@ -118,11 +119,13 @@ export const zh: Copy = {
   "nav.features": "功能",
   "nav.platforms": "平台",
   "nav.faq": "常见问题",
-  "nav.terminal": "终端",
+  "nav.remote": "远程",
+  "nav.terminal": "远程",
   "nav.primary": "主导航",
   "nav.mobile": "移动导航",
   "nav.close": "关闭菜单",
-  "platform.terminalCta": "探索终端",
+  "platform.remoteCta": "探索远程控制",
+  "platform.terminalCta": "探索远程控制",
   "platform.scheduleCta": "了解定时任务",
   "media.note":
     "部分插图使用 MiniMax 参考素材；工作流程与功能可用性说明对应 Const Harness。",
@@ -130,8 +133,8 @@ export const zh: Copy = {
   "comparison.other": "纯聊天工作流",
   "comparison.0.harness": "在一个工作台中整合本地项目、文件搜索、对话与成果。",
   "comparison.0.other": "通过粘贴文本或上传所选文件提供上下文。",
-  "comparison.1.harness": "内置终端、浏览器、桌面工具与插件连接。",
-  "comparison.1.other": "在自己的终端、浏览器与应用中执行步骤。",
+  "comparison.1.harness": "自主子智能体、浏览器控制、桌面工具与远程配对。",
+  "comparison.1.other": "在分散的应用程序之间手动复制粘贴指令。",
   "comparison.2.harness":
     "选择审查、修改前询问或完全访问模式，检查文件差异和支持的撤销操作。",
   "comparison.2.other": "自行应用建议，再在编辑器与工具中验证改动。",
@@ -143,7 +146,7 @@ export const zh: Copy = {
   "getstarted.0.cta": "获取桌面应用",
   "getstarted.0.feature0": "Windows、macOS 和 Linux",
   "getstarted.0.feature1": "项目对话与文件审查",
-  "getstarted.0.feature2": "内置终端与浏览器",
+  "getstarted.0.feature2": "内置浏览器与远程控制",
   "getstarted.1.highlight": "自己的 API 密钥",
   "getstarted.1.cta": "了解模型设置",
   "getstarted.1.feature0": "OpenAI 与 Anthropic 协议",
@@ -165,7 +168,7 @@ export const zh: Copy = {
   "footer.link.tasks": "任务工作流",
   "footer.link.comparison": "工作流对比",
   "preview.alt":
-    "Const Harness 工作台示意图，展示项目对话、终端检查与文件审查。",
+    "Const Harness 工作台示意图，展示项目对话与文件审查。",
   "preview.new": "新任务",
   "preview.projects": "项目",
   "preview.task": "构建落地页",
@@ -199,7 +202,7 @@ export const zh: Copy = {
   "preview.selectFolder": "选择文件夹",
   "preview.local": "本地",
   "preview.cloud": "云端",
-  "preview.quick.video": "视频生成",
+  "preview.quick.video": "自主子智能体",
   "preview.quick.code": "代码",
   "preview.quick.data": "数据分析",
   "preview.quick.general": "常规任务",

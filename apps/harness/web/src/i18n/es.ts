@@ -4,7 +4,7 @@ export const es: Copy = {
     "No se han podido cargar las descargas publicadas. Consulta las versiones o compila desde el código.",
   "meta.title": "Const Harness — Workbench agéntico local para desarrolladores",
   "meta.description":
-    "Un entorno de IA de escritorio para código, investigación y creación. Conecta tu proyecto, elige un modelo y trabaja con terminal, navegador y revisión de archivos.",
+    "Un entorno de IA de escritorio para código, investigación y creación. Conecta tu proyecto, elige un modelo y trabaja con subagentes autónomos, navegador y revisión de archivos en un solo lugar.",
   "nav.product": "Producto",
   "nav.docs": "Documentación",
   "nav.changelog": "Novedades",
@@ -38,19 +38,20 @@ export const es: Copy = {
   "capabilities.2.title": "Control del navegador",
   "capabilities.2.description":
     "Investiga, navega y prueba en un navegador real dentro del entorno. Inspecciona páginas, captura pantallas y verifica el sitio mientras lo construyes.",
-  "capabilities.3.title": "Crea imágenes, vídeo y audio",
+  "capabilities.3.title": "Subagentes autónomos",
   "capabilities.3.description":
-    "Combina habilidades creativas con tus proveedores de imagen, vídeo y voz. Crea presentaciones y proyectos de animación y conserva los resultados con el resto del trabajo.",
-  "capabilities.4.title": "Un terminal para trabajo real",
+    "Divide proyectos complejos en tareas paralelas. Genera subagentes especializados: scouts para explorar código, revisores para auditar lógica y agentes sónicos para ediciones rápidas con seguimiento en tiempo real.",
+  "capabilities.4.title": "Control remoto",
   "capabilities.4.description":
-    "Ejecuta comandos, compilaciones y tareas largas sin salir del entorno. Sigue tareas en segundo plano y subagentes, revisa su salida y detenlos cuando sea necesario.",
+    "Controla tu entorno de escritorio desde cualquier lugar. Empareja de forma segura dispositivos web y móviles mediante sesiones cifradas de extremo a extremo para dirigir tareas y revisar cambios.",
+  "capabilities.4.cta": "Abrir espacio remoto",
   "platform.title": "Usa Const Harness donde trabajes",
-  "platform.0.title": "Escritorio",
+  "platform.0.title": "Aplicación de escritorio",
   "platform.0.description":
-    "Un workbench nativo para Windows, macOS y Linux, con el chat, la terminal, el navegador, los diffs y la revisión en una sola ventana.",
-  "platform.1.title": "Terminal",
+    "Un workbench nativo para Windows, macOS y Linux, con el chat, el navegador, los diffs y la revisión en una sola ventana.",
+  "platform.1.title": "Control remoto",
   "platform.1.description":
-    "Usa el terminal integrado junto al proyecto, la conversación y la revisión. Conserva tus scripts y herramientas en el mismo flujo de trabajo.",
+    "Accede a tu entorno de escritorio desde cualquier navegador web o móvil. Monitorea agentes activos, revisa cambios y aprueba mutaciones sobre la marcha.",
   "platform.2.title": "Tareas programadas",
   "platform.2.description":
     "Programa investigación, informes y comprobaciones recurrentes. Se ejecutan en tu equipo mientras la app está abierta y guardan los resultados en una conversación.",
@@ -90,7 +91,7 @@ export const es: Copy = {
     "Instala una versión de escritorio o compila el código, inicia sesión con Const Accounts y elige una carpeta. Configura el proveedor, describe la tarea y selecciona el modo de permisos.",
   "faq.1.q": "¿Const Harness solo sirve para programar?",
   "faq.1.a":
-    "No. Las habilidades y plugins permiten investigar, analizar datos, crear documentos, presentaciones y contenido. Imagen, vídeo y voz requieren configurar el proveedor o herramienta correspondiente.",
+    "No. El workbench también admite investigación, análisis de datos, documentos, presentaciones y delegación de subagentes autónomos mediante habilidades y plugins.",
   "faq.2.q": "¿En qué se diferencian habilidades y plugins?",
   "faq.2.a":
     "Una habilidad reúne instrucciones reutilizables para un tipo de trabajo. Un plugin agrupa capacidades y conexiones. MCP da acceso a herramientas de un servidor configurado.",
@@ -102,7 +103,7 @@ export const es: Copy = {
     "Sí. Configura instrucciones, proyecto, modelo, permisos y horario. Se guarda el historial y los resultados. La ejecución es local: la app debe permanecer abierta y el equipo despierto.",
   "faq.5.q": "¿Qué plataformas y modelos admite?",
   "faq.5.a":
-    "El proyecto permite empaquetar para Windows, macOS y Linux; los binarios dependen de cada publicación. Configura Const Router o proveedores compatibles con OpenAI y Anthropic. La CLI independiente aún es una base; utiliza el terminal integrado.",
+    "El proyecto incluye paquetes para Windows, macOS y Linux. Configura Const Router o proveedores compatibles, o conéctate de forma remota mediante web y móvil.",
   "footer.col.product": "Producto",
   "footer.col.ecosystem": "Ecosistema",
   "footer.col.company": "Compañía",
@@ -124,11 +125,13 @@ export const es: Copy = {
   "nav.features": "Funciones",
   "nav.platforms": "Plataformas",
   "nav.faq": "Preguntas frecuentes",
-  "nav.terminal": "Terminal",
+  "nav.remote": "Remoto",
+  "nav.terminal": "Remoto",
   "nav.primary": "Navegación principal",
   "nav.mobile": "Navegación móvil",
   "nav.close": "Cerrar menú",
-  "platform.terminalCta": "Explorar el terminal",
+  "platform.remoteCta": "Explorar control remoto",
+  "platform.terminalCta": "Explorar control remoto",
   "platform.scheduleCta": "Cómo funciona",
   "media.note":
     "Las ilustraciones incluyen recursos de referencia de MiniMax; los flujos y la disponibilidad descritos corresponden a Const Harness.",
@@ -138,9 +141,9 @@ export const es: Copy = {
     "Proyecto local, búsqueda de archivos, conversaciones y resultados en un entorno.",
   "comparison.0.other": "Aportas contexto pegando texto o adjuntando archivos.",
   "comparison.1.harness":
-    "Terminal, navegador, herramientas de escritorio y conexiones de plugins.",
+    "Subagentes autónomos, navegador, herramientas de escritorio y conexión remota.",
   "comparison.1.other":
-    "Trasladas instrucciones a tu terminal, navegador y aplicaciones.",
+    "Trasladas instrucciones a aplicaciones separadas y copias manualmente.",
   "comparison.2.harness":
     "Elige revisión, consulta antes de cambios o acceso completo. Revisa diferencias y las acciones de deshacer compatibles.",
   "comparison.2.other":
@@ -155,7 +158,7 @@ export const es: Copy = {
   "getstarted.0.cta": "Obtener la app",
   "getstarted.0.feature0": "Windows, macOS y Linux",
   "getstarted.0.feature1": "Conversaciones y revisión de archivos",
-  "getstarted.0.feature2": "Terminal y navegador integrados",
+  "getstarted.0.feature2": "Navegador y control remoto",
   "getstarted.1.highlight": "Tu clave API",
   "getstarted.1.cta": "Configurar modelos",
   "getstarted.1.feature0": "Protocolos OpenAI y Anthropic",
@@ -177,7 +180,7 @@ export const es: Copy = {
   "footer.link.tasks": "Flujos de tareas",
   "footer.link.comparison": "Comparación",
   "preview.alt":
-    "Ilustración de Const Harness con conversación, comprobaciones de terminal y revisión de archivos.",
+    "Ilustración de Const Harness con conversación y revisión de archivos.",
   "preview.new": "Nueva tarea",
   "preview.projects": "Proyectos",
   "preview.task": "Crear la página",
@@ -214,7 +217,7 @@ export const es: Copy = {
   "preview.selectFolder": "Seleccionar carpeta",
   "preview.local": "Local",
   "preview.cloud": "Nube",
-  "preview.quick.video": "Generación de video",
+  "preview.quick.video": "Subagentes autónomos",
   "preview.quick.code": "Código",
   "preview.quick.data": "Análisis de datos",
   "preview.quick.general": "Tareas generales",

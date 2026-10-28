@@ -1557,9 +1557,12 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
 }
 .ch-platform-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
   margin-top: 80px;
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .ch-platform-card {
   display: flex;
@@ -1577,6 +1580,23 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
 }
 .ch-platform-visual > .ch-workbench {
   transform: scale(0.56);
+}
+.ch-remote-illustration {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  border-radius: 12px 12px 0 0;
+}
+.ch-remote-illustration img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 12px 12px 0 0;
 }
 .ch-terminal-illustration {
   width: calc(100% - 22px);

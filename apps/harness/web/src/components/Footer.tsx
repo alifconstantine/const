@@ -25,6 +25,7 @@ export function Footer() {
     {
       heading: t("footer.col.platforms"),
       links: [
+        ["Web", "/download?os=web"],
         ["Windows", "/download?os=windows"],
         ["macOS", "/download?os=macos"],
         ["Linux", "/download?os=linux"],
@@ -39,7 +40,7 @@ export function Footer() {
         [t("capabilities.1.title"), "/#features"],
         [t("capabilities.2.title"), "/#features"],
         [t("capabilities.3.title"), "/#features"],
-        [t("capabilities.4.title"), "/#features"],
+        [t("capabilities.4.title"), "/#remote"],
       ],
     },
     {

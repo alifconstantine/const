@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink, Globe } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
 
@@ -35,8 +35,15 @@ export function HeroSection() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Strictly 4 download platforms requested: Windows, Mac, iOS, Android
+  // Supported platforms: Web, Windows, Mac, iOS, Android (Web & Mobile are remote clients for the desktop app)
   const platforms = [
+    {
+      id: "web",
+      icon: Globe,
+      label: "Web",
+      detail: "Browser Remote · No installation needed",
+      href: "/download?os=web",
+    },
     {
       id: "windows",
       icon: WindowsIcon,
@@ -55,14 +62,14 @@ export function HeroSection() {
       id: "ios",
       icon: AppleIcon,
       label: "iOS",
-      detail: "iPhone & iPad · App Store",
+      detail: "iPhone & iPad · Mobile remote control",
       href: "/download?os=ios",
     },
     {
       id: "android",
       icon: AndroidIcon,
       label: "Android",
-      detail: "Android 9+ (.apk) · Direct APK",
+      detail: "Android 9+ (.apk) · Mobile remote control",
       href: "/download?os=android",
     },
   ];
@@ -120,7 +127,7 @@ export function HeroSection() {
                     transition={{ duration: 0.15, ease: "easeOut" }}
                   >
                     <div className="ch-dropdown-header">
-                      <span>Available for Desktop & Mobile</span>
+                      <span>Desktop App & Remote (Web / Mobile)</span>
                     </div>
                     <div className="ch-dropdown-list">
                       {platforms.map((p) => {

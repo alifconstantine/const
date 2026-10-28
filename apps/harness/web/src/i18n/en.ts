@@ -3,7 +3,7 @@ export const en = {
     "Published downloads could not be loaded. Check the releases page or build from source.",
   "meta.title": "Const Harness — Local-first agentic workbench for developers",
   "meta.description":
-    "A desktop AI workbench for code, research, and creative work. Connect your project, choose a model, and work with a terminal, browser, and file review in one place.",
+    "A desktop AI workbench for code, research, and creative work. Connect your project, choose a model, and work with autonomous subagents, browser, and file review in one place.",
   "nav.product": "Product",
   "nav.docs": "Docs",
   "nav.changelog": "Changelog",
@@ -37,19 +37,20 @@ export const en = {
   "capabilities.2.title": "Browser control",
   "capabilities.2.description":
     "Research, navigate, and test in a real browser inside the workbench. Inspect page structure, capture screenshots, and check your site while you build.",
-  "capabilities.3.title": "Create images, video, and audio",
+  "capabilities.3.title": "Autonomous subagents",
   "capabilities.3.description":
-    "Combine creative skills with your configured image, video, and speech providers. Build presentations and motion projects, then keep the outputs with the rest of your work.",
-  "capabilities.4.title": "A terminal for real work",
+    "Break complex projects into parallel tasks. Spawn specialized subagents—scouts for codebase exploration, reviewers for logic auditing, and sonic workers for fast edits—with real-time execution tracing.",
+  "capabilities.4.title": "Remote control",
   "capabilities.4.description":
-    "Run commands, builds, and long jobs without leaving the workbench. Follow background tasks and subagents, inspect their output, and stop them when needed.",
+    "Control your desktop workbench from anywhere. Securely pair web and mobile devices with end-to-end encrypted relay sessions to steer tasks, inspect diffs, and review changes on the go.",
+  "capabilities.4.cta": "Open remote workspace",
   "platform.title": "Use Const Harness wherever you work",
-  "platform.0.title": "Desktop",
+  "platform.0.title": "Desktop app",
   "platform.0.description":
-    "A native workbench for Windows, macOS, and Linux, with the chat, terminal, browser, diff, and review panes in one window.",
-  "platform.1.title": "Terminal",
+    "A native workbench for Windows, macOS, and Linux, with the chat, browser, diff, and review panes in one window.",
+  "platform.1.title": "Remote control",
   "platform.1.description":
-    "Use the built-in terminal alongside your project, conversation, and review pane. Keep your existing scripts and development tools in the same workflow.",
+    "Access your desktop workspace from any web browser or mobile phone. Monitor active agents, review diffs, and approve changes without being tied to your desk.",
   "platform.2.title": "Scheduled tasks",
   "platform.2.description":
     "Set recurring research, reports, and project checks. Runs execute on your computer while the app is running, with results saved to a conversation.",
@@ -89,7 +90,7 @@ export const en = {
     "Install a desktop build or build from source, sign in through Const Accounts, and choose a project folder. Configure Const Router or a supported model provider, then describe the task and choose its permission mode.",
   "faq.1.q": "Is Const Harness only for writing code?",
   "faq.1.a":
-    "No. The workbench also supports research, data analysis, documents, presentations, and creative workflows through skills and plugins. Image, video, and speech workflows require the corresponding configured provider or tool.",
+    "No. The workbench also supports research, data analysis, documents, presentations, and autonomous subagent delegation through skills and plugins.",
   "faq.2.q": "How are skills and plugins different?",
   "faq.2.a":
     "A skill is a reusable set of instructions for a type of work. A plugin packages capabilities such as skills and service connections. MCP connections give the agent access to tools exposed by a configured server.",
@@ -101,7 +102,7 @@ export const en = {
     "Yes. Set instructions, a workspace, a model, permissions, and a recurring schedule. Runs are recorded in task history and results are saved to a conversation. Execution is local: keep the desktop app running and your computer awake.",
   "faq.5.q": "Which platforms and models can I use?",
   "faq.5.a":
-    "The desktop project includes packaging for Windows, macOS, and Linux; available binaries depend on the published release. Configure Const Router or supported OpenAI- and Anthropic-compatible providers. The standalone CLI in this repository is still a scaffold; use the desktop's built-in terminal for execution.",
+    "The desktop project includes packaging for Windows, macOS, and Linux; available binaries depend on the published release. Configure Const Router or supported OpenAI- and Anthropic-compatible providers, or connect remotely via web and mobile.",
   "footer.col.product": "Product",
   "footer.col.ecosystem": "Ecosystem",
   "footer.col.company": "Company",
@@ -123,11 +124,13 @@ export const en = {
   "nav.features": "Capabilities",
   "nav.platforms": "Platforms",
   "nav.faq": "FAQ",
-  "nav.terminal": "Terminal",
+  "nav.remote": "Remote",
+  "nav.terminal": "Remote",
   "nav.primary": "Main navigation",
   "nav.mobile": "Mobile navigation",
   "nav.close": "Close menu",
-  "platform.terminalCta": "Explore the terminal",
+  "platform.remoteCta": "Explore remote control",
+  "platform.terminalCta": "Explore remote control",
   "platform.scheduleCta": "How scheduling works",
   "media.note":
     "Illustrations include reference assets from MiniMax; product workflows and availability are described for Const Harness.",
@@ -138,9 +141,9 @@ export const en = {
   "comparison.0.other":
     "Provide context by pasting text or attaching selected files.",
   "comparison.1.harness":
-    "A built-in terminal, browser, desktop tools, and plugin connections.",
+    "Autonomous subagents, browser control, desktop tools, and remote pairing.",
   "comparison.1.other":
-    "Move instructions into your own terminal, browser, and applications.",
+    "Move instructions into separate apps and manual copy-pasting.",
   "comparison.2.harness":
     "Choose review, ask-before-changes, or full-access mode. Inspect file diffs and supported undo actions.",
   "comparison.2.other":
@@ -155,7 +158,7 @@ export const en = {
   "getstarted.0.cta": "Get the desktop app",
   "getstarted.0.feature0": "Windows, macOS, and Linux",
   "getstarted.0.feature1": "Project conversations and file review",
-  "getstarted.0.feature2": "Built-in terminal and browser",
+  "getstarted.0.feature2": "Browser and remote control",
   "getstarted.1.highlight": "Your API key",
   "getstarted.1.cta": "Explore model setup",
   "getstarted.1.feature0": "OpenAI and Anthropic protocols",
@@ -177,7 +180,7 @@ export const en = {
   "footer.link.tasks": "Task workflows",
   "footer.link.comparison": "Comparison",
   "preview.alt":
-    "Illustration of the Const Harness workbench with a project conversation, terminal check, and file review.",
+    "Illustration of the Const Harness workbench with a project conversation and file review.",
   "preview.new": "New task",
   "preview.projects": "Projects",
   "preview.task": "Build the landing page",
@@ -214,7 +217,7 @@ export const en = {
   "preview.selectFolder": "Select folder",
   "preview.local": "Local",
   "preview.cloud": "Cloud",
-  "preview.quick.video": "Video generation",
+  "preview.quick.video": "Autonomous subagents",
   "preview.quick.code": "Code",
   "preview.quick.data": "Data analysis",
   "preview.quick.general": "General tasks",

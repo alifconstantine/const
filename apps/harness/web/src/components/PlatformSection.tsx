@@ -1,5 +1,4 @@
 "use client";
-import { CalendarClock, Check, Terminal } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
 import { HeadingReveal } from "@/components/ui/text-reveal";
@@ -14,7 +13,7 @@ export function PlatformSection() {
           <h2 className="ch-title">{t("platform.title")}</h2>
         </HeadingReveal>
         <div className="ch-platform-grid">
-          {([0, 1, 2] as const).map((index) => (
+          {([0, 1] as const).map((index) => (
             <motion.article
               key={index}
               className="ch-platform-card"
@@ -30,22 +29,15 @@ export function PlatformSection() {
               <div className="ch-platform-visual">
                 {index === 0 ? (
                   <WorkbenchPreview compact />
-                ) : index === 1 ? (
-                  <div className="ch-terminal-illustration">
-                    <Terminal size={20} />
-                    <pre>
-                      <code>{`$ pnpm check-types\n\n> tsc --noEmit\n\n✓ 0 errors\n\n$ pnpm build\n\n✓ Build completed\n$ ▋`}</code>
-                    </pre>
-                  </div>
                 ) : (
-                  <div className="ch-schedule-illustration">
-                    <CalendarClock size={26} />
-                    <strong>{t("preview.schedule")}</strong>
-                    <span>{t("preview.daily")}</span>
-                    <div>
-                      <Check size={15} />
-                      {t("preview.complete")}
-                    </div>
+                  <div className="ch-remote-illustration">
+                    <img
+                      src="/assets/image/landing/platform-mobile.png"
+                      alt={t("platform.1.title")}
+                      width={1377}
+                      height={1377}
+                      loading="lazy"
+                    />
                   </div>
                 )}
               </div>
@@ -57,17 +49,9 @@ export function PlatformSection() {
               </p>
               <a
                 className="ch-button ch-button-secondary"
-                href={
-                  index === 0 ? "#download" : index === 1 ? "#terminal" : "#faq"
-                }
+                href={index === 0 ? "#download" : "#remote"}
               >
-                {t(
-                  index === 0
-                    ? "nav.cta"
-                    : index === 1
-                      ? "platform.terminalCta"
-                      : "platform.scheduleCta",
-                )}
+                {t(index === 0 ? "nav.cta" : "platform.remoteCta")}
               </a>
             </motion.article>
           ))}

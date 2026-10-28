@@ -4,7 +4,7 @@ export const id: Copy = {
     "Daftar download belum dapat dimuat. Periksa halaman rilis atau build dari source.",
   "meta.title": "Const Harness — Workbench agen AI lokal untuk developer",
   "meta.description":
-    "Workbench AI desktop untuk coding, riset, dan karya kreatif. Hubungkan proyek, pilih model, lalu gunakan terminal, browser, dan review berkas dalam satu tempat.",
+    "Workbench AI desktop untuk coding, riset, dan karya kreatif. Hubungkan proyek, pilih model, lalu gunakan subagen otonom, browser, dan review berkas dalam satu tempat.",
   "nav.product": "Produk",
   "nav.docs": "Dokumentasi",
   "nav.changelog": "Changelog",
@@ -38,19 +38,20 @@ export const id: Copy = {
   "capabilities.2.title": "Kontrol browser",
   "capabilities.2.description":
     "Riset, navigasi, dan pengujian dilakukan di browser nyata dalam workbench. Periksa struktur halaman, ambil screenshot, dan cek situs sambil membangunnya.",
-  "capabilities.3.title": "Buat gambar, video, dan audio",
+  "capabilities.3.title": "Subagen otonom",
   "capabilities.3.description":
-    "Gabungkan skill kreatif dengan penyedia gambar, video, dan suara yang Anda atur. Buat presentasi dan proyek motion, lalu simpan hasilnya bersama pekerjaan Anda.",
-  "capabilities.4.title": "Terminal untuk pekerjaan nyata",
+    "Pecah proyek kompleks menjadi tugas paralel. Delegasikan pekerjaan ke subagen spesialis—scout untuk eksplorasi kode, reviewer untuk audit logika, dan sonic untuk edit cepat—dengan tracing eksekusi real-time.",
+  "capabilities.4.title": "Remote control",
   "capabilities.4.description":
-    "Jalankan perintah, build, dan proses panjang tanpa meninggalkan workbench. Pantau tugas latar belakang dan subagen, periksa outputnya, dan hentikan bila diperlukan.",
+    "Kendalikan workbench desktop Anda dari mana saja. Pasangkan perangkat web dan seluler dengan sesi relay terenkripsi end-to-end untuk mengarahkan tugas, meninjau diff, dan memantau progres.",
+  "capabilities.4.cta": "Buka remote workspace",
   "platform.title": "Pakai Const Harness di mana pun Anda bekerja",
-  "platform.0.title": "Desktop",
+  "platform.0.title": "Aplikasi desktop",
   "platform.0.description":
-    "Workbench native untuk Windows, macOS, dan Linux, dengan chat, terminal, browser, diff, dan panel review dalam satu jendela.",
-  "platform.1.title": "Terminal",
+    "Workbench native untuk Windows, macOS, dan Linux, dengan chat, browser, diff, dan panel review dalam satu jendela.",
+  "platform.1.title": "Remote control",
   "platform.1.description":
-    "Gunakan terminal bawaan bersama proyek, percakapan, dan panel review. Pertahankan skrip serta alat pengembangan Anda dalam alur kerja yang sama.",
+    "Akses workspace desktop Anda dari browser web atau ponsel mana pun. Pantau agen aktif, tinjau diff berkas, dan setujui perubahan tanpa terikat di meja kerja.",
   "platform.2.title": "Tugas terjadwal",
   "platform.2.description":
     "Atur riset, laporan, dan pemeriksaan proyek berulang. Tugas berjalan di komputer saat aplikasi aktif, dengan hasil disimpan ke percakapan.",
@@ -90,7 +91,7 @@ export const id: Copy = {
     "Pasang build desktop atau build dari source, masuk melalui Const Accounts, lalu pilih folder proyek. Atur Const Router atau penyedia model yang didukung, kemudian jelaskan tugas dan pilih mode izinnya.",
   "faq.1.q": "Apakah Const Harness hanya untuk coding?",
   "faq.1.a":
-    "Tidak. Workbench juga mendukung riset, analisis data, dokumen, presentasi, dan alur kreatif melalui skill serta plugin. Gambar, video, dan suara membutuhkan penyedia atau alat terkait yang sudah dikonfigurasi.",
+    "Tidak. Workbench juga mendukung riset, analisis data, dokumen, presentasi, dan delegasi subagen otonom melalui skill serta plugin.",
   "faq.2.q": "Apa perbedaan skill dan plugin?",
   "faq.2.a":
     "Skill adalah kumpulan instruksi yang dapat dipakai ulang untuk jenis pekerjaan tertentu. Plugin mengemas kemampuan seperti skill dan koneksi layanan. Koneksi MCP memberikan akses ke alat dari server yang dikonfigurasi.",
@@ -102,7 +103,7 @@ export const id: Copy = {
     "Ya. Atur instruksi, workspace, model, izin, dan jadwal berulang. Eksekusi tercatat dalam riwayat tugas dan hasil disimpan ke percakapan. Eksekusi berjalan lokal: biarkan aplikasi desktop aktif dan komputer tetap menyala.",
   "faq.5.q": "Platform dan model apa yang dapat digunakan?",
   "faq.5.a":
-    "Proyek desktop memiliki konfigurasi paket untuk Windows, macOS, dan Linux; binary yang tersedia mengikuti rilis yang diterbitkan. Atur Const Router atau penyedia kompatibel OpenAI dan Anthropic. CLI mandiri di repositori ini masih berupa scaffold; gunakan terminal bawaan desktop untuk eksekusi.",
+    "Proyek desktop memiliki konfigurasi paket untuk Windows, macOS, dan Linux; binary yang tersedia mengikuti rilis yang diterbitkan. Atur Const Router atau penyedia kompatibel OpenAI dan Anthropic, atau hubungkan remote control via web dan mobile.",
   "footer.col.product": "Produk",
   "footer.col.ecosystem": "Ekosistem",
   "footer.col.company": "Perusahaan",
@@ -124,11 +125,13 @@ export const id: Copy = {
   "nav.features": "Kemampuan",
   "nav.platforms": "Platform",
   "nav.faq": "FAQ",
-  "nav.terminal": "Terminal",
+  "nav.remote": "Remote",
+  "nav.terminal": "Remote",
   "nav.primary": "Navigasi utama",
   "nav.mobile": "Navigasi seluler",
   "nav.close": "Tutup menu",
-  "platform.terminalCta": "Jelajahi terminal",
+  "platform.remoteCta": "Jelajahi remote control",
+  "platform.terminalCta": "Jelajahi remote control",
   "platform.scheduleCta": "Cara kerja penjadwalan",
   "media.note":
     "Ilustrasi mencakup aset referensi dari MiniMax; alur kerja dan ketersediaan fitur dijelaskan untuk Const Harness.",
@@ -139,9 +142,9 @@ export const id: Copy = {
   "comparison.0.other":
     "Konteks diberikan dengan menempelkan teks atau melampirkan berkas pilihan.",
   "comparison.1.harness":
-    "Terminal, browser, alat desktop, dan koneksi plugin bawaan.",
+    "Subagen otonom, kontrol browser, alat desktop, dan pairing remote bawaan.",
   "comparison.1.other":
-    "Pindahkan instruksi ke terminal, browser, dan aplikasi Anda sendiri.",
+    "Pindahkan instruksi ke aplikasi terpisah dan salin-tempel manual.",
   "comparison.2.harness":
     "Pilih mode review, ask-before-changes, atau full access. Periksa diff berkas dan tindakan undo yang didukung.",
   "comparison.2.other":
@@ -158,7 +161,7 @@ export const id: Copy = {
   "getstarted.0.cta": "Dapatkan aplikasi desktop",
   "getstarted.0.feature0": "Windows, macOS, dan Linux",
   "getstarted.0.feature1": "Percakapan proyek dan review berkas",
-  "getstarted.0.feature2": "Terminal dan browser bawaan",
+  "getstarted.0.feature2": "Browser dan remote control",
   "getstarted.1.highlight": "API key Anda",
   "getstarted.1.cta": "Lihat pengaturan model",
   "getstarted.1.feature0": "Protokol OpenAI dan Anthropic",
@@ -180,7 +183,7 @@ export const id: Copy = {
   "footer.link.tasks": "Alur kerja tugas",
   "footer.link.comparison": "Perbandingan alur",
   "preview.alt":
-    "Ilustrasi workbench Const Harness dengan percakapan proyek, pemeriksaan terminal, dan review berkas.",
+    "Ilustrasi workbench Const Harness dengan percakapan proyek dan review berkas.",
   "preview.new": "Tugas baru",
   "preview.projects": "Proyek",
   "preview.task": "Buat landing page",
@@ -217,7 +220,7 @@ export const id: Copy = {
   "preview.selectFolder": "Pilih folder",
   "preview.local": "Lokal",
   "preview.cloud": "Cloud",
-  "preview.quick.video": "Pembuatan video",
+  "preview.quick.video": "Subagen otonom",
   "preview.quick.code": "Kode",
   "preview.quick.data": "Analisis data",
   "preview.quick.general": "Tugas umum",

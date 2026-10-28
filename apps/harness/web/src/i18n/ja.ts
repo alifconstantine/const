@@ -5,7 +5,7 @@ export const ja: Copy = {
   "meta.title":
     "Const Harness — 開発者のためのローカルファースト AI エージェントワークベンチ",
   "meta.description":
-    "コード、調査、制作のためのデスクトップAIワークベンチ。プロジェクトとモデルを選び、ターミナル、ブラウザー、変更レビューを一か所で使えます。",
+    "コード、調査、制作のためのデスクトップAIワークベンチ。プロジェクトとモデルを選び、自律サブエージェント、ブラウザー、変更レビューを一か所で使えます。",
   "nav.product": "製品",
   "nav.docs": "ドキュメント",
   "nav.changelog": "変更履歴",
@@ -39,19 +39,20 @@ export const ja: Copy = {
   "capabilities.2.title": "ブラウザ操作",
   "capabilities.2.description":
     "ワークベンチ内のブラウザーで調査、移動、テストを実行。ページ構造やスクリーンショットを確認しながら開発できます。",
-  "capabilities.3.title": "画像・動画・音声を制作",
+  "capabilities.3.title": "自律サブエージェント",
   "capabilities.3.description":
-    "制作スキルと設定した画像・動画・音声プロバイダーを組み合わせ、プレゼンやモーション作品を作成。出力をプロジェクトと一緒に管理できます。",
-  "capabilities.4.title": "実作業のためのターミナル",
+    "複雑なタスクを並行処理に分割。コード調査用scout、レビュー用reviewer、高速編集用sonicなど専門サブエージェントを実行トレース付きで展開します。",
+  "capabilities.4.title": "リモートコントロール",
   "capabilities.4.description":
-    "ワークベンチからコマンド、ビルド、長時間のジョブを実行。バックグラウンドタスクとサブエージェントの出力を確認し、必要なら停止できます。",
+    "どこからでもデスクトップワークベンチを操作。Webやモバイル端末とエンドツーエンド暗号化で安全にペアリングし、タスク指示やdiff確認が可能です。",
+  "capabilities.4.cta": "リモートワークスペースを開く",
   "platform.title": "Const Harness をどこからでも使う",
-  "platform.0.title": "デスクトップ",
+  "platform.0.title": "デスクトップアプリ",
   "platform.0.description":
-    "Windows・macOS・Linux 向けのネイティブワークベンチ。チャット、ターミナル、ブラウザ、差分、レビューを 1 つのウィンドウにまとめます。",
-  "platform.1.title": "ターミナル",
+    "Windows・macOS・Linux 向けのネイティブワークベンチ。チャット、ブラウザ、差分、レビューを 1 つのウィンドウにまとめます。",
+  "platform.1.title": "リモートコントロール",
   "platform.1.description":
-    "プロジェクト、会話、レビューと並べて内蔵ターミナルを使用。既存のスクリプトや開発ツールをそのまま使えます。",
+    "ブラウザやスマートフォンからデスクトップ環境にアクセス。タスクの進捗監視やdiffの承認をどこからでも実行できます。",
   "platform.2.title": "スケジュールタスク",
   "platform.2.description":
     "調査、レポート、プロジェクト検証を定期実行。アプリが動作中のコンピューターで実行し、結果を会話に保存します。",
@@ -90,7 +91,7 @@ export const ja: Copy = {
     "デスクトップビルドをインストールするかソースからビルドし、Const Accountsでログインします。プロジェクトフォルダー、モデルプロバイダー、許可モードを選んで作業を依頼してください。",
   "faq.1.q": "コードを書くためだけのアプリですか？",
   "faq.1.a":
-    "いいえ。スキルやプラグインで調査、分析、文書、プレゼン、制作にも対応します。画像・動画・音声には対応するプロバイダーやツールの設定が必要です。",
+    "いいえ。スキルやプラグインで調査、分析、文書、プレゼン、自律サブエージェントの並行処理にも対応します。",
   "faq.2.q": "スキルとプラグインの違いは？",
   "faq.2.a":
     "スキルは作業の手順を再利用できる形にしたものです。プラグインはスキルやサービス接続などをまとめます。MCP接続は設定したサーバーのツールを提供します。",
@@ -102,7 +103,7 @@ export const ja: Copy = {
     "はい。指示、作業フォルダー、モデル、権限、定期スケジュールを設定できます。実行履歴と結果を保存します。ローカル実行のため、アプリとコンピューターを起動しておく必要があります。",
   "faq.5.q": "対応するOSとモデルは？",
   "faq.5.a":
-    "Windows、macOS、Linux向けのパッケージ設定があります。配布バイナリはリリースによって異なります。Const RouterやOpenAI・Anthropic互換のプロバイダーを設定できます。単体CLIはまだ雛形のため、実行には内蔵ターミナルを利用してください。",
+    "Windows、macOS、Linux向けのパッケージ設定があります。Const Routerや互換プロバイダーを設定するか、Web/モバイルのリモート接続をご利用ください。",
   "footer.col.product": "製品",
   "footer.col.ecosystem": "エコシステム",
   "footer.col.company": "会社",
@@ -124,11 +125,13 @@ export const ja: Copy = {
   "nav.features": "機能",
   "nav.platforms": "プラットフォーム",
   "nav.faq": "よくある質問",
-  "nav.terminal": "ターミナル",
+  "nav.remote": "リモート",
+  "nav.terminal": "リモート",
   "nav.primary": "メインナビゲーション",
   "nav.mobile": "モバイルナビゲーション",
   "nav.close": "メニューを閉じる",
-  "platform.terminalCta": "ターミナルを見る",
+  "platform.remoteCta": "リモート機能を見る",
+  "platform.terminalCta": "リモート機能を見る",
   "platform.scheduleCta": "定期実行について",
   "media.note":
     "一部の画像はMiniMaxの参考素材です。機能と利用条件の説明はConst Harnessのものです。",
@@ -138,8 +141,8 @@ export const ja: Copy = {
     "ファイル検索、会話、成果物をローカルプロジェクトに集約。",
   "comparison.0.other": "テキストを貼り付けたり、選んだファイルを添付。",
   "comparison.1.harness":
-    "内蔵ターミナル、ブラウザー、デスクトップ操作、プラグイン接続。",
-  "comparison.1.other": "手順を別のターミナル、ブラウザー、アプリで実行。",
+    "自律サブエージェント、ブラウザ操作、デスクトップツール、リモートペアリング機能。",
+  "comparison.1.other": "指示を別々のアプリに手動で移動・コピー&ペースト。",
   "comparison.2.harness":
     "レビュー・変更前の確認・フルアクセスを選択。差分と対応する取り消し操作を確認。",
   "comparison.2.other": "提案を自分で適用し、エディターやツールで検証。",
@@ -151,7 +154,7 @@ export const ja: Copy = {
   "getstarted.0.cta": "アプリを入手",
   "getstarted.0.feature0": "Windows・macOS・Linux",
   "getstarted.0.feature1": "プロジェクト会話とファイルレビュー",
-  "getstarted.0.feature2": "内蔵ターミナルとブラウザー",
+  "getstarted.0.feature2": "ブラウザとリモートコントロール",
   "getstarted.1.highlight": "自分のAPIキー",
   "getstarted.1.cta": "モデル設定を見る",
   "getstarted.1.feature0": "OpenAI・Anthropicプロトコル",
@@ -173,7 +176,7 @@ export const ja: Copy = {
   "footer.link.tasks": "タスクワークフロー",
   "footer.link.comparison": "ワークフロー比較",
   "preview.alt":
-    "プロジェクト会話、ターミナル検証、ファイルレビューを表示したConst Harnessのイラスト。",
+    "プロジェクト会話とファイルレビューを表示したConst Harnessのイラスト。",
   "preview.new": "新しいタスク",
   "preview.projects": "プロジェクト",
   "preview.task": "ランディングページを作成",
@@ -209,7 +212,7 @@ export const ja: Copy = {
   "preview.selectFolder": "フォルダを選択",
   "preview.local": "ローカル",
   "preview.cloud": "クラウド",
-  "preview.quick.video": "動画生成",
+  "preview.quick.video": "自律サブエージェント",
   "preview.quick.code": "コード",
   "preview.quick.data": "データ分析",
   "preview.quick.general": "一般的なタスク",
