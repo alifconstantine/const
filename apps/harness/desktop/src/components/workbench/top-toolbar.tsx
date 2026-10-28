@@ -4,6 +4,7 @@ import {
   SquareTerminal,
   MessageCirclePlus,
   PanelLeft,
+  Menu,
   Folder,
   MoreHorizontal,
   Globe,
@@ -169,7 +170,7 @@ export function TopToolbar({
         className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden mr-2"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {!isSidebarOpen && !remote?.mobile && (
+        {!isSidebarOpen && (
           <>
             <button
               type="button"
@@ -178,11 +179,15 @@ export function TopToolbar({
                 e.currentTarget.blur();
                 onToggleSidebar();
               }}
-              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer flex items-center justify-center select-none"
+              className="shrink-0 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer flex items-center justify-center select-none"
               title={t("topToolbar.toggleSidebar")}
               aria-label={t("topToolbar.toggleSidebar")}
             >
-              <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
+              {remote?.mobile ? (
+                <Menu className="w-4 h-4" />
+              ) : (
+                <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
+              )}
             </button>
 
             <button
