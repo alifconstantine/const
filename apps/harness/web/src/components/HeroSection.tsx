@@ -1,11 +1,10 @@
 "use client";
-import React from "react";
-import { motion } from "framer-motion";
-import { ChevronDown, Globe, Terminal } from "lucide-react";
-import { GitHubIcon } from "./GitHubIcon";
+
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
-import { LINKS } from "@/lib/links";
 
 function WindowsIcon({ size = 16, className = "" }: { size?: number; className?: string }) {
   return (
@@ -33,65 +32,150 @@ function AndroidIcon({ size = 16, className = "" }: { size?: number; className?:
 
 export function HeroSection() {
   const { t } = useI18n();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Strictly 4 download platforms requested: Windows, Mac, iOS, Android
   const platforms = [
-    { icon: Terminal, label: "Terminal", href: "#terminal" },
-    { icon: Globe, label: "Web", href: "#web" },
-    { icon: AppleIcon, label: "iOS", href: "#mobile" },
-    { icon: AndroidIcon, label: "Android", href: "#android" },
-    { icon: GitHubIcon, label: "GitHub", href: LINKS.repository, external: true },
+    {
+      id: "windows",
+      icon: WindowsIcon,
+      label: "Windows",
+      detail: "Windows 10/11 (.exe) · x64 / ARM64",
+      href: "/download?os=windows",
+    },
+    {
+      id: "macos",
+      icon: AppleIcon,
+      label: "Mac",
+      detail: "macOS 12+ (.dmg) · Apple Silicon & Intel",
+      href: "/download?os=macos",
+    },
+    {
+      id: "ios",
+      icon: AppleIcon,
+      label: "iOS",
+      detail: "iPhone & iPad · App Store",
+      href: "/download?os=ios",
+    },
+    {
+      id: "android",
+      icon: AndroidIcon,
+      label: "Android",
+      detail: "Android 9+ (.apk) · Direct APK",
+      href: "/download?os=android",
+    },
   ];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <section className="ch-hero" id="product">
       <div className="ch-hero-backdrop-glow" aria-hidden="true" />
       <div className="ch-hero-shell">
         {/* Top Header: Title, Subtitle, CTA, Platforms */}
-        <motion.div
-          className="ch-hero-header"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        >
+        <div className="ch-hero-header">
           <h1 className="ch-hero-main-title">Const Harness</h1>
           <p className="ch-hero-main-subtitle">
             {t("hero.subtitle")}
           </p>
 
-          {/* Download CTA Button */}
-          <div className="ch-hero-cta-wrap">
-            <a href="#download" className="ch-hero-download-btn">
-              <WindowsIcon size={16} />
-              <span>{t("hero.downloadButton") || "Download Const Harness"}</span>
-              <ChevronDown size={14} className="opacity-60 ml-0.5" />
-            </a>
+          {/* Download CTA Dropdown Button */}
+          <div className="ch-hero-cta-wrap" ref={dropdownRef}>
+            <div className="relative inline-block">
+              <button
+                type="button"
+                className="ch-hero-download-btn"
+                onClick={() => setDropdownOpen((prev) => !prev)}
+                aria-expanded={dropdownOpen}
+                aria-haspopup="true"
+              >
+                <WindowsIcon size={16} />
+                <span>{t("hero.downloadButton") || "Download Const Harness"}</span>
+                <ChevronDown
+                  size={14}
+                  className={`opacity-70 ml-0.5 transition-transform duration-200 ${
+                    dropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Dropdown Menu with 4 platforms */}
+              <AnimatePresence>
+                {dropdownOpen && (
+                  <motion.div
+                    className="ch-download-dropdown-menu"
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                  >
+                    <div className="ch-dropdown-header">
+                      <span>Available for Desktop & Mobile</span>
+                    </div>
+                    <div className="ch-dropdown-list">
+                      {platforms.map((p) => {
+                        const Icon = p.icon;
+                        return (
+                          <a
+                            key={p.id}
+                            href={p.href}
+                            className="ch-dropdown-item"
+                            onClick={() => setDropdownOpen(false)}
+                          >
+                            <div className="ch-dropdown-item-icon">
+                              <Icon size={18} />
+                            </div>
+                            <div className="ch-dropdown-item-info">
+                              <div className="ch-dropdown-item-title">
+                                <span>{p.label}</span>
+                              </div>
+                              <span className="ch-dropdown-item-desc">{p.detail}</span>
+                            </div>
+                            <ExternalLink size={13} className="ch-dropdown-item-arrow" />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* Platforms Badges Row */}
-          <div className="ch-hero-platforms-row" role="navigation" aria-label="Supported platforms">
-            {platforms.map(({ icon: Icon, label, href, external }) => (
+          {/* Platforms Badges Row: Only Windows, Mac, iOS, Android */}
+          <div
+            className="ch-hero-platforms-row"
+            role="navigation"
+            aria-label="Supported platforms"
+          >
+            {platforms.map(({ icon: Icon, label, href }) => (
               <a
                 key={label}
                 href={href}
                 className="ch-hero-platform-pill"
-                {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                title={`Download for ${label}`}
               >
                 <Icon size={15} />
                 <span>{label}</span>
               </a>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* Elevated App Window Mockup */}
-        <motion.div
-          className="ch-hero-preview-container"
-          initial={{ opacity: 0, y: 40, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.85, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        >
+        <div className="ch-hero-preview-container">
           <WorkbenchPreview />
-        </motion.div>
+        </div>
       </div>
     </section>
   );

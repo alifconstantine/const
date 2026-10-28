@@ -20,8 +20,9 @@ export function Footer() {
       heading: t("footer.col.platforms"),
       links: [
         ["Windows", "/download?os=windows"],
-        ["macOS", "/download?os=macos"],
-        ["Linux", "/download?os=linux"],
+        ["Mac", "/download?os=macos"],
+        ["iOS", "/download?os=ios"],
+        ["Android", "/download?os=android"],
         [t("footer.link.download"), "/download"],
       ],
     },
