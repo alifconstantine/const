@@ -15,7 +15,6 @@ export function RemoteWorkspace({
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const { locale } = useI18n();
   const t = remoteCopy(locale);
   useEffect(() => {
@@ -52,7 +51,7 @@ export function RemoteWorkspace({
       script.remove();
       css.remove();
     };
-  }, [sessionId, convexUrl, accountsUrl, attempt]);
+  }, [sessionId, convexUrl, accountsUrl]);
   return (
     <>
       <div ref={element} id="remote-workspace" className="fixed inset-0" />
@@ -61,7 +60,7 @@ export function RemoteWorkspace({
           <p>{t("error")}</p>
           <button
             className="rounded-xl bg-[#2b2b2b] px-4 py-2"
-            onClick={() => setAttempt((value) => value + 1)}
+            onClick={() => window.location.reload()}
           >
             {t("retry")}
           </button>
