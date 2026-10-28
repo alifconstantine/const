@@ -199,6 +199,12 @@
       "skillPath": "plugins/data-providers/skills/hyperliquid-reader/SKILL.md",
       "computedHash": "75864bfd99e93b372ecd13baee489600a99fcb8034fd61e7a5f508ace0ac1b51"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "58ed3306678b241316905ffaee23efdf098247a181f593ad125c4c299e63ad8c"
+    },
     "instagram-scraper": {
       "source": "apidojo-io/social-media-skills",
       "sourceType": "github",

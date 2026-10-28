@@ -61,7 +61,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useKeyboardShortcuts, DEFAULT_KEYBOARD_SHORTCUTS, type ShortcutItem } from "../lib/shortcuts";
 import type { UserProfile } from "./sidebar";
-import { getUserInitials } from "./sidebar";
+
 import type { UserConfig } from "../vite-env";
 import {
   useTheme,
@@ -88,6 +88,7 @@ import { McpSettings } from "./settings/mcp-settings";
 
 import { UsageStatsView } from "./settings/usage-stats-view";
 import { WeeklyQuotaCard } from "./settings/weekly-quota-card";
+import { ProfileSettings } from "./settings/profile-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
 import { playTaskCompletionSound } from "../lib/sound";
@@ -401,108 +402,6 @@ export function SettingsView({
     }
   };
 
-  // Profile settings state & mutations
-  const updateProfileMutation = useMutation(api.users.updateProfile);
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [usernameDraft, setUsernameDraft] = useState<string>(user?.name || "Const User");
-  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!isEditingUsername && user?.name) {
-      setUsernameDraft(user.name);
-    }
-  }, [user?.name, isEditingUsername]);
-
-  const handleSaveUsername = async () => {
-    const trimmed = usernameDraft.trim();
-    if (!trimmed) {
-      toast.error("Username cannot be empty");
-      return;
-    }
-    try {
-      const existingRaw = localStorage.getItem("const_custom_user_profile");
-      const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      const updated = { ...existing, name: trimmed };
-      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
-
-      try {
-        await updateProfileMutation({ name: trimmed });
-      } catch {
-        // Silently fallback if offline/unauthenticated
-      }
-
-      setIsEditingUsername(false);
-      toast.success("Username updated successfully");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update username");
-    }
-  };
-
-  const handleSelectAvatarPreset = async (avatarUrl: string) => {
-    try {
-      const existingRaw = localStorage.getItem("const_custom_user_profile");
-      const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      const updated = { ...existing, image: avatarUrl };
-      localStorage.setItem("const_custom_user_profile", JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: updated }));
-
-      try {
-        await updateProfileMutation({ image: avatarUrl });
-      } catch {
-        // Fallback if offline/unauthenticated
-      }
-
-      setIsAvatarPickerOpen(false);
-      toast.success("Avatar updated");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to update avatar");
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image file size must be less than 2MB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      await handleSelectAvatarPreset(base64);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveAvatar = async () => {
-    try {
-      const existingRaw = localStorage.getItem("const_custom_user_profile");
-      const existing = existingRaw ? JSON.parse(existingRaw) : {};
-      delete existing.image;
-      if (Object.keys(existing).length > 0) {
-        localStorage.setItem("const_custom_user_profile", JSON.stringify(existing));
-      } else {
-        localStorage.removeItem("const_custom_user_profile");
-      }
-      window.dispatchEvent(new CustomEvent("const:user-profile-updated", { detail: existing }));
-
-      try {
-        await updateProfileMutation({ image: "" });
-      } catch {
-        // Fallback
-      }
-
-      setIsAvatarPickerOpen(false);
-      toast.success("Avatar removed (initials restored)");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to remove avatar");
-    }
-  };
-
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Real-time reactive query for 7M Token Quota from Convex
@@ -732,7 +631,7 @@ export function SettingsView({
     },
   ];
 
-  const initials = getUserInitials(user?.name, user?.email);
+
 
   const tabHeader = useMemo(() => {
     switch (activeTab) {
@@ -822,10 +721,10 @@ export function SettingsView({
         {/* ----------------------------------------------------------- */}
         {/* Left Sidebar inside Modal                                   */}
         {/* ----------------------------------------------------------- */}
-        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
+        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col shrink-0 bg-[#f8f9fa] dark:bg-[#181818] border-r border-neutral-200/80 dark:border-[#282828] p-3 select-none">
           {/* Top Heading */}
           <div className="px-2.5 pt-2 pb-2 shrink-0 mb-1">
-            <h2 className="text-base font-semibold text-[#171717] dark:text-white tracking-tight">
+            <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
               {t("settings.title")}
             </h2>
           </div>
@@ -835,7 +734,7 @@ export function SettingsView({
             <div className="flex flex-col gap-4 pt-1">
               {navCategories.map((cat) => (
                 <div key={cat.label} className="flex flex-col gap-1">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] px-2.5 tracking-tight">
+                  <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2.5 pt-1.5 pb-0.5">
                     {cat.label}
                   </span>
                   <div className="flex flex-col gap-0.5">
@@ -848,18 +747,18 @@ export function SettingsView({
                           type="button"
                           onClick={() => setActiveTab(item.id)}
                           className={cn(
-                            "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer text-left outline-none focus:outline-none",
+                            "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left outline-none focus:outline-none",
                             isActive
-                              ? "bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white"
-                              : "text-[#555555] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b]"
+                              ? "bg-neutral-200/80 dark:bg-[#2c2c2c] text-neutral-900 dark:text-white font-semibold shadow-2xs"
+                              : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#222222]"
                           )}
                         >
                           <Icon
                             className={cn(
-                              "w-4 h-4 shrink-0",
+                              "w-4 h-4 shrink-0 transition-colors",
                               isActive
-                                ? "text-[#262626] dark:text-white"
-                                : "text-[#737373] dark:text-[#969696]"
+                                ? "text-blue-600 dark:text-white"
+                                : "text-neutral-400 dark:text-neutral-500"
                             )}
                           />
                           <span className="truncate">{item.label}</span>
@@ -878,12 +777,12 @@ export function SettingsView({
         {/* ----------------------------------------------------------- */}
         <main className="flex-1 h-full flex flex-col min-w-0 bg-[#ffffff] dark:bg-[#161616] overflow-hidden">
           {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' */}
-          <div className="flex-none px-6 sm:px-8 pt-5 pb-2 flex items-start justify-between gap-4 select-none">
+          <div className="flex-none px-6 sm:px-8 pt-6 pb-3 flex items-start justify-between gap-4 select-none">
             <div>
-              <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white capitalize">
+              <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white capitalize">
                 {tabHeader.title}
               </h1>
-              <p className="mt-1 text-xs text-[#737373] dark:text-[#969696]">
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                 {tabHeader.desc}
               </p>
             </div>
@@ -893,7 +792,7 @@ export function SettingsView({
               type="button"
               onClick={handleClose}
               aria-label={t("common.close")}
-              className="p-1.5 rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
+              className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#222222] transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
               title={`${t("common.close")} (Esc)`}
             >
               <X className="w-4 h-4" />
@@ -901,279 +800,14 @@ export function SettingsView({
           </div>
 
           {/* Dynamic Section Content wrapped in Radix ScrollArea */}
-          <ScrollArea className="flex-1 min-h-0 w-full px-6 sm:px-8 py-3">
+          <ScrollArea className="flex-1 min-h-0 w-full px-6 sm:px-8 py-4">
             {activeTab === "profile" ? (
-              /* --------------------------------------------------------- */
-              /* Profile Tab                                               */
-              /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* Account Profile Card */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    {t("settings.userProfileIdentity")}
-                  </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-5">
-                    {/* Avatar & Username Header Section */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 min-w-0">
-                        {/* Avatar with Hover Camera Button */}
-                        <div className="relative group shrink-0">
-                          <Avatar className="h-16 w-16 rounded-full bg-[#eaeaea] dark:bg-[#2b2b2b] border-2 border-[#dedee2] dark:border-[#383838] shadow-sm overflow-hidden">
-                            {user?.image ? (
-                              <AvatarImage
-                                src={user.image}
-                                alt={user?.name || "User"}
-                                className="object-cover w-full h-full"
-                              />
-                            ) : (
-                              <AvatarFallback className="text-base font-bold text-[#262626] dark:text-white bg-gradient-to-br from-[#e2e2e5] to-[#c7c7cb] dark:from-[#383838] dark:to-[#222222]">
-                                {initials}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <button
-                            type="button"
-                            onClick={() => setIsAvatarPickerOpen((v) => !v)}
-                            className="absolute inset-0 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer backdrop-blur-[1px]"
-                            title={t("settings.changeAvatar")}
-                          >
-                            <Camera className="w-5 h-5" />
-                            <span className="text-[9px] font-medium mt-0.5">{t("settings.editAvatar")}</span>
-                          </button>
-                        </div>
-
-                        {/* Username & Status badge */}
-                        <div className="min-w-0 flex flex-col">
-                          <div className="flex items-center gap-2">
-                            {isEditingUsername ? (
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="text"
-                                  value={usernameDraft}
-                                  onChange={(e) => setUsernameDraft(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSaveUsername();
-                                    if (e.key === "Escape") {
-                                      setUsernameDraft(user?.name || "Const User");
-                                      setIsEditingUsername(false);
-                                    }
-                                  }}
-                                  autoFocus
-                                  placeholder={t("settings.enterUsername")}
-                                  className="px-2.5 py-1 text-sm font-semibold rounded-lg border border-primary/50 bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white focus:outline-none focus:ring-1 focus:ring-primary w-44 sm:w-56"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleSaveUsername}
-                                  className="p-1 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
-                                  title={t("settings.saveUsername")}
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setUsernameDraft(user?.name || "Const User");
-                                    setIsEditingUsername(false);
-                                  }}
-                                  className="p-1 rounded-md bg-[#eaeaea] dark:bg-[#333333] text-[#737373] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#444444] transition-colors cursor-pointer"
-                                  title="Cancel"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group/name">
-                                <span className="text-base font-semibold text-[#262626] dark:text-white truncate">
-                                  {user?.name || "Const User"}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setUsernameDraft(user?.name || "Const User");
-                                    setIsEditingUsername(true);
-                                  }}
-                                  className="opacity-60 hover:opacity-100 p-1 rounded-md hover:bg-[#eaeaea] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer"
-                                  title={t("settings.editUsername")}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-xs text-[#737373] dark:text-[#969696] truncate">
-                              {user?.email || "Local Workspace"}
-                            </span>
-                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              Active
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Change Avatar Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsAvatarPickerOpen((v) => !v)}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>{t("settings.changeAvatar")}</span>
-                      </button>
-                    </div>
-
-                    {/* Avatar Picker Drawer / Popover if Open */}
-                    {isAvatarPickerOpen && (
-                      <div className="p-4 rounded-xl border border-primary/20 bg-[#ffffff] dark:bg-[#1a1a1a] flex flex-col gap-3.5 animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-[#262626] dark:text-white flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-primary" />
-                            {t("settings.chooseAvatarOrUpload")}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setIsAvatarPickerOpen(false)}
-                            className="p-1 rounded text-[#737373] hover:text-black dark:text-[#969696] dark:hover:text-white cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Preset Gradients */}
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
-                            {t("settings.avatarPresets")}
-                          </span>
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                            {AVATAR_PRESETS.map((preset) => (
-                              <button
-                                key={preset.id}
-                                type="button"
-                                onClick={() => handleSelectAvatarPreset(preset.svg)}
-                                className="group/preset relative flex flex-col items-center gap-1 p-2 rounded-lg border border-[#dedee2] dark:border-[#333333] hover:border-primary/60 bg-[#f9f9fb] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2a2a2a] transition-all cursor-pointer"
-                              >
-                                <img
-                                  src={preset.svg}
-                                  alt={preset.name}
-                                  className="w-10 h-10 rounded-full border border-black/10 dark:border-white/10 group-hover/preset:scale-105 transition-transform"
-                                />
-                                <span className="text-[10px] text-[#737373] dark:text-[#969696] truncate max-w-full text-center">
-                                  {preset.name}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Action Row: Upload file + Remove */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#dedee2] dark:border-[#333333]">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                            className="hidden"
-                            onChange={handleFileUpload}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-white transition-colors cursor-pointer flex items-center gap-1.5"
-                          >
-                            <Upload className="w-3.5 h-3.5 text-primary" />
-                            <span>{t("settings.uploadCustomImage")}</span>
-                          </button>
-
-                          {user?.image && (
-                            <button
-                              type="button"
-                              onClick={handleRemoveAvatar}
-                              className="px-2.5 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>{t("settings.removeAvatar")}</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Email Address & Verification */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 rounded-lg bg-[#ffffff] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#333333]">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Mail className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[11px] text-[#737373] dark:text-[#969696]">{t("settings.emailAddress")}</span>
-                          <span className="text-xs font-medium text-[#262626] dark:text-white truncate">
-                            {user?.email || t("settings.noEmailLinked")}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                        {user?.email ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            <ShieldCheck className="w-3 h-3" />
-                            Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#eaeaea] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696]">
-                            {t("settings.offlineMode")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Account Identifier */}
-                    <div className="flex items-center justify-between pt-1 border-t border-[#dedee2] dark:border-[#383838] text-xs">
-                      <div className="flex flex-col">
-                        <span className="text-[#737373] dark:text-[#969696]">{t("settings.accountIdentifier")}</span>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4] mt-0.5 text-[11px]">
-                          {user?.id || "local-user-session"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(user?.id || user?.email || "local-user-session");
-                          toast.success(t("settings.accountIdCopied"));
-                        }}
-                        className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>{t("settings.copyId")}</span>
-                      </button>
-                    </div>
-
-                    {/* Switch Account and Sign Out */}
-                    {(onSwitchAccount || onSignOut) && (
-                      <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                        {onSwitchAccount && (
-                          <button
-                            type="button"
-                            onClick={onSwitchAccount}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
-                          >
-                            <ArrowLeftRight className="w-3.5 h-3.5" />
-                            <span>{t("sidebar.switchAccount")}</span>
-                          </button>
-                        )}
-                        {onSignOut && (
-                          <button
-                            type="button"
-                            onClick={onSignOut}
-                            className="px-3 py-1.5 text-xs font-medium rounded-lg text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
-                          >
-                            <LogOut className="w-3.5 h-3.5" />
-                            <span>{t("sidebar.signOut")}</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <WeeklyQuotaCard quota={quota} />
-              </div>
+              <ProfileSettings
+                user={user}
+                quota={quota}
+                onSignOut={onSignOut}
+                onSwitchAccount={onSwitchAccount}
+              />
             ) : activeTab === "general" ? (
               /* --------------------------------------------------------- */
               /* General Settings Tab                                      */
