@@ -27,6 +27,7 @@ export const desktopChannels = [
   "conversations:list-archived",
   "conversations:get",
   "conversations:save",
+  "conversations:update-ui",
   "conversations:delete",
   "conversations:rename",
   "conversations:archive",

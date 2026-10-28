@@ -357,9 +357,10 @@ declare global {
         instructionId?: string;
         sourceSideChatId?: string;
       }) => Promise<{ success: boolean; notRunning?: boolean; stale?: boolean; status?: "queued" | "consumed" | "plan_updated" }>;
-      getSessionSnapshot?: (conversationId: string) => Promise<{
+      getSessionSnapshot?: (conversationId: string, options?: { hydrate?: boolean }) => Promise<{
         conversationId: string; runId: string; startedAt: number; revision: number; updatedAt: number;
         status: string; objective: string; activeTool?: string; lastResult?: string; recentOutput: string; todos?: unknown;
+        __remoteLive?: { messages: any[] };
       } | null>;
       getSideReceipts?: (sideChatId: string) => Promise<Record<string, "queued" | "consumed" | "plan_updated" | "expired">>;
       registerSideChat?: (payload: { sideChatId: string; parentConversationId: string }) => Promise<{ success: boolean }>;
@@ -392,6 +393,7 @@ declare global {
       listArchivedConversations?: () => Promise<any[]>;
       getConversation?: (id: string) => Promise<any | null>;
       saveConversation?: (convo: any) => Promise<boolean>;
+      updateConversationUi?: (id: string, patch: import("./lib/conversation-store").ConversationUiPatch) => Promise<boolean>;
       deleteConversation?: (id: string) => Promise<boolean>;
       renameConversation?: (id: string, title: string) => Promise<boolean>;
       archiveConversation?: (id: string) => Promise<boolean>;
@@ -441,7 +443,7 @@ declare global {
       openPath?: (targetPath: string) => Promise<boolean>;
       showInFolder?: (targetPath: string) => Promise<boolean>;
       resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
-      onConversationsChanged?: (callback: (data: { conversationId?: string; remoteMessages?: any[] }) => void) => () => void;
+      onConversationsChanged?: (callback: (data: { conversationId?: string; remoteMessages?: any[]; remoteConversation?: import("./lib/conversation-store").ConversationItem; uiOnly?: boolean }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;
         create: (data: Partial<ScheduledTaskItem>) => Promise<ScheduledTaskItem>;

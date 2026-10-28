@@ -74,6 +74,7 @@ export async function dispatchRemoteDesktop(
   if (
     [
       "conversations:get",
+      "conversations:update-ui",
       "conversations:delete",
       "conversations:rename",
       "conversations:archive",
@@ -86,6 +87,14 @@ export async function dispatchRemoteDesktop(
     ].includes(channel)
   )
     validateId(args[0]);
+  if (channel === "conversations:update-ui") {
+    if (!args[1] || typeof args[1] !== "object") throw new Error("REMOTE_INVALID_ARGUMENT");
+    if (args[1].sideConversation) {
+      validateId(args[1].sideConversation.id);
+      if (args[1].sideConversation.parentConversationId !== args[0]) throw new Error("REMOTE_INVALID_ARGUMENT");
+    }
+    if (args[1].deleteSideConversationId) validateId(args[1].deleteSideConversationId);
+  }
   if (channel === "conversations:get-paths") validateId(args[0], true);
   if (channel === "agent:generate-title") args[1] = lastAuthToken || undefined;
   if (channel === "marketplace:open-skills-folder") {
@@ -142,14 +151,16 @@ export async function dispatchRemoteDesktop(
   }
   if (channel === "conversations:get") {
     const value = conversationDb.getConversation(args[0]);
-    const live = remoteLive.get(args[0]);
+    const liveState = remoteLive.get(args[0]);
+    const live = liveState ? structuredClone(liveState) : undefined;
     const runId = activeSessions.get(args[0])?.runId;
     return {
       ok: true,
       value: value
         ? {
             ...value,
-            __remoteLive: live && runId ? { ...live, runId } : undefined,
+            messages: live?.messages && runId ? live.messages : value.messages,
+            __remoteLive: live && runId ? { ...live, messages: undefined, text: undefined, thinking: undefined, completeMessages: true, runId } : undefined,
             __remoteRevision:
               live && runId
                 ? { runId, revision: live.revision }
@@ -176,17 +187,37 @@ export async function dispatchRemoteDesktop(
     const stored = conversationDb.getConversation(args[0].id);
     // Lists contain metadata only, so saves from a sidebar action can have an
     // empty transcript. Only send-message replaces authoritative host history.
-    if (stored)
+    if (stored) {
+      let messages = stored.messages;
+      if (Array.isArray(args[0].messages) && args[0].messages.length > 0) {
+        messages = stored.messages.map((storedMsg) => {
+          const incomingMsg = storedMsg.id && args[0].messages.find((m: any) => m.id === storedMsg.id);
+          if (incomingMsg?.intelligenceUiState) {
+            return {
+              ...storedMsg,
+              intelligenceUiState: {
+                ...storedMsg.intelligenceUiState,
+                ...incomingMsg.intelligenceUiState,
+              },
+            };
+          }
+          return storedMsg;
+        });
+      }
+
       args[0] = {
         ...args[0],
-        messages: stored.messages,
+        messages,
         telemetry: stored.telemetry,
         createdAt: stored.createdAt,
+        rightPaneState: args[0].rightPaneState !== undefined ? args[0].rightPaneState : stored.rightPaneState,
+        sideConversations: args[0].sideConversations !== undefined ? args[0].sideConversations : stored.sideConversations,
         updatedAt:
           activeSessions.has(stored.id) || args[0].updatedAt < stored.updatedAt
             ? stored.updatedAt
             : Date.now(),
       };
+    }
     const fields = [
       "title",
       "project",
@@ -195,6 +226,8 @@ export async function dispatchRemoteDesktop(
       "isPinned",
       "isArchived",
       "messages",
+      "rightPaneState",
+      "sideConversations",
     ];
     conversationChanged =
       !stored ||
@@ -271,7 +304,7 @@ export async function dispatchRemoteDesktop(
     ].includes(channel.split(":")[1]!)
   )
     notify("conversations:changed", {
-      conversationId: typeof args[0] === "string" ? args[0] : args[0]?.id,
+      conversationId: channel === "conversations:pin-project" ? undefined : typeof args[0] === "string" ? args[0] : args[0]?.id,
       originRequestId: command.requestId,
     });
   return {

@@ -116,8 +116,8 @@ export function createDesktopBridge(
       instructionId?: string;
       sourceSideChatId?: string;
     }) => ipcRenderer.invoke("agent:steer", payload),
-    getSessionSnapshot: (conversationId: string) =>
-      ipcRenderer.invoke("agent:get-session-snapshot", conversationId),
+    getSessionSnapshot: (conversationId: string, options?: { hydrate?: boolean }) =>
+      ipcRenderer.invoke("agent:get-session-snapshot", conversationId, options),
     getSideReceipts: (sideChatId: string) =>
       ipcRenderer.invoke("agent:get-side-receipts", sideChatId),
     registerSideChat: (payload: {
@@ -180,6 +180,8 @@ export function createDesktopBridge(
       ipcRenderer.invoke("conversations:get", id),
     saveConversation: (convo: any) =>
       ipcRenderer.invoke("conversations:save", convo),
+    updateConversationUi: (id: string, patch: import("./conversation-store").ConversationUiPatch) =>
+      ipcRenderer.invoke("conversations:update-ui", id, patch),
     deleteConversation: (id: string) =>
       ipcRenderer.invoke("conversations:delete", id),
     renameConversation: (id: string, title: string) =>

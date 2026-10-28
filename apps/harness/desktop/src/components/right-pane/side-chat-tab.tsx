@@ -23,6 +23,7 @@ import {
   saveSideConversation,
   deleteSideConversation,
   loadConversations,
+  normalizeUiMessages,
   type ConversationItem,
 } from "../../lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
@@ -243,11 +244,17 @@ export function SideChatTab({
     let disposed = false;
 
     const onSideSaved = (event: Event) => {
-      const detail = (event as CustomEvent<{ id: string }>).detail;
+      const detail = (event as CustomEvent<{ id: string; fromHost?: boolean }>).detail;
       if (detail?.id !== sideChatId) return;
       const saved = loadSideConversation(effectiveParentId, sideChatId);
-      if (saved) commitMessages(saved.messages || []);
-      if (!pendingSideSends.has(sideChatId)) setIsExecuting(false);
+      // During a run the stream can be ahead of the host checkpoint. Apply
+      // persisted side history once idle, or use the live session snapshot.
+      if (!detail.fromHost || (!activeRunIdRef.current && !pendingSideSends.has(sideChatId))) {
+        commitMessages(saved?.messages || []);
+        if (saved?.model) setActiveModel(saved.model);
+        if (saved?.mode) setActiveMode(saved.mode);
+      }
+      if (!detail.fromHost && !pendingSideSends.has(sideChatId)) setIsExecuting(false);
     };
     window.addEventListener("const:side-conversation-saved", onSideSaved);
     if (pendingSideSends.has(sideChatId)) setIsExecuting(true);
@@ -465,9 +472,21 @@ export function SideChatTab({
     });
 
     const unsubStarted = window.electron?.onSessionStarted?.((data) => {
-      if (data?.conversationId === sideChatId) { activeRunIdRef.current = data.runId || null; setIsExecuting(true); }
+      if (data?.conversationId === sideChatId) {
+        const newRun = activeRunIdRef.current !== data.runId;
+        activeRunIdRef.current = data.runId || null;
+        setIsExecuting(true);
+        if (newRun && !pendingSideSends.has(sideChatId)) void hydrateRun().catch(() => {});
+      }
     });
-    window.electron.getRunningSessions?.().then((ids) => { if (ids.includes(sideChatId)) setIsExecuting(true); }).catch(() => {});
+    const hydrateRun = async () => {
+      const snapshot = await window.electron?.getSessionSnapshot?.(sideChatId, { hydrate: true });
+      if (disposed || !snapshot?.runId) return;
+      activeRunIdRef.current = snapshot.runId;
+      if (Array.isArray(snapshot.__remoteLive?.messages)) commitMessages(normalizeUiMessages(snapshot.__remoteLive.messages));
+      setIsExecuting(true);
+    };
+    void hydrateRun().catch(() => {});
     window.electron.getSideReceipts?.(sideChatId).then(async (receipts) => {
       const parent = await window.electron?.getSessionSnapshot?.(effectiveParentId);
       if (disposed) return;
@@ -484,7 +503,11 @@ export function SideChatTab({
       if (data?.conversationId === sideChatId) {
         if (data.runId && activeRunIdRef.current && data.runId !== activeRunIdRef.current) return;
         activeRunIdRef.current = null;
-        if (!pendingSideSends.has(sideChatId)) setIsExecuting(false);
+        if (!pendingSideSends.has(sideChatId)) {
+          setIsExecuting(false);
+          const saved = loadSideConversation(effectiveParentId, sideChatId);
+          if (saved) commitMessages(saved.messages || []);
+        }
       }
     });
 
@@ -561,7 +584,13 @@ export function SideChatTab({
 
     const payloadMessages: any[] = [];
     let parentSnapshot = null;
-    try { parentSnapshot = await window.electron?.getSessionSnapshot?.(effectiveParentId) || null; } catch {}
+    try {
+      const snapshot = await window.electron?.getSessionSnapshot?.(effectiveParentId);
+      if (snapshot) {
+        const { __remoteLive, ...context } = snapshot;
+        parentSnapshot = context;
+      }
+    } catch {}
     const parentHistory = effectiveParentId === parentConversationId ? parentMessages : effectiveConversations.find((item) => item.id === effectiveParentId)?.messages || [];
     const parentTurns = parentHistory.filter((item: any) => item.role === "user" || item.role === "assistant");
     const originalRequest = parentTurns.find((item: any) => item.role === "user")?.content;

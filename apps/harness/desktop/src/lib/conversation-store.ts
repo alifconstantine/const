@@ -2,6 +2,22 @@ import { shiftIntelligenceUiState } from "../components/intelligence-ui/protocol
 import type { ChatTelemetry } from "./chat-telemetry";
 import { translate } from "./i18n";
 import { mergeTelemetry } from "./chat-telemetry";
+import type { RightPaneTab } from "../components/right-pane/types";
+import type { FileMutationRecord } from "../vite-env";
+
+export interface ConversationRightPaneState {
+  isOpen: boolean;
+  isExpanded?: boolean;
+  tabs: RightPaneTab[];
+  activeTabId: string | null;
+  reviewMutations?: FileMutationRecord[] | null;
+}
+
+export interface ConversationUiPatch {
+  rightPaneState?: ConversationRightPaneState;
+  sideConversation?: SideConversationItem;
+  deleteSideConversationId?: string;
+}
 
 export interface ConversationItem {
   id: string;
@@ -27,6 +43,8 @@ export interface ConversationItem {
     additions: number;
     deletions: number;
   };
+  rightPaneState?: ConversationRightPaneState;
+  sideConversations?: SideConversationItem[];
 }
 
 export function getDefaultAgentMode(): "request_review" | "ask_before_changes" | "full_access" {
@@ -196,6 +214,16 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
 const STORAGE_KEY = "const_harness_conversations";
 let cachedConversations: ConversationItem[] | null = null;
 
+/** Cache a hydrated host record without writing it back to the host. */
+export function cacheConversation(conversation: ConversationItem): void {
+  const list = loadConversations();
+  const index = list.findIndex(item => item.id === conversation.id);
+  if (index < 0) list.push(conversation);
+  else list[index] = conversation;
+  cachedConversations = list;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+}
+
 /**
  * Load all stored active conversations, ordered by updatedAt descending.
  * Synchronous from memory/localStorage cache for instant React rendering.
@@ -292,12 +320,19 @@ export async function refreshConversationsFromDisk(): Promise<ConversationItem[]
       if (Array.isArray(diskList)) {
         const normalized = diskList
           .filter((c) => !isSideChatConversation(c.id))
-          .map((c) => ({
-            ...c,
-            title: getCleanConversationTitle(c.title),
-            isScheduled: isScheduledTaskConversation(c),
-            messages: normalizeUiMessages(c.messages || []),
-          }));
+          .map((c) => {
+            // A remote sidebar refresh intentionally omits histories. Preserve
+            // records already hydrated instead of turning open chats into []
+            // and losing their telemetry or interactive response state.
+            const cached = c.__remoteSummary ? cachedConversations?.find(item => item.id === c.id) : undefined;
+            return {
+              ...cached,
+              ...c,
+              title: getCleanConversationTitle(c.title),
+              isScheduled: isScheduledTaskConversation(c),
+              messages: normalizeUiMessages(cached?.messages || c.messages || []),
+            };
+          });
         cachedConversations = normalized;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         return normalized;
@@ -592,15 +627,50 @@ export interface SideConversationItem {
 
 const SIDE_STORAGE_PREFIX = "const_harness_side_chat_";
 
+/** Apply host state without saving it back or keeping an older side-chat cache. */
+export function syncConversationUi(conversation: ConversationItem): void {
+  if (conversation.rightPaneState) {
+    localStorage.setItem(`const_harness_right_pane_${conversation.id}`, JSON.stringify(conversation.rightPaneState));
+  }
+  if (Array.isArray(conversation.sideConversations)) {
+    const previous = loadSideConversations(conversation.id);
+    localStorage.setItem(`${SIDE_STORAGE_PREFIX}${conversation.id}`, JSON.stringify(conversation.sideConversations));
+    for (const id of new Set([...previous, ...conversation.sideConversations].map(side => side.id))) {
+      window.dispatchEvent(new CustomEvent("const:side-conversation-saved", { detail: { id, fromHost: true } }));
+    }
+  }
+}
+
+export function updateConversationUi(id: string, patch: ConversationUiPatch): void {
+  // This RPC patches UI columns only; it never sends cached message history.
+  void window.electron?.updateConversationUi?.(id, patch).catch(err => {
+    console.warn("[ConversationStore] Failed to save conversation UI:", err);
+  });
+}
+
 export function loadSideConversations(parentConversationId: string): SideConversationItem[] {
   if (!parentConversationId) return [];
   try {
     const raw = localStorage.getItem(`${SIDE_STORAGE_PREFIX}${parentConversationId}`);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  // Fallback: check cached or loaded parent conversation for sideConversations
+  try {
+    const convos = loadConversations();
+    const parent = convos.find((c) => c.id === parentConversationId);
+    if (Array.isArray(parent?.sideConversations) && parent.sideConversations.length > 0) {
+      try {
+        localStorage.setItem(
+          `${SIDE_STORAGE_PREFIX}${parentConversationId}`,
+          JSON.stringify(parent.sideConversations)
+        );
+      } catch {}
+      return parent.sideConversations;
+    }
+  } catch {}
+
+  return [];
 }
 
 export function loadSideConversation(
@@ -626,6 +696,8 @@ export function saveSideConversation(sideConvo: SideConversationItem): void {
       `${SIDE_STORAGE_PREFIX}${sideConvo.parentConversationId}`,
       JSON.stringify(list)
     );
+
+    updateConversationUi(sideConvo.parentConversationId, { sideConversation: updated });
   } catch (err) {
     console.warn("[ConversationStore] Failed to save side conversation:", err);
   }
@@ -639,6 +711,8 @@ export function deleteSideConversation(parentConversationId: string, sideId: str
       `${SIDE_STORAGE_PREFIX}${parentConversationId}`,
       JSON.stringify(list)
     );
+
+    updateConversationUi(parentConversationId, { deleteSideConversationId: sideId });
   } catch {}
 }
 

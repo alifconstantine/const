@@ -355,6 +355,7 @@ interface ChatCardProps {
   isExecuting?: boolean;
   onAbort?: () => void;
   compact?: boolean;
+  showProjectHeader?: boolean;
   showContextUsage?: boolean;
   contextUsage?: ContextUsageData;
   metrics?: ConversationMetrics;
@@ -401,6 +402,7 @@ export function ChatCard({
   isExecuting = false,
   onAbort,
   compact = false,
+  showProjectHeader = false,
   showContextUsage,
   contextUsage,
   metrics,
@@ -1325,7 +1327,12 @@ export function ChatCard({
       ? "Outside Project"
       : currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
 
-  const filteredWorkspaces = workspaces.filter((ws) =>
+  const availableWorkspaces = Array.from(new Set([
+    ...workspaces,
+    ...(conversations || []).map(conversation => conversation.project),
+    currentProject,
+  ].filter((project): project is string => !!project && project !== "Outside Project" && project !== "[object Object]")));
+  const filteredWorkspaces = availableWorkspaces.filter((ws) =>
     ws.toLowerCase().includes(searchWorkspace.toLowerCase())
   );
 
@@ -1390,8 +1397,8 @@ export function ChatCard({
           compact ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
         }`}
       >
-        {/* Top Header Strip: Choose Project (Only visible in landing view) */}
-        {!compact && (
+        {/* Top Header Strip: Choose Project (Visible in landing view or when showProjectHeader is true) */}
+        {(!compact || showProjectHeader) && (
           <div className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
             <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
               <button
@@ -1414,7 +1421,7 @@ export function ChatCard({
               {isProjectOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                   {/* Real Workspaces List (only shown if real folders were opened) */}
-                  {workspaces.length > 0 && (
+                  {availableWorkspaces.length > 0 && (
                     <>
                       <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 border-b border-[#e2e2e4] dark:border-[#383838]/60">
                         <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />

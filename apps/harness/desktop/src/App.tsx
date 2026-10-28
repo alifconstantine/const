@@ -25,7 +25,7 @@ import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
-import { isTelemetryEvent, reduceTelemetry, summarizeTelemetry, estimateVisibleContext, telemetryForHistory, type ChatTelemetry } from "./lib/chat-telemetry";
+import { isTelemetryEvent, reduceTelemetry, summarizeTelemetry, estimateVisibleContext, telemetryForHistory, mergeTelemetry, type ChatTelemetry } from "./lib/chat-telemetry";
 import { shouldNotifyAgentFailure } from "./lib/agent-errors";
 import { Sidebar } from "./components/sidebar";
 import { TopToolbar } from "./components/workbench/top-toolbar";
@@ -84,6 +84,7 @@ import { playTaskCompletionSound } from "./lib/sound";
 import { localDb } from "./lib/db";
 import {
   loadConversations,
+  cacheConversation,
   saveConversation,
   deleteConversation,
   renameConversation,
@@ -97,6 +98,10 @@ import {
   normalizeUiMessages,
   isSideChatConversation,
   getDefaultAgentMode,
+  syncConversationUi,
+  updateConversationUi,
+  loadSideConversations,
+  type ConversationRightPaneState,
   type ConversationItem,
 } from "./lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "./lib/mention-search";
@@ -331,14 +336,6 @@ function formatChatMessageForLlm(
   ];
 }
 
-interface ConversationRightPaneState {
-  isOpen: boolean;
-  isExpanded?: boolean;
-  tabs: RightPaneTab[];
-  activeTabId: string | null;
-  reviewMutations?: FileMutationRecord[] | null;
-}
-
 interface ConversationBottomPanelState {
   isOpen: boolean;
   tabs: RightPaneTab[];
@@ -369,7 +366,11 @@ const getStoredRightPaneState = (convoId: string): ConversationRightPaneState | 
 const storeRightPaneState = (convoId: string, state: ConversationRightPaneState) => {
   if (!convoId) return;
   try {
-    localStorage.setItem(`const_harness_right_pane_${convoId}`, JSON.stringify(state));
+    const key = `const_harness_right_pane_${convoId}`;
+    const serialized = JSON.stringify(state);
+    if (localStorage.getItem(key) === serialized) return;
+    localStorage.setItem(key, serialized);
+    updateConversationUi(convoId, { rightPaneState: state });
   } catch {}
 };
 
@@ -522,61 +523,89 @@ export function AuthenticatedContent({
   });
 
   useEffect(() => {
+    let disposed = false;
     initConversationStore().then(async (list) => {
       if (remote && window.electron?.getConversation) {
         const id = conversationIdRef.current;
         const active = await window.electron.getConversation(id);
-        if (active && conversationIdRef.current === id) list = list.map(item => item.id === id ? active : item);
+        if (disposed) return;
+        if (active && conversationIdRef.current === id) { cacheConversation(active); list = loadConversations(); }
       }
+      if (disposed) return;
       setConversations(list);
       // Hydrate messages from active conversation on initial mount if currently empty
       if (remote || (messagesRef.current.length === 0 && !activeSessionMessagesRef.current.has(conversationIdRef.current))) {
         const active = list.find((c) => c.id === conversationIdRef.current);
-        if (active && active.messages && active.messages.length > 0) {
-          messagesRef.current = normalizeUiMessages(active.messages);
-          setMessages(messagesRef.current);
+        if (active) {
+          syncConversationUi(active);
+          hydrateConversationTelemetry(active);
+          if (active.messages && active.messages.length > 0) {
+            messagesRef.current = normalizeUiMessages(active.messages);
+            setMessages(messagesRef.current);
+          }
           if (active.title) setConversationTitle(active.title);
           if (active.project) setCurrentProject(active.project);
+          if (active.mode) setCurrentMode(active.mode);
+          if (active.model) setActiveModelItem(previous => ({ ...previous, id: active.model!, name: active.model!, provider: previous?.provider || "const", providerName: previous?.providerName || "ConstRouter", contextWindow: getModelContextLimit(active.model!) }));
+          if (active.rightPaneState) {
+            restoreConversationRightPaneState(active.id, active.rightPaneState);
+          }
         }
       }
-    }).catch(() => toast.error(t("remoteControl.actionError")));
+    }).catch(() => { if (!disposed) toast.error(t("remoteControl.actionError")); });
 
     if (window.electron?.onConversationsChanged) {
-      const unsubscribe = window.electron.onConversationsChanged(async (data) => {
-        if (data?.conversationId && data.remoteMessages) {
-          const next = normalizeUiMessages(data.remoteMessages);
-          activeSessionMessagesRef.current.set(data.conversationId, next);
-          if (data.conversationId === conversationIdRef.current) {
-            messagesRef.current = next;
-            setMessages(next);
+      const unsubscribe = window.electron.onConversationsChanged((data) => {
+        void (async () => {
+          if (!remote && data?.conversationId && data.remoteMessages) {
+            const next = normalizeUiMessages(data.remoteMessages);
+            if (next[next.length - 1]?.role !== "assistant") next.push({ id: `remote_${data.conversationId}_live`, role: "assistant", content: "", thinking: "", toolCalls: [], traceSteps: [], mutations: [], timestamp: Date.now() });
+            activeSessionMessagesRef.current.set(data.conversationId, next);
+            if (data.conversationId === conversationIdRef.current) { messagesRef.current = next; setMessages(next); }
           }
-        }
-        const refreshed = await refreshConversationsFromDisk();
-        setConversations(refreshed);
-        const current = refreshed.find(item => item.id === conversationIdRef.current);
-        if (current) {
-          setConversationTitle(current.title);
-          if (current.project) setCurrentProject(current.project);
-        }
-
-        // If the changed conversation is currently open, reload its messages ONLY if currently empty in memory
-        if (data?.conversationId && data.conversationId === conversationIdRef.current) {
-          if (runningConvoIdsRef.current.has(data.conversationId)) {
-            return;
-          }
-          if (messagesRef.current.length === 0 && window.electron?.getConversation) {
-            const activeConvo = await window.electron.getConversation(data.conversationId);
-            if (data.conversationId !== conversationIdRef.current) return;
-            if (data.conversationId === conversationIdRef.current && messagesRef.current.length === 0 &&
-                !activeSessionMessagesRef.current.has(data.conversationId) && activeConvo?.messages?.length) {
-              messagesRef.current = normalizeUiMessages(activeConvo.messages);
-              setMessages(messagesRef.current);
+          const activeConvo = data?.remoteConversation || (data?.conversationId ? await window.electron?.getConversation?.(data.conversationId) : null);
+          if (disposed) return;
+          if (activeConvo) {
+            cacheConversation(activeConvo);
+            hydrateConversationTelemetry(activeConvo);
+            syncConversationUi(activeConvo);
+            if (activeConvo.id === conversationIdRef.current && activeConvo.rightPaneState) {
+              restoreConversationRightPaneState(activeConvo.id, activeConvo.rightPaneState);
             }
           }
-        }
+          if (activeConvo && (remote || !data?.uiOnly)) {
+            // Remote snapshots include live output. Native checkpoints may still
+            // lag behind a running renderer, whose stream remains authoritative.
+            if (remote || !runningConvoIdsRef.current.has(activeConvo.id)) {
+              const next = normalizeUiMessages(data?.remoteMessages || activeConvo.messages || []);
+              if (runningConvoIdsRef.current.has(activeConvo.id)) activeSessionMessagesRef.current.set(activeConvo.id, next);
+              else activeSessionMessagesRef.current.delete(activeConvo.id);
+              if (activeConvo.id === conversationIdRef.current) {
+                messagesRef.current = next;
+                setMessages(next);
+              }
+            }
+          }
+          // Commit the snapshot before awaiting anything else: buffered stream
+          // events are released on the next task and must extend this history.
+          const refreshed = await refreshConversationsFromDisk();
+          if (disposed) return;
+          setConversations(refreshed);
+          const current = activeConvo?.id === conversationIdRef.current ? activeConvo : refreshed.find(item => item.id === conversationIdRef.current);
+          if (current) {
+            setConversationTitle(current.title);
+            if (current.project) setCurrentProject(current.project);
+            if (current.mode) setCurrentMode(current.mode);
+            if (current.model) setActiveModelItem(previous => previous?.id === current.model ? previous : { ...previous, id: current.model!, name: current.model!, provider: previous?.provider || "const", providerName: previous?.providerName || "ConstRouter", contextWindow: getModelContextLimit(current.model!) });
+          } else if (!activeConvo && data?.conversationId === conversationIdRef.current) {
+            activeSessionMessagesRef.current.delete(data.conversationId);
+            handleNewChat(currentProjectRef.current);
+          }
+        })().catch(() => { if (!disposed) toast.error(t("remoteControl.actionError")); });
       });
-      return () => unsubscribe();
+      return () => { disposed = true; unsubscribe(); };
     }
+    return () => { disposed = true; };
   }, []);
 
   const [conversationId, setConversationId] = useState<string>(() => {
@@ -723,6 +752,13 @@ export function AuthenticatedContent({
   });
   const telemetryByConversationRef = useRef(new Map<string, ChatTelemetry>());
   const [telemetryRevision, setTelemetryRevision] = useState(0);
+  const hydrateConversationTelemetry = useCallback((conversation: ConversationItem) => {
+    const telemetry = mergeTelemetry(telemetryByConversationRef.current.get(conversation.id), conversation.telemetry);
+    if (telemetry) {
+      telemetryByConversationRef.current.set(conversation.id, telemetry);
+      setTelemetryRevision(revision => revision + 1);
+    }
+  }, []);
 
   // Right Sidebar (Side Pane) state & tab management - initialized closed on startup
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
@@ -838,11 +874,12 @@ export function AuthenticatedContent({
     convoBottomPanelMapRef.current.set(currentId, bottomState);
   }, []);
 
-  const restoreConversationRightPaneState = useCallback((targetConvoId: string) => {
+  const restoreConversationRightPaneState = useCallback((targetConvoId: string, explicitState?: ConversationRightPaneState) => {
     if (!targetConvoId) return;
     const state =
-      convoRightPaneMapRef.current.get(targetConvoId) ||
+      explicitState ||
       getStoredRightPaneState(targetConvoId) ||
+      convoRightPaneMapRef.current.get(targetConvoId) ||
       {
         isOpen: false,
         isExpanded: false,
@@ -852,6 +889,8 @@ export function AuthenticatedContent({
       };
 
     convoRightPaneMapRef.current.set(targetConvoId, state);
+    // Seed the cache before React's persistence effect runs, avoiding an echo.
+    try { localStorage.setItem(`const_harness_right_pane_${targetConvoId}`, JSON.stringify(state)); } catch {}
     setIsRightSidebarOpen(state.isOpen);
     setIsRightSidebarExpanded(Boolean(state.isOpen && state.isExpanded));
     setRightPaneTabs(state.tabs || []);
@@ -2389,18 +2428,33 @@ export function AuthenticatedContent({
 
   // Query active background sessions on mount & subscribe to session lifecycle
   useEffect(() => {
+    let disposed = false;
+    const observedSessions = new Map<string, boolean>();
     if (window.electron?.getRunningSessions) {
       window.electron.getRunningSessions().then((ids) => {
-        if (ids && ids.length > 0) {
-          setRunningConvoIds(new Set(ids.filter((id) => !isSideChatConversation(id))));
-        }
-      });
+        if (disposed) return;
+        const running = new Set(ids.filter(id => !isSideChatConversation(id) && observedSessions.get(id) !== false));
+        for (const [id, active] of observedSessions) if (active) running.add(id);
+        runningConvoIdsRef.current = running;
+        setRunningConvoIds(running);
+      }).catch(() => { if (!disposed) toast.error(t("remoteControl.actionError")); });
     }
 
     const unsubStarted = window.electron?.onSessionStarted?.((data) => {
       if (data?.conversationId) {
         if (isSideChatConversation(data.conversationId)) return;
+        observedSessions.set(data.conversationId, true);
         if (data.runId) activeRunIdsRef.current.set(data.conversationId, data.runId);
+        runningConvoIdsRef.current.add(data.conversationId);
+        if (!executionStartTimeMapRef.current.has(data.conversationId)) executionStartTimeMapRef.current.set(data.conversationId, Date.now());
+        const history = data.conversationId === conversationIdRef.current
+          ? messagesRef.current
+          : activeSessionMessagesRef.current.get(data.conversationId) || [];
+        if (history[history.length - 1]?.role !== "assistant") {
+          const next: ChatMessage[] = [...history, { id: `${data.runId}_live`, role: "assistant", content: "", thinking: "", traceSteps: [], toolCalls: [], mutations: [], timestamp: Date.now() }];
+          activeSessionMessagesRef.current.set(data.conversationId, next);
+          if (data.conversationId === conversationIdRef.current) { messagesRef.current = next; setMessages(next); }
+        }
         setRunningConvoIds((prev) => new Set(prev).add(data.conversationId));
       }
     });
@@ -2410,6 +2464,8 @@ export function AuthenticatedContent({
         if (isSideChatConversation(data.conversationId)) return;
         const currentRunId = activeRunIdsRef.current.get(data.conversationId);
         if (data.runId && currentRunId && data.runId !== currentRunId) return;
+        observedSessions.set(data.conversationId, false);
+        runningConvoIdsRef.current.delete(data.conversationId);
         stoppingConversationsRef.current.delete(data.conversationId);
         setPendingApprovals((prev) => {
           const current = prev.get(data.conversationId);
@@ -2475,6 +2531,7 @@ export function AuthenticatedContent({
     });
 
     return () => {
+      disposed = true;
       unsubStarted?.();
       unsubEnded?.();
     };
@@ -3232,6 +3289,8 @@ export function AuthenticatedContent({
       telemetry: telemetryByConversationRef.current.get(targetConvoId) ?? existing?.telemetry ?? (isVisible ? activeTelemetry : undefined),
       mode: effectiveMode,
       model: chosenModel,
+      rightPaneState: getStoredRightPaneState(targetConvoId) || undefined,
+      sideConversations: loadSideConversations(targetConvoId),
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -3697,7 +3756,7 @@ export function AuthenticatedContent({
       messagesRef.current = [...activeRunningMsgs];
       setMessages(messagesRef.current);
       setEditingPrompt("");
-      restoreConversationRightPaneState(id);
+      restoreConversationRightPaneState(id, target?.rightPaneState);
       return;
     }
 
@@ -3706,13 +3765,14 @@ export function AuthenticatedContent({
       const diskConvo = await window.electron.getConversation(id);
       if (navigationRevisionRef.current !== navigationRevision) return;
       if (diskConvo) {
+        cacheConversation(diskConvo);
         target = diskConvo;
-        const refreshed = await refreshConversationsFromDisk();
-        if (navigationRevisionRef.current !== navigationRevision) return;
-        setConversations(refreshed);
+        setConversations(prev => prev.map(item => item.id === id ? diskConvo : item));
       }
     }
     if (target) {
+      syncConversationUi(target);
+      hydrateConversationTelemetry(target);
       setConversationId(target.id);
       conversationIdRef.current = target.id;
       setConversationTitle(target.title);
@@ -3745,7 +3805,7 @@ export function AuthenticatedContent({
       messagesRef.current = normalizeUiMessages(target.messages || []);
       setMessages(messagesRef.current);
       setEditingPrompt("");
-      restoreConversationRightPaneState(target.id);
+      restoreConversationRightPaneState(target.id, target.rightPaneState);
     }
   };
 
@@ -4335,6 +4395,7 @@ export function AuthenticatedContent({
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
                   compact={remote?.mobile}
+                  showProjectHeader={true}
                   metrics={remote?.mobile ? conversationMetrics || emptyConversationMetrics : undefined}
                   contextUsage={remote?.mobile ? contextUsage : undefined}
                   showContextUsage={!!remote?.mobile}
@@ -4788,7 +4849,7 @@ export function AuthenticatedContent({
                 </button>
 
                 {/* Hairline Divider */}
-                <div className="w-[1px] h-3.5 bg-[#dedee2] dark:bg-[#383838]/70 mx-1" />
+                <div data-native-control className="w-[1px] h-3.5 bg-[#dedee2] dark:bg-[#383838]/70 mx-1" />
 
                 {/* Minimize Window */}
                 <button data-native-control

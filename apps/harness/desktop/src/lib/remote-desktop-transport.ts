@@ -52,6 +52,7 @@ export function remoteDesktopTransport(
             emit("conversations:changed", {
               ...state.metadata,
               remoteMessages: conversation?.messages,
+              remoteConversation: conversation,
             });
         } while (state.dirty && !disposed);
       } catch {
@@ -209,7 +210,7 @@ export function remoteDesktopTransport(
     const conversationId =
       channel === "agent:abort" ? args[0] : args[0]?.conversationId;
     const snapshotId =
-      ["conversations:get", "agent:get-session-snapshot"].includes(channel) &&
+      (channel === "conversations:get" || (channel === "agent:get-session-snapshot" && args[1]?.hydrate)) &&
       typeof args[0] === "string"
         ? (args[0] as string)
         : null;
@@ -234,22 +235,17 @@ export function remoteDesktopTransport(
       const live = value?.__remoteLive;
       if (live?.runId) {
         runs.set(snapshotId, live.runId);
-        if (channel === "conversations:get" && live.text) {
+        if (channel === "conversations:get" && Array.isArray(live.messages)) {
+          // A host snapshot includes the complete active turn, even when output
+          // was reset or is newer than the last SQLite renderer checkpoint.
+          value.messages = live.messages;
+        } else if (channel === "conversations:get" && !live.completeMessages && typeof live.text === "string") {
+          // Support a paired host running the older text-only snapshot format.
           const messages = [...(value.messages || [])];
           const last = messages[messages.length - 1];
-          if (last?.role === "assistant") {
-            if (
-              typeof last.content === "string" &&
-              last.content.length < live.text.length
-            )
-              messages[messages.length - 1] = { ...last, content: live.text };
-          } else
-            messages.push({
-              id: `${live.runId}_live`,
-              role: "assistant",
-              content: live.text,
-              timestamp: Date.now(),
-            });
+          const response = { ...(last?.role === "assistant" ? last : { id: `${live.runId}_live`, role: "assistant", timestamp: Date.now() }), content: live.text, thinking: live.thinking || "", toolCalls: live.toolCalls || [] };
+          if (last?.role === "assistant") messages[messages.length - 1] = response;
+          else messages.push(response);
           value.messages = messages;
         }
       }
@@ -274,7 +270,10 @@ export function remoteDesktopTransport(
                 },
               ],
             });
-          if (live.questions)
+          if (live.questions) {
+            if (live.questions.toolCallId) {
+              questions.set(live.questions.toolCallId, live.runId);
+            }
             event({
               type: "desktop:event",
               channel: "agent:stream-event",
@@ -287,6 +286,21 @@ export function remoteDesktopTransport(
                 },
               ],
             });
+          }
+          if (live.todos) {
+            event({
+              type: "desktop:event",
+              channel: "agent:stream-event",
+              args: [
+                {
+                  type: "todo_update",
+                  todos: live.todos,
+                  conversationId: snapshotId,
+                  runId: live.runId,
+                },
+              ],
+            });
+          }
         }
         for (const packet of snapshot.packets) event(packet);
       }, 0);
@@ -336,6 +350,12 @@ export function remoteDesktopTransport(
       if (channel === "agent:get-session-snapshot" && value?.runId)
         runs.set(args[0], value.runId);
       releaseSnapshot(value);
+      if (channel === "conversations:get" && value) {
+        // Live controls have already been captured for replay. Keep ephemeral
+        // transport metadata out of persisted renderer caches and later saves.
+        delete value.__remoteLive;
+        delete value.__remoteRevision;
+      }
       return value;
     } finally {
       if (!snapshotReleased) releaseSnapshot();

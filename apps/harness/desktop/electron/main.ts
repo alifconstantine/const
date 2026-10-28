@@ -70,6 +70,7 @@ import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
 import { handleDesktopIpc, invokeRemoteDesktop, sendDesktopEvent } from "./desktop-ipc";
 import { dispatchRemoteDesktop } from "./remote-desktop-controller";
+import { createRemoteSessionState, updateRemoteSessionState, type RemoteSessionState } from "./remote-session-state";
 import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
@@ -1223,7 +1224,7 @@ app.whenReady().then(() => {
     sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
-  const remoteLive = new Map<string, { revision: number; text: string; status: string; approval?: any; questions?: any; context?: any; usage?: any; tools: string[] }>();
+  const remoteLive = new Map<string, RemoteSessionState>();
   const remoteRevisions = new Map<string, { runId: string; revision: number }>();
   const sideParents = new Map<string, string>();
   const sideReceipts = new SideSteeringReceipts(path.join(constBrainDir, "side-steering-receipts.json"));
@@ -1253,7 +1254,7 @@ app.whenReady().then(() => {
     if (command.type === "desktop:invoke") {
       if (!win || win.isDestroyed()) throw new Error("REMOTE_DISCONNECTED");
       const host = win.webContents;
-      reply(await dispatchRemoteDesktop(command, { conversationDb, activeSessions, remoteLive, remoteRevisions, pendingQuestions, loadUserConfig, lastAuthToken, constBrainDir, invoke: (channel, args) => invokeRemoteDesktop(channel, { sender: host, senderFrame: host.mainFrame } as Electron.IpcMainInvokeEvent, args), notify: (channel, data) => { if (!host.isDestroyed()) sendDesktopEvent(host, channel, data); } }));
+      reply(await dispatchRemoteDesktop(command, { conversationDb, activeSessions, remoteLive, remoteRevisions, pendingQuestions, loadUserConfig, lastAuthToken, constBrainDir, invoke: (channel, args) => invokeRemoteDesktop(channel, { sender: host, senderFrame: host.mainFrame, remoteRequestId: command.requestId } as unknown as Electron.IpcMainInvokeEvent, args), notify: (channel, data) => { if (!host.isDestroyed()) sendDesktopEvent(host, channel, data); } }));
     } else if (command.type === "state:get") {
       const convos = conversationDb.listRemoteSummaries();
       const running = Array.from(activeSessions.keys());
@@ -1562,17 +1563,10 @@ app.whenReady().then(() => {
                 questions,
               });
             }
-            remoteDaemon.broadcast({
-              type: "agent:stream-event",
-              conversationId: convoId,
-              runId,
-              event: { type: "ask_question", toolCallId, questions },
-            });
           }).finally(() => {
             const live = remoteLive.get(convoId);
             if (live) delete live.questions;
             if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { type: "question_resolved", toolCallId, conversationId: convoId, runId });
-            remoteDaemon.broadcast({ type: "agent:stream-event", conversationId: convoId, runId, event: { type: "question_resolved", toolCallId } });
           });
         },
         browserHandler: async (toolName, args) => {
@@ -1609,38 +1603,20 @@ app.whenReady().then(() => {
         sideInstructions: new Map(),
       };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
-      remoteLive.set(convoId, { revision: 0, text: "", status: "running", tools: [] });
+      const savedHistory = payload.sessionKind === "companion"
+        ? conversationDb.getConversation(payload.parentConversationId!)?.sideConversations?.find(side => side.id === convoId)?.messages
+        : conversationDb.getConversation(convoId)?.messages;
+      remoteLive.set(convoId, createRemoteSessionState(savedHistory || payload.messages, runId));
 
       if (win && !win.isDestroyed()) {
         sendDesktopEvent(win.webContents, "agent:session-started", { conversationId: convoId, runId });
       }
-      remoteDaemon.broadcast({
-        type: "agent:session-started",
-        conversationId: convoId,
-        runId,
-      });
 
       const eventForwarder = createAgentEventForwarder((agentEvent) => {
         if (!activeSessions.owns(convoId, runId)) return false;
         const live = remoteLive.get(convoId);
-        if (live) {
-          live.revision++;
-          if (agentEvent.type === "token") live.text = (live.text + String(agentEvent.token || "")).slice(-80_000);
-          if (agentEvent.type === "token_reset") live.text = "";
-          if (agentEvent.type === "status") live.status = String(agentEvent.status || "running");
-          if (agentEvent.type === "approval_request") live.approval = agentEvent;
-          if (agentEvent.type === "approval_resolved") delete live.approval;
-          if (agentEvent.type === "context_update") live.context = agentEvent;
-          if (agentEvent.type === "tool_call") live.tools = [...live.tools.slice(-19), String(agentEvent.toolName || agentEvent.name || "")];
-        }
+        if (live) updateRemoteSessionState(live, agentEvent);
         if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, runId, remoteSequence: live?.revision });
-        remoteDaemon.broadcast({
-          type: "agent:stream-event",
-          event: agentEvent.type === "usage" && live?.usage ? { ...agentEvent, ...live.usage } : agentEvent,
-          sequence: live?.revision,
-          conversationId: convoId,
-          runId,
-        });
         return true;
       });
       try {
@@ -1697,10 +1673,18 @@ app.whenReady().then(() => {
 
         // Auto-save to SQLite conversation database even if cancelled, to ensure partial work is never lost
         const isSideChat = convoId.startsWith("side_conversation_") || convoId.startsWith("side_chat_");
-        if (!isSideChat) {
+        if (isSideChat && payload.parentConversationId) {
+          const parent = conversationDb.getConversation(payload.parentConversationId);
+          const side = parent?.sideConversations?.find(side => side.id === convoId);
+          const live = remoteLive.get(convoId);
+          if (side && live) {
+            const changed = conversationDb.updateConversationUi(parent!.id, { sideConversation: { ...side, messages: live.messages, updatedAt: Date.now() } });
+            if (changed && win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "conversations:changed", { conversationId: parent!.id, uiOnly: true });
+          }
+        } else if (!isSideChat) {
           try {
             const existingConvo = conversationDb.getConversation(convoId);
-            const msgsToSave = selectAgentAutosaveMessages(existingConvo?.messages || [], updatedMessages);
+            const msgsToSave = selectAgentAutosaveMessages(existingConvo?.messages || [], remoteLive.get(convoId)?.messages || updatedMessages);
             if (msgsToSave.length > 0) {
               conversationDb.saveConversation({
                 ...existingConvo,
@@ -2060,10 +2044,12 @@ app.whenReady().then(() => {
     return Array.from(activeSessions.keys());
   });
 
-  handleDesktopIpc("agent:get-session-snapshot", async (_event, conversationId: string) => {
+  handleDesktopIpc("agent:get-session-snapshot", async (_event, conversationId: string, options?: { hydrate?: boolean }) => {
     const session = activeSessions.get(conversationId);
     const live = remoteLive.get(conversationId);
-    return session ? { conversationId, runId: session.runId, startedAt: session.startedAt, ...session.snapshot, recentOutput: live?.text || session.snapshot.recentOutput, __remoteLive: live ? { ...live, runId: session.runId } : undefined, __remoteRevision: live ? { runId: session.runId, revision: live.revision } : undefined } : null;
+    const snapshot = live ? structuredClone(live) : undefined;
+    if (snapshot && !options?.hydrate) snapshot.messages = [];
+    return session ? { conversationId, runId: session.runId, startedAt: session.startedAt, ...session.snapshot, recentOutput: live?.text || session.snapshot.recentOutput, __remoteLive: snapshot ? { ...snapshot, runId: session.runId } : undefined, __remoteRevision: live ? { runId: session.runId, revision: live.revision } : undefined } : null;
   });
   handleDesktopIpc("agent:get-side-receipts", async (_event, sideChatId: string) => sideReceipts.get(sideChatId));
 
@@ -2081,38 +2067,59 @@ app.whenReady().then(() => {
     return conversationDb.getConversation(id);
   });
 
-  handleDesktopIpc("conversations:save", async (_event, convo: ConversationRecord) => {
-    conversationDb.saveConversation(convo);
+  const broadcastLocalConversationChange = (event: Electron.IpcMainInvokeEvent, conversationId?: string) => {
+    if (!(event as any).remoteRequestId) remoteDaemon.broadcast({ type: "desktop:event", channel: "conversations:changed", args: [{ conversationId }] });
+  };
+
+  handleDesktopIpc("conversations:update-ui", async (event, id: string, patch: import("../src/lib/conversation-store").ConversationUiPatch) => {
+    if (conversationDb.updateConversationUi(id, patch) && win && !win.isDestroyed()) {
+      sendDesktopEvent(win.webContents, "conversations:changed", { conversationId: id, uiOnly: true, originRequestId: (event as any).remoteRequestId });
+    }
     return true;
   });
 
-  handleDesktopIpc("conversations:delete", async (_event, id: string) => {
+  handleDesktopIpc("conversations:save", async (event, convo: ConversationRecord) => {
+    const stored = conversationDb.getConversation(convo.id);
+    // Full saves can originate from stale renderer caches. UI state has its own
+    // atomic update path and must not roll back when a checkpoint is persisted.
+    conversationDb.saveConversation(stored ? { ...convo, rightPaneState: stored.rightPaneState, sideConversations: stored.sideConversations } : convo);
+    broadcastLocalConversationChange(event, convo.id);
+    return true;
+  });
+
+  handleDesktopIpc("conversations:delete", async (event, id: string) => {
     conversationDb.deleteConversation(id);
+    broadcastLocalConversationChange(event, id);
     return true;
   });
 
-  handleDesktopIpc("conversations:rename", async (_event, id: string, title: string) => {
+  handleDesktopIpc("conversations:rename", async (event, id: string, title: string) => {
     conversationDb.renameConversation(id, title);
+    broadcastLocalConversationChange(event, id);
     return true;
   });
 
-  handleDesktopIpc("conversations:archive", async (_event, id: string) => {
+  handleDesktopIpc("conversations:archive", async (event, id: string) => {
     conversationDb.archiveConversation(id);
+    broadcastLocalConversationChange(event, id);
     return true;
   });
 
-  handleDesktopIpc("conversations:unarchive", async (_event, id: string) => {
+  handleDesktopIpc("conversations:unarchive", async (event, id: string) => {
     conversationDb.unarchiveConversation(id);
+    broadcastLocalConversationChange(event, id);
     return true;
   });
 
-  handleDesktopIpc("conversations:pin", async (_event, id: string, isPinned: boolean) => {
+  handleDesktopIpc("conversations:pin", async (event, id: string, isPinned: boolean) => {
     conversationDb.pinConversation(id, isPinned);
+    broadcastLocalConversationChange(event, id);
     return true;
   });
 
-  handleDesktopIpc("conversations:pin-project", async (_event, projectName: string, isPinned: boolean) => {
+  handleDesktopIpc("conversations:pin-project", async (event, projectName: string, isPinned: boolean) => {
     conversationDb.pinProject(projectName, isPinned);
+    broadcastLocalConversationChange(event);
     return true;
   });
 

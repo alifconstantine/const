@@ -19,7 +19,7 @@ const conversations: any[] = [
   {
     id: "preview-chat",
     title: "Review remote integration",
-    project: "Outside Project",
+    project: "/workspace/const",
     model: "test-model",
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -89,6 +89,19 @@ api = createDesktopBridge(
         const i = conversations.findIndex((c) => c.id === args[0].id);
         if (i >= 0) conversations[i] = args[0];
         else conversations.push(args[0]);
+        return true;
+      }
+      if (channel === "conversations:update-ui") {
+        const conversation = conversations.find(c => c.id === args[0]);
+        if (!conversation) return true;
+        const patch = args[1];
+        if (patch.rightPaneState) conversation.rightPaneState = patch.rightPaneState;
+        if (patch.sideConversation) {
+          const sides = conversation.sideConversations || [];
+          conversation.sideConversations = [...sides.filter((side: any) => side.id !== patch.sideConversation.id), patch.sideConversation];
+        }
+        if (patch.deleteSideConversationId) conversation.sideConversations = (conversation.sideConversations || []).filter((side: any) => side.id !== patch.deleteSideConversationId);
+        emit("conversations:changed", { conversationId: conversation.id, uiOnly: true });
         return true;
       }
       if (channel === "conversations:rename") {
@@ -189,6 +202,15 @@ api = createDesktopBridge(
   { getPathForFile: () => "" },
 );
 window.electron = api;
+(window as any).__remoteFixture = {
+  updateConversation(id: string, patch: any) {
+    const conversation = conversations.find(c => c.id === id);
+    if (!conversation) throw new Error("Unknown fixture conversation");
+    Object.assign(conversation, patch);
+    emit("conversations:changed", { conversationId: id });
+  },
+  emit,
+};
 localStorage.setItem("const_app_language", "en");
 localStorage.setItem("const_harness_theme", "dark");
 initThemeListener();

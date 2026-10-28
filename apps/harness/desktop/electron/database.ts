@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { mergeTelemetry, reduceTelemetry, telemetryForHistory, type ChatTelemetry } from "../src/lib/chat-telemetry";
+import type { ConversationRightPaneState, ConversationUiPatch, SideConversationItem } from "../src/lib/conversation-store";
 
 export interface StoredMessage {
   id?: string;
@@ -36,6 +37,8 @@ export interface ConversationRecord {
     additions: number;
     deletions: number;
   };
+  rightPaneState?: ConversationRightPaneState;
+  sideConversations?: SideConversationItem[];
 }
 
 export class ConversationDatabase {
@@ -60,6 +63,29 @@ export class ConversationDatabase {
     this.initSchema();
   }
 
+  /** UI updates must never replace a transcript or another side conversation. */
+  updateConversationUi(id: string, patch: ConversationUiPatch): boolean {
+    const stored = this.getConversation(id);
+    if (!stored) return false;
+    const rightPaneState = patch.rightPaneState ?? stored.rightPaneState;
+    let sideConversations = stored.sideConversations;
+    if (patch.sideConversation) {
+      if (patch.sideConversation.parentConversationId !== id) throw new Error("REMOTE_INVALID_ARGUMENT");
+      sideConversations = [...(sideConversations || [])];
+      const index = sideConversations.findIndex(side => side.id === patch.sideConversation!.id);
+      if (index < 0) sideConversations.push(patch.sideConversation);
+      else sideConversations[index] = patch.sideConversation;
+    }
+    if (patch.deleteSideConversationId) {
+      sideConversations = (sideConversations || []).filter(side => side.id !== patch.deleteSideConversationId);
+    }
+    if (JSON.stringify(rightPaneState) === JSON.stringify(stored.rightPaneState) &&
+        JSON.stringify(sideConversations) === JSON.stringify(stored.sideConversations)) return false;
+    this.db.prepare("UPDATE conversations SET right_pane_state = ?, side_conversations = ? WHERE id = ?")
+      .run(rightPaneState ? JSON.stringify(rightPaneState) : null, sideConversations ? JSON.stringify(sideConversations) : null, id);
+    return true;
+  }
+
   private initSchema(): void {
     try {
       this.db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
@@ -78,7 +104,10 @@ export class ConversationDatabase {
         model TEXT,
         mode TEXT,
         diff_stats TEXT,
-        context_usage TEXT
+        context_usage TEXT,
+        telemetry TEXT,
+        right_pane_state TEXT,
+        side_conversations TEXT
       );
 
       CREATE TABLE IF NOT EXISTS messages (
@@ -114,6 +143,12 @@ export class ConversationDatabase {
     } catch {}
     try {
       this.db.exec("ALTER TABLE conversations ADD COLUMN telemetry TEXT;");
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE conversations ADD COLUMN right_pane_state TEXT;");
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE conversations ADD COLUMN side_conversations TEXT;");
     } catch {}
 
     // Clean up legacy [Scheduled] titles in existing database
@@ -157,7 +192,7 @@ export class ConversationDatabase {
   /** Sidebar bootstrap must not load the full transcript of every local chat. */
   public listRemoteSummaries(includeArchived = false): ConversationRecord[] {
     const rows = this.db.prepare("SELECT id, title, project, model, mode, is_pinned AS isPinned, is_archived AS isArchived, is_scheduled AS isScheduled, created_at AS createdAt, updated_at AS updatedAt FROM conversations WHERE (? = 1 OR is_archived = 0) AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY updated_at DESC").all(includeArchived ? 1 : 0) as any[];
-    return rows.map(row => ({ ...row, isPinned: !!row.isPinned, isArchived: !!row.isArchived, isScheduled: !!row.isScheduled, messages: [] }));
+    return rows.map(row => ({ ...row, isPinned: !!row.isPinned, isArchived: !!row.isArchived, isScheduled: !!row.isScheduled, messages: [], __remoteSummary: true }));
   }
 
   public searchRemoteConversations(query: string): ConversationRecord[] {
@@ -199,9 +234,14 @@ export class ConversationDatabase {
     const contextUsage = telemetry?.context ?? convo.contextUsage ?? previous?.contextUsage;
     const contextUsageJson = contextUsage ? JSON.stringify(contextUsage) : null;
 
+    const rightPaneState = convo.rightPaneState !== undefined ? convo.rightPaneState : previous?.rightPaneState;
+    const rightPaneStateJson = rightPaneState ? JSON.stringify(rightPaneState) : null;
+    const sideConversations = convo.sideConversations !== undefined ? convo.sideConversations : previous?.sideConversations;
+    const sideConversationsJson = sideConversations ? JSON.stringify(sideConversations) : null;
+
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, mode, diff_stats, context_usage, telemetry)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, mode, diff_stats, context_usage, telemetry, right_pane_state, side_conversations)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         project = excluded.project,
@@ -213,7 +253,9 @@ export class ConversationDatabase {
         mode = excluded.mode,
         diff_stats = excluded.diff_stats,
         context_usage = excluded.context_usage,
-        telemetry = excluded.telemetry
+        telemetry = excluded.telemetry,
+        right_pane_state = excluded.right_pane_state,
+        side_conversations = excluded.side_conversations
     `);
 
     stmt.run(
@@ -229,7 +271,9 @@ export class ConversationDatabase {
       convo.mode || null,
       diffStatsJson,
       contextUsageJson,
-      telemetryJson
+      telemetryJson,
+      rightPaneStateJson,
+      sideConversationsJson
     );
 
     // Sync messages
@@ -377,6 +421,8 @@ export class ConversationDatabase {
     let diffStats = undefined;
     let contextUsage = undefined;
     let telemetry: ChatTelemetry | undefined;
+    let rightPaneState = undefined;
+    let sideConversations = undefined;
     try {
       if (row.telemetry) telemetry = JSON.parse(row.telemetry);
     } catch {}
@@ -385,6 +431,12 @@ export class ConversationDatabase {
     } catch {}
     try {
       if (row.context_usage) contextUsage = JSON.parse(row.context_usage);
+    } catch {}
+    try {
+      if (row.right_pane_state) rightPaneState = JSON.parse(row.right_pane_state);
+    } catch {}
+    try {
+      if (row.side_conversations) sideConversations = JSON.parse(row.side_conversations);
     } catch {}
 
     const msgRows = this.db
@@ -441,6 +493,8 @@ export class ConversationDatabase {
       diffStats,
       contextUsage,
       telemetry,
+      rightPaneState,
+      sideConversations,
       messages,
     };
   }

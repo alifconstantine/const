@@ -15,11 +15,13 @@ import {
   Bot,
   FolderTree,
   Waypoints,
+  PanelRight,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import { cn } from "@const/ui";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 import { useTranslation } from "../../lib/i18n";
+import { useRemoteRuntime } from "../../lib/remote-runtime";
 
 interface TabHeaderProps {
   tabs: RightPaneTab[];
@@ -110,6 +112,7 @@ export function TabHeader({
   onToggleExpand,
 }: TabHeaderProps) {
   const { t } = useTranslation();
+  const remote = useRemoteRuntime();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -210,6 +213,20 @@ export function TabHeader({
       className="h-11 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-3 shrink-0 select-none relative z-30"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
+      {/* Optional Collapse / Back Button on Mobile or Compact view */}
+      {remote?.mobile && onCollapse && (
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer text-[#8e8e8e] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 mr-1.5 shrink-0 outline-none focus-visible:outline-none ring-0"
+          title={t("rightPane.hidePanel")}
+          aria-label={t("rightPane.hidePanel")}
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          <PanelRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
       <div
         className={`relative shrink-0 ${isDropdownOpen ? "z-50" : ""}`}
@@ -336,7 +353,10 @@ export function TabHeader({
             handleDragEnd();
           }
         }}
-        className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 pl-1.5 pr-[175px]"
+        className={cn(
+          "flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 pl-1.5",
+          remote ? "pr-16" : "pr-[175px]"
+        )}
       >
         {tabs.map((tab, index) => {
           const Icon = getTabIcon(tab.type);

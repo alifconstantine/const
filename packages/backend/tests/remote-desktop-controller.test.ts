@@ -164,3 +164,32 @@ test("conversation identifiers cannot traverse host directories through native R
   expect(s.context.invoke).not.toHaveBeenCalled();
   expect(s.context.conversationDb.saveConversation).not.toHaveBeenCalled();
 });
+
+test("project pin notifications do not treat a workspace path as a conversation ID", async () => {
+  const s = setup();
+  await s.invoke("conversations:pin-project", ["/workspace/const", true]);
+  expect(s.context.notify).toHaveBeenCalledWith("conversations:changed", { conversationId: undefined, originRequestId: "request" });
+});
+
+test("UI patches validate their parent and keep message interactions bound to matching IDs", async () => {
+  const s = setup();
+  await expect(s.invoke("conversations:update-ui", ["../escape", {}])).rejects.toThrow("REMOTE_INVALID_CONVERSATION_ID");
+  await expect(s.invoke("conversations:update-ui", ["chat", { sideConversation: { id: "side_chat_one", parentConversationId: "other" } }])).rejects.toThrow("REMOTE_INVALID_ARGUMENT");
+  s.stored.messages = [{ id: "host-answer", role: "assistant", content: "Host answer" }];
+  await s.invoke("conversations:save", [{ ...s.stored, messages: [{ id: "different-answer", role: "assistant", content: "Other turn", intelligenceUiState: { chart: { value: "wrong" } } }] }]);
+  expect(s.context.invoke).toHaveBeenCalledWith("conversations:save", [expect.objectContaining({ messages: s.stored.messages })]);
+});
+
+test("host live snapshots are consistent and transfer history only once", async () => {
+  const s = setup();
+  (s.context.activeSessions as Map<string, { runId: string }>).set("chat", { runId: "run" });
+  const messages = [{ role: "user", content: "prompt" }, { role: "assistant", content: "Current output", traceSteps: [{ type: "tool", result: "Current tool result" }] }];
+  s.context.remoteLive.set("chat", { revision: 2, text: "Current output", thinking: "Reasoning", messages });
+  const result = await s.invoke("conversations:get", ["chat"]);
+  expect(result.value.messages).toEqual(messages);
+  expect(result.value.__remoteLive).toMatchObject({ completeMessages: true, runId: "run" });
+  expect(result.value.__remoteLive.messages).toBeUndefined();
+  expect(result.value.__remoteLive.text).toBeUndefined();
+  messages[1].content = "A later event";
+  expect(result.value.messages[1].content).toBe("Current output");
+});

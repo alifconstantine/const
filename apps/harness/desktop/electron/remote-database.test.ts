@@ -52,6 +52,20 @@ test("remote sidebar summaries omit transcripts, preserve flags, and search mess
     );
     assert.match(String(found[0]?.messages[0]?.content), /needle_100%/);
     assert.deepEqual(database.searchRemoteConversations("needleZ100Q"), []);
+
+    // Verify rightPaneState and sideConversations persistence
+    database.saveConversation({
+      ...base,
+      id: "pane_sync_test",
+      title: "Sync Test",
+      rightPaneState: { isOpen: true, activeTabId: "tab-1", tabs: [{ id: "tab-1", type: "side_conversation", title: "Side" }] },
+      sideConversations: [{ id: "side_chat_1", parentConversationId: "pane_sync_test", title: "Side", project: base.project, createdAt: 1, updatedAt: 1, messages: [] }],
+    });
+    const loaded = database.getConversation("pane_sync_test");
+    assert.equal(loaded?.rightPaneState?.isOpen, true);
+    assert.equal(loaded?.rightPaneState?.activeTabId, "tab-1");
+    assert.equal(loaded?.sideConversations?.length, 1);
+    assert.equal(loaded?.sideConversations?.[0]?.title, "Side");
   } finally {
     (database as any).db.close();
     assert.ok(
@@ -59,6 +73,32 @@ test("remote sidebar summaries omit transcripts, preserve flags, and search mess
         .resolve(dir)
         .startsWith(path.resolve(os.tmpdir()) + path.sep + "const-remote-db-"),
     );
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("UI patches preserve transcript, activity time, and independently saved side chats", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-remote-db-"));
+  const database = new ConversationDatabase(dir);
+  try {
+    database.saveConversation({ id: "parent", title: "Work", project: "/workspace", createdAt: 1, updatedAt: 2, messages: [{ id: "answer", role: "assistant", content: "Authoritative answer", intelligenceUiState: { chart: { value: 1 } } }] });
+    const before = database.getConversation("parent")!;
+    const pane = { isOpen: true, activeTabId: "review", tabs: [{ id: "review", type: "review" as const, title: "Review" }] };
+    assert.equal(database.updateConversationUi("parent", { rightPaneState: pane }), true);
+    const base = { parentConversationId: "parent", title: "Side", project: "/workspace", createdAt: 1, updatedAt: 2, messages: [] };
+    database.updateConversationUi("parent", { sideConversation: { ...base, id: "side_chat_a" } });
+    database.updateConversationUi("parent", { sideConversation: { ...base, id: "side_chat_b" } });
+    database.updateConversationUi("parent", { deleteSideConversationId: "side_chat_a" });
+    const after = database.getConversation("parent")!;
+    assert.deepEqual(after.messages, before.messages);
+    assert.equal(after.updatedAt, before.updatedAt);
+    assert.deepEqual(after.rightPaneState, pane);
+    assert.deepEqual(after.sideConversations?.map(side => side.id), ["side_chat_b"]);
+    assert.equal(database.updateConversationUi("parent", { rightPaneState: pane }), false);
+    assert.equal(database.updateConversationUi("missing", { rightPaneState: pane }), false);
+    assert.throws(() => database.updateConversationUi("parent", { sideConversation: { ...base, id: "side_chat_c", parentConversationId: "other" } }));
+  } finally {
+    (database as any).db.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });

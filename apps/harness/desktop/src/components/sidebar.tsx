@@ -231,12 +231,16 @@ export function Sidebar({
   });
 
   useEffect(() => {
-    getPinnedProjects().then((pins) => {
-      if (Array.isArray(pins) && pins.length > 0) {
+    let disposed = false;
+    const refreshPins = () => { void getPinnedProjects().then((pins) => {
+      if (!disposed && Array.isArray(pins)) {
         setPinnedProjects(pins);
         localStorage.setItem("const_harness_pinned_projects", JSON.stringify(pins));
       }
-    });
+    }); };
+    refreshPins();
+    const unsubscribe = window.electron?.onConversationsChanged?.(data => { if (!data?.conversationId) refreshPins(); });
+    return () => { disposed = true; unsubscribe?.(); };
   }, []);
 
   const togglePinProject = (projectName: string) => {
