@@ -37,7 +37,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       type="button"
       onClick={toggleTheme}
       className={cn(
-        "ch-theme-toggle h-9 w-9 p-0 rounded-full border border-zinc-200/80 dark:border-[#262626] bg-white dark:bg-[#171717] hover:bg-zinc-100 dark:hover:bg-[#202020] text-zinc-900 dark:text-zinc-100 transition-all cursor-pointer flex items-center justify-center shadow-none shrink-0",
+        "ch-theme-toggle h-[34px] w-[34px] p-0 rounded-full border border-transparent bg-transparent text-inherit transition-all cursor-pointer flex items-center justify-center shadow-none shrink-0",
         className,
       )}
       aria-label={t("footer.theme") || "Toggle theme"}

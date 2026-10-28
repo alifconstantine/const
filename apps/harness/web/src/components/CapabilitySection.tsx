@@ -26,7 +26,6 @@ export function CapabilitySection() {
             <motion.article
               key={item.index}
               className="ch-capability"
-              id={item.index === 4 ? "terminal" : undefined}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}

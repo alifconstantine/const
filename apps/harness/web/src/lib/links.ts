@@ -5,6 +5,8 @@ export const LINKS = {
   releases: `${REPOSITORY}/releases`,
   changelog: `${REPOSITORY}/commits/main/apps/harness`,
   cli: `${REPOSITORY}/tree/main/apps/harness/cli`,
+  issues: `${REPOSITORY}/issues`,
+  pulls: `${REPOSITORY}/pulls`,
   router: "https://router.const.web.id",
   accounts: "https://accounts.const.web.id",
   learn: "https://learn.const.web.id",

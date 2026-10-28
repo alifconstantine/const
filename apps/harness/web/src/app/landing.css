@@ -186,10 +186,18 @@ body:has(.ch-download-page) .ch-header {
   background: #ffffff20;
   color: inherit;
   font-size: 13px;
+  backdrop-filter: blur(8px);
+}
+.ch-header-cta:hover {
+  background: #ffffff35;
 }
 .ch-header[data-scrolled="true"] .ch-header-cta,
 body:has(.ch-download-page) .ch-header-cta {
   background: var(--ch-surface-muted);
+}
+.ch-header[data-scrolled="true"] .ch-header-cta:hover,
+body:has(.ch-download-page) .ch-header-cta:hover {
+  background: var(--ch-line);
 }
 .ch-header .ch-icon-button {
   border-color: var(--ch-line);
@@ -198,12 +206,53 @@ body:has(.ch-download-page) .ch-header-cta {
   border-color: #262626;
 }
 .ch-theme-toggle {
-  border-color: var(--ch-line) !important;
-  color: var(--ch-ink) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
-.dark .ch-theme-toggle {
-  border-color: #262626 !important;
-  color: #ffffff !important;
+.ch-header .ch-theme-toggle {
+  background: #ffffff20;
+  border-color: transparent;
+  color: inherit;
+  backdrop-filter: blur(8px);
+}
+.ch-header .ch-theme-toggle:hover {
+  background: #ffffff35;
+}
+.ch-header[data-scrolled="true"] .ch-theme-toggle,
+body:has(.ch-download-page) .ch-header .ch-theme-toggle {
+  background: var(--ch-surface-muted);
+  border-color: transparent;
+  color: var(--ch-ink);
+}
+.ch-header[data-scrolled="true"] .ch-theme-toggle:hover,
+body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
+  background: var(--ch-line);
+}
+.ch-footer .ch-theme-toggle {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border-color: var(--ch-line);
+  color: var(--ch-ink);
+}
+.ch-footer .ch-theme-toggle:hover {
+  background: var(--ch-surface-muted);
+}
+.dark .ch-footer .ch-theme-toggle {
+  border-color: #262626;
+  color: #ffffff;
+}
+.dark .ch-footer .ch-theme-toggle:hover {
+  background: #202020;
 }
 .ch-menu-toggle {
   display: none;
@@ -1942,6 +1991,7 @@ body:has(.ch-download-page) .ch-header-cta {
   color: var(--ch-ink-muted);
   line-height: 1.6;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 .ch-footer-link:hover {
   color: var(--ch-ink);

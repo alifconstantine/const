@@ -8,11 +8,11 @@ import { ConstLogoIcon } from "@const/ui";
 import { LINKS } from "@/lib/links";
 
 const ITEMS = [
-  { key: "nav.product", href: "/#capabilities" },
-  { key: "nav.start", href: "/#get-started" },
   { key: "nav.features", href: "/#features" },
+  { key: "nav.platforms", href: "/#platforms" },
+  { key: "nav.start", href: "/#get-started" },
+  { key: "nav.faq", href: "/#faq" },
   { key: "nav.docs", href: LINKS.docs },
-  { key: "nav.terminal", href: "/#terminal" },
   { key: "nav.changelog", href: LINKS.changelog },
 ] as const;
 
@@ -47,11 +47,20 @@ export function Navbar() {
           <span>Const Harness</span>
         </Link>
         <nav className="ch-nav" aria-label={t("nav.primary")}>
-          {ITEMS.map((item) => (
-            <a key={item.key} href={item.href} className="ch-nav-link">
-              {t(item.key)}
-            </a>
-          ))}
+          {ITEMS.map((item) => {
+            const isExternal = item.href.startsWith("http");
+            return (
+              <a
+                key={item.key}
+                href={item.href}
+                target={isExternal ? "_blank" : undefined}
+                rel={isExternal ? "noopener noreferrer" : undefined}
+                className="ch-nav-link"
+              >
+                {t(item.key)}
+              </a>
+            );
+          })}
         </nav>
         <div className="ch-header-actions">
           <ThemeToggle />
@@ -76,11 +85,20 @@ export function Navbar() {
           id="mobile-nav"
           aria-label={t("nav.mobile")}
         >
-          {ITEMS.map((item) => (
-            <a key={item.key} href={item.href} onClick={() => setOpen(false)}>
-              {t(item.key)}
-            </a>
-          ))}
+          {ITEMS.map((item) => {
+            const isExternal = item.href.startsWith("http");
+            return (
+              <a
+                key={item.key}
+                href={item.href}
+                target={isExternal ? "_blank" : undefined}
+                rel={isExternal ? "noopener noreferrer" : undefined}
+                onClick={() => setOpen(false)}
+              >
+                {t(item.key)}
+              </a>
+            );
+          })}
           <Link href="/download" onClick={() => setOpen(false)}>
             {t("nav.cta")}
           </Link>

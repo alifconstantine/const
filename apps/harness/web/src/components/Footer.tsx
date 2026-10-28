@@ -4,44 +4,51 @@ import { GitHubIcon } from "./GitHubIcon";
 import { useI18n } from "@/context/I18nContext";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { LINKS } from "@/lib/links";
+interface FooterColumn {
+  heading: string;
+  links: [label: string, href: string][];
+}
+
 export function Footer() {
   const { t, locale, setLocale, locales } = useI18n();
-  const columns = [
+  const columns: FooterColumn[] = [
     {
       heading: t("footer.col.product"),
       links: [
-        [t("footer.link.desktop"), "/#product"],
-        [t("footer.link.learn"), LINKS.learn],
-        [t("footer.link.router"), LINKS.router],
-        [t("footer.link.accounts"), LINKS.accounts],
+        [t("footer.col.capabilities"), "/#features"],
+        [t("footer.link.tasks"), "/#capabilities"],
+        [t("footer.col.platforms"), "/#platforms"],
+        [t("footer.link.comparison"), "/#comparison"],
+        [t("footer.link.download"), "/download"],
       ],
     },
     {
       heading: t("footer.col.platforms"),
       links: [
         ["Windows", "/download?os=windows"],
-        ["Mac", "/download?os=macos"],
-        ["iOS", "/download?os=ios"],
+        ["macOS", "/download?os=macos"],
+        ["Linux", "/download?os=linux"],
         ["Android", "/download?os=android"],
-        [t("footer.link.download"), "/download"],
+        ["iOS", "/download?os=ios"],
       ],
     },
     {
       heading: t("footer.col.capabilities"),
       links: [
         [t("capabilities.0.title"), "/#features"],
+        [t("capabilities.1.title"), "/#features"],
         [t("capabilities.2.title"), "/#features"],
-        [t("capabilities.4.title"), "/#terminal"],
-        [t("platform.2.title"), "/#platforms"],
+        [t("capabilities.3.title"), "/#features"],
+        [t("capabilities.4.title"), "/#features"],
       ],
     },
     {
       heading: t("footer.col.ecosystem"),
       links: [
-        [t("footer.link.platform"), "https://const.web.id"],
+        [t("footer.link.router"), LINKS.router],
+        [t("footer.link.accounts"), LINKS.accounts],
+        [t("footer.link.learn"), LINKS.learn],
         ["Model Context Protocol", "https://modelcontextprotocol.io"],
-        ["Const Router", LINKS.router],
-        ["GitHub", LINKS.repository],
       ],
     },
     {
@@ -49,17 +56,18 @@ export function Footer() {
       links: [
         [t("footer.link.docs"), LINKS.docs],
         [t("footer.link.changelog"), LINKS.changelog],
-        [t("footer.link.cli"), LINKS.cli],
+        [t("footer.link.releases"), LINKS.releases],
         [t("faq.short"), "/#faq"],
+        [t("nav.start"), "/#get-started"],
       ],
     },
     {
       heading: t("footer.col.company"),
       links: [
-        [t("footer.link.about"), "https://const.web.id"],
-        [t("footer.link.contact"), `${LINKS.repository}/issues`],
+        [t("footer.link.platform"), "https://const.web.id"],
         [t("footer.link.source"), LINKS.repository],
-        [t("footer.link.releases"), LINKS.releases],
+        [t("footer.link.issues"), LINKS.issues],
+        [t("footer.link.pullRequests"), LINKS.pulls],
       ],
     },
   ];
@@ -71,13 +79,21 @@ export function Footer() {
             <nav key={column.heading} aria-label={column.heading}>
               <h3 className="ch-footer-heading">{column.heading}</h3>
               <ul className="ch-footer-links">
-                {column.links.map(([label, href]) => (
-                  <li key={label}>
-                    <a className="ch-footer-link" href={href}>
-                      {label}
-                    </a>
-                  </li>
-                ))}
+                {column.links.map(([label, href]) => {
+                  const isExternal = href.startsWith("http");
+                  return (
+                    <li key={label}>
+                      <a
+                        className="ch-footer-link"
+                        href={href}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noopener noreferrer" : undefined}
+                      >
+                        {label}
+                      </a>
+                    </li>
+                  );
+                })}
               </ul>
             </nav>
           ))}
@@ -101,7 +117,12 @@ export function Footer() {
               ))}
             </select>
             <ThemeToggle />
-            <a href={LINKS.repository} aria-label="GitHub">
+            <a
+              href={LINKS.repository}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+            >
               <GitHubIcon size={19} />
             </a>
           </div>
