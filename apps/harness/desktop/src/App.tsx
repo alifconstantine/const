@@ -533,6 +533,14 @@ function AuthenticatedContent({
 
     if (window.electron?.onConversationsChanged) {
       const unsubscribe = window.electron.onConversationsChanged(async (data) => {
+        if (data?.conversationId && data.remoteMessages) {
+          const next = normalizeUiMessages(data.remoteMessages);
+          activeSessionMessagesRef.current.set(data.conversationId, next);
+          if (data.conversationId === conversationIdRef.current) {
+            messagesRef.current = next;
+            setMessages(next);
+          }
+        }
         const refreshed = await refreshConversationsFromDisk();
         setConversations(refreshed);
 

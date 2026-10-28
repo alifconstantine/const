@@ -96,6 +96,9 @@ importers:
       '@const/backend':
         specifier: workspace:*
         version: link:../../../packages/backend
+      '@const/remote':
+        specifier: workspace:*
+        version: link:../../../packages/remote
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
@@ -241,6 +244,9 @@ importers:
 
   apps/harness/web:
     dependencies:
+      '@const/remote':
+        specifier: workspace:*
+        version: link:../../../packages/remote
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
@@ -250,6 +256,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.3.0)
       framer-motion:
         specifier: ^13.4.4
         version: 13.4.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -823,9 +832,15 @@ importers:
       '@types/node':
         specifier: ^22.13.9
         version: 22.20.1
+      convex-test:
+        specifier: ^0.0.65
+        version: 0.0.65(convex@1.45.0(react@19.2.8))
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
+      vitest:
+        specifier: 4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.9)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.9.0))
 
   packages/chord:
     dependencies:
@@ -966,6 +981,15 @@ importers:
       vitest:
         specifier: 4.1.9
         version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.9)(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.51.0)(tsx@4.20.6)(yaml@2.9.0))
+
+  packages/remote:
+    dependencies:
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.3.0)
+      zod:
+        specifier: 4.3.6
+        version: 4.3.6
 
   packages/server:
     dependencies:
@@ -5408,6 +5432,11 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
+  convex-test@0.0.65:
+    resolution: {integrity: sha512-2FgHlLGraM2O3tEVpOfvoHSleK0x92J8xjQ/qClWzNJX3NcmgvuNeWBrmma7sLJ8lB3ENPxx6ykJTfvZmWg3BQ==}
+    peerDependencies:
+      convex: ^1.43.0
+
   convex@1.45.0:
     resolution: {integrity: sha512-AV3B56Ptu/14d76g3urBJ50dwpiZa6uJaLT84OWox5aCwZIJiuAamdjv3lLHDzs8vv5kC31anEZohhUe3qJ2bA==}
     engines: {node: '>=20.0.0', npm: '>=7.0.0'}
@@ -8787,10 +8816,6 @@ packages:
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
-
-  tinyexec@1.3.0:
-    resolution: {integrity: sha512-QKAl9m8gWWGHV8jZcPeym6j+XULi6tOf1mT83WYJ4Lk2ytW/uwAWkrP0uFsdoYMdueVJ0qs26wZ+23xeB4ibNQ==}
-    engines: {node: '>=18'}
 
   tinyexec@1.3.1:
     resolution: {integrity: sha512-GCvB3aoys96IuDFBMcTB46JOR6mdMtAToqwiW8JlWhsoh1mhHi/xn9ss/Dg7N555GiJyEt2qzoG/NHCwM6h1EA==}
@@ -13797,6 +13822,10 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
+  convex-test@0.0.65(convex@1.45.0(react@19.2.8)):
+    dependencies:
+      convex: 1.45.0(react@19.2.8)
+
   convex@1.45.0(react@19.2.8):
     dependencies:
       esbuild: 0.27.0
@@ -18011,8 +18040,6 @@ snapshots:
 
   tinybench@2.9.0: {}
 
-  tinyexec@1.3.0: {}
-
   tinyexec@1.3.1: {}
 
   tinyglobby@0.2.17:
@@ -18367,7 +18394,7 @@ snapshots:
       picomatch: 4.0.7
       std-env: 4.2.0
       tinybench: 2.9.0
-      tinyexec: 1.3.0
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
       vite: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.51.0)(tsx@4.20.6)(yaml@2.9.0)
@@ -18396,7 +18423,7 @@ snapshots:
       picomatch: 4.0.7
       std-env: 4.2.0
       tinybench: 2.9.0
-      tinyexec: 1.3.0
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
       vite: 6.4.3(@types/node@24.12.4)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.51.0)(tsx@4.20.6)(yaml@2.9.0)

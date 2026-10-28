@@ -14,6 +14,7 @@
     "test:markdown": "tsx --test src/components/workbench/*.test.ts",
     "test:remote": "tsx --test electron/remote-daemon.test.ts",
     "test:startup": "node scripts/test-startup.cjs",
+    "test:remote:preview": "vite --config tests/remote-mobile.vite.ts",
     "test:telemetry": "tsx --test src/lib/chat-telemetry.test.ts electron/chat-telemetry.test.ts",
     "test:side-chat": "node scripts/test-side-chat.cjs",
     "test:window-branding": "node scripts/test-window-branding.cjs",
@@ -31,6 +32,7 @@
     "package:mac": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --mac --x64 --arm64"
   },
   "dependencies": {
+    "@const/remote": "workspace:*",
     "@const/agent": "workspace:*",
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",

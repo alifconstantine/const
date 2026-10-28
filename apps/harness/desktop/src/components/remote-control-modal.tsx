@@ -73,7 +73,7 @@ export function RemoteControlModal({ isOpen, onClose }: RemoteControlModalProps)
     setBusy(true);
     setError(null);
     try {
-      const next = await (action === "start" ? api.startSession() : action === "stop" ? api.stopSession() : api.refreshSession());
+      const next = await (action === "start" ? api.startSession(localStorage.getItem("const_harness_auth_token") || "") : action === "stop" ? api.stopSession() : api.refreshSession());
       if (generation.current === current) { setStatus(next); setNow(Date.now()); }
     } catch { if (generation.current === current) setError(action === "start" ? "startError" : "actionError"); }
     finally { if (generation.current === current) setBusy(false); }

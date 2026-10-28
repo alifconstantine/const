@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "convex dev",
     "deploy": "convex deploy",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test:remote": "vitest run tests/remote"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
@@ -16,7 +17,9 @@
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
     "@types/node": "^22.13.9",
-    "typescript": "^5.8.2"
+    "convex-test": "^0.0.65",
+    "typescript": "^5.8.2",
+    "vitest": "4.1.9"
   },
   "exports": {
     "./_generated/*": "./convex/_generated/*",

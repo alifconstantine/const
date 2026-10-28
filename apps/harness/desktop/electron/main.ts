@@ -1,5 +1,5 @@
 import { getModelContextLimit } from "../src/lib/model-context";
-import { isTelemetryEvent } from "../src/lib/chat-telemetry";
+import { isTelemetryEvent, summarizeTelemetry } from "../src/lib/chat-telemetry";
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "./browser/guest-policy";
 import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker, Notification, protocol, net, session, safeStorage } from "electron";
 import { pathToFileURL } from "node:url";
@@ -68,6 +68,7 @@ import { AgentSessionRegistry } from "./agent-sessions";
 import { selectAgentAutosaveMessages } from "./agent-history";
 import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
+import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -1193,6 +1194,7 @@ app.whenReady().then(() => {
     sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
+  const remoteLive = new Map<string, { revision: number; text: string; status: string; approval?: any; questions?: any; context?: any; usage?: any; tools: string[] }>();
   const sideParents = new Map<string, string>();
   const sideReceipts = new SideSteeringReceipts(path.join(constBrainDir, "side-steering-receipts.json"));
   const recordSideReceipt = (sideChatId: string, instructionId: string, status: "queued" | "consumed" | "plan_updated" | "expired", runId: string) => {
@@ -1219,10 +1221,12 @@ app.whenReady().then(() => {
 
   remoteDaemon.onCommand(async (command, reply) => {
     if (command.type === "state:get") {
-      const convos = conversationDb.listConversations(false);
+      const convos = conversationDb.listRemoteSummaries();
       const running = Array.from(activeSessions.keys());
       reply({
         deviceId: remoteDaemon.deviceId,
+        projects: conversationDb.listRemoteProjects(),
+        models: uniqueModelsById([...DEFAULT_MODELS, ...(loadUserConfig().customModels || [])]).map((model) => ({ id: model.id, displayName: model.displayName || model.id })),
         conversations: convos.map((c) => ({
           id: c.id,
           title: c.title,
@@ -1237,7 +1241,52 @@ app.whenReady().then(() => {
     } else if (command.type === "conversation:get") {
       const convoId = command.payload?.conversationId;
       const convo = convoId ? conversationDb.getConversation(convoId) : null;
-      reply({ conversation: convo });
+      const session = convoId ? activeSessions.get(convoId) : null;
+      const live = convoId ? remoteLive.get(convoId) : undefined;
+      const messages: { role: string; content: string }[] = [];
+      let size = 0;
+      for (const message of [...(convo?.messages || [])].reverse().slice(0, 80)) {
+        const content = (typeof message.content === "string" ? message.content : JSON.stringify(message.content) || "").slice(-12_000);
+        const bytes = new TextEncoder().encode(content).length;
+        if (size + bytes > 150_000) break;
+        messages.unshift({ role: message.role, content }); size += bytes;
+      }
+      reply({ conversation: convo ? { ...convo, messages, telemetry: summarizeTelemetry(convo.telemetry), isRunning: !!session, runId: session?.runId, live } : null });
+    } else if (command.type === "conversation:send") {
+      const { conversationId, text, model, project } = command.payload;
+      if (!/^remote_[a-zA-Z0-9_-]{1,100}$/.test(conversationId) && !conversationDb.getConversation(conversationId)) throw new Error("INVALID_CONVERSATION");
+      if (activeSessions.has(conversationId)) { reply({ success: false, error: "ALREADY_RUNNING" }); return; }
+      const existing = conversationDb.getConversation(conversationId);
+      const allowedProjects = new Set(conversationDb.listRemoteProjects());
+      const workspacePath = existing?.project || project;
+      if (workspacePath && workspacePath !== "Outside Project" && !allowedProjects.has(workspacePath)) throw new Error("INVALID_PROJECT");
+      const messages = [...(existing?.messages || []), { role: "user", content: text }] as AgentMessage[];
+      const config = loadUserConfig();
+      const chosenModel = model || existing?.model || config.activeModel || DEFAULT_ROUTER_MODEL_ID;
+      if (![...DEFAULT_MODELS, ...(config.customModels || [])].some((entry) => entry.id === chosenModel)) throw new Error("INVALID_MODEL");
+      conversationDb.saveConversation({ ...existing, id: conversationId, title: existing?.title || text.slice(0, 80), project: workspacePath || "Outside Project", createdAt: existing?.createdAt || Date.now(), updatedAt: Date.now(), messages, model: chosenModel });
+      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId, remoteMessages: messages });
+      const execution = runAgent({ messages, conversationId, model: chosenModel, workspacePath, mode: "ask_before_changes", authToken: lastAuthToken || undefined });
+      reply({ success: true, conversationId, runId: activeSessions.get(conversationId)?.runId });
+      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId });
+      void execution.then((result) => { remoteDaemon.broadcast({ type: "conversation:changed", conversationId, success: result.success, aborted: result.aborted, error: result.error }); }).catch(() => { remoteDaemon.broadcast({ type: "conversation:changed", conversationId, success: false, error: "RUN_FAILED" }); });
+    } else if (command.type === "conversation:rename" || command.type === "conversation:archive") {
+      const id = command.payload.conversationId;
+      if (!conversationDb.getConversation(id) || activeSessions.has(id)) throw new Error("CONVERSATION_BUSY");
+      if (command.type === "conversation:rename") conversationDb.renameConversation(id, command.payload.title);
+      else conversationDb.archiveConversation(id);
+      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId: id });
+      reply({ success: true });
+      remoteDaemon.broadcast({ type: "conversation:changed", conversationId: id });
+    } else if (command.type === "agent:approval") {
+      const { conversationId, runId, approvalId, decision } = command.payload;
+      const session = activeSessions.get(conversationId);
+      reply({ success: !!session && session.runId === runId && session.agent.resolveApproval(approvalId, { approvalId, decision }) });
+    } else if (command.type === "scheduled:list") {
+      reply({ tasks: scheduledTasksManager?.listTasks().map((task) => ({ id: task.id, name: task.name, enabled: task.enabled, nextRunAt: task.nextRunAt })) || [] });
+    } else if (command.type === "marketplace:list") {
+      const plugins = marketplaceService.listPlugins();
+      reply({ plugins: plugins.installed.map((plugin) => ({ id: plugin.id, name: plugin.name, description: plugin.description, enabled: plugin.isEnabled })) });
     } else if (command.type === "agent:abort") {
       const convoId = command.payload?.conversationId;
       if (convoId) {
@@ -1282,9 +1331,11 @@ app.whenReady().then(() => {
       throw new Error("REMOTE_HOST_ONLY");
     }
   };
-  ipcMain.handle("remote:start-session", async (event) => {
+  ipcMain.handle("remote:start-session", async (event, authToken: string) => {
     requireRemoteHost(event);
-    return await remoteDaemon.start();
+    if (!isValidAuthToken(authToken)) throw new Error("REMOTE_LOGIN_REQUIRED");
+    lastAuthToken = authToken;
+    return await remoteDaemon.startRelay({ authToken, convexUrl: process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL, webOrigin: process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN });
   });
   ipcMain.handle("remote:stop-session", async (event) => {
     requireRemoteHost(event);
@@ -1368,10 +1419,7 @@ app.whenReady().then(() => {
     return killed;
   });
 
-  ipcMain.handle(
-    "agent:send-message",
-    async (
-      _event,
+  const runAgent = async (
       payload: {
         messages: AgentMessage[];
         model?: string;
@@ -1469,6 +1517,8 @@ app.whenReady().then(() => {
         onAskQuestion: (toolCallId, questions) => {
           return new Promise((resolve) => {
             pendingQuestions.set(toolCallId, { runId, resolve });
+            const live = remoteLive.get(convoId);
+            if (live) live.questions = { toolCallId, questions };
             if (win && !win.isDestroyed()) {
               win.webContents.send("agent:stream-event", {
                 type: "ask_question",
@@ -1484,6 +1534,10 @@ app.whenReady().then(() => {
               runId,
               event: { type: "ask_question", toolCallId, questions },
             });
+          }).finally(() => {
+            const live = remoteLive.get(convoId);
+            if (live) delete live.questions;
+            remoteDaemon.broadcast({ type: "agent:stream-event", conversationId: convoId, runId, event: { type: "question_resolved", toolCallId } });
           });
         },
         browserHandler: async (toolName, args) => {
@@ -1520,6 +1574,7 @@ app.whenReady().then(() => {
         sideInstructions: new Map(),
       };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
+      remoteLive.set(convoId, { revision: 0, text: "", status: "running", tools: [] });
 
       if (win && !win.isDestroyed()) {
         win.webContents.send("agent:session-started", { conversationId: convoId, runId });
@@ -1532,10 +1587,22 @@ app.whenReady().then(() => {
 
       const eventForwarder = createAgentEventForwarder((agentEvent) => {
         if (!activeSessions.owns(convoId, runId)) return false;
+        const live = remoteLive.get(convoId);
+        if (live) {
+          live.revision++;
+          if (agentEvent.type === "token") live.text = (live.text + String(agentEvent.token || "")).slice(-80_000);
+          if (agentEvent.type === "token_reset") live.text = "";
+          if (agentEvent.type === "status") live.status = String(agentEvent.status || "running");
+          if (agentEvent.type === "approval_request") live.approval = agentEvent;
+          if (agentEvent.type === "approval_resolved") delete live.approval;
+          if (agentEvent.type === "context_update") live.context = agentEvent;
+          if (agentEvent.type === "tool_call") live.tools = [...live.tools.slice(-19), String(agentEvent.toolName || agentEvent.name || "")];
+        }
         if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId, runId });
         remoteDaemon.broadcast({
           type: "agent:stream-event",
-          event: agentEvent,
+          event: agentEvent.type === "usage" && live?.usage ? { ...agentEvent, ...live.usage } : agentEvent,
+          sequence: live?.revision,
           conversationId: convoId,
           runId,
         });
@@ -1546,7 +1613,9 @@ app.whenReady().then(() => {
           payload.messages,
           (agentEvent: any) => {
             if (isTelemetryEvent(agentEvent)) {
-              conversationDb.recordTelemetry(convoId, agentEvent);
+              const telemetry = conversationDb.recordTelemetry(convoId, agentEvent);
+              const live = remoteLive.get(convoId);
+              if (live && agentEvent.type === "usage") live.usage = summarizeTelemetry(telemetry);
             }
             if (!activeSessions.owns(convoId, runId)) return;
             const snapshot = agentSession.snapshot;
@@ -1638,10 +1707,11 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
+        remoteLive.delete(convoId);
         finishSession(agentSession);
       }
-    }
-  );
+    };
+  ipcMain.handle("agent:send-message", (_event, payload: Parameters<typeof runAgent>[0]) => runAgent(payload));
 
   ipcMain.handle(
     "agent:steer",

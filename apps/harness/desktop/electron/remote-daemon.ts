@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { remoteCommandSchema, type RemoteCommand, type RemoteConnectedDevice, type RemoteDaemonStatus } from "../src/lib/remote-control";
 import { createPairingPage } from "./remote-pairing-page";
+import { RemoteRelay } from "./remote-relay";
 
 type CommandHandler = (command: RemoteCommand, reply: (response: unknown) => void) => void | Promise<void>;
 type Client = { ws: WebSocket; device: RemoteConnectedDevice; alive: boolean; pending: number };
@@ -33,6 +34,8 @@ export class RemoteDaemon {
   private listeners = new Set<(status: RemoteDaemonStatus) => void>();
   private handler: CommandHandler | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private relay: RemoteRelay | null = null;
+  private relayOptions: { authToken: string; convexUrl: string; webOrigin: string } | null = null;
 
   constructor(private readonly address = localAddress) {}
 
@@ -43,6 +46,7 @@ export class RemoteDaemon {
   }
 
   getStatus(): RemoteDaemonStatus {
+    if (this.relay) return this.relay.getStatus();
     return {
       status: !this.origin ? "idle" : this.clients.size ? "connected" : "waiting",
       deviceId: this.deviceId,
@@ -60,6 +64,22 @@ export class RemoteDaemon {
   }
 
   onCommand(handler: CommandHandler): void { this.handler = handler; }
+
+  startRelay(options: { authToken: string; convexUrl: string; webOrigin: string }): Promise<RemoteDaemonStatus> {
+    return this.serialize(async () => {
+      if (this.relay?.getStatus().status !== "idle" && this.relay) return this.relay.getStatus();
+      if (this.server) throw new Error("REMOTE_ALREADY_RUNNING");
+      this.relayOptions = options;
+      return this.connectRelay(options);
+    });
+  }
+  private async connectRelay(options: { authToken: string; convexUrl: string; webOrigin: string }) {
+    this.relay = new RemoteRelay(this.deviceId, () => this.notify(), async (command, reply) => {
+      if (!this.handler) throw new Error("NOT_READY");
+      await this.handler(command, reply);
+    });
+    return this.relay.start(options.authToken, options.convexUrl, options.webOrigin);
+  }
 
   private notify(): void {
     for (const listener of this.listeners) listener(this.getStatus());
@@ -175,6 +195,7 @@ export class RemoteDaemon {
   }
 
   broadcast(message: { type: string; [key: string]: unknown }): void {
+    this.relay?.broadcast(message);
     if (!this.clients.size) return;
     for (const { ws } of this.clients.values()) this.send(ws, message);
   }
@@ -187,6 +208,10 @@ export class RemoteDaemon {
 
   refresh(): Promise<RemoteDaemonStatus> {
     return this.serialize(async () => {
+      if (this.relay && this.relayOptions) {
+        await this.relay.stop();
+        return this.connectRelay(this.relayOptions);
+      }
       if (this.origin) { this.rotate(); this.notify(); }
       return this.getStatus();
     });
@@ -194,6 +219,9 @@ export class RemoteDaemon {
 
   stop(): Promise<void> {
     return this.serialize(async () => {
+      await this.relay?.stop();
+      this.relay = null;
+      this.relayOptions = null;
       this.disconnect();
       if (this.heartbeat) clearInterval(this.heartbeat);
       this.heartbeat = null;

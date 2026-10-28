@@ -1,69 +1,103 @@
-# Remote control, phase 1
+# Harness remote control
 
-Open the account menu → Remote Control → Start. The desktop creates a local HTTP
-listener on an OS-assigned port, bound to one private IPv4 interface. Scan the QR
-with a phone on the same trusted network. The phone opens a small pairing page
-served by that listener and establishes a WebSocket connection. Closing the dialog
-keeps the session running; Stop, logout, account switching, closing the desktop
-window, or renderer failure revokes it.
+The desktop account menu opens the horizontal Remote Control dialog. Start creates
+an authenticated relay session and a QR link to
+`https://harness.const.web.id/r/<sessionId>#key=...`. The browser signs in through
+Accounts with the same Const account as the desktop. No public desktop port or
+same-Wi-Fi requirement is needed for this transport.
 
-This phase provides the desktop daemon, QR dialog, pairing shell, and agent event
-bridge. The full mobile workspace, starting/sending agent prompts from mobile,
-remote approvals, and internet access are future work. The pairing shell only
-displays connection status; it does not render conversations yet.
+## Architecture
 
-## Transport and authorization
+- `packages/remote`: shared command validation, AES-GCM envelopes, browser client,
+  and five-language mobile copy.
+- `packages/backend/convex/remote.ts`: authenticated realtime mailbox, device
+  grants, atomic command claims, presence, expiration, and cleanup.
+- `electron/remote-relay.ts`: outbound Convex connection, command dispatch and
+  batched streaming. Agent prompts share the desktop `runAgent` execution path.
+- `apps/harness/web/src/app/r/[sessionId]`: responsive remote workspace. It reuses
+  Radix controls, ScrollArea, branding and the user message surface from `@const/ui`.
+- The old LAN daemon remains available for transport regression tests. The desktop
+  Start action now selects the encrypted internet relay.
 
-- LAN HTTP/WS is **not encrypted**. Use a trusted network. No TLS or internet relay
-  is claimed by the UI. An HTTPS website cannot reliably connect to this plaintext
-  socket; the QR therefore points to the desktop's own HTTP origin.
-- A 256-bit random bearer key is carried in the URL fragment, omitted from the
-  pairing HTTP request, and removed from browser history by the pairing page.
-  Anyone with the QR/link can access conversations and the supported commands.
-- Pairing credentials expire for new connections after 15 minutes. Existing
-  connections remain active. Refresh replaces the session/key and immediately
-  disconnects all clients. Stop also closes the listener.
-- Host and browser Origin checks precede the WebSocket upgrade. There is no wildcard
-  CORS or unauthenticated status endpoint. At most four clients may connect.
-- Commands have runtime schemas and 64 KiB message limits. Heartbeats remove dead
-  clients; slow consumers are disconnected rather than buffered indefinitely.
-- Starting the listener requires the main desktop renderer's IPC, never a guest
-  browser frame. The listener is off by default.
+## Pairing and privacy
 
-## Protocol
+Both endpoints authenticate as the session owner on every broker operation. A QR
+key alone does not authorize another Const account. A separate host capability
+prevents a paired browser from impersonating the desktop. Per-tab device grants
+are stored in sessionStorage and are revoked on Disconnect. Desktop Stop,
+refresh, logout, account switching, renderer failure and window close revoke the
+host session. Local shutdown remains bounded even if the network is unavailable.
 
-Connect to the `localBridgeUrl` returned by the desktop status IPC, with `session`
-and `key` query parameters obtained from the QR. After `handshake:ack`, send JSON:
+A random 256-bit key stays in the QR fragment and endpoint session memory/storage.
+The page removes pairing and callback credentials from the URL immediately.
+AES-GCM encrypts commands, replies and events before upload, binding each packet
+to its session, direction and request ID. The broker sees account/device metadata,
+timing and ciphertext, but receives no conversation decryption key. HTTPS/WSS
+also protects transport. This does not protect against a compromised endpoint.
 
-```json
-{"type":"state:get","requestId":"1"}
-{"type":"conversation:get","requestId":"2","payload":{"conversationId":"..."}}
-{"type":"agent:abort","requestId":"3","payload":{"conversationId":"...","runId":"..."}}
-{"type":"agent:answer-question","requestId":"4","payload":{"toolCallId":"...","runId":"...","answer":{}}}
-```
+Pairing expires after 15 minutes; existing grants remain valid for the session's
+8-hour lifetime. Heartbeats run every 15 seconds; clients show the desktop offline
+after 45 seconds without a heartbeat. Refresh replaces the session and all grants.
 
-Replies use `{type: "response", requestId, payload}`. `state:get` includes running
-conversation IDs and their run IDs. Mutating commands require the matching current
-run ID so stale clients cannot affect replacement runs. Transport errors use
-`{type: "error", error: "CODE"}` without exposing exception details.
+Commands are atomically claimed once. Request receipts persist until session
+cleanup; ciphertext responses expire after five minutes. Old queued commands
+cannot execute after 60 seconds. Bounded event replay triggers a fresh snapshot
+when a sequence gap is detected. An uncertain prompt submission is never silently
+resent: the draft and target conversation survive reconnect so the user can inspect
+whether it was received. Expired sessions and relay packets are cleaned up by
+scheduled backend jobs.
 
-Agent events use `{type: "agent:stream-event", conversationId, runId, event}`;
-session lifecycle events use `agent:session-started` / `agent:session-ended`.
+## Mobile behavior
 
-## Next architecture step
+The header contains hamburger, one Run/Context/Usage button, conversation actions,
+and panel. It has no conversation title. The chat occupies the middle and AI Input
+stays above the keyboard/safe area. A first visit opens an unsaved No project draft;
+returning restores this tab's last conversation. Desktop/mobile navigation remains
+independent. Drafts are scoped to each conversation.
 
-For access across networks, add an authenticated HTTPS/WSS relay. The desktop
-should establish an outbound connection, with expiring one-time pairing grants,
-device authorization/revocation, account/workspace scoping, and encrypted transport.
-Reuse desktop conversation components through a shared mobile client that consumes
-the same typed command/event protocol. Do not expose this LAN listener to the
-internet or change the QR to an external `/r/...` route before the relay exists.
+Supported: conversation history and search, projects, sending prompts/model
+selection, streaming output, stop, question answers, allow-once/deny approvals,
+rename/archive, context/usage, activity panel, language/theme/account menus, and
+read-only Scheduled/Marketplace lists. New remote runs use ask-before-changes mode.
+
+Current bounds: bootstrap contains the 100 most recent conversations; a conversation
+snapshot includes up to 80 recent messages within 150 KiB plus bounded live output.
+Scheduled/Marketplace editing, file editing/attachments, full desktop sidepanel
+tabs, and automatic token refresh are not provided by this mobile version. An
+expired login returns the user to Accounts; existing backend authority is always
+checked again.
+
+## Configuration and rollout
+
+Use the same Convex deployment for Accounts, desktop and web:
+
+- Desktop: `VITE_CONVEX_URL`; built-in production fallback is
+  `https://earnest-hawk-132.convex.cloud`.
+- Desktop QR origin: `HARNESS_REMOTE_WEB_ORIGIN`, default
+  `https://harness.const.web.id`.
+- Web: `NEXT_PUBLIC_CONVEX_URL` (same production fallback), and optionally
+  `NEXT_PUBLIC_ACCOUNTS_URL` (default `https://accounts.const.web.id`).
+
+Deploy backend functions/indexes with `pnpm --filter @const/backend exec convex deploy`.
+Build/deploy `apps/harness/web` using the public variables above, preserving its
+existing landing/download routes. A Git push alone is not evidence of a successful
+hosting rollout. Rebuild/restart the desktop after updating source.
 
 ## Verification
 
 ```sh
-pnpm --filter @const/harness-desktop test:remote
+pnpm --filter @const/backend test:remote
+pnpm --filter @const/backend check-types
+pnpm --filter @const/harness-web check-types
 pnpm --filter @const/harness-desktop check-types
+pnpm --filter @const/harness-web build
+pnpm --filter @const/harness-desktop test:remote
 pnpm --filter @const/harness-desktop build
 pnpm --filter @const/harness-desktop test:startup
 ```
+
+`pnpm --filter @const/harness-desktop test:remote:preview` starts the isolated mobile
+fixture at `http://127.0.0.1:5198/tests/remote-mobile-preview.html`. It uses synthetic
+data and does not contact Accounts, the production relay or a model. Broker tests
+exercise account boundaries and encryption; the host/browser transport integration
+test runs both real endpoint classes against an in-memory broker.

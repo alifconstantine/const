@@ -329,7 +329,7 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("marketplace:get-skill-content", slug, workspacePath),
   },
   remote: {
-    startSession: () => ipcRenderer.invoke("remote:start-session"),
+    startSession: (authToken: string) => ipcRenderer.invoke("remote:start-session", authToken),
     stopSession: () => ipcRenderer.invoke("remote:stop-session"),
     refreshSession: () => ipcRenderer.invoke("remote:refresh-session"),
     getStatus: () => ipcRenderer.invoke("remote:get-status"),

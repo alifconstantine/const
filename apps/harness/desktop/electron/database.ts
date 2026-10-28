@@ -154,6 +154,16 @@ export class ConversationDatabase {
     return rows.map((row) => this.hydrateConversation(row));
   }
 
+  /** Sidebar bootstrap must not load the full transcript of every local chat. */
+  public listRemoteSummaries(): Omit<ConversationRecord, "messages">[] {
+    return this.db.prepare("SELECT id, title, project, model, created_at AS createdAt, updated_at AS updatedAt FROM conversations WHERE is_archived = 0 AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY updated_at DESC LIMIT 100").all() as unknown as Omit<ConversationRecord, "messages">[];
+  }
+
+  public listRemoteProjects(): string[] {
+    const rows = this.db.prepare("SELECT DISTINCT project FROM conversations WHERE is_archived = 0 AND project <> 'Outside Project' AND project <> '' AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' LIMIT 200").all() as { project: string }[];
+    return rows.map((row) => row.project);
+  }
+
   public getConversation(id: string): ConversationRecord | null {
     const row = this.db
       .prepare("SELECT * FROM conversations WHERE id = ?")
@@ -253,7 +263,7 @@ export class ConversationDatabase {
   }
 
   /** Stream telemetry updates never rewrite messages or conversation metadata. */
-  public recordTelemetry(conversationId: string, event: unknown): void {
+  public recordTelemetry(conversationId: string, event: unknown): ChatTelemetry | undefined {
     const row = this.db.prepare("SELECT telemetry FROM conversations WHERE id = ?").get(conversationId) as { telemetry?: string } | undefined;
     if (!row) return;
     let previous: ChatTelemetry | undefined;
@@ -267,6 +277,7 @@ export class ConversationDatabase {
     const telemetry = reduceTelemetry(previous, event);
     this.db.prepare("UPDATE conversations SET telemetry = ?, context_usage = COALESCE(?, context_usage) WHERE id = ?")
       .run(JSON.stringify(telemetry), telemetry.context ? JSON.stringify(telemetry.context) : null, conversationId);
+    return telemetry;
   }
 
   public deleteConversation(id: string): void {

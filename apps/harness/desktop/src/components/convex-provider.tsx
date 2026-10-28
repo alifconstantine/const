@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useCallback, ReactNode } from "react";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import { DEFAULT_CONVEX_URL } from "@const/remote/config";
 
 const convexUrl =
   (import.meta.env.VITE_CONVEX_URL as string) ||
   (import.meta.env.NEXT_PUBLIC_CONVEX_URL as string) ||
-  "https://earnest-hawk-132.convex.cloud";
+  DEFAULT_CONVEX_URL;
 
 export const convex = new ConvexReactClient(convexUrl);
 

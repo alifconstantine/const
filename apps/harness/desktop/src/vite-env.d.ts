@@ -440,7 +440,7 @@ declare global {
       openPath?: (targetPath: string) => Promise<boolean>;
       showInFolder?: (targetPath: string) => Promise<boolean>;
       resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
-      onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
+      onConversationsChanged?: (callback: (data: { conversationId?: string; remoteMessages?: any[] }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;
         create: (data: Partial<ScheduledTaskItem>) => Promise<ScheduledTaskItem>;
@@ -612,7 +612,7 @@ declare global {
         } | null>;
       };
       remote?: {
-        startSession: () => Promise<RemoteDaemonStatus>;
+        startSession: (authToken: string) => Promise<RemoteDaemonStatus>;
         stopSession: () => Promise<RemoteDaemonStatus>;
         refreshSession: () => Promise<RemoteDaemonStatus>;
         getStatus: () => Promise<RemoteDaemonStatus>;
