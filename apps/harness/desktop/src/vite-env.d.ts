@@ -392,6 +392,7 @@ declare global {
       searchConversations?: (query: string) => Promise<any[]>;
       listArchivedConversations?: () => Promise<any[]>;
       getConversation?: (id: string) => Promise<any | null>;
+      getUsageLogs?: () => Promise<import("./lib/usage-logs").LocalRequestLog[]>;
       saveConversation?: (convo: any) => Promise<boolean>;
       updateConversationUi?: (id: string, patch: import("./lib/conversation-store").ConversationUiPatch) => Promise<boolean>;
       deleteConversation?: (id: string) => Promise<boolean>;

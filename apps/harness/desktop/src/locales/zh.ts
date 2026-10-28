@@ -642,6 +642,8 @@ export const zh: TranslationDictionary = {
 
     // Usage stats
     refreshUsageStats: "刷新使用统计",
+    usageStatsUpdated: "使用统计已更新。",
+    usageStatsLoadFailed: "无法加载使用统计，请尝试刷新。",
     clearLocalLogs: "清空本地日志",
     clearHistory: "清空历史",
     noUsageRecorded: "暂无模型调用记录",

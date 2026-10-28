@@ -2054,6 +2054,7 @@ app.whenReady().then(() => {
   handleDesktopIpc("agent:get-side-receipts", async (_event, sideChatId: string) => sideReceipts.get(sideChatId));
 
   // Conversations Database IPC Handlers
+  handleDesktopIpc("usage:list", async () => conversationDb.listUsageLogs());
   handleDesktopIpc("conversations:list", async (_event, includeArchived?: boolean) => {
     return conversationDb.listConversations(includeArchived);
   });

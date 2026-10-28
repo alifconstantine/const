@@ -638,6 +638,8 @@ export interface TranslationDictionary {
 
     // Usage stats
     refreshUsageStats: string;
+    usageStatsUpdated: string;
+    usageStatsLoadFailed: string;
     clearLocalLogs: string;
     clearHistory: string;
     noUsageRecorded: string;

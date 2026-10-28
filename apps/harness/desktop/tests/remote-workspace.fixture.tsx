@@ -21,6 +21,11 @@ const conversations: any[] = [
     title: "Review remote integration",
     project: "/workspace/const",
     model: "test-model",
+    telemetry: {
+      version: 1,
+      requests: { "preview-request": { requestId: "preview-request", model: "test-model", startedAt: Date.now(), promptTokens: 1200, completionTokens: 600, totalTokens: 1800, cacheReadTokens: 500, durationMs: 2000, status: "completed" } },
+      context: { usedTokens: 6400, totalTokens: 128000, model: "test-model", updatedAt: Date.now() },
+    },
     createdAt: Date.now(),
     updatedAt: Date.now(),
     messages: [
@@ -55,6 +60,8 @@ api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
       if (channel === "config:get") return config;
+      if (channel === "dialog:open-directory") return "/workspace/mobile-picked";
+      if (channel === "usage:list") return conversations.flatMap(conversation => Object.values(conversation.telemetry?.requests || {}).map((request: any) => ({ id: `llm_${conversation.id}_${request.requestId}`, requestId: `llm_${conversation.id}_${request.requestId}`, conversationId: conversation.id, model: request.model, promptTokens: request.promptTokens, completionTokens: request.completionTokens, totalTokens: request.totalTokens, durationMs: request.durationMs, status: 200, createdAt: request.startedAt })));
       if (channel === "config:save") {
         Object.assign(config, args[0]);
         return config;
@@ -76,7 +83,7 @@ api = createDesktopBridge(
       )
         return conversations.filter(
           (c) => !!c.isArchived === (channel.endsWith("archived") || !!args[0]),
-        );
+        ).map(({ messages: _messages, telemetry: _telemetry, sideConversations: _sides, rightPaneState: _pane, ...summary }) => ({ ...summary, messages: [], __remoteSummary: true }));
       if (channel === "conversations:get")
         return conversations.find((c) => c.id === args[0]) || null;
       if (channel === "conversations:search")

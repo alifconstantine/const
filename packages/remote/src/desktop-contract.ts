@@ -1,6 +1,7 @@
 // Explicit wire capabilities. Native window, authentication, pairing, and arbitrary IPC stay local.
 export const desktopChannels = [
   "system:runtime",
+  "usage:list",
   "system:open-const-folder",
   "workspace:select-directory",
   "browser:remote-input",

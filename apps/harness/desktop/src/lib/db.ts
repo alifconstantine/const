@@ -3,21 +3,8 @@ import Dexie, { type EntityTable } from "dexie";
 export type { LocalSkill, LocalSkillBundle, SkillCategory, SkillFileEntry, SkillFrontmatter } from "./skills/types";
 import type { LocalSkill, LocalSkillBundle } from "./skills/types";
 import { loadConversations } from "./conversation-store";
-
-export interface LocalRequestLog {
-  id: string;
-  requestId: string;
-  model: string;
-  provider?: string;
-  conversationId?: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  durationMs: number;
-  status: number;
-  toolNames?: string[];
-  createdAt: number;
-}
+import { modelRequestToLog, type LocalRequestLog } from "./usage-logs";
+export type { LocalRequestLog } from "./usage-logs";
 
 export const db = new Dexie("ConstHarnessDatabase") as Dexie & {
   skills: EntityTable<LocalSkill, "id">;
@@ -42,15 +29,8 @@ export const localDb = {
   },
 
   async recordModelRequest(conversationId: string, request: ModelRequest): Promise<void> {
-    if (request.totalTokens === undefined) return;
-    const id = `llm_${conversationId}_${request.requestId}`;
-    await db.requestLogs.put({
-      id, requestId: id, model: request.model, conversationId,
-      promptTokens: request.promptTokens ?? 0, completionTokens: request.completionTokens ?? 0,
-      totalTokens: request.totalTokens, durationMs: request.durationMs ?? 0,
-      status: request.status === "failed" ? 500 : request.status === "cancelled" ? 499 : 200,
-      createdAt: request.startedAt,
-    });
+    const log = modelRequestToLog(conversationId, request);
+    if (log) await db.requestLogs.put(log);
   },
 
   async getRequestLogs(since?: number): Promise<LocalRequestLog[]> {

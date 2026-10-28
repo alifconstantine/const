@@ -1399,7 +1399,7 @@ export function ChatCard({
       >
         {/* Top Header Strip: Choose Project (Visible in landing view or when showProjectHeader is true) */}
         {(!compact || showProjectHeader) && (
-          <div className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
+          <div data-workspace-selector className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
             <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
               <button
                 type="button"
@@ -2431,9 +2431,10 @@ export function ChatCard({
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.sessionStatistics")}
+                      aria-label={t("workbench.sessionStatistics")}
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                      <span>
+                      <span data-telemetry-label>
                         {t(metrics.turns === 1 ? "workbench.telemetryTurn" : "workbench.telemetryTurns").replace("{count}", String(metrics.turns))} &middot; {t(metrics.steps === 1 ? "workbench.telemetryStep" : "workbench.telemetrySteps").replace("{count}", String(metrics.steps ?? "—"))} &middot; {metrics.tokPerSec === undefined ? "—" : metrics.tokPerSec.toFixed(1)} tok/s
                       </span>
                     </button>
@@ -2667,9 +2668,10 @@ export function ChatCard({
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.telemetryUsage")}
+                      aria-label={t("workbench.telemetryUsage")}
                     >
                       <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                      <span>
+                      <span data-telemetry-label>
                         {metrics.hasUsage ? formatTokenDisplay(convTokens) : "—"} tok &middot; {t("workbench.telemetryCacheHit")} {metrics.cacheHitRate === undefined ? "—" : `${metrics.cacheHitRate.toFixed(1)}%`}
                       </span>
                     </button>

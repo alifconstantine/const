@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
-import { loadConversations } from "../../lib/conversation-store";
+import { useRemoteRuntime } from "../../lib/remote-runtime";
+import { useHostUsageLogs } from "../../lib/use-host-usage-logs";
 import {
   GitHubActivity,
   type Contribution,
@@ -101,6 +102,7 @@ function UsageStatsInner({
   activeModel = "agy/gemini-3.8-flash-tiered",
 }: UsageStatsViewProps) {
   const { t } = useTranslation();
+  const remote = useRemoteRuntime();
   // Time range selection: "7d" (Last 7 days) or "30d" (Last 30 days)
   const [timeRange, setTimeRange] = useState<"7d" | "30d">("7d");
   // Activity tab mode: "daily" | "weekly" | "cumulative"
@@ -108,19 +110,22 @@ function UsageStatsInner({
   // Activity surface style variant: "white" | "calamansi" | "slate" | "citrus"
   const [activityVariant, setActivityVariant] = useState<GitHubActivityVariant>("white");
   // Refresh state
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLocallyRefreshing, setIsRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const hostUsage = useHostUsageLogs(!!remote, refreshKey);
+  const isRefreshing = remote ? hostUsage.loading : isLocallyRefreshing;
 
   // Sync conversations to local IndexedDB on mount
   useEffect(() => {
-    localDb.syncLogsFromConversations().catch(() => {});
-  }, []);
+    if (!remote) void localDb.syncLogsFromConversations().catch(() => {});
+  }, [!!remote]);
 
   // 1. Reactive query from local Dexie database
-  const localLogs = useLiveQuery(
-    () => localDb.getRequestLogs(),
-    [refreshKey]
+  const cachedLogs = useLiveQuery(
+    () => remote ? [] : localDb.getRequestLogs(),
+    [refreshKey, !!remote]
   );
+  const localLogs = remote ? hostUsage.logs : cachedLogs;
 
   // 2. Local conversations fallback / aggregation (STRICTLY REAL DATA, ZERO DUMMY)
   const localStats = useMemo(() => {
@@ -170,15 +175,19 @@ function UsageStatsInner({
   }, [activeModel]);
 
   // Handle Refresh action
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
+    if (remote) { setRefreshKey(key => key + 1); return; }
     setIsRefreshing(true);
-    localDb.syncLogsFromConversations().catch(() => {});
-    setRefreshKey((k) => k + 1);
-    setTimeout(() => {
+    try {
+      await localDb.syncLogsFromConversations();
+      setRefreshKey(key => key + 1);
+      toast.success(t("settings.usageStatsUpdated"));
+    } catch {
+      toast.error(t("settings.usageStatsLoadFailed"));
+    } finally {
       setIsRefreshing(false);
-      toast.success("Usage stats updated from local DB");
-    }, 450);
-  }, []);
+    }
+  }, [!!remote, t]);
 
   // 1. Top KPI Summary Metrics (ZERO DUMMY DATA - STRICTLY FROM LOCAL DB)
   const { totalTokensStr, peakTokensStr, longestSessionStr, currentStreakStr, longestStreakStr } = useMemo(() => {
@@ -429,6 +438,7 @@ function UsageStatsInner({
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex flex-col gap-5 w-full max-w-3xl pb-8 select-none">
+        {remote && hostUsage.error && <p role="alert" className="text-sm text-muted-foreground">{t("settings.usageStatsLoadFailed")}</p>}
         {/* ------------------------------------------------------------- */}
         {/* Header with "Usage stats" & "App usage" Pill                  */}
         {/* ------------------------------------------------------------- */}
@@ -817,7 +827,7 @@ function UsageStatsInner({
               </span>
             </div>
 
-            {localLogs && localLogs.length > 0 && (
+            {!remote && localLogs && localLogs.length > 0 && (
               <button
                 type="button"
                 onClick={handleClearLogs}

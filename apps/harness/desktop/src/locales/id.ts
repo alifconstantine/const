@@ -642,6 +642,8 @@ export const id: TranslationDictionary = {
 
     // Usage stats
     refreshUsageStats: "Segarkan statistik penggunaan",
+    usageStatsUpdated: "Statistik penggunaan diperbarui.",
+    usageStatsLoadFailed: "Statistik penggunaan gagal dimuat. Coba muat ulang.",
     clearLocalLogs: "Hapus log lokal",
     clearHistory: "Bersihkan riwayat",
     noUsageRecorded: "Belum ada penggunaan model yang tercatat",

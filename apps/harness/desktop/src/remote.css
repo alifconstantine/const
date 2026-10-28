@@ -100,11 +100,8 @@
   gap: 4px;
   white-space: nowrap;
 }
-.remote-mobile [data-remote-telemetry] button:has(.lucide-gauge) span {
+.remote-mobile [data-remote-telemetry] [data-telemetry-label] {
   display: none;
-}
-.remote-mobile [data-remote-telemetry] button:has(.lucide-database) span {
-  font-size: 11px;
 }
 .remote-mobile .workspace-landing {
   padding: 12px;

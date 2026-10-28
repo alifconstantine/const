@@ -60,3 +60,31 @@ test("old tool estimates and context-derived backfills are excluded from usage s
   assert.equal(isModelRequestLog({ ...log, toolNames: ["read"] }), false);
   assert.equal(reduceTelemetry(undefined, { type: "usage", promptTokens: 100 }).requests.constructor, Object);
 });
+
+test("remote usage includes archived host requests, deduplicates updates and omits transcripts", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-remote-usage-"));
+  const database = new ConversationDatabase(dir);
+  try {
+    const base = { title: "Usage", project: dir, createdAt: 1, updatedAt: 1, messages: [{ role: "user", content: "Private transcript must stay on host" }] };
+    database.saveConversation({ ...base, id: "active" });
+    database.saveConversation({ ...base, id: "archived", isArchived: true });
+    database.saveConversation({ ...base, id: "broken" });
+    database.recordTelemetry("active", { type: "llm_request", requestId: "one", model: "model", startedAt: 1000 });
+    assert.deepEqual(database.listUsageLogs(), []); // No estimates from an unbilled request.
+    database.recordTelemetry("active", { type: "usage", requestId: "one", promptTokens: 100, completionTokens: 20, totalTokens: 120 });
+    database.recordTelemetry("active", { type: "usage", requestId: "one", promptTokens: 100, completionTokens: 50, totalTokens: 150 });
+    database.recordTelemetry("archived", { type: "llm_request", requestId: "two", model: "other-model", startedAt: 2000 });
+    database.recordTelemetry("archived", { type: "usage", requestId: "two", promptTokens: 1000, completionTokens: 200, totalTokens: 1200 });
+    (database as any).db.prepare("UPDATE conversations SET telemetry = ? WHERE id = ?").run("{invalid", "broken");
+    const logs = database.listUsageLogs();
+    assert.equal(logs.length, 2);
+    assert.deepEqual(logs.map(log => log.conversationId), ["archived", "active"]);
+    assert.equal(logs.reduce((sum, log) => sum + log.totalTokens, 0), 1350);
+    assert.equal(logs[1]?.id, "llm_active_one");
+    assert.equal(logs[1]?.completionTokens, 50);
+    assert.ok(!JSON.stringify(logs).includes("Private transcript"));
+  } finally {
+    (database as any).db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

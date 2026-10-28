@@ -4427,11 +4427,11 @@ export function AuthenticatedContent({
         ) : (
           <div className="flex-1 min-w-0 overflow-hidden flex flex-col relative">
             {/* Left Vertical Mini-Timeline Navigator (TurnTimelineNav matching const-harness) */}
-            <ChatIndicator
+            {!remote?.mobile && <ChatIndicator
               messages={messages}
               isExecuting={isExecuting}
               scrollContainerRef={chatScrollRef}
-            />
+            />}
 
             {/* Top-Right Floating Card: Unified Todo & Sub-Agents */}
             {((activeTodos && activeTodos.length > 0) || (activeSubAgents && activeSubAgents.length > 0)) && (
@@ -4630,6 +4630,7 @@ export function AuthenticatedContent({
                         activeModelItem?.id
                       }
                       compact
+                      showProjectHeader={!!remote?.mobile}
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
                       onAbort={() => handleAbort()}

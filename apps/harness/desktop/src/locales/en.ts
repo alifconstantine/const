@@ -642,6 +642,8 @@ export const en: TranslationDictionary = {
 
     // Usage stats
     refreshUsageStats: "Refresh usage statistics",
+    usageStatsUpdated: "Usage statistics updated.",
+    usageStatsLoadFailed: "Could not load usage statistics. Please try refreshing.",
     clearLocalLogs: "Clear local logs",
     clearHistory: "Clear history",
     noUsageRecorded: "No model usage recorded yet",

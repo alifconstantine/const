@@ -642,6 +642,8 @@ export const ja: TranslationDictionary = {
 
     // Usage stats
     refreshUsageStats: "使用状況を更新",
+    usageStatsUpdated: "使用統計を更新しました。",
+    usageStatsLoadFailed: "使用統計を読み込めませんでした。更新をお試しください。",
     clearLocalLogs: "ローカルログを消去",
     clearHistory: "履歴をクリア",
     noUsageRecorded: "モデルの使用履歴はまだありません",

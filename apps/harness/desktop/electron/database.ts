@@ -4,6 +4,7 @@ import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { mergeTelemetry, reduceTelemetry, telemetryForHistory, type ChatTelemetry } from "../src/lib/chat-telemetry";
 import type { ConversationRightPaneState, ConversationUiPatch, SideConversationItem } from "../src/lib/conversation-store";
+import { modelRequestToLog, type LocalRequestLog } from "../src/lib/usage-logs";
 
 export interface StoredMessage {
   id?: string;
@@ -313,6 +314,25 @@ export class ConversationDatabase {
 
     // Ensure brain directory and append to transcript.jsonl
     this.ensureBrainTranscript(convo);
+  }
+
+  /** Export provider usage without exposing conversation transcripts. */
+  public listUsageLogs(): LocalRequestLog[] {
+    // Usage needs metadata only, including archived tasks. Never transfer all
+    // transcripts just to populate a remote activity chart.
+    const rows = this.db.prepare("SELECT id, telemetry FROM conversations WHERE telemetry IS NOT NULL").all() as { id: string; telemetry: string }[];
+    const logs: LocalRequestLog[] = [];
+    for (const row of rows) {
+      try {
+        const telemetry = JSON.parse(row.telemetry) as ChatTelemetry;
+        if (telemetry.version !== 1 || !telemetry.requests || Array.isArray(telemetry.requests)) continue;
+        for (const request of Object.values(telemetry.requests)) {
+          const log = modelRequestToLog(row.id, request);
+          if (log) logs.push(log);
+        }
+      } catch { /* One damaged historical record must not hide other usage. */ }
+    }
+    return logs.sort((a, b) => b.createdAt - a.createdAt);
   }
 
   /** Stream telemetry updates never rewrite messages or conversation metadata. */

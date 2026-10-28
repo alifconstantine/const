@@ -178,6 +178,8 @@ export function createDesktopBridge(
       ipcRenderer.invoke("conversations:list-archived"),
     getConversation: (id: string) =>
       ipcRenderer.invoke("conversations:get", id),
+    getUsageLogs: (): Promise<import("./usage-logs").LocalRequestLog[]> =>
+      ipcRenderer.invoke("usage:list"),
     saveConversation: (convo: any) =>
       ipcRenderer.invoke("conversations:save", convo),
     updateConversationUi: (id: string, patch: import("./conversation-store").ConversationUiPatch) =>
