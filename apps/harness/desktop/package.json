@@ -5,7 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && vite",
-    "build": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
+    "build": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",

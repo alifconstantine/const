@@ -5,6 +5,8 @@ import path from "node:path";
 
 export default defineConfig({
   base: "./",
+  // Electron ships these assets locally; gzip reporting adds costly work for large diagram chunks.
+  build: { reportCompressedSize: false },
   plugins: [
     react(),
     electron([
