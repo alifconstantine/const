@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { useRemoteRuntime } from "../../lib/remote-runtime";
 import { getModelContextLimit } from "../../lib/model-context";
 import { estimateMessage } from "@const/agent/token-meter";
 import { ROUTER_DEFAULT_MODELS } from "../../lib/router-models";
@@ -427,6 +429,9 @@ export function ChatCard({
   onSteerAllQueuedMessages,
   onSteerDraft,
 }: ChatCardProps) {
+  const remote = useRemoteRuntime();
+  const [telemetryTarget, setTelemetryTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => { setTelemetryTarget(remote?.mobile ? document.getElementById("remote-header-telemetry") : null); }, [remote?.mobile, conversationId]);
   const { t } = useTranslation();
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const [containerNarrow, setContainerNarrow] = useState(false);
@@ -2408,8 +2413,8 @@ export function ChatCard({
         const cachedInputTokens = metrics ? (metrics.cachedInputTokens ?? Math.round(metrics.inputTokens * ((metrics.cacheHitRate ?? 0) / 100))) : 0;
         const uncachedInputTokens = metrics ? (metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens)) : 0;
 
-        return (
-          <div className="w-full flex items-center justify-between gap-2 sm:gap-4 pt-2 pb-0.5 px-1 select-none flex-wrap">
+        const telemetry = (
+          <div data-remote-telemetry className="w-full flex items-center justify-between gap-2 sm:gap-4 pt-2 pb-0.5 px-1 select-none flex-wrap">
             {/* Left: Session statistics & Context Windows */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
               {metrics && (
@@ -2713,6 +2718,7 @@ export function ChatCard({
             )}
           </div>
         );
+        return remote?.mobile && telemetryTarget ? createPortal(telemetry, telemetryTarget) : telemetry;
       })()}
 
       {/* Media Lightbox Preview Modal */}

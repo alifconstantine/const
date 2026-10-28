@@ -1,6 +1,9 @@
 export interface TranslationDictionary {
   mcp: import("./mcp").McpTranslations;
   remoteControl: {
+    loginRequired: string;
+    target: string;
+    encryption: string;
     title: string;
     description: string;
     scan: string;

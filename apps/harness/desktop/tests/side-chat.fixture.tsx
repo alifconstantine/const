@@ -1,3 +1,4 @@
+import "../src/lib/disable-openui-devtools";
 import React, { Profiler, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nProvider } from "../src/lib/i18n";
@@ -6,6 +7,8 @@ import type { RightPaneTab } from "../src/components/right-pane/types";
 import "../src/index.css";
 
 const counts = { commits: 0, updates: 0 };
+localStorage.setItem("const_app_language", "en");
+localStorage.removeItem("const_harness_side_chat_parent");
 const listeners = new Set<(event: any) => void>();
 const started = new Set<(event: any) => void>();
 const ended = new Set<(event: any) => void>();
@@ -77,4 +80,4 @@ setTimeout(() => {
       }, 300);
     }, 100);
   }, 500);
-}, 500);
+}, 1500);

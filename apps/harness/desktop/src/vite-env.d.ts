@@ -388,6 +388,7 @@ declare global {
       generateTitle: (prompt: string, authToken?: string, model?: string) => Promise<string | null>;
       onAgentEvent: (callback: (event: AgentStreamEvent) => void) => () => void;
       listConversations?: (includeArchived?: boolean) => Promise<any[]>;
+      searchConversations?: (query: string) => Promise<any[]>;
       listArchivedConversations?: () => Promise<any[]>;
       getConversation?: (id: string) => Promise<any | null>;
       saveConversation?: (convo: any) => Promise<boolean>;
@@ -490,6 +491,7 @@ declare global {
         }) => void
       ) => () => void;
       browser?: {
+        remoteInput?: (input: any) => Promise<any>;
         registerTab: (tabId: string, guestContentsId: number) => Promise<boolean>;
         unregisterTab: (tabId: string) => Promise<boolean>;
         setActiveTab: (tabId: string) => Promise<boolean>;

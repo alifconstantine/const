@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRemoteRuntime } from "../lib/remote-runtime";
 import {
   Archive,
   CalendarClock,
@@ -152,6 +153,16 @@ export function CommandPaletteModal({
 }: CommandPaletteModalProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const remote = useRemoteRuntime();
+  const [remoteMatches, setRemoteMatches] = useState<ConversationItem[]>([]);
+  useEffect(() => {
+    let disposed = false;
+    if (!remote || !open || query.trim().length < 2) { setRemoteMatches([]); return; }
+    const timer = setTimeout(() => {
+      void window.electron?.searchConversations?.(query).then(rows => { if (!disposed) setRemoteMatches(rows); }).catch(() => { if (!disposed) setRemoteMatches([]); });
+    }, 180);
+    return () => { disposed = true; clearTimeout(timer); };
+  }, [remote, open, query]);
   const [tab, setTab] = useState<PaletteTab>("all");
   const [taskCategory, setTaskCategory] = useState<TaskCategoryFilter>("all");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -187,7 +198,8 @@ export function CommandPaletteModal({
 
   // All Real Tasks extracted from conversations
   const allTasks: TaskItem[] = useMemo(() => {
-    return conversations
+    const matches = new Set(remoteMatches.map(item => item.id));
+    return [...remoteMatches, ...conversations.filter(item => !matches.has(item.id))]
       .filter((c) => Boolean(c.title || c.id))
       .map((c) => {
         const isProject = Boolean(
@@ -205,7 +217,7 @@ export function CommandPaletteModal({
         };
       })
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-  }, [conversations]);
+  }, [conversations, remoteMatches]);
 
   // Filtered Tasks based on query and taskCategory (Title > Workspace > Messages)
   const filteredTasks = useMemo(() => {

@@ -1,3 +1,5 @@
+import { useRemoteRuntime } from "../../lib/remote-runtime";
+import { RemoteBrowserViewport } from "./remote-browser-viewport";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ChevronLeft,
@@ -89,6 +91,7 @@ function normalizeUrl(input: any): string {
 }
 
 export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: BrowserTabProps) {
+  const remote = useRemoteRuntime();
   const { t } = useTranslation();
   const initialUrl =
     typeof tab.url === "string" && tab.url && tab.url !== "[object Object]"
@@ -1074,7 +1077,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             height: "100%",
           }}
         >
-          <webview
+          {remote ? <RemoteBrowserViewport tabId={tab.id} url={initialUrlRef.current || currentUrl} webviewRef={webviewRef} /> : <webview
             ref={webviewRef}
             src={initialUrlRef.current || currentUrl}
             partition="persist:const_browser"
@@ -1087,7 +1090,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               height: "100%",
               flex: "1 1 100%",
             }}
-          />
+          />}
         </div>
       </div>
     </div>

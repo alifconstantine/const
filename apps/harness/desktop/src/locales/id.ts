@@ -4,7 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const id: TranslationDictionary = {
   mcp: mcpTranslations.id,
   remoteControl: {
-    title: "Remote control ponsel",
+    loginRequired: "Masuk untuk menggunakan kendali jarak jauh.",
+    target: "Tujuan: {host}",
+    encryption: "AES-GCM E2E",
+    title: "Kendali jarak jauh",
     description: "Pindai kode QR atau buka tautan di ponsel.",
     scan: "Pindai dengan kamera ponsel",
     loading: "Menyiapkan koneksi…",
@@ -18,7 +21,7 @@ export const id: TranslationDictionary = {
     connectedCount: "Perangkat terhubung: {count}",
     network: "Masuk di ponsel dengan akun Const yang sama. Desktop harus tetap terbuka dan terhubung.",
     security: "Koneksi remote terenkripsi",
-    scope: "Lanjutkan percakapan, kirim prompt, dan setujui tindakan dari ponsel.",
+    scope: "Perangkat terhubung dapat mengakses chat, file, terminal, jadwal, plugin, dan pengaturan Harness. Hubungkan hanya perangkat tepercaya.",
     startError: "Gagal memulai remote control. Periksa login dan konfigurasi layanan remote.",
     actionError: "Tindakan gagal. Coba lagi.",
     expired: "QR kedaluwarsa. Perbarui untuk menghubungkan perangkat baru.",

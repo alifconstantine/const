@@ -14,12 +14,13 @@ async function main() {
   const port = portServer.address().port;
   await new Promise(resolve => portServer.close(resolve));
   const vite = path.join(path.dirname(require.resolve("vite/package.json")), "bin/vite.js");
-  const server = spawn(process.execPath, [vite, "--config", "tests/vite.config.ts", "--port", String(port)], { cwd: root, stdio: "ignore" });
+  const server = spawn(process.execPath, [vite, "--config", "tests/vite.config.ts", "--port", String(port)], { cwd: root, stdio: "inherit", windowsHide: true, env: { ...process.env, CONST_FIXTURE_ENTRY: "tests/side-chat.html" } });
   const url = `http://127.0.0.1:${port}/tests/side-chat.html`;
   try {
     let ready = false;
-    for (let i = 0; i < 100 && !ready; i++) {
-      try { ready = (await fetch(url)).ok; } catch {}
+    for (let i = 0; i < 120 && !ready; i++) {
+      if (server.exitCode !== null) throw new Error(`Side chat fixture server exited with ${server.exitCode}`);
+      try { ready = (await fetch(url, { signal: AbortSignal.timeout(1000) })).ok; } catch {}
       if (!ready) await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!ready) throw new Error("Side chat fixture server did not start");
@@ -41,7 +42,9 @@ async function main() {
     console.log("Side chat fixture passed:", JSON.stringify(result));
   } finally {
     server.kill();
-    rmSync(temp, { recursive: true, force: true });
+    if (path.dirname(path.resolve(temp)) === path.resolve(tmpdir()) && path.basename(temp).startsWith("const-side-chat-test-")) {
+      rmSync(temp, { recursive: true, force: true });
+    }
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

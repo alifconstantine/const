@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { Check, Copy, Monitor, QrCode, RotateCw, Smartphone, Unplug, X } from "lucide-react";
+import { Check, Copy, Globe, LogIn, Monitor, QrCode, RotateCw, Smartphone, Unplug, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, ScrollArea } from "@const/ui";
 import { useTranslation } from "../lib/i18n";
+import { useAppAuth } from "./convex-provider";
 import type { RemoteDaemonStatus } from "../lib/remote-control";
+import { useRemoteRuntime } from "../lib/remote-runtime";
 
 interface RemoteControlModalProps { isOpen: boolean; onClose: () => void }
 
-export function RemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
+export function RemoteControlModal(props: RemoteControlModalProps) {
+  const remote = useRemoteRuntime();
   const { t } = useTranslation();
+  if (!remote) return <HostRemoteControlModal {...props} />;
+  return <Dialog open={props.isOpen} onOpenChange={open => { if (!open) props.onClose(); }}><DialogContent hideClose className="max-w-md border-0 rounded-2xl bg-white dark:bg-[#222222] p-6"><div className="flex items-center justify-between"><DialogTitle>{t("remoteControl.title")}</DialogTitle><button onClick={props.onClose} aria-label={t("common.close")}><X className="w-4 h-4" /></button></div><DialogDescription>{remote.deviceName}</DialogDescription><p className="text-sm text-muted-foreground">{t(remote.online ? "remoteControl.mobileConnected" : "remoteControl.mobileDisconnected")}</p><button className="rounded-xl bg-black/5 dark:bg-white/10 px-4 py-2 text-sm" onClick={() => void remote.disconnect?.()}>{t("common.stop")}</button></DialogContent></Dialog>;
+}
+
+function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
+  const { t } = useTranslation();
+  const auth = useAppAuth();
   const [status, setStatus] = useState<RemoteDaemonStatus | null>(null);
   const [qr, setQr] = useState<{ url: string; image: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,6 +29,9 @@ export function RemoteControlModal({ isOpen, onClose }: RemoteControlModalProps)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pairingUrl = useRef(status?.pairingUrl);
   pairingUrl.current = status?.pairingUrl;
+
+  const authToken = auth?.token || localStorage.getItem("const_harness_auth_token") || "";
+  const isLoggedIn = !!authToken;
 
   // Opening only observes status. Starting network access is an explicit action.
   useEffect(() => {
@@ -66,14 +79,30 @@ export function RemoteControlModal({ isOpen, onClose }: RemoteControlModalProps)
     return () => { cancelled = true; };
   }, [isOpen, status?.pairingUrl]);
 
+  const handleLogin = async () => {
+    try {
+      if (window.electron?.startAuth) {
+        await window.electron.startAuth({ accountsUrl: "https://accounts.const.web.id" });
+      } else {
+        window.open("https://accounts.const.web.id", "_blank");
+      }
+    } catch {
+      setError("startError");
+    }
+  };
+
   const run = async (action: "start" | "stop" | "refresh") => {
     const api = window.electron?.remote;
     if (!api || busy) return;
+    if (action === "start" && !isLoggedIn) {
+      void handleLogin();
+      return;
+    }
     const current = generation.current;
     setBusy(true);
     setError(null);
     try {
-      const next = await (action === "start" ? api.startSession(localStorage.getItem("const_harness_auth_token") || "") : action === "stop" ? api.stopSession() : api.refreshSession());
+      const next = await (action === "start" ? api.startSession(authToken) : action === "stop" ? api.stopSession() : api.refreshSession());
       if (generation.current === current) { setStatus(next); setNow(Date.now()); }
     } catch { if (generation.current === current) setError(action === "start" ? "startError" : "actionError"); }
     finally { if (generation.current === current) setBusy(false); }
@@ -120,15 +149,56 @@ export function RemoteControlModal({ isOpen, onClose }: RemoteControlModalProps)
             <div className="flex min-w-0 flex-col gap-4 justify-center">
               <div className="flex items-center justify-between gap-3">
                 <h3 role="status" className="text-sm font-medium dark:text-white">{t(busy ? "remoteControl.loading" : stopped ? "remoteControl.stopped" : status.status === "connected" ? "remoteControl.connected" : "remoteControl.waiting")}</h3>
-                <button className={button} disabled={busy || !window.electron?.remote} onClick={() => void run(stopped ? "start" : "stop")}><Unplug className="h-3.5 w-3.5" />{t(stopped ? "remoteControl.start" : "common.stop")}</button>
+                <button className={button} disabled={busy || !window.electron?.remote} onClick={() => void run(stopped ? "start" : "stop")}>
+                  <Unplug className="h-3.5 w-3.5" />
+                  {t(stopped ? "remoteControl.start" : "common.stop")}
+                </button>
               </div>
+
+              {/* Endpoint domain confirmation */}
+              {status?.pairingUrl ? (
+                <div className="flex flex-col gap-1.5 rounded-xl bg-[#f4f4f5] dark:bg-[#202020] border border-[#dedee2] dark:border-[#333333] p-2.5">
+                  <div className="flex items-center justify-between text-xs text-[#737373] dark:text-[#969696]">
+                    <span className="flex items-center gap-1.5 font-medium text-[#262626] dark:text-[#e5e5e5]">
+                      <Globe className="h-3.5 w-3.5" />
+                      {new URL(status.pairingUrl).host}
+                    </span>
+                    <span className="font-mono text-[10px] bg-black/5 dark:bg-white/10 text-[#737373] dark:text-[#d4d4d4] px-1.5 py-0.5 rounded">
+                      {t("remoteControl.encryption")}
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-[#737373] dark:text-[#888888] truncate select-all">
+                    {status.pairingUrl.split("#")[0]}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-[#737373] dark:text-[#969696]">
+                  <Globe className="h-3.5 w-3.5 shrink-0" />
+                  <span>{t("remoteControl.target", { host: "harness.const.web.id" })}</span>
+                </div>
+              )}
+
+              {/* Login required warning if stopped and not logged in */}
+              {stopped && !isLoggedIn && (
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-black/5 dark:bg-white/5 px-3 py-2 text-xs text-[#737373] dark:text-[#d4d4d4]">
+                  <span>{t("remoteControl.loginRequired")}</span>
+                  <button
+                    className={`${button} font-medium !py-1 !px-2.5 !text-xs`}
+                    onClick={() => void handleLogin()}
+                  >
+                    <LogIn className="h-3 w-3" />
+                    {t("auth.signInButton")}
+                  </button>
+                </div>
+              )}
+
               <p className="text-[13px] leading-relaxed text-[#737373] dark:text-[#969696]">{t("remoteControl.network")}</p>
               {status?.connectedDevices.length ? <p className="text-xs">{t("remoteControl.connectedCount", { count: status.connectedDevices.length })}</p> : null}
               <div className="flex flex-wrap gap-2">
                 <button className={button} disabled={busy || stopped} onClick={() => void run("refresh")}><RotateCw className="h-3.5 w-3.5" />{t("remoteControl.refresh")}</button>
                 <button className={button} disabled={busy || stopped || expired} onClick={() => void copy()}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{t(copied ? "common.copied" : "remoteControl.copy")}</button>
               </div>
-              {error && <p role="alert" className="text-[13px] dark:text-white">{t(`remoteControl.${error}`)}</p>}
+              {error && <p role="alert" className="text-[13px] text-red-500 dark:text-red-400">{t(`remoteControl.${error}`)}</p>}
               <p className="text-xs text-[#737373] dark:text-[#969696]">{t("remoteControl.scope")}</p>
               <div className="flex items-center gap-2 text-xs text-[#737373] dark:text-[#969696]"><Monitor className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{status?.deviceId}</span></div>
               <p className="text-xs text-[#737373] dark:text-[#969696]">{t("remoteControl.security")}</p>

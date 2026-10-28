@@ -5,6 +5,7 @@ import fs from "node:fs";
 
 // Isolated browser fixture: no Electron process, credentials, or model calls.
 export default defineConfig({
+  optimizeDeps: { entries: process.env.CONST_FIXTURE_ENTRY || undefined },
   plugins: [
     react(),
     {

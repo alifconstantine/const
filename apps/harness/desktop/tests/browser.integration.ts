@@ -240,6 +240,21 @@ async function run() {
     assert.equal(blockedDestinationHits, 0);
     driver.setAllowedDomains([]);
   });
+  await check("remote human input targets the guest, pauses AI, and rejects invalid coordinates", async () => {
+    await driver.remoteInput({ tabId: "primary", action: "evaluate", script: "document.querySelector('#editor').focus(); document.querySelector('#editor').value = ''" });
+    await driver.remoteInput({ tabId: "primary", action: "text", text: "remote input" });
+    assert.equal(await js("document.querySelector('#editor').value"), "remote input");
+    assert.equal(driver.getControl().holder, "human");
+    await assert.rejects(driver.remoteInput({ tabId: "primary", action: "click", x: Infinity, y: 0.5 }), /invalid/);
+    await assert.rejects(driver.remoteInput({ tabId: "missing", action: "text", text: "must not insert" }));
+    assert.equal(await js("document.querySelector('#editor').value"), "remote input");
+    driver.releaseControl();
+  });
+  await check("remote browser frames are ephemeral and leave no screenshot file", async () => {
+    const shot = await driver.screenshot({ tabId: "primary", format: "jpeg", quality: 55, ephemeral: true });
+    assert.ok(shot.dataUrl.startsWith("data:image/jpeg;base64,"));
+    assert.ok(!shot.filePath);
+  });
   host.destroy();
   console.log(`Browser integration: ${passed} checks passed on Electron ${process.versions.electron}.`);
 }

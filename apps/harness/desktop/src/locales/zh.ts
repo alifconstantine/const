@@ -4,7 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const zh: TranslationDictionary = {
   mcp: mcpTranslations.zh,
   remoteControl: {
-    title: "手机远程控制",
+    loginRequired: "请登录以使用远程控制。",
+    target: "连接地址：{host}",
+    encryption: "AES-GCM E2E",
+    title: "远程控制",
     description: "用手机扫描二维码或打开链接。",
     scan: "使用手机相机扫描",
     loading: "正在准备连接…",
@@ -18,7 +21,7 @@ export const zh: TranslationDictionary = {
     connectedCount: "已连接设备：{count}",
     network: "请在手机上使用相同的 Const 账户登录，并保持桌面端开启和联网。",
     security: "加密远程连接",
-    scope: "在手机上继续对话、发送提示并批准操作。",
+    scope: "连接的设备可以访问聊天、文件、终端、计划任务、插件和 Harness 设置。请仅连接可信设备。",
     startError: "无法启动远程控制，请检查登录状态和远程服务配置。",
     actionError: "操作失败，请重试。",
     expired: "二维码已过期，请刷新后连接新设备。",

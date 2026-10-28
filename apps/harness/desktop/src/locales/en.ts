@@ -4,7 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const en: TranslationDictionary = {
   mcp: mcpTranslations.en,
   remoteControl: {
-    title: "Mobile remote control",
+    loginRequired: "Sign in to use remote control.",
+    target: "Destination: {host}",
+    encryption: "AES-GCM E2E",
+    title: "Remote control",
     description: "Scan the QR code or open the link on your phone.",
     scan: "Scan with your phone camera",
     loading: "Preparing connection…",
@@ -18,7 +21,7 @@ export const en: TranslationDictionary = {
     connectedCount: "Connected devices: {count}",
     network: "Sign in on your phone with the same Const account. Your desktop must remain open and connected.",
     security: "Encrypted remote connection",
-    scope: "Continue conversations, send prompts, and approve actions from your phone.",
+    scope: "Connected devices can access chats, files, terminals, scheduled tasks, plugins, and Harness settings. Pair only devices you trust.",
     startError: "Could not start remote control. Check your sign-in and remote service configuration.",
     actionError: "The action failed. Try again.",
     expired: "QR expired. Refresh to pair a new device.",

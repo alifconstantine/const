@@ -4,7 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const ja: TranslationDictionary = {
   mcp: mcpTranslations.ja,
   remoteControl: {
-    title: "モバイルリモート操作",
+    loginRequired: "リモートコントロールを使用するにはログインしてください。",
+    target: "接続先: {host}",
+    encryption: "AES-GCM E2E",
+    title: "リモートコントロール",
     description: "スマートフォンでQRコードをスキャンするか、リンクを開いてください。",
     scan: "スマートフォンのカメラでスキャン",
     loading: "接続を準備中…",
@@ -18,7 +21,7 @@ export const ja: TranslationDictionary = {
     connectedCount: "接続中のデバイス: {count}",
     network: "スマートフォンで同じConstアカウントにログインしてください。デスクトップは開いたまま接続してください。",
     security: "暗号化されたリモート接続",
-    scope: "スマートフォンから会話の続行、プロンプトの送信、操作の承認ができます。",
+    scope: "接続した端末からチャット、ファイル、ターミナル、スケジュール、プラグイン、Harness設定にアクセスできます。信頼できる端末のみ接続してください。",
     startError: "リモート操作を開始できません。ログインとリモートサービスの設定を確認してください。",
     actionError: "操作に失敗しました。再試行してください。",
     expired: "QRの有効期限が切れました。新しいデバイスを接続するには更新してください。",

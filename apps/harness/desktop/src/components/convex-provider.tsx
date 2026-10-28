@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useCallback, useMemo, useEffect, ReactNode } from "react";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { DEFAULT_CONVEX_URL } from "@const/remote/config";
 
@@ -37,14 +37,18 @@ export function ConvexClientProvider({
   token,
   signOut,
   children,
+  url,
 }: {
   token: string | null;
   signOut: () => void;
   children: ReactNode;
+  url?: string;
 }) {
+  const client = useMemo(() => url ? new ConvexReactClient(url) : convex, [url]);
+  useEffect(() => () => { if (url) void client.close(); }, [client, url]);
   return (
     <AuthContext.Provider value={{ token, signOut }}>
-      <ConvexProviderWithAuth client={convex} useAuth={useConvexAuthAdapter}>
+      <ConvexProviderWithAuth client={client} useAuth={useConvexAuthAdapter}>
         {children}
       </ConvexProviderWithAuth>
     </AuthContext.Provider>

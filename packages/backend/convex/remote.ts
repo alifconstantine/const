@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
   mutation,
   query,
@@ -18,14 +18,10 @@ type Ctx = MutationCtx | QueryCtx;
 async function session(ctx: Ctx, id: Id<"remoteSessions">) {
   const owner = await getAuthUserId(ctx);
   const row = await ctx.db.get(id);
-  if (
-    !owner ||
-    !row ||
-    row.ownerId !== owner ||
-    row.revoked ||
-    row.expiresAt <= Date.now()
-  )
-    throw new Error("REMOTE_UNAUTHORIZED");
+  if (!owner || !row || row.ownerId !== owner)
+    throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
+  if (row.revoked || row.expiresAt <= Date.now())
+    throw new ConvexError({ code: "REMOTE_SESSION_EXPIRED" });
   return row;
 }
 async function host(
@@ -33,7 +29,8 @@ async function host(
   args: { sessionId: Id<"remoteSessions">; hostHash: string },
 ) {
   const row = await session(ctx, args.sessionId);
-  if (row.hostHash !== args.hostHash) throw new Error("REMOTE_UNAUTHORIZED");
+  if (row.hostHash !== args.hostHash)
+    throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
   return row;
 }
 async function device(
@@ -49,14 +46,15 @@ async function device(
   if (
     !client ||
     client.sessionId !== args.sessionId ||
-    client.secretHash !== args.secretHash ||
-    client.revoked
+    client.secretHash !== args.secretHash
   )
-    throw new Error("REMOTE_UNAUTHORIZED");
+    throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
+  if (client.revoked) throw new ConvexError({ code: "REMOTE_DEVICE_REVOKED" });
   return row;
 }
 function packet(value: string) {
-  if (!value || value.length > 700_000) throw new Error("REMOTE_PACKET_LIMIT");
+  if (!value || value.length > 700_000)
+    throw new ConvexError({ code: "REMOTE_PACKET_LIMIT" });
 }
 
 export const create = mutation({
@@ -69,16 +67,32 @@ export const create = mutation({
       args.hostHash.length !== 43 ||
       args.pairHash.length !== 43
     )
-      throw new Error("REMOTE_UNAUTHORIZED");
+      throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
     const previous = await ctx.db
       .query("remoteSessions")
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
       .collect();
+    for (const stale of previous.filter(
+      (row) => !row.revoked && Date.now() - row.heartbeatAt > 90_000,
+    )) {
+      await ctx.db.patch(stale._id, { revoked: true });
+      await ctx.scheduler.runAfter(
+        0,
+        makeFunctionReference<"mutation", { sessionId: Id<"remoteSessions"> }>(
+          "remote:cleanup",
+        ),
+        { sessionId: stale._id },
+      );
+    }
     if (
-      previous.filter((row) => !row.revoked && row.expiresAt > Date.now())
-        .length >= 4
+      previous.filter(
+        (row) =>
+          !row.revoked &&
+          row.expiresAt > Date.now() &&
+          Date.now() - row.heartbeatAt <= 90_000,
+      ).length >= 4
     )
-      throw new Error("REMOTE_SESSION_LIMIT");
+      throw new ConvexError({ code: "REMOTE_SESSION_LIMIT" });
     const id = await ctx.db.insert("remoteSessions", {
       ...args,
       ownerId,
@@ -113,7 +127,7 @@ export const join = mutation({
       args.secretHash.length !== 43 ||
       args.name.length > 100
     )
-      throw new Error("REMOTE_PAIRING_EXPIRED");
+      throw new ConvexError({ code: "REMOTE_PAIRING_EXPIRED" });
     const clients = await ctx.db
       .query("remoteDevices")
       .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
@@ -123,7 +137,7 @@ export const join = mutation({
     );
     if (existing) return existing._id;
     if (clients.filter((client) => !client.revoked).length >= 4)
-      throw new Error("REMOTE_DEVICE_LIMIT");
+      throw new ConvexError({ code: "REMOTE_DEVICE_LIMIT" });
     return ctx.db.insert("remoteDevices", {
       sessionId: args.sessionId,
       name: args.name,
@@ -140,9 +154,12 @@ export const hostInbox = query({
     const commands = await ctx.db
       .query("remoteCommands")
       .withIndex("by_session_state", (q) =>
-        q.eq("sessionId", args.sessionId).eq("state", "queued"),
+        q
+          .eq("sessionId", args.sessionId)
+          .eq("state", "queued")
+          .gt("_creationTime", Date.now() - 60_000),
       )
-      .order("desc")
+      .order("asc")
       .take(20);
     const devices = await ctx.db
       .query("remoteDevices")
@@ -178,9 +195,11 @@ export const deviceFeed = query({
       .take(40);
     const responses = await ctx.db
       .query("remoteCommands")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .withIndex("by_device_completed", (q) =>
+        q.eq("deviceId", args.deviceId).eq("state", "done"),
+      )
       .order("desc")
-      .take(8);
+      .take(16);
     return {
       deviceName: row.deviceName,
       heartbeatAt: row.heartbeatAt,
@@ -198,16 +217,29 @@ export const deviceFeed = query({
   },
 });
 export const submit = mutation({
-  args: { ...deviceArgs, requestId: v.string(), packet: v.string() },
+  args: {
+    ...deviceArgs,
+    requestId: v.string(),
+    packet: v.string(),
+    chunkCount: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const row = await device(ctx, args);
     packet(args.packet);
-    if (args.packet.length > 150_000) throw new Error("REMOTE_PACKET_LIMIT");
+    if (
+      args.chunkCount !== undefined &&
+      (!Number.isInteger(args.chunkCount) ||
+        args.chunkCount < 1 ||
+        args.chunkCount > 192)
+    )
+      throw new ConvexError({ code: "REMOTE_PACKET_LIMIT" });
+    if (args.packet.length > 150_000)
+      throw new ConvexError({ code: "REMOTE_PACKET_LIMIT" });
     if (
       Date.now() - row.heartbeatAt > 45_000 ||
       !/^[a-zA-Z0-9_-]{1,100}$/.test(args.requestId)
     )
-      throw new Error("REMOTE_OFFLINE");
+      throw new ConvexError({ code: "REMOTE_OFFLINE" });
     const prior = await ctx.db
       .query("remoteCommands")
       .withIndex("by_request", (q) =>
@@ -217,7 +249,7 @@ export const submit = mutation({
     if (prior) return prior._id;
     const sameWindow = Date.now() - (row.rateWindow || 0) < 60_000;
     const count = sameWindow ? (row.rateCount || 0) + 1 : 1;
-    if (count > 120) throw new Error("REMOTE_RATE_LIMIT");
+    if (count > 600) throw new ConvexError({ code: "REMOTE_RATE_LIMIT" });
     await ctx.db.patch(row._id, {
       rateWindow: sameWindow ? row.rateWindow : Date.now(),
       rateCount: count,
@@ -228,7 +260,9 @@ export const submit = mutation({
       deviceId: args.deviceId,
       requestId: args.requestId,
       packet: args.packet,
-      state: "queued",
+      state: args.chunkCount ? "uploading" : "queued",
+      chunkCount: args.chunkCount,
+      uploadedChunks: args.chunkCount ? 0 : undefined,
       createdAt: Date.now(),
     });
     await ctx.scheduler.runAfter(
@@ -274,8 +308,19 @@ export const complete = mutation({
       command.sessionId !== args.sessionId ||
       command.state !== "claimed"
     )
-      throw new Error("REMOTE_INVALID_COMMAND");
-    await ctx.db.patch(command._id, { state: "done", response: args.response });
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    await ctx.db.patch(command._id, {
+      state: "done",
+      response: args.response,
+      completedAt: Date.now(),
+    });
+    await ctx.scheduler.runAfter(
+      5 * 60_000,
+      makeFunctionReference<"mutation", { commandId: Id<"remoteCommands"> }>(
+        "remote:expirePacket",
+      ),
+      { commandId: command._id },
+    );
   },
 });
 export const publish = mutation({
@@ -283,7 +328,8 @@ export const publish = mutation({
   handler: async (ctx, args) => {
     const row = await host(ctx, args);
     packet(args.packet);
-    if (args.packet.length > 96_000) throw new Error("REMOTE_PACKET_LIMIT");
+    if (args.packet.length > 96_000)
+      throw new ConvexError({ code: "REMOTE_PACKET_LIMIT" });
     await ctx.db.patch(row._id, {
       revision: row.revision + 1,
       heartbeatAt: Date.now(),
@@ -347,6 +393,7 @@ export const cleanup = internalMutation({
       "remoteCommands",
       "remoteEvents",
       "remoteDevices",
+      "remoteChunks",
     ] as const) {
       const records = await ctx.db
         .query(table)
@@ -371,11 +418,175 @@ export const expirePacket = internalMutation({
   handler: async (ctx, args) => {
     const command = await ctx.db.get(args.commandId);
     // Keep a small receipt until session cleanup, so reconnects cannot replay a command.
-    if (command)
+    if (command?.state === "claimed") {
+      await ctx.db.patch(command._id, { packet: "" });
+      return;
+    }
+    if (command) {
       await ctx.db.patch(command._id, {
         packet: "",
         response: undefined,
         state: "done",
       });
+      const chunks = await ctx.db
+        .query("remoteChunks")
+        .withIndex("by_part", (q) => q.eq("commandId", command._id))
+        .take(8);
+      for (const chunk of chunks) await ctx.db.delete(chunk._id);
+      if (chunks.length === 8)
+        await ctx.scheduler.runAfter(
+          0,
+          makeFunctionReference<
+            "mutation",
+            { commandId: Id<"remoteCommands"> }
+          >("remote:expirePacket"),
+          args,
+        );
+    }
+  },
+});
+
+const chunkArgs = { commandId: v.id("remoteCommands"), index: v.number() };
+function validChunk(index: number, value?: string) {
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index >= 192 ||
+    (value !== undefined && (!value || value.length > 100_000))
+  )
+    throw new ConvexError({ code: "REMOTE_PACKET_LIMIT" });
+}
+export const uploadChunk = mutation({
+  args: { ...deviceArgs, ...chunkArgs, packet: v.string() },
+  handler: async (ctx, args) => {
+    await device(ctx, args);
+    validChunk(args.index, args.packet);
+    const command = await ctx.db.get(args.commandId);
+    if (
+      !command ||
+      command.sessionId !== args.sessionId ||
+      command.deviceId !== args.deviceId ||
+      args.index >= (command.chunkCount || 0)
+    )
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    const existing = await ctx.db
+      .query("remoteChunks")
+      .withIndex("by_part", (q) =>
+        q
+          .eq("commandId", command._id)
+          .eq("direction", "command")
+          .eq("index", args.index),
+      )
+      .unique();
+    if (existing) {
+      if (existing.packet !== args.packet)
+        throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+      return;
+    }
+    if (
+      command.state !== "uploading" ||
+      Date.now() - command.createdAt > 60_000
+    )
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    await ctx.db.insert("remoteChunks", {
+      sessionId: args.sessionId,
+      commandId: command._id,
+      direction: "command",
+      index: args.index,
+      packet: args.packet,
+    });
+    const uploadedChunks = (command.uploadedChunks || 0) + 1;
+    await ctx.db.patch(command._id, {
+      uploadedChunks,
+      state: uploadedChunks === command.chunkCount ? "queued" : "uploading",
+    });
+  },
+});
+export const commandChunk = query({
+  args: { ...hostArgs, ...chunkArgs },
+  handler: async (ctx, args) => {
+    await host(ctx, args);
+    validChunk(args.index);
+    const command = await ctx.db.get(args.commandId);
+    if (
+      !command ||
+      command.sessionId !== args.sessionId ||
+      command.state !== "claimed" ||
+      args.index >= (command.chunkCount || 0)
+    )
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    const chunk = await ctx.db
+      .query("remoteChunks")
+      .withIndex("by_part", (q) =>
+        q
+          .eq("commandId", command._id)
+          .eq("direction", "command")
+          .eq("index", args.index),
+      )
+      .unique();
+    if (!chunk) throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    return chunk.packet;
+  },
+});
+export const writeResponseChunk = mutation({
+  args: { ...hostArgs, ...chunkArgs, packet: v.string() },
+  handler: async (ctx, args) => {
+    await host(ctx, args);
+    validChunk(args.index, args.packet);
+    const command = await ctx.db.get(args.commandId);
+    if (
+      !command ||
+      command.sessionId !== args.sessionId ||
+      command.state !== "claimed"
+    )
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    const existing = await ctx.db
+      .query("remoteChunks")
+      .withIndex("by_part", (q) =>
+        q
+          .eq("commandId", command._id)
+          .eq("direction", "response")
+          .eq("index", args.index),
+      )
+      .unique();
+    if (existing) {
+      if (existing.packet !== args.packet)
+        throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+      return;
+    }
+    await ctx.db.insert("remoteChunks", {
+      sessionId: args.sessionId,
+      commandId: command._id,
+      direction: "response",
+      index: args.index,
+      packet: args.packet,
+    });
+  },
+});
+export const responseChunk = query({
+  args: { ...deviceArgs, ...chunkArgs },
+  handler: async (ctx, args) => {
+    await device(ctx, args);
+    validChunk(args.index);
+    const command = await ctx.db.get(args.commandId);
+    if (
+      !command ||
+      command.sessionId !== args.sessionId ||
+      command.deviceId !== args.deviceId ||
+      command.state !== "done" ||
+      !command.response
+    )
+      throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    const chunk = await ctx.db
+      .query("remoteChunks")
+      .withIndex("by_part", (q) =>
+        q
+          .eq("commandId", command._id)
+          .eq("direction", "response")
+          .eq("index", args.index),
+      )
+      .unique();
+    if (!chunk) throw new ConvexError({ code: "REMOTE_INVALID_COMMAND" });
+    return chunk.packet;
   },
 });

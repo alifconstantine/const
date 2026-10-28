@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
+import { sanitizeInlineMarkdown } from "../../lib/safe-markdown";
 import { Check, Copy } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { ResponseTable } from "../intelligence-ui/response-table";
@@ -451,7 +452,7 @@ function InlineRenderer({ text }: { text: string }) {
   if (typeof html === "string") {
     return (
       <span
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: sanitizeInlineMarkdown(html) }}
         className="cursor-text select-text [&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:cursor-pointer [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium"
       />
     );

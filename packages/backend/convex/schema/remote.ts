@@ -31,17 +31,31 @@ export const remoteTables = {
       v.literal("queued"),
       v.literal("claimed"),
       v.literal("done"),
+      v.literal("uploading"),
     ),
+    chunkCount: v.optional(v.number()),
+    uploadedChunks: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
     response: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_session", ["sessionId"])
     .index("by_session_state", ["sessionId", "state"])
     .index("by_device", ["deviceId", "createdAt"])
+    .index("by_device_completed", ["deviceId", "state", "completedAt"])
     .index("by_request", ["deviceId", "requestId"]),
   remoteEvents: defineTable({
     sessionId: v.id("remoteSessions"),
     revision: v.number(),
     packet: v.string(),
   }).index("by_session", ["sessionId", "revision"]),
+  remoteChunks: defineTable({
+    sessionId: v.id("remoteSessions"),
+    commandId: v.id("remoteCommands"),
+    direction: v.union(v.literal("command"), v.literal("response")),
+    index: v.number(),
+    packet: v.string(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_part", ["commandId", "direction", "index"]),
 };

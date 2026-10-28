@@ -1,3 +1,4 @@
+import { useRemoteRuntime } from "../lib/remote-runtime";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   ConstLogoIcon,
@@ -195,6 +196,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [theme, setTheme] = useTheme();
   const [currentZoom, setCurrentZoom] = useInterfaceZoom();
+  const remote = useRemoteRuntime();
   const { t, language: currentLanguage, setLanguage } = useTranslation();
 
   const handleSelectLanguage = (code: string) => {
@@ -715,12 +717,12 @@ export function Sidebar({
           >
             <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
             <div className="flex items-center gap-1.5">
-              <span className="font-serif text-base font-normal tracking-tight text-foreground">
+              {remote ? <span className="flex items-center gap-2 text-xs max-w-40 truncate" title={t(remote.online ? "remoteControl.mobileConnected" : "remoteControl.mobileDisconnected")}><span className={`w-1.5 h-1.5 shrink-0 rounded-full ${remote.online ? "bg-green-500" : "bg-[#969696]"}`} /><span className="truncate">{remote.deviceName}</span></span> : <><span className="font-serif text-base font-normal tracking-tight text-foreground">
                 Const
               </span>
               <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 Harness
-              </span>
+              </span></>}
             </div>
           </div>
 
@@ -739,7 +741,7 @@ export function Sidebar({
               title={t("sidebar.collapseSidebar")}
               aria-label={t("sidebar.collapseSidebar")}
             >
-              <PanelLeft className="w-4 h-4" />
+              {remote?.mobile ? <X className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
             </button>
           </div>
         </div>

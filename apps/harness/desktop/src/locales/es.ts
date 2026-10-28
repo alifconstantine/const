@@ -4,7 +4,10 @@ import type { TranslationDictionary } from "./types";
 export const es: TranslationDictionary = {
   mcp: mcpTranslations.es,
   remoteControl: {
-    title: "Control remoto móvil",
+    loginRequired: "Inicia sesión para usar el control remoto.",
+    target: "Destino: {host}",
+    encryption: "AES-GCM E2E",
+    title: "Control remoto",
     description: "Escanea el código QR o abre el enlace en tu teléfono.",
     scan: "Escanea con la cámara del teléfono",
     loading: "Preparando conexión…",
@@ -18,7 +21,7 @@ export const es: TranslationDictionary = {
     connectedCount: "Dispositivos conectados: {count}",
     network: "Inicia sesión en el teléfono con la misma cuenta Const. Mantén el escritorio abierto y conectado.",
     security: "Conexión remota cifrada",
-    scope: "Continúa conversaciones, envía mensajes y aprueba acciones desde el teléfono.",
+    scope: "Los dispositivos conectados pueden acceder a chats, archivos, terminales, tareas programadas, plugins y ajustes de Harness. Vincula solo dispositivos de confianza.",
     startError: "No se pudo iniciar el control remoto. Revisa tu sesión y la configuración del servicio remoto.",
     actionError: "La acción falló. Vuelve a intentarlo.",
     expired: "El QR ha caducado. Actualízalo para conectar otro dispositivo.",

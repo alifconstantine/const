@@ -610,6 +610,44 @@ export class BrowserController {
     }
   }
 
+  /** Paired human input uses the guest page, while pausing concurrent AI control. */
+  public async remoteInput(input: any) {
+    const actions = ["navigate", "back", "forward", "reload", "click", "key", "text", "scroll", "zoom", "mute", "evaluate", "devtools"];
+    if (!input || typeof input.tabId !== "string" || !actions.includes(input.action)) throw new Error("invalid");
+    const tab = await this.ensureTargetTab({ tabId: input.tabId });
+    const target = tab.contents;
+    this.takeControl();
+    if (input.action === "navigate") await target.loadURL(this.normalizeUrl(String(input.url || "")));
+    if (input.action === "back" && target.navigationHistory.canGoBack()) target.navigationHistory.goBack();
+    if (input.action === "forward" && target.navigationHistory.canGoForward()) target.navigationHistory.goForward();
+    if (input.action === "reload") target.reload();
+    if (input.action === "click") {
+      if (![input.x, input.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) throw new Error("invalid");
+      const viewport = await target.executeJavaScript("({width:innerWidth,height:innerHeight})");
+      const x = Math.min(viewport.width - 1, Math.round(input.x * viewport.width)), y = Math.min(viewport.height - 1, Math.round(input.y * viewport.height));
+      target.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+      target.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 });
+    }
+    if (input.action === "key") {
+      if (typeof input.key !== "string" || input.key.length > 40) throw new Error("invalid");
+      target.sendInputEvent({ type: "keyDown", keyCode: input.key, modifiers: input.modifiers || [] });
+      target.sendInputEvent({ type: "keyUp", keyCode: input.key, modifiers: input.modifiers || [] });
+    }
+    if (input.action === "text") { if (typeof input.text !== "string" || input.text.length > 32000) throw new Error("invalid"); await target.insertText(input.text); }
+    if (input.action === "scroll") {
+      if (!Number.isFinite(input.deltaY) || Math.abs(input.deltaY) > 10000) throw new Error("invalid");
+      target.sendInputEvent({ type: "mouseWheel", x: 1, y: 1, deltaY: input.deltaY, deltaX: 0 });
+    }
+    if (input.action === "zoom") { if (!Number.isFinite(input.factor) || input.factor < 0.25 || input.factor > 3) throw new Error("invalid"); target.setZoomFactor(input.factor); }
+    if (input.action === "mute") target.setAudioMuted(!!input.muted);
+    if (input.action === "devtools") target.openDevTools({ mode: "detach" });
+    if (input.action === "evaluate") {
+      if (typeof input.script !== "string" || input.script.length > 100000) throw new Error("invalid");
+      return await target.executeJavaScript(input.script, true);
+    }
+    return { url: target.getURL(), canGoBack: target.navigationHistory.canGoBack(), canGoForward: target.navigationHistory.canGoForward() };
+  }
+
   public takeControl(): ControlState {
     this.updateControl({
       holder: "human",
@@ -2069,6 +2107,7 @@ export class BrowserController {
   }
 
   public async screenshot(params?: {
+    ephemeral?: boolean;
     annotate?: boolean;
     quality?: number;
     format?: "jpeg" | "png";
@@ -2217,16 +2256,15 @@ export class BrowserController {
     const base64 = buffer.toString("base64");
     const dataUrl = `data:${mimeType};base64,${base64}`;
 
-    const filePath = path.join(
+    const filePath = params?.ephemeral ? "" : path.join(
       os.tmpdir(),
       `const-browser-shot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
     );
-    await fs.promises.writeFile(filePath, buffer).catch(() => {});
-    this.pruneOldScreenshots();
+    if (filePath) { await fs.promises.writeFile(filePath, buffer).catch(() => {}); this.pruneOldScreenshots(); }
 
     const legend = formatScreenshotLegend(annotationTargets);
 
-    this.onAiActionCallback?.({
+    if (!params?.ephemeral) this.onAiActionCallback?.({
       type: "screenshot",
       details: {
         tabId: tab.tabId,

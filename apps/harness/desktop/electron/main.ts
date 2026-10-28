@@ -68,6 +68,8 @@ import { AgentSessionRegistry } from "./agent-sessions";
 import { selectAgentAutosaveMessages } from "./agent-history";
 import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
+import { handleDesktopIpc, invokeRemoteDesktop, sendDesktopEvent } from "./desktop-ipc";
+import { dispatchRemoteDesktop } from "./remote-desktop-controller";
 import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
@@ -112,7 +114,7 @@ const mcpService = new McpService(new McpStore(harnessHomeDir, {
     return safeStorage.decryptString(value);
   },
 }), () => {
-  for (const window of BrowserWindow.getAllWindows()) window.webContents.send("mcp:changed");
+  for (const window of BrowserWindow.getAllWindows()) sendDesktopEvent(window.webContents, "mcp:changed");
 }, (url) => shell.openExternal(url));
 let mcpShuttingDown = false;
 app.on("before-quit", (event) => {
@@ -288,7 +290,7 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
     if (enabled === undefined) continue;
     const installed = marketplaceService.listPlugins().installed.find((plugin) => plugin.name === name && plugin.scope === "user");
     if (installed) marketplaceService.setEnabled(installed.id, enabled);
-    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("marketplace:changed");
+    for (const window of BrowserWindow.getAllWindows()) sendDesktopEvent(window.webContents, "marketplace:changed");
   }
   if (config.launchOnStartup !== undefined) {
     try {
@@ -337,17 +339,39 @@ try {
   // Ignore filesystem initialization errors
 }
 
-// Load environment variables if present
+// Load environment variables if present (.env.local, .env)
 try {
   const envCandidates = [
+    path.resolve(__dirname, "../.env.local"),
     path.resolve(__dirname, "../.env"),
+    path.resolve(__dirname, "../../.env.local"),
     path.resolve(__dirname, "../../.env"),
+    path.resolve(process.cwd(), ".env.local"),
     path.resolve(process.cwd(), ".env"),
   ];
-  for (const envFile of envCandidates) {
-    if (fs.existsSync(envFile) && (process as any).loadEnvFile) {
-      (process as any).loadEnvFile(envFile);
-      break;
+  for (const envFile of app.isPackaged ? [] : envCandidates) {
+    if (fs.existsSync(envFile)) {
+      if ((process as any).loadEnvFile) {
+        try { (process as any).loadEnvFile(envFile); } catch {}
+      }
+      try {
+        const raw = fs.readFileSync(envFile, "utf-8");
+        for (const line of raw.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith("#")) continue;
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx > 0) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            let val = trimmed.slice(eqIdx + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            if (process.env[key] === undefined) {
+              process.env[key] = val;
+            }
+          }
+        }
+      } catch {}
     }
   }
 } catch {
@@ -451,14 +475,14 @@ function sendDeepLinkToRenderer(url: string) {
     // Consume session state upon valid token delivery
     activeLoginSessionState = null;
     lastAuthToken = token;
-    win.webContents.send("auth:deep-link", { url, token, cancelled: false });
+    sendDesktopEvent(win.webContents, "auth:deep-link", { url, token, cancelled: false });
     return;
   }
 
   // If no token was found and no session is active, reject
   if (!activeLoginSessionState) {
     console.warn("[Electron Main] Rejected callback: no token and no active login session.");
-    win.webContents.send("auth:deep-link", {
+    sendDesktopEvent(win.webContents, "auth:deep-link", {
       url,
       token: undefined,
       cancelled: true,
@@ -473,7 +497,7 @@ function sendDeepLinkToRenderer(url: string) {
     const cleanActive = activeLoginSessionState.replace(/\/+$/, "").trim();
     if (cleanReturned !== cleanActive) {
       console.warn("[Electron Main] Rejected callback: state mismatch on empty callback.");
-      win.webContents.send("auth:deep-link", {
+      sendDesktopEvent(win.webContents, "auth:deep-link", {
         url,
         token: undefined,
         cancelled: true,
@@ -555,29 +579,29 @@ function createWindow() {
 
     event.preventDefault();
     if (navigationUrl.startsWith("http://") || navigationUrl.startsWith("https://")) {
-      win?.webContents.send("browser:open-tab-request", { url: navigationUrl, newTab: true });
+      win && sendDesktopEvent(win.webContents, "browser:open-tab-request", { url: navigationUrl, newTab: true });
     }
   });
 
   // Intercept target="_blank" and window.open to open in the sidepanel browser tab instead of a full new window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
-      win?.webContents.send("browser:open-tab-request", { url, newTab: true });
+      win && sendDesktopEvent(win.webContents, "browser:open-tab-request", { url, newTab: true });
     }
     return { action: "deny" };
   });
 
   win.on("maximize", () => {
-    win?.webContents.send("window:maximized-change", true);
+    win && sendDesktopEvent(win.webContents, "window:maximized-change", true);
   });
   win.on("unmaximize", () => {
-    win?.webContents.send("window:maximized-change", false);
+    win && sendDesktopEvent(win.webContents, "window:maximized-change", false);
   });
 
   nativeTheme.on("updated", () => {
     if (win && !win.isDestroyed()) {
       win.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0c0c0c" : "#ffffff");
-      win.webContents.send("theme:system-changed", nativeTheme.shouldUseDarkColors ? "dark" : "light");
+      sendDesktopEvent(win.webContents, "theme:system-changed", nativeTheme.shouldUseDarkColors ? "dark" : "light");
     }
   });
 
@@ -673,21 +697,26 @@ app.whenReady().then(() => {
   ipcMain.on("window:close", () => {
     win?.close();
   });
-  ipcMain.handle("window:is-maximized", () => {
+  handleDesktopIpc("system:runtime", () => ({ platform: process.platform, defaultDirectory: loadUserConfig().defaultProjectLocation || app.getPath("home"), versions: { node: process.versions.node, chrome: process.versions.chrome, electron: process.versions.electron } }));
+  handleDesktopIpc("workspace:select-directory", (_event, directory: string) => {
+    if (typeof directory !== "string" || directory.length > 4096 || !fs.statSync(directory).isDirectory()) throw new Error("invalid");
+    return path.resolve(directory);
+  });
+  handleDesktopIpc("window:is-maximized", () => {
     return win?.isMaximized() ?? false;
   });
-  ipcMain.handle("window:set-zoom-factor", (_event, factor: number) => {
+  handleDesktopIpc("window:set-zoom-factor", (_event, factor: number) => {
     if (win && !win.isDestroyed() && typeof factor === "number" && factor > 0) {
       win.webContents.setZoomFactor(factor);
     }
   });
-  ipcMain.handle("window:get-zoom-factor", () => {
+  handleDesktopIpc("window:get-zoom-factor", () => {
     if (win && !win.isDestroyed()) {
       return win.webContents.getZoomFactor();
     }
     return 1.0;
   });
-  ipcMain.handle("window:set-theme-mode", (_event, mode: "system" | "light" | "dark") => {
+  handleDesktopIpc("window:set-theme-mode", (_event, mode: "system" | "light" | "dark") => {
     try {
       if (mode === "system") {
         nativeTheme.themeSource = "system";
@@ -709,7 +738,7 @@ app.whenReady().then(() => {
   });
 
   // Dialog handler
-  ipcMain.handle("dialog:open-directory", async () => {
+  handleDesktopIpc("dialog:open-directory", async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
       title: "Select Project Folder",
@@ -722,7 +751,7 @@ app.whenReady().then(() => {
   });
 
   // Open external URL handler
-  ipcMain.handle("auth:open-external", async (_event, url: string) => {
+  handleDesktopIpc("auth:open-external", async (_event, url: string) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       await shell.openExternal(url);
       return true;
@@ -731,7 +760,7 @@ app.whenReady().then(() => {
   });
 
   // Dedicated Loopback Auth Login Handlers
-  ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
+  handleDesktopIpc("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
     try {
       const serverRes = await startLoopbackAuthServer((token, _refreshToken) => {
         sendDeepLinkToRenderer(`const-harness://callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(serverRes.state)}`);
@@ -765,7 +794,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("auth:cancel-login", async () => {
+  handleDesktopIpc("auth:cancel-login", async () => {
     activeLoginSessionState = null;
     stopLoopbackAuthServer();
     console.log("[Electron Main] Authentication session cancelled by user");
@@ -775,7 +804,7 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   // Config & Model Management IPC Handlers
   // ---------------------------------------------------------------------------
-  ipcMain.handle("computer:get-capabilities", async () => {
+  handleDesktopIpc("computer:get-capabilities", async () => {
     try {
       return await computerController.getCapabilities();
     } catch (err: any) {
@@ -783,7 +812,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("computer:list-apps", async () => {
+  handleDesktopIpc("computer:list-apps", async () => {
     try {
       const apps = await computerController.listApps();
       return Array.isArray(apps) ? apps : [];
@@ -793,18 +822,18 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("config:get", async () => {
+  handleDesktopIpc("config:get", async () => {
     return loadUserConfig();
   });
 
-  ipcMain.handle("config:save", async (_event, newConfig: Partial<UserConfig>) => {
+  handleDesktopIpc("config:save", async (_event, newConfig: Partial<UserConfig>) => {
     return saveUserConfig(newConfig);
   });
 
   // ---------------------------------------------------------------------------
   // Memory Management IPC Handlers
   // ---------------------------------------------------------------------------
-  ipcMain.handle(
+  handleDesktopIpc(
     "memory:list",
     async (
       _event,
@@ -815,11 +844,11 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("memory:read", async (_event, filePath: string) => {
+  handleDesktopIpc("memory:read", async (_event, filePath: string) => {
     return await readMemoryFile(filePath);
   });
 
-  ipcMain.handle("memory:save", async (_event, filePath: string, content: string) => {
+  handleDesktopIpc("memory:save", async (_event, filePath: string, content: string) => {
     let target = filePath;
     if (filePath.startsWith(".const") || !path.isAbsolute(filePath)) {
       target = path.join(os.homedir(), filePath);
@@ -831,11 +860,11 @@ app.whenReady().then(() => {
     return true;
   });
 
-  ipcMain.handle("memory:delete", async (_event, filePath: string) => {
+  handleDesktopIpc("memory:delete", async (_event, filePath: string) => {
     return await deleteMemoryFile(filePath);
   });
 
-  ipcMain.handle("memory:open-in-folder", async (_event, filePath: string) => {
+  handleDesktopIpc("memory:open-in-folder", async (_event, filePath: string) => {
     if (fs.existsSync(filePath)) {
       shell.showItemInFolder(filePath);
       return true;
@@ -843,14 +872,14 @@ app.whenReady().then(() => {
     return false;
   });
 
-  ipcMain.handle("memory:get-config", async () => {
+  handleDesktopIpc("memory:get-config", async () => {
     const config = loadUserConfig();
     return {
       workspaceMemoryEnabled: config.workspaceMemoryEnabled ?? true,
     };
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "memory:save-config",
     async (_event, memoryConfig: { workspaceMemoryEnabled?: boolean }) => {
       const current = loadUserConfig();
@@ -871,10 +900,10 @@ app.whenReady().then(() => {
   // Marketplace & Skills Management IPC Handlers
   const capabilitiesChanged = () => {
     void mcpService.invalidate();
-    for (const window of BrowserWindow.getAllWindows()) window.webContents.send("marketplace:changed");
+    for (const window of BrowserWindow.getAllWindows()) sendDesktopEvent(window.webContents, "marketplace:changed");
   };
   const handleMcp = (channel: string, handler: (...args: any[]) => unknown) => {
-    ipcMain.handle(channel, async (event, ...args) => {
+    handleDesktopIpc(channel, async (event, ...args) => {
       const ownWindow = BrowserWindow.getAllWindows().some((window) => window.webContents === event.sender);
       if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
       try { return await handler(...args); }
@@ -900,16 +929,16 @@ app.whenReady().then(() => {
     if (window && !window.isDestroyed()) { window.show(); window.focus(); }
   });
   handleMcp("mcp:disconnect", (id: string, workspace?: string) => mcpService.disconnectAccount(id, workspace));
-  ipcMain.handle("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
-  ipcMain.handle("marketplace:install-plugin", (_event, payload: { name: string; scope?: "user" | "workspace"; workspacePath?: string }) => {
+  handleDesktopIpc("marketplace:list-plugins", (_event, workspacePath?: string) => marketplaceService.listPlugins(workspacePath));
+  handleDesktopIpc("marketplace:install-plugin", (_event, payload: { name: string; scope?: "user" | "workspace"; workspacePath?: string }) => {
     marketplaceService.installPlugin(payload.name, "user", payload.workspacePath);
     capabilitiesChanged();
   });
-  ipcMain.handle("marketplace:uninstall-plugin", (_event, payload: { id: string; workspacePath?: string }) => {
+  handleDesktopIpc("marketplace:uninstall-plugin", (_event, payload: { id: string; workspacePath?: string }) => {
     marketplaceService.uninstallPlugin(payload.id, payload.workspacePath);
     capabilitiesChanged();
   });
-  ipcMain.handle("marketplace:set-enabled", (_event, payload: { id: string; enabled: boolean; workspacePath?: string }) => {
+  handleDesktopIpc("marketplace:set-enabled", (_event, payload: { id: string; enabled: boolean; workspacePath?: string }) => {
     const plugin = marketplaceService.listPlugins(payload.workspacePath).installed.find((item) => item.id === payload.id);
     marketplaceService.setEnabled(payload.id, payload.enabled, payload.workspacePath);
     if (plugin?.scope === "user" && plugin.name === "browser-use") saveUserConfig({ enableBrowserUse: payload.enabled });
@@ -917,29 +946,29 @@ app.whenReady().then(() => {
     capabilitiesChanged();
   });
   // ---------------------------------------------------------------------------
-  ipcMain.handle("marketplace:list-installed", async (_event, workspacePath?: string) => {
+  handleDesktopIpc("marketplace:list-installed", async (_event, workspacePath?: string) => {
     return marketplaceService.listInstalledSkills(workspacePath);
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "marketplace:install-skill",
     async (
       event,
       payload: { slug: string; source?: string; skillId?: string; scope?: "user" | "workspace"; workspacePath?: string; requestId?: string }
     ) => {
       const installed = await marketplaceService.installSkill(payload.slug, payload.scope, payload.workspacePath, payload.source, payload.skillId, payload.requestId, (progress) => {
-        if (!event.sender.isDestroyed()) event.sender.send("marketplace:install-progress", progress);
+        if (!event.sender.isDestroyed()) sendDesktopEvent(event.sender, "marketplace:install-progress", progress);
       });
       if (installed) capabilitiesChanged();
       return installed;
     }
   );
 
-  ipcMain.handle("marketplace:cancel-skill-install", (_event, requestId: string) => marketplaceService.cancelSkillInstall(requestId));
-  ipcMain.handle("marketplace:search-skills", (_event, query: string) => fetchSkillsCatalog(typeof query === "string" ? query.slice(0, 200) : ""));
-  ipcMain.handle("marketplace:preview-remote-skill", (_event, source: string, skillId: string) => marketplaceService.previewRemoteSkill(source, skillId));
+  handleDesktopIpc("marketplace:cancel-skill-install", (_event, requestId: string) => marketplaceService.cancelSkillInstall(requestId));
+  handleDesktopIpc("marketplace:search-skills", (_event, query: string) => fetchSkillsCatalog(typeof query === "string" ? query.slice(0, 200) : ""));
+  handleDesktopIpc("marketplace:preview-remote-skill", (_event, source: string, skillId: string) => marketplaceService.previewRemoteSkill(source, skillId));
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "marketplace:uninstall-skill",
     async (
       _event,
@@ -951,7 +980,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "marketplace:open-skills-folder",
     async (
       _event,
@@ -961,14 +990,14 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "marketplace:get-skill-content",
     async (_event, slug: string, workspacePath?: string) => {
       return marketplaceService.getSkillContent(slug, workspacePath);
     }
   );
 
-  ipcMain.handle("agent:get-models", async () => {
+  handleDesktopIpc("agent:get-models", async () => {
     const config = loadUserConfig();
     const provCfg = config.providers["const"] || config.providers["const-engine"];
     const routerBaseUrl = (provCfg?.baseUrl || "https://router.const.web.id/v1").replace(/\/+$/, "");
@@ -1072,7 +1101,7 @@ app.whenReady().then(() => {
   });
 
   // Dedicated lightweight title generation that never conflicts with activeAgent
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:generate-title",
     async (_event, prompt: string, authToken?: string, model?: string) => {
       try {
@@ -1195,14 +1224,15 @@ app.whenReady().then(() => {
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
   const remoteLive = new Map<string, { revision: number; text: string; status: string; approval?: any; questions?: any; context?: any; usage?: any; tools: string[] }>();
+  const remoteRevisions = new Map<string, { runId: string; revision: number }>();
   const sideParents = new Map<string, string>();
   const sideReceipts = new SideSteeringReceipts(path.join(constBrainDir, "side-steering-receipts.json"));
   const recordSideReceipt = (sideChatId: string, instructionId: string, status: "queued" | "consumed" | "plan_updated" | "expired", runId: string) => {
     sideReceipts.set(sideChatId, instructionId, status);
-    if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { type: "side_steer_receipt", conversationId: sideChatId, instructionId, status, runId });
+    if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { type: "side_steer_receipt", conversationId: sideChatId, instructionId, status, runId });
   };
   const pendingQuestions = new Map<string, { runId: string; resolve: (answer: any) => void }>();
-  ipcMain.handle("agent:register-side-chat", async (_event, payload: { sideChatId: string; parentConversationId: string }) => {
+  handleDesktopIpc("agent:register-side-chat", async (_event, payload: { sideChatId: string; parentConversationId: string }) => {
     if (!/^(side_conversation_|side_chat_)/.test(payload?.sideChatId || "") || !payload.parentConversationId || /^(side_conversation_|side_chat_)/.test(payload.parentConversationId)) return { success: false };
     const previous = sideParents.get(payload.sideChatId);
     if (previous && previous !== payload.parentConversationId) return { success: false };
@@ -1215,12 +1245,16 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   remoteDaemon.onStatusChange((status) => {
     if (win && !win.isDestroyed()) {
-      win.webContents.send("remote:status-changed", status);
+      sendDesktopEvent(win.webContents, "remote:status-changed", status);
     }
   });
 
   remoteDaemon.onCommand(async (command, reply) => {
-    if (command.type === "state:get") {
+    if (command.type === "desktop:invoke") {
+      if (!win || win.isDestroyed()) throw new Error("REMOTE_DISCONNECTED");
+      const host = win.webContents;
+      reply(await dispatchRemoteDesktop(command, { conversationDb, activeSessions, remoteLive, remoteRevisions, pendingQuestions, loadUserConfig, lastAuthToken, constBrainDir, invoke: (channel, args) => invokeRemoteDesktop(channel, { sender: host, senderFrame: host.mainFrame } as Electron.IpcMainInvokeEvent, args), notify: (channel, data) => { if (!host.isDestroyed()) sendDesktopEvent(host, channel, data); } }));
+    } else if (command.type === "state:get") {
       const convos = conversationDb.listRemoteSummaries();
       const running = Array.from(activeSessions.keys());
       reply({
@@ -1265,17 +1299,17 @@ app.whenReady().then(() => {
       const chosenModel = model || existing?.model || config.activeModel || DEFAULT_ROUTER_MODEL_ID;
       if (![...DEFAULT_MODELS, ...(config.customModels || [])].some((entry) => entry.id === chosenModel)) throw new Error("INVALID_MODEL");
       conversationDb.saveConversation({ ...existing, id: conversationId, title: existing?.title || text.slice(0, 80), project: workspacePath || "Outside Project", createdAt: existing?.createdAt || Date.now(), updatedAt: Date.now(), messages, model: chosenModel });
-      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId, remoteMessages: messages });
+      if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "conversations:changed", { conversationId, remoteMessages: messages });
       const execution = runAgent({ messages, conversationId, model: chosenModel, workspacePath, mode: "ask_before_changes", authToken: lastAuthToken || undefined });
       reply({ success: true, conversationId, runId: activeSessions.get(conversationId)?.runId });
-      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId });
+      if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "conversations:changed", { conversationId });
       void execution.then((result) => { remoteDaemon.broadcast({ type: "conversation:changed", conversationId, success: result.success, aborted: result.aborted, error: result.error }); }).catch(() => { remoteDaemon.broadcast({ type: "conversation:changed", conversationId, success: false, error: "RUN_FAILED" }); });
     } else if (command.type === "conversation:rename" || command.type === "conversation:archive") {
       const id = command.payload.conversationId;
       if (!conversationDb.getConversation(id) || activeSessions.has(id)) throw new Error("CONVERSATION_BUSY");
       if (command.type === "conversation:rename") conversationDb.renameConversation(id, command.payload.title);
       else conversationDb.archiveConversation(id);
-      if (win && !win.isDestroyed()) win.webContents.send("conversations:changed", { conversationId: id });
+      if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "conversations:changed", { conversationId: id });
       reply({ success: true });
       remoteDaemon.broadcast({ type: "conversation:changed", conversationId: id });
     } else if (command.type === "agent:approval") {
@@ -1298,7 +1332,7 @@ app.whenReady().then(() => {
           globalSubAgentManager.killAllRunningSubAgents((id) => {
             const agent = globalSubAgentManager.getSubAgent(id, convoId);
             const event = { type: "subagent_killed", agentId: id, agent };
-            if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { ...event, conversationId: convoId, runId: targetSession.runId });
+            if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...event, conversationId: convoId, runId: targetSession.runId });
             remoteDaemon.broadcast({ type: "agent:stream-event", conversationId: convoId, runId: targetSession.runId, event });
           }, convoId);
           targetSession.agent.abort();
@@ -1331,22 +1365,22 @@ app.whenReady().then(() => {
       throw new Error("REMOTE_HOST_ONLY");
     }
   };
-  ipcMain.handle("remote:start-session", async (event, authToken: string) => {
+  handleDesktopIpc("remote:start-session", async (event, authToken: string) => {
     requireRemoteHost(event);
     if (!isValidAuthToken(authToken)) throw new Error("REMOTE_LOGIN_REQUIRED");
     lastAuthToken = authToken;
     return await remoteDaemon.startRelay({ authToken, convexUrl: process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL, webOrigin: process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN });
   });
-  ipcMain.handle("remote:stop-session", async (event) => {
+  handleDesktopIpc("remote:stop-session", async (event) => {
     requireRemoteHost(event);
     await remoteDaemon.stop();
     return remoteDaemon.getStatus();
   });
-  ipcMain.handle("remote:refresh-session", async (event) => {
+  handleDesktopIpc("remote:refresh-session", async (event) => {
     requireRemoteHost(event);
     return await remoteDaemon.refresh();
   });
-  ipcMain.handle("remote:get-status", (event) => {
+  handleDesktopIpc("remote:get-status", (event) => {
     requireRemoteHost(event);
     return remoteDaemon.getStatus();
   });
@@ -1363,7 +1397,7 @@ app.whenReady().then(() => {
       question.resolve({ status: "cancelled", error: "Session ended" });
     }
     if (win && !win.isDestroyed()) {
-      win.webContents.send("agent:session-ended", { conversationId: session.conversationId, runId: session.runId });
+      sendDesktopEvent(win.webContents, "agent:session-ended", { conversationId: session.conversationId, runId: session.runId });
     }
     remoteDaemon.broadcast({
       type: "agent:session-ended",
@@ -1375,11 +1409,11 @@ app.whenReady().then(() => {
   // Subscribe to background tasks to push real-time events to renderer
   globalTaskManager.subscribe((event) => {
     if (win && !win.isDestroyed()) {
-      win.webContents.send("task:event", event);
+      sendDesktopEvent(win.webContents, "task:event", event);
     }
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:answer-question",
     async (_event, { toolCallId, answer }: { toolCallId: string; answer: any }) => {
       const question = pendingQuestions.get(toolCallId);
@@ -1392,24 +1426,24 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("tasks:list", async (_event, conversationId?: string) => {
+  handleDesktopIpc("tasks:list", async (_event, conversationId?: string) => {
     return globalTaskManager.listTasks(conversationId);
   });
 
-  ipcMain.handle("tasks:kill", async (_event, taskId: string, conversationId?: string) => {
+  handleDesktopIpc("tasks:kill", async (_event, taskId: string, conversationId?: string) => {
     return globalTaskManager.killTask(taskId, conversationId);
   });
 
-  ipcMain.handle("tasks:get-output", async (_event, taskId: string) => {
+  handleDesktopIpc("tasks:get-output", async (_event, taskId: string) => {
     const task = globalTaskManager.getTask(taskId);
     return task ? task.logs : [];
   });
 
-  ipcMain.handle("subagents:kill", async (_event, agentId: string) => {
+  handleDesktopIpc("subagents:kill", async (_event, agentId: string) => {
     const killed = globalSubAgentManager.killSubAgent(agentId);
     if (killed && win && !win.isDestroyed()) {
       const agent = globalSubAgentManager.getSubAgent(agentId);
-      win.webContents.send("agent:stream-event", {
+      sendDesktopEvent(win.webContents, "agent:stream-event", {
         type: "subagent_killed",
         conversationId: agent?.conversationId,
         agentId: agent?.id || agentId,
@@ -1520,7 +1554,7 @@ app.whenReady().then(() => {
             const live = remoteLive.get(convoId);
             if (live) live.questions = { toolCallId, questions };
             if (win && !win.isDestroyed()) {
-              win.webContents.send("agent:stream-event", {
+              sendDesktopEvent(win.webContents, "agent:stream-event", {
                 type: "ask_question",
                 conversationId: convoId,
                 runId,
@@ -1537,6 +1571,7 @@ app.whenReady().then(() => {
           }).finally(() => {
             const live = remoteLive.get(convoId);
             if (live) delete live.questions;
+            if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { type: "question_resolved", toolCallId, conversationId: convoId, runId });
             remoteDaemon.broadcast({ type: "agent:stream-event", conversationId: convoId, runId, event: { type: "question_resolved", toolCallId } });
           });
         },
@@ -1577,7 +1612,7 @@ app.whenReady().then(() => {
       remoteLive.set(convoId, { revision: 0, text: "", status: "running", tools: [] });
 
       if (win && !win.isDestroyed()) {
-        win.webContents.send("agent:session-started", { conversationId: convoId, runId });
+        sendDesktopEvent(win.webContents, "agent:session-started", { conversationId: convoId, runId });
       }
       remoteDaemon.broadcast({
         type: "agent:session-started",
@@ -1598,7 +1633,7 @@ app.whenReady().then(() => {
           if (agentEvent.type === "context_update") live.context = agentEvent;
           if (agentEvent.type === "tool_call") live.tools = [...live.tools.slice(-19), String(agentEvent.toolName || agentEvent.name || "")];
         }
-        if (win && !win.isDestroyed()) win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId, runId });
+        if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, runId, remoteSequence: live?.revision });
         remoteDaemon.broadcast({
           type: "agent:stream-event",
           event: agentEvent.type === "usage" && live?.usage ? { ...agentEvent, ...live.usage } : agentEvent,
@@ -1681,7 +1716,7 @@ app.whenReady().then(() => {
 
               // Notify renderer that conversations have changed
               if (win && !win.isDestroyed()) {
-                win.webContents.send("conversations:changed", { conversationId: convoId });
+                sendDesktopEvent(win.webContents, "conversations:changed", { conversationId: convoId });
               }
             }
           } catch (dbErr) {
@@ -1707,13 +1742,15 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
+        const live = remoteLive.get(convoId);
+        if (live) { remoteRevisions.set(convoId, { runId, revision: live.revision }); if (remoteRevisions.size > 200) remoteRevisions.delete(remoteRevisions.keys().next().value!); }
         remoteLive.delete(convoId);
         finishSession(agentSession);
       }
     };
-  ipcMain.handle("agent:send-message", (_event, payload: Parameters<typeof runAgent>[0]) => runAgent(payload));
+  handleDesktopIpc("agent:send-message", (_event, payload: Parameters<typeof runAgent>[0]) => runAgent(payload));
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:steer",
     async (
       _event,
@@ -1758,7 +1795,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "file:extract-pdf-text",
     async (
       _event,
@@ -1782,7 +1819,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "file:extract-document-text",
     async (
       _event,
@@ -1806,7 +1843,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "file:save-attachment",
     async (
       _event,
@@ -1861,7 +1898,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("file:read-as-data-url", async (_event, filePath: string) => {
+  handleDesktopIpc("file:read-as-data-url", async (_event, filePath: string) => {
     try {
       if (!filePath || !fs.existsSync(filePath)) {
         return { success: false, error: "File not found" };
@@ -1892,7 +1929,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
+  handleDesktopIpc("agent:abort", async (_event, targetConvoId?: string) => {
     const safeConvoId =
       typeof targetConvoId === "string" && targetConvoId.trim().length > 0
         ? targetConvoId.trim()
@@ -1913,7 +1950,7 @@ app.whenReady().then(() => {
       globalSubAgentManager.killAllRunningSubAgents((id) => {
         if (win && !win.isDestroyed()) {
           const agent = globalSubAgentManager.getSubAgent(id, safeConvoId);
-          win.webContents.send("agent:stream-event", {
+          sendDesktopEvent(win.webContents, "agent:stream-event", {
             type: "subagent_killed",
             conversationId: agent?.conversationId || safeConvoId,
             agentId: id,
@@ -1944,7 +1981,7 @@ app.whenReady().then(() => {
     return { success: true };
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:respond-approval",
     async (
       _event,
@@ -1977,7 +2014,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:update-mode",
     async (
       _event,
@@ -2019,69 +2056,71 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("agent:get-running-sessions", async () => {
+  handleDesktopIpc("agent:get-running-sessions", async () => {
     return Array.from(activeSessions.keys());
   });
 
-  ipcMain.handle("agent:get-session-snapshot", async (_event, conversationId: string) => {
+  handleDesktopIpc("agent:get-session-snapshot", async (_event, conversationId: string) => {
     const session = activeSessions.get(conversationId);
-    return session ? { conversationId, runId: session.runId, startedAt: session.startedAt, ...session.snapshot } : null;
+    const live = remoteLive.get(conversationId);
+    return session ? { conversationId, runId: session.runId, startedAt: session.startedAt, ...session.snapshot, recentOutput: live?.text || session.snapshot.recentOutput, __remoteLive: live ? { ...live, runId: session.runId } : undefined, __remoteRevision: live ? { runId: session.runId, revision: live.revision } : undefined } : null;
   });
-  ipcMain.handle("agent:get-side-receipts", async (_event, sideChatId: string) => sideReceipts.get(sideChatId));
+  handleDesktopIpc("agent:get-side-receipts", async (_event, sideChatId: string) => sideReceipts.get(sideChatId));
 
   // Conversations Database IPC Handlers
-  ipcMain.handle("conversations:list", async (_event, includeArchived?: boolean) => {
+  handleDesktopIpc("conversations:list", async (_event, includeArchived?: boolean) => {
     return conversationDb.listConversations(includeArchived);
   });
+  handleDesktopIpc("conversations:search", async (_event, query: string) => conversationDb.searchRemoteConversations(query));
 
-  ipcMain.handle("conversations:list-archived", async () => {
+  handleDesktopIpc("conversations:list-archived", async () => {
     return conversationDb.listArchivedConversations();
   });
 
-  ipcMain.handle("conversations:get", async (_event, id: string) => {
+  handleDesktopIpc("conversations:get", async (_event, id: string) => {
     return conversationDb.getConversation(id);
   });
 
-  ipcMain.handle("conversations:save", async (_event, convo: ConversationRecord) => {
+  handleDesktopIpc("conversations:save", async (_event, convo: ConversationRecord) => {
     conversationDb.saveConversation(convo);
     return true;
   });
 
-  ipcMain.handle("conversations:delete", async (_event, id: string) => {
+  handleDesktopIpc("conversations:delete", async (_event, id: string) => {
     conversationDb.deleteConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:rename", async (_event, id: string, title: string) => {
+  handleDesktopIpc("conversations:rename", async (_event, id: string, title: string) => {
     conversationDb.renameConversation(id, title);
     return true;
   });
 
-  ipcMain.handle("conversations:archive", async (_event, id: string) => {
+  handleDesktopIpc("conversations:archive", async (_event, id: string) => {
     conversationDb.archiveConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:unarchive", async (_event, id: string) => {
+  handleDesktopIpc("conversations:unarchive", async (_event, id: string) => {
     conversationDb.unarchiveConversation(id);
     return true;
   });
 
-  ipcMain.handle("conversations:pin", async (_event, id: string, isPinned: boolean) => {
+  handleDesktopIpc("conversations:pin", async (_event, id: string, isPinned: boolean) => {
     conversationDb.pinConversation(id, isPinned);
     return true;
   });
 
-  ipcMain.handle("conversations:pin-project", async (_event, projectName: string, isPinned: boolean) => {
+  handleDesktopIpc("conversations:pin-project", async (_event, projectName: string, isPinned: boolean) => {
     conversationDb.pinProject(projectName, isPinned);
     return true;
   });
 
-  ipcMain.handle("conversations:get-project-pins", async () => {
+  handleDesktopIpc("conversations:get-project-pins", async () => {
     return conversationDb.getProjectPins();
   });
 
-  ipcMain.handle("conversations:get-paths", async (_event, conversationId?: string, workspacePath?: string) => {
+  handleDesktopIpc("conversations:get-paths", async (_event, conversationId?: string, workspacePath?: string) => {
     const home = harnessHomeDir;
     const brain = path.join(home, "brain");
     const id = conversationId || "";
@@ -2095,7 +2134,7 @@ app.whenReady().then(() => {
     };
   });
 
-  ipcMain.handle("conversations:get-transcript", async (_event, conversationId: string) => {
+  handleDesktopIpc("conversations:get-transcript", async (_event, conversationId: string) => {
     if (!conversationId) return "";
     try {
       const logsDir = path.join(harnessHomeDir, "brain", conversationId, ".system_generated", "logs");
@@ -2113,14 +2152,14 @@ app.whenReady().then(() => {
     return "";
   });
 
-  ipcMain.handle("conversations:import-legacy", async (_event, convos: ConversationRecord[]) => {
+  handleDesktopIpc("conversations:import-legacy", async (_event, convos: ConversationRecord[]) => {
     conversationDb.importLegacyConversations(convos);
     return true;
   });
 
 
   // Rollback file mutation handler
-  ipcMain.handle(
+  handleDesktopIpc(
     "agent:rollback-file",
     async (_event, payload: { record: FileMutationRecord }) => {
       if (!payload?.record) {
@@ -2131,7 +2170,7 @@ app.whenReady().then(() => {
   );
 
   // Workspace directory resolution
-  ipcMain.handle(
+  handleDesktopIpc(
     "workspace:resolve-path",
     async (_event, options?: { project?: string; conversationId?: string }) => {
       const project = options?.project;
@@ -2158,7 +2197,7 @@ app.whenReady().then(() => {
   // Workspace files scanning and shell open-path handlers for Mentions & Palette
   const workspaceFilesCache = new Map<string, { timestamp: number; data: any[] }>();
 
-  ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
+  handleDesktopIpc("workspace:list-files", async (_event, workspacePath?: string) => {
     if (!workspacePath || !fs.existsSync(workspacePath)) return [];
     
     // Check 15-second cache
@@ -2288,7 +2327,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
+  handleDesktopIpc("shell:open-path", async (_event, targetPath: string) => {
     if (!targetPath) return false;
     try {
       const res = await shell.openPath(targetPath);
@@ -2299,7 +2338,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "system:show-notification",
     async (_event, payload: { title: string; body: string; silent?: boolean }) => {
       try {
@@ -2319,7 +2358,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("system:open-const-folder", async () => {
+  handleDesktopIpc("system:open-const-folder", async () => {
     try {
       if (!fs.existsSync(constHomeDir)) {
         fs.mkdirSync(constHomeDir, { recursive: true });
@@ -2332,7 +2371,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("workspace:read-file", async (_event, filePath: string, workspacePath?: string) => {
+  handleDesktopIpc("workspace:read-file", async (_event, filePath: string, workspacePath?: string) => {
     if (!filePath) return { error: "Path is required" };
     try {
       let resolvedPath = filePath;
@@ -2362,7 +2401,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "workspace:read-directory",
     async (_event, dirPath?: string, workspacePath?: string) => {
       try {
@@ -2418,7 +2457,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("shell:show-in-folder", async (_event, targetPath: string) => {
+  handleDesktopIpc("shell:show-in-folder", async (_event, targetPath: string) => {
     if (!targetPath) return false;
     try {
       if (fs.existsSync(targetPath)) {
@@ -2552,7 +2591,7 @@ app.whenReady().then(() => {
       try {
         const updatedMessages = await agent.run(messagesToRun, (agentEvent: any) => {
           if (win && !win.isDestroyed()) {
-            win.webContents.send("agent:stream-event", {
+            sendDesktopEvent(win.webContents, "agent:stream-event", {
               ...agentEvent,
               conversationId: convoId,
               isScheduled: true,
@@ -2575,7 +2614,7 @@ app.whenReady().then(() => {
 
           // Realtime notification: Notify renderer that conversations have changed
           if (win && !win.isDestroyed()) {
-            win.webContents.send("conversations:changed", { conversationId: convoId });
+            sendDesktopEvent(win.webContents, "conversations:changed", { conversationId: convoId });
           }
         } catch (dbErr) {
           console.warn("[ScheduledTasks] Failed to save conversation to DB:", dbErr);
@@ -2593,46 +2632,46 @@ app.whenReady().then(() => {
     },
     onChanged: () => {
       if (win && !win.isDestroyed()) {
-        win.webContents.send("scheduled-tasks:changed");
+        sendDesktopEvent(win.webContents, "scheduled-tasks:changed");
       }
     },
   });
 
   scheduledTasksManager.start();
 
-  ipcMain.handle("scheduled-tasks:list", async () => {
+  handleDesktopIpc("scheduled-tasks:list", async () => {
     return scheduledTasksManager?.listTasks() || [];
   });
 
-  ipcMain.handle("scheduled-tasks:create", async (_event, data: any) => {
+  handleDesktopIpc("scheduled-tasks:create", async (_event, data: any) => {
     return scheduledTasksManager?.createTask(data) || null;
   });
 
-  ipcMain.handle("scheduled-tasks:update", async (_event, data: any) => {
+  handleDesktopIpc("scheduled-tasks:update", async (_event, data: any) => {
     return scheduledTasksManager?.updateTask(data) || null;
   });
 
-  ipcMain.handle("scheduled-tasks:delete", async (_event, id: string) => {
+  handleDesktopIpc("scheduled-tasks:delete", async (_event, id: string) => {
     return scheduledTasksManager?.deleteTask(id) || false;
   });
 
-  ipcMain.handle("scheduled-tasks:run", async (_event, id: string) => {
+  handleDesktopIpc("scheduled-tasks:run", async (_event, id: string) => {
     if (!scheduledTasksManager) return { success: false, error: "Manager not initialized" };
     return await scheduledTasksManager.executeTask(id, "manual");
   });
 
-  ipcMain.handle("scheduled-tasks:history", async (_event, taskId?: string) => {
+  handleDesktopIpc("scheduled-tasks:history", async (_event, taskId?: string) => {
     return scheduledTasksManager?.getHistory(taskId) || [];
   });
 
-  ipcMain.handle("scheduled-tasks:delete-run", async (_event, id: string) => {
+  handleDesktopIpc("scheduled-tasks:delete-run", async (_event, id: string) => {
     return scheduledTasksManager?.deleteRun(id) || false;
   });
 
   // ---------------------------------------------------------------------------
   // Terminal Management IPC Handlers
   // ---------------------------------------------------------------------------
-  ipcMain.handle(
+  handleDesktopIpc(
     "terminal:create",
     async (
       _event,
@@ -2718,20 +2757,20 @@ app.whenReady().then(() => {
             try { proc.stdin?.write("\x1b]11;rgb:1010/1010/1010\x1b\\"); } catch {}
           }
           if (win && !win.isDestroyed()) {
-            win.webContents.send("terminal:data", { id, data: str });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, data: str });
           }
         });
 
         proc.stderr?.on("data", (chunk: Buffer) => {
           if (win && !win.isDestroyed()) {
-            win.webContents.send("terminal:data", { id, data: chunk.toString("utf-8") });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, data: chunk.toString("utf-8") });
           }
         });
 
         proc.on("exit", (code) => {
           activeTerminals.delete(id);
           if (win && !win.isDestroyed()) {
-            win.webContents.send("terminal:exit", { id, code });
+            sendDesktopEvent(win.webContents, "terminal:exit", { id, code });
           }
         });
 
@@ -2739,8 +2778,8 @@ app.whenReady().then(() => {
           console.error(`[Terminal ${id}] Process error:`, err);
           activeTerminals.delete(id);
           if (win && !win.isDestroyed()) {
-            win.webContents.send("terminal:data", { id, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
-            win.webContents.send("terminal:exit", { id, code: 1 });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
+            sendDesktopEvent(win.webContents, "terminal:exit", { id, code: 1 });
           }
         });
 
@@ -2752,7 +2791,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "terminal:write",
     async (_event, options: { id: string; data: string }) => {
       const term = activeTerminals.get(options.id);
@@ -2764,7 +2803,7 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("terminal:destroy", async (_event, id: string) => {
+  handleDesktopIpc("terminal:destroy", async (_event, id: string) => {
     const term = activeTerminals.get(id);
     if (term) {
       try {
@@ -2782,24 +2821,24 @@ app.whenReady().then(() => {
   browserController.setCallbacks({
     onStateChange: (state: ControlState) => {
       if (win && !win.isDestroyed()) {
-        win.webContents.send("browser:control-changed", state);
+        sendDesktopEvent(win.webContents, "browser:control-changed", state);
       }
     },
     onAiAction: (action: { type: string; details?: any }) => {
       if (win && !win.isDestroyed()) {
-        win.webContents.send("browser:ai-action", action);
+        sendDesktopEvent(win.webContents, "browser:ai-action", action);
       }
     },
     onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean }) => {
       if (win && !win.isDestroyed()) {
-        win.webContents.send("browser:open-tab-request", payload);
+        sendDesktopEvent(win.webContents, "browser:open-tab-request", payload);
         return payload.tabId || "browser-tab-default";
       }
       return null;
     },
   });
 
-  ipcMain.handle(
+  handleDesktopIpc(
     "browser:register-tab",
     async (_event, payload: { tabId: string; guestContentsId: number }) => {
       browserController.registerWebview(payload.tabId, payload.guestContentsId);
@@ -2807,105 +2846,106 @@ app.whenReady().then(() => {
     }
   );
 
-  ipcMain.handle("browser:open-tab", async (_event, payload: { url: string; tabId?: string; newTab?: boolean }) => {
+  handleDesktopIpc("browser:open-tab", async (_event, payload: { url: string; tabId?: string; newTab?: boolean }) => {
     if (win && !win.isDestroyed()) {
-      win.webContents.send("browser:open-tab-request", payload);
+      sendDesktopEvent(win.webContents, "browser:open-tab-request", payload);
       return true;
     }
     return false;
   });
 
-  ipcMain.handle("browser:unregister-tab", async (_event, tabId: string) => {
+  handleDesktopIpc("browser:unregister-tab", async (_event, tabId: string) => {
     browserController.unregisterWebview(tabId);
     return true;
   });
 
-  ipcMain.handle("browser:set-active-tab", async (_event, tabId: string) => {
+  handleDesktopIpc("browser:set-active-tab", async (_event, tabId: string) => {
     browserController.setActiveTab(tabId);
     return true;
   });
 
-  ipcMain.handle("browser:list-tabs", async () => {
+  handleDesktopIpc("browser:list-tabs", async () => {
     return browserController.listTabs();
   });
+  handleDesktopIpc("browser:remote-input", async (_event, input: any) => browserController.remoteInput(input));
 
-  ipcMain.handle("browser:get-control", async () => {
+  handleDesktopIpc("browser:get-control", async () => {
     return browserController.getControl();
   });
 
-  ipcMain.handle("browser:take-control", async () => {
+  handleDesktopIpc("browser:take-control", async () => {
     return browserController.takeControl();
   });
 
-  ipcMain.handle("browser:release-control", async () => {
+  handleDesktopIpc("browser:release-control", async () => {
     return browserController.releaseControl();
   });
 
-  ipcMain.handle("browser:supply-secret", async (_event, text: string) => {
+  handleDesktopIpc("browser:supply-secret", async (_event, text: string) => {
     return await browserController.supplySecret(text);
   });
 
-  ipcMain.handle("browser:navigate", async (_event, url: string, options?: any) => {
+  handleDesktopIpc("browser:navigate", async (_event, url: string, options?: any) => {
     return await browserController.navigate(url, options);
   });
 
-  ipcMain.handle("browser:snapshot", async (_event, args?: any) => {
+  handleDesktopIpc("browser:snapshot", async (_event, args?: any) => {
     return await browserController.snapshot(args);
   });
 
-  ipcMain.handle("browser:click", async (_event, args: any) => {
+  handleDesktopIpc("browser:click", async (_event, args: any) => {
     return await browserController.click(args);
   });
 
-  ipcMain.handle("browser:type", async (_event, args: any) => {
+  handleDesktopIpc("browser:type", async (_event, args: any) => {
     return await browserController.type(args);
   });
 
-  ipcMain.handle("browser:key", async (_event, args: any) => {
+  handleDesktopIpc("browser:key", async (_event, args: any) => {
     return await browserController.key(args);
   });
 
-  ipcMain.handle("browser:scroll", async (_event, args: any) => {
+  handleDesktopIpc("browser:scroll", async (_event, args: any) => {
     return await browserController.scroll(args);
   });
 
-  ipcMain.handle("browser:screenshot", async (_event, args?: any) => {
+  handleDesktopIpc("browser:screenshot", async (_event, args?: any) => {
     return await browserController.screenshot(args);
   });
 
-  ipcMain.handle("browser:console", async (_event, args?: any) => {
+  handleDesktopIpc("browser:console", async (_event, args?: any) => {
     return await browserController.readConsoleAndNetwork(args);
   });
 
-  ipcMain.handle("browser:evaluate", async (_event, args: any) => {
+  handleDesktopIpc("browser:evaluate", async (_event, args: any) => {
     return await browserController.evaluate(args);
   });
 
-  ipcMain.handle("browser:wait-for", async (_event, args: any) => {
+  handleDesktopIpc("browser:wait-for", async (_event, args: any) => {
     return await browserController.waitFor(args);
   });
 
-  ipcMain.handle("browser:verify-text", async (_event, args: any) => {
+  handleDesktopIpc("browser:verify-text", async (_event, args: any) => {
     return await browserController.verifyText(args);
   });
 
-  ipcMain.handle("browser:find", async (_event, args: any) => {
+  handleDesktopIpc("browser:find", async (_event, args: any) => {
     return await browserController.find(args);
   });
 
-  ipcMain.handle("browser:hover", async (_event, args: any) => {
+  handleDesktopIpc("browser:hover", async (_event, args: any) => {
     return await browserController.hover(args);
   });
 
-  ipcMain.handle("browser:paste", async (_event, args: any) => {
+  handleDesktopIpc("browser:paste", async (_event, args: any) => {
     return await browserController.paste(args);
   });
 
-  ipcMain.handle("browser:get-allowed-domains", async () => {
+  handleDesktopIpc("browser:get-allowed-domains", async () => {
     return browserController.getAllowedDomains();
   });
 
-  ipcMain.handle("browser:set-allowed-domains", async (_event, domains: string[]) => {
+  handleDesktopIpc("browser:set-allowed-domains", async (_event, domains: string[]) => {
     browserController.setAllowedDomains(Array.isArray(domains) ? domains : []);
     return browserController.getAllowedDomains();
   });

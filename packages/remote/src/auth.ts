@@ -25,12 +25,13 @@ export function remoteAuth(sessionId: string) {
       (cookie ? decodeURIComponent(cookie) : null),
   };
 }
-export function remoteLogin(switchAccount = false) {
+export function remoteLogin(
+  switchAccount = false,
+  accountsUrl = "https://accounts.const.web.id",
+) {
   const state = crypto.randomUUID();
   sessionStorage.setItem("const_remote_login_state", state);
-  const accounts = new URL(
-    process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id",
-  );
+  const accounts = new URL(accountsUrl);
   accounts.searchParams.set("continue", location.origin + location.pathname);
   accounts.searchParams.set("state", state);
   accounts.searchParams.set("app", "harness");

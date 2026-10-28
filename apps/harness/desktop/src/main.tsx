@@ -1,3 +1,4 @@
+import "./lib/disable-openui-devtools";
 // Suppress OpenUI floating devtools inspector widget across all environments
 (globalThis as Record<symbol, unknown>)[Symbol.for("openui.devtools.autoMount")] = true;
 

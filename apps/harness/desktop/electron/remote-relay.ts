@@ -6,7 +6,8 @@ import {
   type RemoteCommand,
   type RemotePacket,
 } from "@const/remote/protocol";
-import { digest, open, randomSecret, seal } from "@const/remote/crypto";
+import { digest, randomSecret, seal } from "@const/remote/crypto";
+import { packTransfer, unpackTransfer } from "@const/remote/transfer";
 import type { RemoteDaemonStatus } from "../src/lib/remote-control";
 
 export class RemoteRelay {
@@ -129,10 +130,11 @@ export class RemoteRelay {
         }))
       )
         return;
-      const raw = await open(
+      const raw = await unpackTransfer(
         this.secret,
         `${credentials.sessionId}:command:${row.requestId}`,
         row.packet,
+        (index) => client.query(broker.commandChunk, { ...credentials, commandId: row._id, index }),
       );
       const command = commandSchema.parse(raw);
       if (command.requestId !== row.requestId || this.stopped) return;
@@ -144,16 +146,21 @@ export class RemoteRelay {
       } catch {
         response = { success: false, error: "COMMAND_FAILED" };
       }
-      const encrypted = await seal(
+      const encrypted = await packTransfer(
         this.secret,
         `${credentials.sessionId}:response:${row.requestId}`,
         response,
+        row._id,
       );
+      for (let index = 0; index < encrypted.parts.length; index++) {
+        if (this.stopped) return;
+        await client.mutation(broker.writeResponseChunk, { ...credentials, commandId: row._id, index, packet: encrypted.parts[index] });
+      }
       if (!this.stopped)
         await client.mutation(broker.complete, {
           ...credentials,
           commandId: row._id,
-          response: encrypted,
+          response: encrypted.packet,
         });
     } catch {
       /* A claimed command is never automatically re-executed after failure. */
@@ -163,6 +170,17 @@ export class RemoteRelay {
   }
   broadcast(event: RemotePacket) {
     if (this.stopped || !this.credentials) return;
+    if (event.type === "desktop:event") {
+      // History is fetched authoritatively; never repeat a whole transcript in a notification.
+      if (event.channel === "conversations:changed") event = { ...event, args: [{ conversationId: (event.args as any[])?.[0]?.conversationId, originRequestId: (event.args as any[])?.[0]?.originRequestId }] };
+      const serialized = JSON.stringify(event);
+      if (new TextEncoder().encode(serialized).length > 40_000) {
+        if (serialized.length > 2_000_000) { this.broadcast({ type: "resync" }); return; }
+        const id = crypto.randomUUID(); const count = Math.ceil(serialized.length / 8000);
+        for (let index = 0; index < count; index++) this.broadcast({ type: "desktop:event-part", id, index, count, data: serialized.slice(index * 8000, (index + 1) * 8000) });
+        return;
+      }
+    }
     if (new TextEncoder().encode(JSON.stringify(event)).length > 40_000) {
       event = {
         type: event.type,

@@ -147,6 +147,9 @@ importers:
       dexie-react-hooks:
         specifier: ^4.4.0
         version: 4.4.0(dexie@4.4.5)(react@19.2.8)
+      dompurify:
+        specifier: 3.4.17
+        version: 3.4.17
       jszip:
         specifier: ^3.10.2
         version: 3.10.2
@@ -256,9 +259,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      convex:
-        specifier: ^1.45.0
-        version: 1.45.0(react@19.3.0)
       framer-motion:
         specifier: ^13.4.4
         version: 13.4.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -284,6 +284,9 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
     devDependencies:
+      '@const/harness-desktop':
+        specifier: workspace:*
+        version: link:../desktop
       '@const/typescript-config':
         specifier: workspace:*
         version: link:../../../packages/typescript-config

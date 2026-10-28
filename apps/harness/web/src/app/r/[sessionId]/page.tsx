@@ -17,6 +17,7 @@ export default async function RemotePage({
     <RemoteWorkspace
       sessionId={sessionId}
       convexUrl={process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL}
+      accountsUrl={process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id"}
     />
   );
 }

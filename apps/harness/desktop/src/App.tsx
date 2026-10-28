@@ -1,3 +1,4 @@
+import { useRemoteRuntime } from "./lib/remote-runtime";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   LogIn,
@@ -111,6 +112,8 @@ import type {
   SubAgentItem,
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
+
+const emptyConversationMetrics: ConversationMetrics = { turns: 0, steps: 0, modelRequests: 0, toolCalls: 0, hasUsage: false, incompleteUsage: false, workingDurationMs: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
 function getGreeting(t: (key: any) => string): string {
   const hour = new Date().getHours();
@@ -377,13 +380,14 @@ const removeStoredRightPaneState = (convoId: string) => {
   } catch {}
 };
 
-function AuthenticatedContent({
+export function AuthenticatedContent({
   onSignOut,
   onSwitchAccount,
 }: {
   onSignOut: () => void;
   onSwitchAccount: () => void;
 }) {
+  const remote = useRemoteRuntime();
   const user = useQuery(api.auth.queries.currentUser, {});
   const [cachedUser, setCachedUser] = useState<any>(() => {
     try {
@@ -454,7 +458,7 @@ function AuthenticatedContent({
 
   const { token } = useAppAuth();
   const { t } = useTranslation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !remote?.mobile);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
@@ -481,6 +485,7 @@ function AuthenticatedContent({
   const greeting = getGreeting(t);
 
   const handleOpenSettings = (tab: string = "general") => {
+    if (remote?.mobile) setIsSidebarOpen(false);
     if (tab === "skills" || tab === "marketplace" || tab === "plugins") {
       setIsSkillsOpen(true);
       setIsScheduledTasksOpen(false);
@@ -517,10 +522,15 @@ function AuthenticatedContent({
   });
 
   useEffect(() => {
-    initConversationStore().then((list) => {
+    initConversationStore().then(async (list) => {
+      if (remote && window.electron?.getConversation) {
+        const id = conversationIdRef.current;
+        const active = await window.electron.getConversation(id);
+        if (active && conversationIdRef.current === id) list = list.map(item => item.id === id ? active : item);
+      }
       setConversations(list);
       // Hydrate messages from active conversation on initial mount if currently empty
-      if (messagesRef.current.length === 0 && !activeSessionMessagesRef.current.has(conversationIdRef.current)) {
+      if (remote || (messagesRef.current.length === 0 && !activeSessionMessagesRef.current.has(conversationIdRef.current))) {
         const active = list.find((c) => c.id === conversationIdRef.current);
         if (active && active.messages && active.messages.length > 0) {
           messagesRef.current = normalizeUiMessages(active.messages);
@@ -529,7 +539,7 @@ function AuthenticatedContent({
           if (active.project) setCurrentProject(active.project);
         }
       }
-    });
+    }).catch(() => toast.error(t("remoteControl.actionError")));
 
     if (window.electron?.onConversationsChanged) {
       const unsubscribe = window.electron.onConversationsChanged(async (data) => {
@@ -543,6 +553,11 @@ function AuthenticatedContent({
         }
         const refreshed = await refreshConversationsFromDisk();
         setConversations(refreshed);
+        const current = refreshed.find(item => item.id === conversationIdRef.current);
+        if (current) {
+          setConversationTitle(current.title);
+          if (current.project) setCurrentProject(current.project);
+        }
 
         // If the changed conversation is currently open, reload its messages ONLY if currently empty in memory
         if (data?.conversationId && data.conversationId === conversationIdRef.current) {
@@ -551,6 +566,7 @@ function AuthenticatedContent({
           }
           if (messagesRef.current.length === 0 && window.electron?.getConversation) {
             const activeConvo = await window.electron.getConversation(data.conversationId);
+            if (data.conversationId !== conversationIdRef.current) return;
             if (data.conversationId === conversationIdRef.current && messagesRef.current.length === 0 &&
                 !activeSessionMessagesRef.current.has(data.conversationId) && activeConvo?.messages?.length) {
               messagesRef.current = normalizeUiMessages(activeConvo.messages);
@@ -566,11 +582,11 @@ function AuthenticatedContent({
   const [conversationId, setConversationId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem("const_harness_active_conversation_id");
-      if (saved && typeof saved === "string" && saved.startsWith("session_")) {
+      if (saved && typeof saved === "string" && (saved.startsWith("session_") || (remote && /^(remote_|scheduled_)[a-zA-Z0-9_-]+$/.test(saved)))) {
         return saved;
       }
     } catch {}
-    const newId = `session_${Date.now()}`;
+    const newId = remote ? `session_${crypto.randomUUID()}` : `session_${Date.now()}`;
     try {
       localStorage.setItem("const_harness_active_conversation_id", newId);
     } catch {}
@@ -1487,6 +1503,13 @@ function AuthenticatedContent({
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
   };
+
+  useEffect(() => {
+    if (!remote) return;
+    const open = (event: Event) => { const directory = (event as CustomEvent<string>).detail; if (typeof directory === "string") handleOpenFilePreview(directory.replace(/\\/g, "/").replace(/\/+$/, "") + "/"); };
+    window.addEventListener("const:remote-open-directory", open);
+    return () => window.removeEventListener("const:remote-open-directory", open);
+  }, [remote, handleOpenFilePreview]);
 
   const handleOpenReview = (mutationsToReview?: FileMutationRecord[]) => {
     setIsRightSidebarOpen(true);
@@ -2760,6 +2783,8 @@ function AuthenticatedContent({
           messagesRef.current = targetMsgs;
           setMessages(targetMsgs);
         }
+      } else if (event.type === "question_resolved") {
+        setPendingQuestions(prev => { if (prev.get(targetConvoId)?.toolCallId !== event.toolCallId) return prev; const next = new Map(prev); next.delete(targetConvoId); return next; });
       } else if (event.type === "ask_question") {
         setPendingQuestions((prev) => {
           const next = new Map(prev);
@@ -3558,7 +3583,7 @@ function AuthenticatedContent({
     messagesRef.current = [];
     setMessages([]);
     setConversationTitle("");
-    const newSessionId = `session_${Date.now()}`;
+    const newSessionId = remote ? `session_${crypto.randomUUID()}` : `session_${Date.now()}`;
     setConversationId(newSessionId);
     conversationIdRef.current = newSessionId;
     setEditingPrompt("");
@@ -3677,7 +3702,7 @@ function AuthenticatedContent({
     }
 
     let target = conversations.find((c) => c.id === id);
-    if (!target && window.electron?.getConversation) {
+    if ((!target || remote) && window.electron?.getConversation) {
       const diskConvo = await window.electron.getConversation(id);
       if (navigationRevisionRef.current !== navigationRevision) return;
       if (diskConvo) {
@@ -4106,13 +4131,14 @@ function AuthenticatedContent({
   return (
     <div
       className={cn(
-        "h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-2.5",
+        "workspace-shell h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-2.5",
         isSidebarOpen ? "gap-2.5" : "gap-0"
       )}
     >
+      {remote?.mobile && isSidebarOpen && <button className="remote-sidebar-backdrop" aria-label={t("common.close")} onClick={() => setIsSidebarOpen(false)} />}
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
-        className={`shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
+        className={`workspace-sidebar shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
           isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
@@ -4122,29 +4148,31 @@ function AuthenticatedContent({
             onSignOut={onSignOut}
             onSwitchAccount={onSwitchAccount}
             onCollapse={() => setIsSidebarOpen(false)}
-            onNewChat={handleNewChat}
-            onNewChatOutside={() => handleNewChat("Outside Project")}
+            onNewChat={(project) => { handleNewChat(project); if (remote?.mobile) setIsSidebarOpen(false); }}
+            onNewChatOutside={() => { handleNewChat("Outside Project"); if (remote?.mobile) setIsSidebarOpen(false); }}
             conversations={conversations}
             activeConversationId={conversationId}
             runningConvoIds={runningConvoIds}
             pendingApprovals={pendingApprovals}
-            onSelectConversation={handleSelectConversation}
+            onSelectConversation={(id) => { if (remote?.mobile) setIsSidebarOpen(false); void handleSelectConversation(id); }}
             onDeleteConversation={handleDeleteConversation}
             onRenameConversation={handleRenameConversation}
             onArchiveConversation={handleArchiveConversation}
             onUnarchiveConversation={handleUnarchiveConversation}
             onOpenSettings={(tab) => handleOpenSettings(tab || "general")}
             onOpenScheduledTasks={() => {
+              if (remote?.mobile) setIsSidebarOpen(false);
               setIsScheduledTasksOpen(true);
               setIsSkillsOpen(false);
             }}
             isScheduledTasksActive={isScheduledTasksOpen}
             onOpenSkills={() => {
+              if (remote?.mobile) setIsSidebarOpen(false);
               setIsSkillsOpen(true);
               setIsScheduledTasksOpen(false);
             }}
             isSkillsActive={isSkillsOpen}
-            onOpenSearch={() => setIsSearchOpen(true)}
+            onOpenSearch={() => { setIsSearchOpen(true); if (remote?.mobile) setIsSidebarOpen(false); }}
           />
         </div>
       </div>
@@ -4182,19 +4210,19 @@ function AuthenticatedContent({
               >
                 <button
                   type="button"
-                  onClick={() => window.electron?.minimize?.()}
+                  data-native-control onClick={() => window.electron?.minimize?.()}
                   className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  title={t("topToolbar.minimize")}
-                  aria-label={t("topToolbar.minimize")}
+                  title={t("common.minimize")}
+                  aria-label={t("common.minimize")}
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.electron?.maximize?.()}
+                  data-native-control onClick={() => window.electron?.maximize?.()}
                   className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                  title={isWindowMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
-                  aria-label={isWindowMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
+                  title={isWindowMaximized ? t("common.restore") : t("common.maximize")}
+                  aria-label={isWindowMaximized ? t("common.restore") : t("common.maximize")}
                 >
                   {isWindowMaximized ? (
                     <Copy className="w-3 h-3 rotate-180" />
@@ -4204,10 +4232,10 @@ function AuthenticatedContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.electron?.close?.()}
+                  data-native-control onClick={() => window.electron?.close?.()}
                   className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] hover:text-white transition-colors cursor-pointer"
-                  title={t("topToolbar.close")}
-                  aria-label={t("topToolbar.close")}
+                  title={t("common.close")}
+                  aria-label={t("common.close")}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -4241,7 +4269,7 @@ function AuthenticatedContent({
             {/* Center Main Chat Panel Card */}
             <div
               className={cn(
-                "h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px]",
+                "workspace-chat h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px]",
                 !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]"
               )}
               style={{
@@ -4281,7 +4309,7 @@ function AuthenticatedContent({
               <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
                 {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
                 {messages.length === 0 ? (
-          <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
+          <div className="workspace-landing flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-hidden">
             {/* Centered Conversation Container */}
             <div className={cn("relative flex flex-col items-center w-full max-w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
 
@@ -4306,7 +4334,10 @@ function AuthenticatedContent({
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
-                  showContextUsage={false}
+                  compact={remote?.mobile}
+                  metrics={remote?.mobile ? conversationMetrics || emptyConversationMetrics : undefined}
+                  contextUsage={remote?.mobile ? contextUsage : undefined}
+                  showContextUsage={!!remote?.mobile}
                   project={currentProject}
                   onProjectChange={setSafeCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
@@ -4623,13 +4654,14 @@ function AuthenticatedContent({
             {/* Right SidePanel Card: Anchored to the right edge, smoothly expands from right to left */}
             <div
               className={cn(
-                "absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30",
+                "workspace-right-pane absolute top-0 bottom-0 right-0 h-full overflow-hidden flex flex-row justify-end z-30",
                 !isDraggingRightSidebar && "transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
                 isRightSidebarOpen ? "pointer-events-auto" : "pointer-events-none"
               )}
               style={{
                 width: !isRightSidebarOpen
                   ? 0
+                  : remote?.mobile ? "100%"
                   : isRightSidebarExpanded
                   ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                   : `${rightSidebarWidth}px`,
@@ -4638,10 +4670,10 @@ function AuthenticatedContent({
               <div
                 className="h-full overflow-hidden shrink-0"
                 style={{
-                  width: isRightSidebarExpanded
+                  width: remote?.mobile ? "100%" : isRightSidebarExpanded
                     ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                     : `${rightSidebarWidth}px`,
-                  minWidth: isRightSidebarExpanded
+                  minWidth: remote?.mobile ? "100%" : isRightSidebarExpanded
                     ? (mainContainerWidth ? `${mainContainerWidth}px` : "100%")
                     : `${rightSidebarWidth}px`,
                   transition: !isDraggingRightSidebar
@@ -4650,7 +4682,7 @@ function AuthenticatedContent({
                 }}
               >
                 <RightPane
-                  width={isRightSidebarExpanded ? (mainContainerWidth || (typeof window !== "undefined" ? window.innerWidth : 1280)) : rightSidebarWidth}
+                  width={remote?.mobile ? mainContainerWidth || window.innerWidth : isRightSidebarExpanded ? (mainContainerWidth || (typeof window !== "undefined" ? window.innerWidth : 1280)) : rightSidebarWidth}
                   maxWidth={clampRightSidebarWidth(window.innerWidth)}
                   minWidth={300}
                   onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
@@ -4759,7 +4791,7 @@ function AuthenticatedContent({
                 <div className="w-[1px] h-3.5 bg-[#dedee2] dark:bg-[#383838]/70 mx-1" />
 
                 {/* Minimize Window */}
-                <button
+                <button data-native-control
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => {
@@ -4774,7 +4806,7 @@ function AuthenticatedContent({
                 </button>
 
                 {/* Maximize / Restore Window */}
-                <button
+                <button data-native-control
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => {
@@ -4793,7 +4825,7 @@ function AuthenticatedContent({
                 </button>
 
                 {/* Close Window */}
-                <button
+                <button data-native-control
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => {

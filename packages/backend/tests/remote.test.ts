@@ -284,3 +284,136 @@ test("packet expiration preserves the request receipt until the session is revok
   const receipt = await s.t.run((ctx) => ctx.db.get(commandId));
   expect(receipt?.packet).toBe("");
 });
+
+test("multipart requests remain unclaimable until complete and chunks are device scoped", async () => {
+  const s = await setup();
+  const grant = {
+    sessionId: s.sessionId,
+    deviceId: s.deviceId,
+    secretHash: s.secretHash,
+  };
+  const commandId = await s.owner.mutation(api.remote.submit, {
+    ...grant,
+    requestId: "multipart",
+    packet: "encrypted descriptor",
+    chunkCount: 2,
+  });
+  const host = { sessionId: s.sessionId, hostHash: s.hostHash };
+  expect(await s.owner.mutation(api.remote.claim, { ...host, commandId })).toBe(
+    false,
+  );
+  const secondSecret = await digest(randomSecret());
+  const secondId = await s.owner.mutation(api.remote.join, {
+    sessionId: s.sessionId,
+    pairHash: s.pairHash,
+    secretHash: secondSecret,
+    name: "Second phone",
+  });
+  await expect(
+    s.owner.mutation(api.remote.uploadChunk, {
+      sessionId: s.sessionId,
+      deviceId: secondId,
+      secretHash: secondSecret,
+      commandId,
+      index: 0,
+      packet: "chunk",
+    }),
+  ).rejects.toThrow();
+  for (const index of [0, 1])
+    await s.owner.mutation(api.remote.uploadChunk, {
+      ...grant,
+      commandId,
+      index,
+      packet: `part-${index}`,
+    });
+  await s.owner.mutation(api.remote.uploadChunk, {
+    ...grant,
+    commandId,
+    index: 1,
+    packet: "part-1",
+  });
+  expect(await s.owner.mutation(api.remote.claim, { ...host, commandId })).toBe(
+    true,
+  );
+  expect(
+    await s.owner.query(api.remote.commandChunk, {
+      ...host,
+      commandId,
+      index: 0,
+    }),
+  ).toBe("part-0");
+  await s.owner.mutation(api.remote.writeResponseChunk, {
+    ...host,
+    commandId,
+    index: 0,
+    packet: "reply part",
+  });
+  await s.owner.mutation(api.remote.complete, {
+    ...host,
+    commandId,
+    response: "reply descriptor",
+  });
+  await expect(
+    s.owner.query(api.remote.responseChunk, {
+      sessionId: s.sessionId,
+      deviceId: secondId,
+      secretHash: secondSecret,
+      commandId,
+      index: 0,
+    }),
+  ).rejects.toThrow();
+  expect(
+    await s.owner.query(api.remote.responseChunk, {
+      ...grant,
+      commandId,
+      index: 0,
+    }),
+  ).toBe("reply part");
+  await s.t.mutation(internal.remote.expirePacket, { commandId });
+  expect(
+    await s.t.run((ctx) => ctx.db.query("remoteChunks").collect()),
+  ).toEqual([]);
+});
+
+test("a claimed long run can finish after command ciphertext expires", async () => {
+  const s = await setup();
+  const host = { sessionId: s.sessionId, hostHash: s.hostHash };
+  const commandId = await s.owner.mutation(api.remote.submit, {
+    sessionId: s.sessionId,
+    deviceId: s.deviceId,
+    secretHash: s.secretHash,
+    requestId: "long-run",
+    packet: "private command",
+  });
+  await s.owner.mutation(api.remote.claim, { ...host, commandId });
+  await s.t.mutation(internal.remote.expirePacket, { commandId });
+  expect((await s.t.run((ctx) => ctx.db.get(commandId)))?.state).toBe(
+    "claimed",
+  );
+  await expect(
+    s.owner.mutation(api.remote.complete, {
+      ...host,
+      commandId,
+      response: "late encrypted result",
+    }),
+  ).resolves.toBeNull();
+});
+
+test("offline crashed hosts do not lock the account out for eight hours", async () => {
+  const s = await setup();
+  await s.t.run((ctx) =>
+    ctx.db.patch(s.sessionId, { heartbeatAt: Date.now() - 91_000 }),
+  );
+  const replacement = await s.owner.mutation(api.remote.create, {
+    deviceName: "Replacement",
+    hostHash: s.hostHash,
+    pairHash: s.pairHash,
+  });
+  expect(replacement).not.toBe(s.sessionId);
+  await expect(
+    s.owner.query(api.remote.hostInbox, {
+      sessionId: s.sessionId,
+      hostHash: s.hostHash,
+    }),
+  ).rejects.toThrow();
+});

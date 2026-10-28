@@ -234,20 +234,20 @@ export function ScheduledTasksView({
         >
           <button
             type="button"
-            onClick={handleMinimize}
+            data-native-control onClick={handleMinimize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-            title={t("topToolbar.minimize")}
-            aria-label={t("topToolbar.minimize")}
+            title={t("common.minimize")}
+            aria-label={t("common.minimize")}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
 
           <button
             type="button"
-            onClick={handleMaximize}
+            data-native-control onClick={handleMaximize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-            title={isMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
-            aria-label={isMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
+            title={isMaximized ? t("common.restore") : t("common.maximize")}
+            aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
           >
             {isMaximized ? (
               <Copy className="w-3 h-3 rotate-180" />
@@ -258,10 +258,10 @@ export function ScheduledTasksView({
 
           <button
             type="button"
-            onClick={handleClose}
+            data-native-control onClick={handleClose}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] hover:text-white transition-colors cursor-pointer"
-            title={t("topToolbar.close")}
-            aria-label={t("topToolbar.close")}
+            title={t("common.close")}
+            aria-label={t("common.close")}
           >
             <X className="w-3.5 h-3.5" />
           </button>

@@ -155,8 +155,17 @@ export class ConversationDatabase {
   }
 
   /** Sidebar bootstrap must not load the full transcript of every local chat. */
-  public listRemoteSummaries(): Omit<ConversationRecord, "messages">[] {
-    return this.db.prepare("SELECT id, title, project, model, created_at AS createdAt, updated_at AS updatedAt FROM conversations WHERE is_archived = 0 AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY updated_at DESC LIMIT 100").all() as unknown as Omit<ConversationRecord, "messages">[];
+  public listRemoteSummaries(includeArchived = false): ConversationRecord[] {
+    const rows = this.db.prepare("SELECT id, title, project, model, mode, is_pinned AS isPinned, is_archived AS isArchived, is_scheduled AS isScheduled, created_at AS createdAt, updated_at AS updatedAt FROM conversations WHERE (? = 1 OR is_archived = 0) AND id NOT LIKE 'side_conversation_%' AND id NOT LIKE 'side_chat_%' ORDER BY updated_at DESC").all(includeArchived ? 1 : 0) as any[];
+    return rows.map(row => ({ ...row, isPinned: !!row.isPinned, isArchived: !!row.isArchived, isScheduled: !!row.isScheduled, messages: [] }));
+  }
+
+  public searchRemoteConversations(query: string): ConversationRecord[] {
+    const text = String(query).slice(0, 200).trim();
+    if (text.length < 2) return [];
+    const like = `%${text.replace(/[\\%_]/g, "\\$&")}%`;
+    const rows = this.db.prepare("SELECT c.id, c.title, c.project, c.created_at AS createdAt, c.updated_at AS updatedAt, substr(m.content, max(instr(lower(m.content), lower(?)) - 80, 1), 500) AS snippet FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id WHERE c.is_archived = 0 AND c.id NOT LIKE 'side_conversation_%' AND c.id NOT LIKE 'side_chat_%' AND (c.title LIKE ? ESCAPE '\\' OR c.project LIKE ? ESCAPE '\\' OR m.content LIKE ? ESCAPE '\\') GROUP BY c.id ORDER BY c.updated_at DESC LIMIT 100").all(text, like, like, like) as any[];
+    return rows.map(({ snippet, ...row }) => ({ ...row, messages: snippet ? [{ role: "assistant", content: snippet }] : [] }));
   }
 
   public listRemoteProjects(): string[] {

@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { app } = require("electron");
 assert.equal(typeof globalThis.crypto?.subtle?.encrypt, "function", "Remote relay requires WebCrypto in Electron main");
+assert.equal(typeof globalThis.CompressionStream, "function", "Remote transfers require bounded gzip streams");
 
 const [temporary, root] = process.argv.slice(2);
 assert(temporary && root, "Missing isolated profile or desktop root");

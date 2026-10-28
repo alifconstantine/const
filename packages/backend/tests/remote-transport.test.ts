@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import schema from "../convex/schema";
 import { RemoteRelay } from "../../../apps/harness/desktop/electron/remote-relay";
 import { RemoteClient } from "../../remote/src/client";
+import { randomBytes } from "node:crypto";
 
 const runtime = { owner: null as any, watchers: new Set<any>() };
 class TestClient {
@@ -54,7 +55,7 @@ test("desktop and browser exchange encrypted requests/events through the authent
     () => {},
     (command, reply) => {
       calls++;
-      reply({ command: command.type, text: "private reply" });
+      reply(command.type === "desktop:invoke" ? { echo: command.payload.args[0] } : { command: command.type, text: "private reply" });
     },
     factory,
   );
@@ -89,6 +90,9 @@ test("desktop and browser exchange encrypted requests/events through the authent
       text: "private reply",
     });
     expect(calls).toBe(1);
+    const large = { history: "private history\n".repeat(10000), binary: randomBytes(180000).toString("base64") };
+    expect(await mobile.request({ type: "desktop:invoke", payload: { channel: "workspace:read-file", args: [large] } })).toEqual({ echo: large });
+    expect(calls).toBe(2);
     host.broadcast({
       type: "agent:stream-event",
       conversationId: "thread",

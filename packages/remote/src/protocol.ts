@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { desktopChannels } from "./desktop-contract";
 
 const id = z.string().min(1).max(200);
 const requestId = id;
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("desktop:invoke"), requestId, payload: z.object({ channel: z.enum(desktopChannels), args: z.array(z.unknown()).max(8), expectedRunId: id.optional() }) }),
   z.object({ type: z.literal("state:get"), requestId }),
   z.object({
     type: z.literal("conversation:get"),
@@ -110,6 +112,7 @@ export const broker = Object.fromEntries(
     "pingDevice",
     "revoke",
     "leave",
+    "uploadChunk", "commandChunk", "writeResponseChunk", "responseChunk",
   ].map((name) => [
     name,
     makeFunctionReference<"mutation" | "query">(`remote:${name}`),

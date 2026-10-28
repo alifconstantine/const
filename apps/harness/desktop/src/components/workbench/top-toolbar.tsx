@@ -1,8 +1,10 @@
+import { useRemoteRuntime } from "../../lib/remote-runtime";
 import React from "react";
 import {
   SquareTerminal,
   MessageCirclePlus,
   PanelLeft,
+  Menu,
   Folder,
   MoreHorizontal,
   Globe,
@@ -64,6 +66,7 @@ export function TopToolbar({
   onToggleBottomPanel,
 }: TopToolbarProps) {
   const { t } = useTranslation();
+  const remote = useRemoteRuntime();
 
   const handleOpenInExplorer = async () => {
     try {
@@ -159,7 +162,7 @@ export function TopToolbar({
 
   return (
     <div
-      className="h-11 w-full flex items-center justify-between px-3 shrink-0 select-none z-30"
+      className="workspace-toolbar h-11 w-full flex items-center justify-between px-3 shrink-0 select-none z-30"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {/* Left section: Conversation breadcrumb / title and project badge */}
@@ -180,7 +183,7 @@ export function TopToolbar({
               title={t("topToolbar.toggleSidebar")}
               aria-label={t("topToolbar.toggleSidebar")}
             >
-              <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
+              {remote?.mobile ? <Menu className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />}
             </button>
 
             <button
@@ -195,16 +198,17 @@ export function TopToolbar({
           </>
         )}
 
+        {remote?.mobile && <div id="remote-header-telemetry" className="flex-1 min-w-0" />}
         {/* Conversation Title & Project Pill */}
-        {conversationTitle && (
-          <div className="flex items-center gap-2 min-w-0 pl-1">
-            <AutoScrollTitle
-              text={conversationTitle}
+        {(conversationTitle || remote) && (
+          <div className="workspace-title-group flex items-center gap-2 min-w-0 pl-1">
+            {!remote?.mobile && <AutoScrollTitle
+              text={conversationTitle || remote?.deviceName || ""}
               className="max-w-[280px]"
               textClassName="text-sm font-medium text-[#161616] dark:text-[#ececec]"
-            />
+            />}
 
-            {project && (
+            {project && !remote?.mobile && (
               <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#333333] text-xs text-[#262626] dark:text-[#a0a0a0] shrink-0">
                 <Folder className="w-3 h-3 text-[#a9a9a9] dark:text-[#999999]" />
                 <span className="truncate max-w-[140px]">{project}</span>
@@ -318,7 +322,7 @@ export function TopToolbar({
       <div
         className={cn(
           "flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto transition-[padding] duration-300",
-          !isRightSidebarOpen ? "pr-[145px]" : "pr-1"
+          !isRightSidebarOpen ? remote ? "pr-10" : "pr-[145px]" : "pr-1"
         )}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >

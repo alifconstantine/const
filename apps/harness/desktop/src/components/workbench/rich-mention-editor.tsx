@@ -1043,6 +1043,9 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           <div
             ref={editorRef}
             contentEditable={!disabled}
+            role="textbox"
+            aria-multiline="true"
+            aria-label={effectivePlaceholder}
             suppressContentEditableWarning
             spellCheck={false}
             autoCorrect="off"
