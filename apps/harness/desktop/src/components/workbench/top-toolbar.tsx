@@ -1,13 +1,13 @@
 import { useRemoteRuntime } from "../../lib/remote-runtime";
 import React from "react";
 import {
-  SquareTerminal,
   MessageCirclePlus,
   PanelLeft,
   Menu,
   Folder,
   MoreHorizontal,
   Globe,
+  SquareTerminal,
 } from "lucide-react";
 import {
   ConstLogoIcon,
@@ -37,9 +37,12 @@ interface TopToolbarProps {
   onOpenSettings?: (tab?: string) => void;
   onOpenTrajectory?: () => void;
   isRightSidebarOpen?: boolean;
+  isDraggingRightSidebar?: boolean;
   onToggleRightSidebar?: () => void;
   onOpenTerminal?: () => void;
   onOpenBrowser?: () => void;
+  onToggleBrowser?: () => void;
+  isBrowserActive?: boolean;
   isBottomPanelOpen?: boolean;
   onToggleBottomPanel?: () => void;
 }
@@ -59,9 +62,12 @@ export function TopToolbar({
   onOpenSettings,
   onOpenTrajectory,
   isRightSidebarOpen = false,
+  isDraggingRightSidebar = false,
   onToggleRightSidebar,
   onOpenTerminal,
   onOpenBrowser,
+  onToggleBrowser,
+  isBrowserActive = false,
   isBottomPanelOpen = false,
   onToggleBottomPanel,
 }: TopToolbarProps) {
@@ -162,7 +168,10 @@ export function TopToolbar({
 
   return (
     <div
-      className="workspace-toolbar h-11 w-full flex items-center justify-between px-3 shrink-0 select-none z-30"
+      className={cn(
+        "workspace-toolbar h-11 w-full flex items-center justify-between pl-3 shrink-0 select-none z-30",
+        !isRightSidebarOpen ? (remote?.mobile ? "pr-3" : "pr-[210px]") : "pr-1.5"
+      )}
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       {/* Left section: Conversation breadcrumb / title and project badge */}
@@ -329,39 +338,61 @@ export function TopToolbar({
         {remote?.mobile && <div id="remote-header-telemetry" className="shrink-0" />}
       </div>
 
-      {/* Right section: Terminal, Browser, and spacing to fixed controls */}
-      <div
-        className={cn(
-          "flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto transition-[padding] duration-300",
-          !isRightSidebarOpen ? remote ? "pr-10" : "pr-[145px]" : "pr-1"
-        )}
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-      >
-        <button
-          type="button"
-          onClick={() => onOpenBrowser?.()}
-          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-          title={t("topToolbar.openBrowser")}
-          aria-label={t("topToolbar.openBrowser")}
+      {/* Right section: Browser & Terminal toggles in Main Chat header (ONLY when sidepanel is open, without sliding transition) */}
+      {isRightSidebarOpen && (
+        <div
+          className="flex items-center gap-0.5 shrink-0 ml-auto pointer-events-auto"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          <Globe className="w-4 h-4" />
-        </button>
+          {/* Browser Toggle */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              if (onToggleBrowser) {
+                onToggleBrowser();
+              } else if (onOpenBrowser) {
+                onOpenBrowser();
+              }
+            }}
+            className={cn(
+              "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
+              isBrowserActive
+                ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
+                : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+            )}
+            title={isBrowserActive ? t("topToolbar.closeBrowser") : t("topToolbar.openBrowser")}
+            aria-label={t("topToolbar.browser")}
+          >
+            <Globe className="w-4 h-4" />
+          </button>
 
-        <button
-          type="button"
-          onClick={onToggleBottomPanel || onOpenTerminal}
-          className={cn(
-            "p-1.5 rounded-lg transition-colors cursor-pointer",
-            isBottomPanelOpen
-              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white"
-              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
-          )}
-          title={isBottomPanelOpen ? "Close bottom panel (Ctrl+J)" : "Toggle bottom panel (Ctrl+J)"}
-          aria-label="Toggle bottom panel (Ctrl+J)"
-        >
-          <SquareTerminal className="w-4 h-4" />
-        </button>
-      </div>
+          {/* Terminal Toggle */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              if (onToggleBottomPanel) {
+                onToggleBottomPanel();
+              } else if (onOpenTerminal) {
+                onOpenTerminal();
+              }
+            }}
+            className={cn(
+              "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
+              isBottomPanelOpen
+                ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
+                : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+            )}
+            title={isBottomPanelOpen ? t("topToolbar.closeTerminal") : t("topToolbar.openTerminal")}
+            aria-label={t("topToolbar.terminal")}
+          >
+            <SquareTerminal className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

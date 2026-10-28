@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, memo } from "react";
 import { MessageSquare, Globe } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { OpenTabView } from "./open-tab-view";
@@ -54,7 +54,7 @@ interface RightPaneProps {
   onToggleExpand?: () => void;
 }
 
-export function RightPane({
+export const RightPane = memo(function RightPane({
   width,
   maxWidth,
   minWidth = 300,
@@ -239,4 +239,4 @@ export function RightPane({
       </div>
     </aside>
   );
-}
+});

@@ -20,6 +20,7 @@ import {
   PanelRight,
   Maximize2,
   Minimize2,
+  SquareTerminal,
 } from "lucide-react";
 import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -118,8 +119,9 @@ import type {
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
-const SIDE_PANEL_DURATION_MS = 280;
-const SIDE_PANEL_MOTION = `${SIDE_PANEL_DURATION_MS}ms cubic-bezier(0.22,1,0.36,1)`;
+const SIDE_PANEL_DURATION_MS = 220;
+const SIDE_PANEL_MOTION = `${SIDE_PANEL_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+const EMPTY_SUBAGENTS: SubAgentItem[] = [];
 
 const emptyConversationMetrics: ConversationMetrics = { turns: 0, steps: 0, modelRequests: 0, toolCalls: 0, hasUsage: false, incompleteUsage: false, workingDurationMs: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
@@ -799,6 +801,19 @@ export function AuthenticatedContent({
 
   // Per-conversation right pane cache and live state references
   const convoRightPaneMapRef = useRef<Map<string, ConversationRightPaneState>>(new Map());
+  const [isRightSidebarTransitioning, setIsRightSidebarTransitioning] = useState(false);
+  const rightSidebarTransitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setIsRightSidebarTransitioning(true);
+    if (rightSidebarTransitionTimerRef.current) clearTimeout(rightSidebarTransitionTimerRef.current);
+    rightSidebarTransitionTimerRef.current = setTimeout(() => {
+      setIsRightSidebarTransitioning(false);
+    }, SIDE_PANEL_DURATION_MS + 40);
+    return () => {
+      if (rightSidebarTransitionTimerRef.current) clearTimeout(rightSidebarTransitionTimerRef.current);
+    };
+  }, [isRightSidebarOpen]);
   const isRightSidebarOpenRef = useRef(isRightSidebarOpen);
   isRightSidebarOpenRef.current = isRightSidebarOpen;
   const isRightSidebarExpandedRef = useRef(isRightSidebarExpanded);
@@ -859,7 +874,7 @@ export function AuthenticatedContent({
     localStorage.setItem("const_harness_right_sidebar_width", String(rightSidebarWidth));
   }, [rightSidebarWidth]);
 
-  // Auto-save active conversation's right pane state whenever it changes
+  // Auto-save active conversation's right pane state (debounced to avoid frame drops on open/close)
   useEffect(() => {
     if (!conversationId) return;
     const state: ConversationRightPaneState = {
@@ -870,7 +885,10 @@ export function AuthenticatedContent({
       reviewMutations: sidebarReviewMutations,
     };
     convoRightPaneMapRef.current.set(conversationId, state);
-    storeRightPaneState(conversationId, state);
+    const timer = setTimeout(() => {
+      storeRightPaneState(conversationId, state);
+    }, 300);
+    return () => clearTimeout(timer);
   }, [conversationId, isRightSidebarOpen, isRightSidebarExpanded, rightPaneTabs, activeRightPaneTabId, sidebarReviewMutations]);
 
   const saveCurrentConversationRightPaneState = useCallback(() => {
@@ -987,17 +1005,14 @@ export function AuthenticatedContent({
     setIsRightSidebarOpen((prev) => !prev);
   }, []);
 
-  const handleToggleBottomPanel = useCallback(async () => {
+  const handleSelectRightPaneTab = useCallback((tabId: string) => {
+    setActiveRightPaneTabId(tabId);
+    setIsOpeningNewTab(false);
+  }, []);
+
+  const handleToggleBottomPanel = useCallback(() => {
     if (!isBottomPanelOpenRef.current && bottomPanelTabsRef.current.length === 0) {
-      let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
-      if (window.electron?.resolveWorkspacePath) {
-        try {
-          resolvedCwd = await window.electron.resolveWorkspacePath({
-            project: currentProject,
-            conversationId,
-          });
-        } catch {}
-      }
+      const initialCwd = currentProject === "Outside Project" ? undefined : currentProject;
       const baseTitle =
         currentProject && currentProject !== "Outside Project"
           ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
@@ -1008,13 +1023,26 @@ export function AuthenticatedContent({
         id: initialTabId,
         type: "terminal",
         title: baseTitle,
-        cwd: resolvedCwd,
+        cwd: initialCwd,
         project: currentProject,
         conversationId,
       };
       setBottomPanelTabs([newTab]);
       setActiveBottomTabId(initialTabId);
       setIsBottomPanelOpen(true);
+
+      if (window.electron?.resolveWorkspacePath && currentProject) {
+        window.electron.resolveWorkspacePath({
+          project: currentProject,
+          conversationId,
+        }).then((resolvedCwd) => {
+          if (resolvedCwd && resolvedCwd !== initialCwd) {
+            setBottomPanelTabs((prev) =>
+              prev.map((tab) => (tab.id === initialTabId ? { ...tab, cwd: resolvedCwd } : tab))
+            );
+          }
+        }).catch(() => {});
+      }
       return;
     }
 
@@ -1211,6 +1239,20 @@ export function AuthenticatedContent({
     },
     [currentProject, conversationId]
   );
+
+  const isBrowserActive = Boolean(
+    isRightSidebarOpen &&
+      !isOpeningNewTab &&
+      rightPaneTabs.find((t) => t.id === activeRightPaneTabId)?.type === "browser"
+  );
+
+  const handleToggleBrowser = useCallback(() => {
+    if (isBrowserActive) {
+      setIsRightSidebarOpen(false);
+    } else {
+      handleOpenBrowser();
+    }
+  }, [isBrowserActive, handleOpenBrowser]);
 
   // Sync active browser tab with Electron BrowserController & listen for AI auto-open requests
   useEffect(() => {
@@ -3453,6 +3495,16 @@ export function AuthenticatedContent({
     }
   };
 
+
+  const handleIntelligenceSubmitMessage = useCallback((prompt: string) => {
+    handleSendMessage({
+      prompt,
+      project: currentProject,
+      mode: currentMode,
+      model: activeModelItem?.id || activeModelItem?.name,
+    });
+  }, [handleSendMessage, currentProject, currentMode, activeModelItem]);
+
   const handleAbort = async (targetId?: string) => {
     const rawTarget =
       typeof targetId === "string" && targetId.trim().length > 0
@@ -4340,7 +4392,7 @@ export function AuthenticatedContent({
           <>
             {/* Center Main Chat Panel Card */}
             <div
-              className="workspace-chat h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px] motion-reduce:!transition-none"
+              className="workspace-chat h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#282828] shadow-xs flex flex-col overflow-hidden relative rounded-[10px] motion-reduce:!transition-none [contain:paint]"
               style={{
                 width: !isRightSidebarOpen
                   ? "100%"
@@ -4366,11 +4418,14 @@ export function AuthenticatedContent({
                     onOpenSettings={handleOpenSettings}
                     onOpenTrajectory={() => handleOpenTrajectory()}
                     isRightSidebarOpen={isRightSidebarOpen}
+                    isDraggingRightSidebar={isDraggingRightSidebar}
                     onToggleRightSidebar={handleToggleRightSidebar}
                     onOpenTerminal={handleToggleBottomPanel}
                     isBottomPanelOpen={isBottomPanelOpen}
                     onToggleBottomPanel={handleToggleBottomPanel}
                     onOpenBrowser={handleOpenBrowser}
+                    onToggleBrowser={handleToggleBrowser}
+                    isBrowserActive={isBrowserActive}
                   />
                 );
               })()}
@@ -4448,7 +4503,7 @@ export function AuthenticatedContent({
               <div className="absolute top-4 right-6 z-30 flex flex-col gap-2.5 items-end pointer-events-none">
                 <FloatingWorkbenchCard
                   todos={activeTodos || []}
-                  subagents={activeSubAgents || []}
+                  subagents={activeSubAgents || EMPTY_SUBAGENTS}
                   isExecuting={isExecuting}
                   onSelectSubAgent={handleOpenSubAgent}
                   onKillAgent={handleKillSubAgent}
@@ -4539,12 +4594,12 @@ export function AuthenticatedContent({
             >
               <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6 select-text", streamWidthClass)}>
                 {messages.map((msg, idx) => (
-                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col group select-text cursor-text">
+                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col group select-text cursor-text [content-visibility:auto] [contain-intrinsic-size:auto_100px]">
                     <ChatMessageItem
                       message={msg}
                       isConversationBusy={isExecuting}
                       onIntelligenceStateChange={handleIntelligenceStateChange}
-                      onIntelligenceSubmit={(prompt) => handleSendMessage({ prompt, project: currentProject, mode: currentMode, model: activeModelItem?.id || activeModelItem?.name })}
+                      onIntelligenceSubmit={handleIntelligenceSubmitMessage}
                       idx={idx}
                       isExecuting={isExecuting && idx === messages.length - 1}
                       liveDurationMs={liveDurationMs}
@@ -4677,14 +4732,22 @@ export function AuthenticatedContent({
               </div>
 
               {/* Bottom Panel (Docked Terminal matching reference video) */}
-              {bottomPanelTabs.length > 0 && (
-                <div
-                  className={cn(
-                    "w-full shrink-0 overflow-hidden transition-[height,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] z-30",
-                    isBottomPanelOpen ? "opacity-100" : "h-0 opacity-0 pointer-events-none"
-                  )}
-                  style={{ height: isBottomPanelOpen ? `${bottomPanelHeight}px` : 0 }}
-                >
+              <div
+                className={cn(
+                  "w-full shrink-0 overflow-hidden z-30 motion-reduce:!transition-none",
+                  isBottomPanelOpen && bottomPanelTabs.length > 0
+                    ? "opacity-100"
+                    : "h-0 opacity-0 pointer-events-none"
+                )}
+                style={{
+                  height: isBottomPanelOpen && bottomPanelTabs.length > 0 ? `${bottomPanelHeight}px` : 0,
+                  transition: isDraggingBottomPanel
+                    ? "none"
+                    : `height ${SIDE_PANEL_MOTION}, opacity ${SIDE_PANEL_MOTION}`,
+                  
+                }}
+              >
+                {bottomPanelTabs.length > 0 && (
                   <BottomPanel
                     height={bottomPanelHeight}
                     onHeightChange={setBottomPanelHeight}
@@ -4698,8 +4761,8 @@ export function AuthenticatedContent({
                     onClose={() => setIsBottomPanelOpen(false)}
                     onDraggingChange={setIsDraggingBottomPanel}
                   />
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Splitter resize handle in the 10px gap between Main Chat and SidePanel */}
@@ -4714,9 +4777,11 @@ export function AuthenticatedContent({
                   : "opacity-0 pointer-events-none"
               )}
               style={{
-                right: !isRightSidebarOpen ? 0 : `${rightSidebarWidth}px`,
+                right: `${rightSidebarWidth}px`,
                 width: "10px",
-                transition: isDraggingRightSidebar ? "none" : `right ${SIDE_PANEL_MOTION}, opacity ${SIDE_PANEL_MOTION}`,
+                transform: isRightSidebarOpen ? "translateX(0)" : `translateX(${rightSidebarWidth + 10}px)`,
+                transition: isDraggingRightSidebar ? "none" : `transform ${SIDE_PANEL_MOTION}, opacity ${SIDE_PANEL_MOTION}`,
+                willChange: isRightSidebarTransitioning || isDraggingRightSidebar ? "transform, opacity" : "auto",
               }}
               title={t("rightPane.dragToResize")}
             >
@@ -4738,8 +4803,10 @@ export function AuthenticatedContent({
                   : `${rightSidebarWidth}px`,
                 transform: isRightSidebarOpen ? "translateX(0)" : "translateX(calc(100% + 10px))",
                 visibility: isRightSidebarOpen ? "visible" : "hidden",
+                pointerEvents: isRightSidebarTransitioning ? "none" : (isRightSidebarOpen ? "auto" : "none"),
                 transition: isDraggingRightSidebar ? "none"
                   : `transform ${SIDE_PANEL_MOTION}, visibility 0s linear ${isRightSidebarOpen ? 0 : SIDE_PANEL_DURATION_MS}ms`,
+                willChange: isRightSidebarTransitioning || isDraggingRightSidebar ? "transform" : "auto",
               }}
             >
               <div
@@ -4762,10 +4829,7 @@ export function AuthenticatedContent({
                   tabs={rightPaneTabs}
                   activeTabId={activeRightPaneTabId}
                   isOpeningNewTab={isOpeningNewTab}
-                  onSelectTab={(tabId) => {
-                    setActiveRightPaneTabId(tabId);
-                    setIsOpeningNewTab(false);
-                  }}
+                  onSelectTab={handleSelectRightPaneTab}
                   onCloseTab={handleCloseTab}
                   onNewTab={handleNewTab}
                   onOpenTabType={handleOpenTabType}
@@ -4782,7 +4846,7 @@ export function AuthenticatedContent({
                   onStopTask={handleStopBackgroundTask}
                   onUpdateTab={handleUpdateTab}
                   onSelectElementForChat={handleSelectElementForChat}
-                  subagents={activeSubAgents || []}
+                  subagents={activeSubAgents || EMPTY_SUBAGENTS}
                   onKillAgent={handleKillSubAgent}
                   parentMessages={messages}
                   parentConversationTitle={conversationTitle}
@@ -4813,13 +4877,51 @@ export function AuthenticatedContent({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <div className="flex items-center gap-0.5 pointer-events-auto">
-                {/* Expand / Restore SidePanel (Smoothly expands/collapses when sidebar is open) */}
-                <div
-                  className={cn(
-                    "overflow-hidden flex items-center transition-[width,opacity] duration-200",
-                    isRightSidebarOpen ? "w-7 opacity-100 mr-0.5" : "w-0 opacity-0 pointer-events-none mr-0"
-                  )}
-                >
+                {/* When Sidepanel is CLOSED, show stationary Browser & Terminal icons in window header */}
+                {!isRightSidebarOpen && (
+                  <>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.currentTarget.blur();
+                        handleToggleBrowser();
+                      }}
+                      className={cn(
+                        "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
+                        isBrowserActive
+                          ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
+                          : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+                      )}
+                      title={isBrowserActive ? t("topToolbar.closeBrowser") : t("topToolbar.openBrowser")}
+                      aria-label={t("topToolbar.browser")}
+                    >
+                      <Globe className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.currentTarget.blur();
+                        handleToggleBottomPanel();
+                      }}
+                      className={cn(
+                        "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
+                        isBottomPanelOpen
+                          ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
+                          : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
+                      )}
+                      title={isBottomPanelOpen ? t("topToolbar.closeTerminal") : t("topToolbar.openTerminal")}
+                      aria-label={t("topToolbar.terminal")}
+                    >
+                      <SquareTerminal className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+
+                {/* Expand / Restore SidePanel (Visible when sidebar is open) */}
+                {isRightSidebarOpen && (
                   <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
@@ -4827,7 +4929,7 @@ export function AuthenticatedContent({
                       e.currentTarget.blur();
                       setIsRightSidebarExpanded((prev) => !prev);
                     }}
-                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none"
+                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none mr-0.5"
                     title={isRightSidebarExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
                     aria-label={isRightSidebarExpanded ? t("rightPane.restorePanel") : t("rightPane.expandPanel")}
                   >
@@ -4837,7 +4939,7 @@ export function AuthenticatedContent({
                       <Maximize2 className="w-3.5 h-3.5" />
                     )}
                   </button>
-                </div>
+                )}
 
                 {/* Toggle SidePanel (PanelRight) - Stays stationary in place at all times */}
                 <button

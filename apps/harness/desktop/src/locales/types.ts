@@ -361,6 +361,7 @@ export interface TranslationDictionary {
     reportIssue: string;
     openTerminal: string;
     openBrowser: string;
+    closeBrowser: string;
     openRightSidebar: string;
     closeRightSidebar: string;
   };

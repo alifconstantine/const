@@ -365,6 +365,7 @@ export const zh: TranslationDictionary = {
     reportIssue: "反馈问题",
     openTerminal: "打开终端",
     openBrowser: "打开浏览器",
+    closeBrowser: "关闭浏览器",
     openRightSidebar: "打开右侧边栏",
     closeRightSidebar: "关闭右侧边栏",
   },

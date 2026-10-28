@@ -365,6 +365,7 @@ export const en: TranslationDictionary = {
     reportIssue: "Report issue",
     openTerminal: "Open terminal",
     openBrowser: "Open browser",
+    closeBrowser: "Close browser",
     openRightSidebar: "Open right sidebar",
     closeRightSidebar: "Close right sidebar",
   },

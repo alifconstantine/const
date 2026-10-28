@@ -365,6 +365,7 @@ export const ja: TranslationDictionary = {
     reportIssue: "問題を報告",
     openTerminal: "ターミナルを開く",
     openBrowser: "ブラウザを開く",
+    closeBrowser: "ブラウザを閉じる",
     openRightSidebar: "右パネルを開く",
     closeRightSidebar: "右パネルを閉じる",
   },

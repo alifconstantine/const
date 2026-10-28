@@ -365,6 +365,7 @@ export const es: TranslationDictionary = {
     reportIssue: "Informar de un problema",
     openTerminal: "Abrir terminal",
     openBrowser: "Abrir navegador",
+    closeBrowser: "Cerrar navegador",
     openRightSidebar: "Abrir barra lateral derecha",
     closeRightSidebar: "Cerrar barra lateral derecha",
   },

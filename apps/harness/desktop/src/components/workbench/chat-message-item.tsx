@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import { Check, Copy, Pencil, ThumbsUp, ThumbsDown } from "lucide-react";
 import { ScrollArea, UserMessageBubble, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -84,7 +84,7 @@ export function formatMessageTimestamp(timestamp?: number): string {
   return `${month}/${day} ${timeStr}`;
 }
 
-export function ChatMessageItem({
+export const ChatMessageItem = memo(function ChatMessageItem({
   message,
   idx = 0,
   isExecuting = false,
@@ -383,4 +383,4 @@ export function ChatMessageItem({
       )}
     </div>
   );
-}
+});

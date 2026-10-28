@@ -365,6 +365,7 @@ export const id: TranslationDictionary = {
     reportIssue: "Laporkan masalah",
     openTerminal: "Buka terminal",
     openBrowser: "Buka peramban",
+    closeBrowser: "Tutup peramban",
     openRightSidebar: "Buka bilah sisi kanan",
     closeRightSidebar: "Tutup bilah sisi kanan",
   },
