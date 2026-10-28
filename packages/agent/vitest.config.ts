@@ -16,6 +16,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: [
+			{ find: /^@const\/agent\/token-meter$/, replacement: fileURLToPath(new URL("./src/const/token-meter.ts", import.meta.url)) },
 			{ find: /^@earendil-works\/pi-telemetry$/, replacement: telemetrySrcIndex },
 			{ find: /^@earendil-works\/pi-agent-core$/, replacement: agentSrcIndex },
 			{ find: /^@earendil-works\/pi-ai$/, replacement: aiSrcIndex },
