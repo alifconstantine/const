@@ -6,7 +6,7 @@ import {
   toast,
 } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
-import { PluginIcon } from "./plugin-icon";
+import { PluginIcon, isPluginLogo } from "./plugin-icon";
 import {
   PluginConnectionInfo,
   pluginDescriptionKeys,
@@ -80,6 +80,7 @@ export function PluginsMarketplace({
       ? connections.filter((c) => c.pluginId === installation.id)
       : [];
     const effective = related.filter((c) => c.isEffective);
+    const isLogo = isPluginLogo(plugin.name);
     return (
       <article
         key={installation?.id ?? plugin.name}
@@ -97,8 +98,12 @@ export function PluginsMarketplace({
         className="rounded-xl bg-[#222222] hover:bg-[#262626] border border-transparent hover:border-[#383838] p-4 flex flex-col justify-between gap-3 transition-all cursor-pointer group"
       >
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-white group-hover:border-white/20 transition-colors">
-            <PluginIcon name={plugin.name} className="w-4.5 h-4.5" size={18} />
+          <div className="w-9 h-9 flex items-center justify-center shrink-0 text-white">
+            <PluginIcon
+              name={plugin.name}
+              className={isLogo ? "w-[18px] h-[18px]" : "w-[22px] h-[22px]"}
+              size={isLogo ? 18 : 22}
+            />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-white truncate">

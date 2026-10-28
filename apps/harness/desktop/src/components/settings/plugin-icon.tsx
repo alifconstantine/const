@@ -12,7 +12,24 @@ import {
   GoogleClassroom,
   Excalidraw,
 } from "@thesvg/react";
-import hyperframesIcon from "../../../plugins/hyperframes/assets/icon.svg";
+
+export const PLUGIN_LOGOS = new Set([
+  "const-guide",
+  "github",
+  "canva",
+  "excalidraw",
+  "google-drive",
+  "google-docs",
+  "google-sheets",
+  "google-slides",
+  "gmail",
+  "google-calendar",
+  "google-classroom",
+]);
+
+export function isPluginLogo(name: string): boolean {
+  return PLUGIN_LOGOS.has(name);
+}
 
 /** Only packaged, known assets render here. Missing brand logos consistently fall back to Blocks. */
 export function PluginIcon({
@@ -26,19 +43,34 @@ export function PluginIcon({
 }) {
   if (name === "const-guide")
     return <ConstLogoIcon size={size} className={className} />;
-  if (name === "hyperframes")
-    return <img src={hyperframesIcon} alt="" className={className} />;
   if (name === "github")
     return (
       <Github
         variant="mono"
+        width={size}
+        height={size}
         className={`${className} text-white`}
         aria-hidden="true"
       />
     );
   if (name === "canva")
-    return <Canva className={className} aria-hidden="true" />;
-  if (name === "excalidraw") return <Excalidraw className={className} aria-hidden="true" />;
+    return (
+      <Canva
+        width={size}
+        height={size}
+        className={className}
+        aria-hidden="true"
+      />
+    );
+  if (name === "excalidraw")
+    return (
+      <Excalidraw
+        width={size}
+        height={size}
+        className={className}
+        aria-hidden="true"
+      />
+    );
   const GoogleIcon = (
     {
       "google-drive": GoogleDrive,
@@ -51,6 +83,13 @@ export function PluginIcon({
     } as Record<string, typeof GoogleDrive>
   )[name];
   if (GoogleIcon)
-    return <GoogleIcon className={className} aria-hidden="true" />;
-  return <Blocks className={className} aria-hidden="true" />;
+    return (
+      <GoogleIcon
+        width={size}
+        height={size}
+        className={className}
+        aria-hidden="true"
+      />
+    );
+  return <Blocks size={size} className={className} aria-hidden="true" />;
 }
