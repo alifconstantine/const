@@ -19,7 +19,9 @@ const inputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   scope: z.enum(["user", "workspace"]),
   workspacePath: z.string().optional(),
-  transport: z.enum(["http", "stdio"]),
+  transport: z.enum(["http", "stdio", "builtin"]),
+  builtin: z.literal("obsidian").optional(),
+  vaultPath: z.string().max(4096).optional(),
   url: z.string().max(2048).optional(),
   command: z.string().max(2048).optional(),
   args: z.array(z.string().max(4096)).max(100).optional(),
@@ -100,6 +102,29 @@ export function validateEndpoint(value: string): URL {
   return url;
 }
 
+function validateBuiltin(input: McpSaveInput) {
+  if (input.transport === "builtin") {
+    if (
+      input.builtin !== "obsidian" ||
+      input.auth !== "none" ||
+      input.url ||
+      input.command ||
+      input.cwd ||
+      input.args?.length ||
+      input.clientId ||
+      input.scopes ||
+      input.apiKey ||
+      input.clientSecret ||
+      Object.keys(input.headers ?? {}).length ||
+      Object.keys(input.env ?? {}).length
+    )
+      throw new Error("invalid");
+    if (input.vaultPath && !path.isAbsolute(input.vaultPath))
+      throw new Error("invalid");
+  } else if (input.builtin !== undefined || input.vaultPath !== undefined)
+    throw new Error("invalid");
+}
+
 /** Workspace files contain public settings; every secret stays in the user's encrypted vault. */
 export class McpStore {
   constructor(
@@ -122,6 +147,7 @@ export class McpStore {
     // Parse public fields too: a repository can edit its workspace configuration.
     return data.connections.map((record) => {
       const checked = inputSchema.parse(record);
+      validateBuiltin(checked);
       if (!checked.id || !checked.key) throw new Error("invalid");
       if (checked.transport === "http") validateEndpoint(checked.url ?? "");
       const {
@@ -169,6 +195,9 @@ export class McpStore {
           record.auth,
           record.clientId,
           record.scopes,
+          ...(record.transport === "builtin"
+            ? [record.builtin, record.vaultPath]
+            : []),
         ]),
       )
       .digest("hex");
@@ -229,13 +258,17 @@ export class McpStore {
   }
   save(raw: McpSaveInput): McpConnection {
     const input = inputSchema.parse(raw);
+    validateBuiltin(input);
     const workspace =
       input.scope === "workspace"
         ? validWorkspace(input.workspacePath)
         : undefined;
     if (input.scope === "workspace" && !workspace) throw new Error("invalid");
     if (input.transport === "http") validateEndpoint(input.url ?? "");
-    else if (!input.command?.trim() || input.auth !== "none")
+    else if (
+      input.transport === "stdio" &&
+      (!input.command?.trim() || input.auth !== "none")
+    )
       throw new Error("invalid");
     if (input.cwd && !path.isAbsolute(input.cwd)) throw new Error("invalid");
     const records = this.records(workspace);

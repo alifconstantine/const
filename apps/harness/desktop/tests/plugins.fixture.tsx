@@ -40,6 +40,7 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     pluginName: plugin.interface.displayName,
     scope: "user",
     transport: server.transport,
+    builtin: server.builtin,
     auth: server.auth,
     url: server.url,
     authOptions: server.authOptions,
@@ -63,7 +64,7 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     setupUrl: server.setupUrl,
     enabled: true,
     timeoutMs: 30000,
-    status: "needs_auth",
+    status: server.auth === "none" ? "disconnected" : "needs_auth",
     tools: [],
     isEffective: true,
     hasCredentials: false,
@@ -115,6 +116,27 @@ const bridge = {
     },
   },
   mcp: {
+    chooseVault: async (id: string) => {
+      connections = connections.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              vaultPath: "D:/Fixture/Obsidian Vault",
+              status: "connected",
+              lastConnectedAt: new Date().toISOString(),
+              tools: [
+                {
+                  name: "read_note",
+                  description: "Simulated vault tool",
+                  inputSchema: { type: "object" },
+                  readOnly: true,
+                },
+              ],
+            }
+          : item,
+      );
+      emit();
+    },
     list: async () => connections,
     onChanged: subscribe,
     save: async (input: McpSaveInput) => {

@@ -33,6 +33,8 @@ Local clients and pending initialization are closed on configuration changes and
 
 ## Providers and logos
 
+Obsidian and Figma setup and verification are described in [Obsidian and Figma](obsidian-and-figma.md). Obsidian adds the `builtin` MCP transport for Const's local vault adapter; it starts no subprocess and opens no listening port.
+
 Sources consulted:
 
 - [MCP TypeScript SDK client auth](https://github.com/modelcontextprotocol/typescript-sdk/tree/v1.x/src/client).

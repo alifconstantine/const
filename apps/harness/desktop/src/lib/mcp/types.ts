@@ -16,7 +16,9 @@ export interface McpConnection {
   workspacePath?: string;
   pluginId?: string;
   pluginName?: string;
-  transport: "http" | "stdio";
+  transport: "http" | "stdio" | "builtin";
+  builtin?: "obsidian";
+  vaultPath?: string;
   url?: string;
   command?: string;
   args?: string[];
@@ -57,13 +59,14 @@ export interface McpConnectionView extends McpConnection {
     | "busy"
     | "invalid"
     | "setup"
+    | "vault"
     | "scope"
     | "account";
 }
 export interface McpSaveInput extends Partial<McpConnection> {
   name: string;
   scope: "user" | "workspace";
-  transport: "http" | "stdio";
+  transport: "http" | "stdio" | "builtin";
   auth: McpAuth;
   apiKey?: string;
   clientSecret?: string;
@@ -71,6 +74,11 @@ export interface McpSaveInput extends Partial<McpConnection> {
   env?: Record<string, string>;
 }
 export interface McpBridge {
+  chooseVault(
+    id: string,
+    workspacePath?: string,
+    language?: string,
+  ): Promise<void>;
   list(workspacePath?: string): Promise<McpConnectionView[]>;
   save(input: McpSaveInput): Promise<void>;
   remove(id: string, workspacePath?: string): Promise<void>;
@@ -84,8 +92,20 @@ export interface McpBridge {
   disconnect(id: string, workspacePath?: string): Promise<void>;
   onChanged(callback: () => void): () => void;
   appView(id: string): Promise<import("./apps").McpAppView>;
-  appCall(id: string, name: string, args: Record<string, unknown>, approved?: boolean): Promise<any>;
+  appCall(
+    id: string,
+    name: string,
+    args: Record<string, unknown>,
+    approved?: boolean,
+  ): Promise<any>;
   appContext(id: string, text: string): Promise<void>;
-  saveDiagram(id: string, scene: NonNullable<import("./apps").McpAppView["scene"]>): Promise<string>;
-  readDiagram(filePath: string): Promise<Pick<import("./apps").McpAppView, "id" | "title" | "filePath" | "scene">>;
+  saveDiagram(
+    id: string,
+    scene: NonNullable<import("./apps").McpAppView["scene"]>,
+  ): Promise<string>;
+  readDiagram(
+    filePath: string,
+  ): Promise<
+    Pick<import("./apps").McpAppView, "id" | "title" | "filePath" | "scene">
+  >;
 }

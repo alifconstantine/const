@@ -92,6 +92,7 @@ export const desktopChannels = [
   "computer:get-capabilities",
   "computer:list-apps",
   "mcp:app-view",
+  "mcp:choose-vault",
   "mcp:app-call",
   "mcp:app-context",
   "mcp:diagram-save",

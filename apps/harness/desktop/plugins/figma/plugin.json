@@ -1,0 +1,16 @@
+{
+  "name": "figma",
+  "version": "1.0.0",
+  "description": "Read Figma designs through the official desktop MCP server, or connect the remote server after Const receives Figma client approval.",
+  "author": { "name": "Figma" },
+  "interface": { "displayName": "Figma", "icon": "figma" },
+  "mcpServers": {
+    "figma": {
+      "transport": "http",
+      "url": "http://127.0.0.1:3845/mcp",
+      "auth": "none",
+      "oauthClientRequired": true,
+      "setupUrl": "https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/"
+    }
+  }
+}

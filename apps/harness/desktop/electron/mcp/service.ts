@@ -42,6 +42,7 @@ import { respondOAuth } from "./oauth-page";
 import { McpAppsStore, type StoredApp } from "./apps-store";
 import type { McpAppView } from "../../src/lib/mcp/apps";
 import path from "node:path";
+import { ObsidianVault, obsidianTransport } from "./obsidian";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
 const SEARCH_TOOLS = "mcp_search_tools";
@@ -154,6 +155,7 @@ export class McpService {
             scope: plugin.scope,
             workspacePath: plugin.workspacePath,
             transport: server.transport,
+            builtin: server.builtin,
             url: server.url,
             command: server.command,
             args: server.args,
@@ -295,6 +297,13 @@ export class McpService {
     return record;
   }
   async save(input: McpSaveInput) {
+    if (
+      input.transport === "builtin" &&
+      (!input.id ||
+        this.store.get(input.id, input.workspacePath).key !==
+          "plugin-obsidian-vault")
+    )
+      throw new Error("invalid");
     if (input.id) {
       const previous = this.store.get(input.id, input.workspacePath);
       await this.disconnect(input.id);
@@ -312,6 +321,40 @@ export class McpService {
     const { key: _key, pluginId: _plugin, pluginName: _name, ...safe } = input;
     this.store.save(safe);
     this.changed();
+  }
+  async chooseVault(
+    id: string,
+    workspace: string | undefined,
+    choose: () => Promise<string | null>,
+  ) {
+    const record = this.get(id, workspace);
+    if (
+      record.key !== "plugin-obsidian-vault" ||
+      record.transport !== "builtin" ||
+      record.builtin !== "obsidian" ||
+      !this.store.isTrusted(record)
+    )
+      throw new Error("invalid");
+    const fingerprint = this.store.fingerprint(record);
+    const chosen = await choose();
+    if (!chosen) return;
+    const vault = new ObsidianVault(chosen);
+    const current = this.get(id, workspace);
+    if (
+      !this.store.isTrusted(current) ||
+      this.store.fingerprint(current) !== fingerprint
+    )
+      throw new Error("invalid");
+    await this.disconnect(id);
+    const latest = this.get(id, workspace);
+    if (
+      !this.store.isTrusted(latest) ||
+      this.store.fingerprint(latest) !== fingerprint
+    )
+      throw new Error("invalid");
+    this.store.save({ ...latest, vaultPath: vault.root });
+    this.changed();
+    await this.connect(id, workspace);
   }
   async remove(id: string, workspace?: string) {
     const record = this.store.get(id, workspace);
@@ -341,6 +384,7 @@ export class McpService {
       ...fields,
       scope: "workspace",
       workspacePath: workspace,
+      ...(record.transport === "builtin" ? { vaultPath: undefined } : {}),
     });
     this.changed();
   }
@@ -713,61 +757,72 @@ export class McpService {
         headers.set("Authorization", `Bearer ${secret.apiKey}`);
       }
       const transport: Transport =
-        record.transport === "http"
-          ? new StreamableHTTPClientTransport(validateEndpoint(record.url!), {
-              authProvider:
-                record.auth === "oauth" &&
-                !isManagedGitHub(record) &&
-                !managedGoogleApp(record)
-                  ? this.provider(record, undefined, undefined, signal)
-                  : undefined,
-              fetch: (input, init) => {
-                const bounded = {
-                  ...init,
-                  signal: AbortSignal.any([
-                    signal,
-                    AbortSignal.timeout(record.timeoutMs),
-                    ...(init?.signal ? [init.signal] : []),
-                  ]),
-                };
-                const broker = managedGoogleApp(record)
-                  ? this.google
-                  : isManagedGitHub(record)
-                    ? this.github
-                    : undefined;
-                return broker
-                  ? broker.fetch(record, input, bounded).catch((error) => {
-                      if (
-                        error instanceof Error &&
-                        ["auth", "scope", "account"].includes(error.message)
-                      ) {
-                        const active = this.live.get(record.id);
-                        if (active) {
-                          this.live.delete(record.id);
-                          this.controllers.get(record.id)?.abort();
-                          this.controllers.delete(record.id);
-                          void active.client.close().catch(() => {});
+        record.transport === "builtin"
+          ? await (async () => {
+              if (
+                record.key !== "plugin-obsidian-vault" ||
+                record.builtin !== "obsidian" ||
+                !record.vaultPath
+              )
+                throw new Error("vault");
+              return obsidianTransport(record.vaultPath);
+            })()
+          : record.transport === "http"
+            ? new StreamableHTTPClientTransport(validateEndpoint(record.url!), {
+                authProvider:
+                  record.auth === "oauth" &&
+                  !isManagedGitHub(record) &&
+                  !managedGoogleApp(record)
+                    ? this.provider(record, undefined, undefined, signal)
+                    : undefined,
+                fetch: (input, init) => {
+                  const bounded = {
+                    ...init,
+                    signal: AbortSignal.any([
+                      signal,
+                      AbortSignal.timeout(record.timeoutMs),
+                      ...(init?.signal ? [init.signal] : []),
+                    ]),
+                  };
+                  const broker = managedGoogleApp(record)
+                    ? this.google
+                    : isManagedGitHub(record)
+                      ? this.github
+                      : undefined;
+                  return broker
+                    ? broker.fetch(record, input, bounded).catch((error) => {
+                        if (
+                          error instanceof Error &&
+                          ["auth", "scope", "account"].includes(error.message)
+                        ) {
+                          const active = this.live.get(record.id);
+                          if (active) {
+                            this.live.delete(record.id);
+                            this.controllers.get(record.id)?.abort();
+                            this.controllers.delete(record.id);
+                            void active.client.close().catch(() => {});
+                          }
+                          this.states.set(record.id, {
+                            status: "needs_auth",
+                            error: error.message as
+                              "auth" | "scope" | "account",
+                          });
+                          this.retryAfter.set(record.id, Date.now() + 30_000);
+                          this.changed();
                         }
-                        this.states.set(record.id, {
-                          status: "needs_auth",
-                          error: error.message as "auth" | "scope" | "account",
-                        });
-                        this.retryAfter.set(record.id, Date.now() + 30_000);
-                        this.changed();
-                      }
-                      throw error;
-                    })
-                  : fetch(input, bounded);
-              },
-              requestInit: { headers },
-            })
-          : new StdioClientTransport({
-              command: record.command!,
-              args: record.args,
-              cwd: record.cwd ?? record.workspacePath,
-              env: { ...getDefaultEnvironment(), ...secret.env },
-              stderr: "ignore",
-            });
+                        throw error;
+                      })
+                    : fetch(input, bounded);
+                },
+                requestInit: { headers },
+              })
+            : new StdioClientTransport({
+                command: record.command!,
+                args: record.args,
+                cwd: record.cwd ?? record.workspacePath,
+                env: { ...getDefaultEnvironment(), ...secret.env },
+                stderr: "ignore",
+              });
       await client.connect(transport, { timeout: record.timeoutMs, signal });
       const tools = await this.readTools(client, record.timeoutMs, signal);
       if (signal.aborted) throw new Error("connection");
@@ -813,9 +868,11 @@ export class McpService {
         error instanceof Error &&
         ["scope", "account"].includes(error.message)
           ? (error.message as "scope" | "account")
-          : auth
-            ? "auth"
-            : "connection";
+          : error instanceof Error && error.message === "vault"
+            ? "vault"
+            : auth
+              ? "auth"
+              : "connection";
       this.retryAfter.set(record.id, Date.now() + 30_000);
       this.states.set(record.id, {
         status: auth ? "needs_auth" : "error",
@@ -875,6 +932,7 @@ export class McpService {
       (record) =>
         record.isEffective &&
         record.enabled &&
+        (record.transport !== "builtin" || !!record.vaultPath) &&
         record.status !== "needs_auth" &&
         this.store.isTrusted(record) &&
         (record.auth === "none" || record.hasCredentials) &&

@@ -370,6 +370,7 @@ export function createDesktopBridge(
     },
     mcp: {
       appView: (id: string) => ipcRenderer.invoke("mcp:app-view", id),
+      chooseVault: (id: string, workspacePath?: string, language?: string) => ipcRenderer.invoke("mcp:choose-vault", id, workspacePath, language),
       appCall: (
         id: string,
         name: string,

@@ -909,12 +909,20 @@ app.whenReady().then(() => {
       if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
       try { return await handler(...args); }
       catch (error) {
-        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup"].includes(error.message) ? error.message : "invalid";
+        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup", "vault"].includes(error.message) ? error.message : "invalid";
         throw new Error(code);
       }
     });
   };
   handleMcp("mcp:list", (workspace?: string) => mcpService.list(workspace));
+  handleMcp("mcp:choose-vault", (id: string, workspace?: string, language?: string) => mcpService.chooseVault(id, workspace, async () => {
+    const { mcpTranslations } = await import("../src/locales/mcp");
+    const labels = mcpTranslations[language as keyof typeof mcpTranslations] ?? mcpTranslations.en;
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    if (!window) throw new Error("connection");
+    const result = await dialog.showOpenDialog(window, { title: labels.chooseVault, properties: ["openDirectory"] });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  }));
   handleMcp("mcp:app-view", (id: string) => mcpService.appView(id));
   handleMcp("mcp:app-call", (id: string, name: string, args: Record<string, unknown>, approved?: boolean) => mcpService.appCall(id, name, args, approved));
   handleMcp("mcp:app-context", (id: string, text: string) => mcpService.appContext(id, text));

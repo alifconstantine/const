@@ -36,9 +36,11 @@ import {
   connectionAccountLabel,
 } from "./plugin-connection-info";
 import { PluginIcon } from "./plugin-icon";
+import { ProviderSetup } from "./provider-setup";
 
 function mcpErrorKey(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("vault")) return "mcp.errorVault";
   if (message.includes("setup")) return "mcp.errorSetup";
   if (message.includes("scope")) return "mcp.errorScope";
   if (message.includes("account")) return "mcp.errorAccount";
@@ -581,9 +583,11 @@ export function McpSettings({
                 : t("mcp.overridden")}
             </span>
             <span className="min-w-0 break-all">
-              {connection.transport === "http"
-                ? connection.url
-                : connection.command}
+              {connection.transport === "builtin"
+                ? t("mcp.localVault")
+                : connection.transport === "http"
+                  ? connection.url
+                  : connection.command}
             </span>
           </div>
           <div className="space-y-1 text-xs text-[#969696]">
@@ -598,10 +602,11 @@ export function McpSettings({
             {connection.managedOAuth === "google" && (
               <p>{t("mcp.googleAccountHint")}</p>
             )}
-            {connection.auth === "oauth" &&
+            {connection.key !== "plugin-figma-figma" &&
+              connection.auth === "oauth" &&
               connection.oauthClientRequired &&
               !connection.clientId && <p>{t("mcp.clientRequired")}</p>}
-            {connection.setupUrl && (
+            {connection.setupUrl && connection.key !== "plugin-figma-figma" && (
               <button
                 type="button"
                 className="underline underline-offset-4 hover:text-white"
@@ -617,28 +622,35 @@ export function McpSettings({
               </button>
             )}
           </div>
+          <ProviderSetup connection={connection} busy={!!pending} run={run} />
           {connection.error && (
             <p role="alert" className="text-xs text-[#d4d4d4]">
               {t(mcpErrorKey(new Error(connection.error)))}
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!!pending}
-              onClick={() => setEditor(connection)}
-            >
-              <Pencil className="mr-1.5 h-3.5 w-3.5" />
-              {t("common.edit")}
-            </Button>
+            {connection.transport !== "builtin" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!!pending}
+                onClick={() => setEditor(connection)}
+              >
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                {t("common.edit")}
+              </Button>
+            )}
             {connection.enabled && connection.isEffective && (
               <>
                 {(connection.auth === "none" || connection.hasCredentials) && (
                   <Button
                     size="sm"
                     variant="ghost"
-                    disabled={!!pending}
+                    disabled={
+                      !!pending ||
+                      (connection.transport === "builtin" &&
+                        !connection.vaultPath)
+                    }
                     onClick={() =>
                       bridge &&
                       void run(connection.id, () =>

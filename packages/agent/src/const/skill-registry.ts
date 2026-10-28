@@ -23,7 +23,8 @@ export interface PluginManifest {
   ui?: { chat?: string; panel?: string; sidebar?: boolean };
 }
 export interface PluginMcpServer {
-  transport: "http" | "stdio";
+  transport: "http" | "stdio" | "builtin";
+  builtin?: "obsidian";
   url?: string;
   command?: string;
   args?: string[];
@@ -123,7 +124,9 @@ export function readPluginManifest(root: string): PluginManifest {
       throw new Error(`Invalid plugin MCP servers: ${root}`);
     for (const [name, server] of Object.entries(manifest.mcpServers)) {
       if (!validName.test(name) || !server || !["none", "oauth", "api-key"].includes(server.auth) ||
-        !["http", "stdio"].includes(server.transport) ||
+        !["http", "stdio", "builtin"].includes(server.transport) ||
+        (server.transport === "builtin" && (server.builtin !== "obsidian" || server.auth !== "none" || server.url !== undefined || server.command !== undefined)) ||
+        (server.transport !== "builtin" && server.builtin !== undefined) ||
         (server.transport === "http" && (typeof server.url !== "string" || !/^https?:\/\//.test(server.url))) ||
         (server.transport === "stdio" && (typeof server.command !== "string" || !server.command.trim())) ||
         (server.args !== undefined && (!Array.isArray(server.args) || server.args.some((arg) => typeof arg !== "string"))))

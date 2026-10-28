@@ -1,0 +1,10 @@
+{
+  "name": "obsidian",
+  "version": "1.0.0",
+  "description": "Search, read, create and update Markdown notes in a local Obsidian vault. Choose a vault folder; no account or extra server is required.",
+  "author": { "name": "Const" },
+  "interface": { "displayName": "Obsidian", "icon": "obsidian" },
+  "mcpServers": {
+    "vault": { "transport": "builtin", "builtin": "obsidian", "auth": "none" }
+  }
+}

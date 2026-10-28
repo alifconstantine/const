@@ -1,0 +1,112 @@
+import { FolderOpen } from "lucide-react";
+import {
+  Button,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
+import type { McpConnectionView } from "../../lib/mcp/types";
+import {
+  FIGMA_DESKTOP_URL,
+  FIGMA_REMOTE_URL,
+  FIGMA_DESKTOP_GUIDE,
+  FIGMA_REMOTE_GUIDE,
+} from "../../lib/mcp/presets";
+
+export function ProviderSetup({
+  connection,
+  busy,
+  run,
+}: {
+  connection: McpConnectionView;
+  busy: boolean;
+  run: (id: string, operation: () => Promise<unknown>) => Promise<void>;
+}) {
+  const { t, language } = useTranslation();
+  const bridge = window.electron?.mcp;
+  if (connection.builtin === "obsidian")
+    return (
+      <div className="space-y-3 text-sm text-[#969696]">
+        <p>{t("mcp.obsidianSetup")}</p>
+        {connection.vaultPath && (
+          <p className="break-all text-xs text-[#d4d4d4]">
+            {connection.vaultPath}
+          </p>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy || !connection.enabled || !connection.isEffective}
+          onClick={() =>
+            bridge &&
+            void run(connection.id, () =>
+              bridge.chooseVault(
+                connection.id,
+                connection.workspacePath,
+                language,
+              ),
+            )
+          }
+        >
+          <FolderOpen className="size-4 mr-2" />
+          {t(connection.vaultPath ? "mcp.changeVault" : "mcp.chooseVault")}
+        </Button>
+      </div>
+    );
+  if (connection.key !== "plugin-figma-figma") return null;
+  const remote = connection.url === FIGMA_REMOTE_URL;
+  const mode = remote
+    ? "remote"
+    : connection.url === FIGMA_DESKTOP_URL
+      ? "desktop"
+      : undefined;
+  return (
+    <div className="space-y-3 text-sm text-[#969696]">
+      <label className="space-y-2 block">
+        <span>{t("mcp.figmaConnection")}</span>
+        <Select
+          value={mode}
+          disabled={busy}
+          onValueChange={(value) =>
+            bridge &&
+            void run(connection.id, () =>
+              bridge.save({
+                ...connection,
+                url: value === "remote" ? FIGMA_REMOTE_URL : FIGMA_DESKTOP_URL,
+                auth: value === "remote" ? "oauth" : "none",
+                scopes: value === "remote" ? "mcp:connect" : undefined,
+                clientId: undefined,
+              }),
+            )
+          }
+        >
+          <SelectTrigger
+            className="max-w-sm rounded-xl bg-[#222222]"
+            aria-label={t("mcp.figmaConnection")}
+          >
+            <SelectValue placeholder={t("mcp.figmaConnection")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="desktop">{t("mcp.figmaDesktop")}</SelectItem>
+            <SelectItem value="remote">{t("mcp.figmaRemote")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      <p>{t(remote ? "mcp.figmaRemoteSetup" : "mcp.figmaDesktopSetup")}</p>
+      <button
+        type="button"
+        className="text-xs underline underline-offset-4 hover:text-white"
+        onClick={() =>
+          void window.electron?.openExternal(
+            remote ? FIGMA_REMOTE_GUIDE : FIGMA_DESKTOP_GUIDE,
+          )
+        }
+      >
+        {t("mcp.setupGuide")}
+      </button>
+    </div>
+  );
+}

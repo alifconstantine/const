@@ -11,6 +11,8 @@ import {
   GoogleCalendar,
   GoogleClassroom,
   Excalidraw,
+  Figma,
+  Obsidian,
 } from "@thesvg/react";
 
 export const PLUGIN_LOGOS = new Set([
@@ -18,6 +20,8 @@ export const PLUGIN_LOGOS = new Set([
   "github",
   "canva",
   "excalidraw",
+  "figma",
+  "obsidian",
   "google-drive",
   "google-docs",
   "google-sheets",
@@ -73,6 +77,8 @@ export function PluginIcon({
     );
   const GoogleIcon = (
     {
+      figma: Figma,
+      obsidian: Obsidian,
       "google-drive": GoogleDrive,
       "google-docs": GoogleDocs,
       "google-sheets": GoogleSheets,

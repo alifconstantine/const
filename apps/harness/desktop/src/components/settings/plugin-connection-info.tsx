@@ -13,6 +13,8 @@ export const pluginDescriptionKeys: Record<string, string> = {
   github: "mcp.githubDescription",
   canva: "mcp.canvaDescription",
   excalidraw: "mcp.excalidrawDescription",
+  obsidian: "mcp.obsidianDescription",
+  figma: "mcp.figmaDescription",
   "google-drive": "mcp.googleDriveDescription",
   "google-docs": "mcp.googleDocsDescription",
   "google-sheets": "mcp.googleSheetsDescription",
@@ -24,6 +26,10 @@ export const pluginDescriptionKeys: Record<string, string> = {
 };
 
 export function connectionAccountLabel(connection: McpConnectionView) {
+  if (connection.builtin === "obsidian")
+    return connection.vaultPath ? "mcp.vaultSelected" : "mcp.chooseVault";
+  if (connection.key === "plugin-figma-figma" && connection.auth === "none")
+    return "mcp.figmaDesktop";
   if (connection.auth === "none") return "mcp.noAccount";
   if (connection.auth === "api-key")
     return connection.hasCredentials
@@ -71,11 +77,17 @@ export function PluginConnectionInfo({
     <div className="flex flex-col gap-1 text-[11px] leading-relaxed text-[#969696]">
       <span>
         {t(
-          account
-            ? "mcp.requiresAccount"
-            : key
-              ? "mcp.requiresKey"
-              : "mcp.noAccount",
+          plugin.name === "obsidian"
+            ? "mcp.localVault"
+            : plugin.name === "figma"
+              ? connections[0]?.auth === "oauth"
+                ? "mcp.requiresAccount"
+                : "mcp.figmaDesktop"
+              : account
+                ? "mcp.requiresAccount"
+                : key
+                  ? "mcp.requiresKey"
+                  : "mcp.noAccount",
         )}
       </span>
       {connections.map((connection) => (
