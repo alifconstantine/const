@@ -1,5 +1,6 @@
 import { Blocks } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
+import { ARTCRAFT_IDS, isArtCraftApp } from "../../lib/mcp/artcraft";
 import {
   Github,
   Canva,
@@ -16,6 +17,7 @@ import {
 } from "@thesvg/react";
 
 export const PLUGIN_LOGOS = new Set([
+  ...ARTCRAFT_IDS,
   "const-guide",
   "github",
   "canva",
@@ -45,6 +47,17 @@ export function PluginIcon({
   className?: string;
   size?: number;
 }) {
+  if (isArtCraftApp(name))
+    return (
+      <img
+        src={`${import.meta.env.BASE_URL}assets/plugins/artcraft/${name}.png`}
+        width={size}
+        height={size}
+        className={className}
+        alt=""
+        aria-hidden="true"
+      />
+    );
   if (name === "const-guide")
     return <ConstLogoIcon size={size} className={className} />;
   if (name === "github")

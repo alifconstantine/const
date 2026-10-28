@@ -1,0 +1,21 @@
+{
+  "name": "cadcraft",
+  "version": "1.0.0",
+  "description": "Create and edit CAD drawings and geometry. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "CADCraft",
+    "icon": "cadcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "cadcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/cadcraft"
+    }
+  }
+}

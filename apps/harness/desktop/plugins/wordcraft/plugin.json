@@ -1,0 +1,21 @@
+{
+  "name": "wordcraft",
+  "version": "1.0.0",
+  "description": "Write, edit and export formatted documents. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "WordCraft",
+    "icon": "wordcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "wordcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/wordcraft"
+    }
+  }
+}

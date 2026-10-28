@@ -40,6 +40,7 @@ import { ProviderSetup } from "./provider-setup";
 
 function mcpErrorKey(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("runtime")) return "mcp.errorRuntime";
   if (message.includes("vault")) return "mcp.errorVault";
   if (message.includes("setup")) return "mcp.errorSetup";
   if (message.includes("scope")) return "mcp.errorScope";
@@ -584,7 +585,11 @@ export function McpSettings({
             </span>
             <span className="min-w-0 break-all">
               {connection.transport === "builtin"
-                ? t("mcp.localVault")
+                ? t(
+                    connection.builtin === "artcraft"
+                      ? "mcp.artcraftRuntime"
+                      : "mcp.localVault",
+                  )
                 : connection.transport === "http"
                   ? connection.url
                   : connection.command}
@@ -622,7 +627,12 @@ export function McpSettings({
               </button>
             )}
           </div>
-          <ProviderSetup connection={connection} busy={!!pending} run={run} />
+          <ProviderSetup
+            connection={connection}
+            workspacePath={workspacePath}
+            busy={!!pending}
+            run={run}
+          />
           {connection.error && (
             <p role="alert" className="text-xs text-[#d4d4d4]">
               {t(mcpErrorKey(new Error(connection.error)))}
@@ -648,8 +658,19 @@ export function McpSettings({
                     variant="ghost"
                     disabled={
                       !!pending ||
-                      (connection.transport === "builtin" &&
-                        !connection.vaultPath)
+                      (connection.builtin === "obsidian" &&
+                        !connection.vaultPath) ||
+                      (connection.builtin === "artcraft" &&
+                        (!workspacePath ||
+                          !connection.detectedRuntime ||
+                          (connection.artcraftApp &&
+                            [
+                              "filmcraft",
+                              "lightcraft",
+                              "cadcraft",
+                              "gridcraft",
+                            ].includes(connection.artcraftApp) &&
+                            !connection.localFileAccess)))
                     }
                     onClick={() =>
                       bridge &&

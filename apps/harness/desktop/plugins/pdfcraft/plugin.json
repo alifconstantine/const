@@ -1,0 +1,21 @@
+{
+  "name": "pdfcraft",
+  "version": "1.0.0",
+  "description": "Read, organize and export PDF documents. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "PdfCraft",
+    "icon": "pdfcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "pdfcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/pdfcraft"
+    }
+  }
+}

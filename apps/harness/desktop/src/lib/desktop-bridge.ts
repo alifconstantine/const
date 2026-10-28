@@ -369,6 +369,7 @@ export function createDesktopBridge(
       listApps: () => ipcRenderer.invoke("computer:list-apps"),
     },
     mcp: {
+      configureArtcraft: (id: string, action: "detect" | "browse", workspacePath?: string, language?: string) => ipcRenderer.invoke("mcp:configure-artcraft", id, action, workspacePath, language),
       appView: (id: string) => ipcRenderer.invoke("mcp:app-view", id),
       chooseVault: (id: string, workspacePath?: string, language?: string) => ipcRenderer.invoke("mcp:choose-vault", id, workspacePath, language),
       appCall: (

@@ -1,0 +1,21 @@
+{
+  "name": "soundcraft",
+  "version": "1.0.0",
+  "description": "Edit audio projects, mix tracks and export sound. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "SoundCraft",
+    "icon": "soundcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "soundcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/soundcraft"
+    }
+  }
+}

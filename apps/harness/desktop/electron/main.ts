@@ -909,12 +909,23 @@ app.whenReady().then(() => {
       if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
       try { return await handler(...args); }
       catch (error) {
-        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup", "vault"].includes(error.message) ? error.message : "invalid";
+        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup", "vault", "runtime"].includes(error.message) ? error.message : "invalid";
         throw new Error(code);
       }
     });
   };
   handleMcp("mcp:list", (workspace?: string) => mcpService.list(workspace));
+  handleMcp("mcp:configure-artcraft", (id: string, action: string, workspace?: string, language?: string) => {
+    if (action !== "detect" && action !== "browse") throw new Error("invalid");
+    return mcpService.configureArtcraft(id, workspace, action === "browse" ? async () => {
+      const { mcpTranslations } = await import("../src/locales/mcp");
+      const labels = mcpTranslations[language as keyof typeof mcpTranslations] ?? mcpTranslations.en;
+      const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("connection");
+      const result = await dialog.showOpenDialog(window, { title: labels.artcraftBrowse, properties: ["openFile"] });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    } : undefined);
+  });
   handleMcp("mcp:choose-vault", (id: string, workspace?: string, language?: string) => mcpService.chooseVault(id, workspace, async () => {
     const { mcpTranslations } = await import("../src/locales/mcp");
     const labels = mcpTranslations[language as keyof typeof mcpTranslations] ?? mcpTranslations.en;
@@ -1547,7 +1558,7 @@ app.whenReady().then(() => {
         model,
         workspacePath: targetWorkspace,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
-        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal),
+        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
         nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
@@ -2097,6 +2108,7 @@ app.whenReady().then(() => {
   });
 
   handleDesktopIpc("conversations:delete", async (event, id: string) => {
+    await mcpService.releaseConversation(id);
     conversationDb.deleteConversation(id);
     broadcastLocalConversationChange(event, id);
     return true;
@@ -2556,7 +2568,7 @@ app.whenReady().then(() => {
         apiKey,
         model,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
-        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal),
+        externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
         nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,

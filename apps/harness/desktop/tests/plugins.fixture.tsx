@@ -41,6 +41,7 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     scope: "user",
     transport: server.transport,
     builtin: server.builtin,
+    artcraftApp: server.artcraftApp as McpConnectionView["artcraftApp"],
     auth: server.auth,
     url: server.url,
     authOptions: server.authOptions,
@@ -116,6 +117,17 @@ const bridge = {
     },
   },
   mcp: {
+    configureArtcraft: async (id: string) => {
+      connections = connections.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              detectedRuntime: `D:/Fixture/ArtCraft/${item.artcraftApp}-cli.exe`,
+            }
+          : item,
+      );
+      emit();
+    },
     chooseVault: async (id: string) => {
       connections = connections.map((item) =>
         item.id === id

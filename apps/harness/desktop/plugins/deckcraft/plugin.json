@@ -1,0 +1,21 @@
+{
+  "name": "deckcraft",
+  "version": "1.0.0",
+  "description": "Create presentations and export slides. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "DeckCraft",
+    "icon": "deckcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "deckcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/deckcraft"
+    }
+  }
+}

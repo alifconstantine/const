@@ -33,6 +33,8 @@ Local clients and pending initialization are closed on configuration changes and
 
 ## Providers and logos
 
+The 13 optional local ArtCraft integrations, CLI setup, session isolation, verified release matrix and output behavior are described in [ArtCraft plugins](artcraft.md). They use the `builtin: artcraft` runtime manager to start official stdio engines lazily, with separate document state per workspace and chat.
+
 Obsidian and Figma setup and verification are described in [Obsidian and Figma](obsidian-and-figma.md). Obsidian adds the `builtin` MCP transport for Const's local vault adapter; it starts no subprocess and opens no listening port.
 
 Sources consulted:

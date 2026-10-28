@@ -1,0 +1,21 @@
+{
+  "name": "filmcraft",
+  "version": "1.0.0",
+  "description": "Edit video timelines and export films. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "FilmCraft",
+    "icon": "filmcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "filmcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/filmcraft"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "vectorcraft",
+  "version": "1.0.0",
+  "description": "Create and edit vector illustrations. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "VectorCraft",
+    "icon": "vectorcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "vectorcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/vectorcraft"
+    }
+  }
+}

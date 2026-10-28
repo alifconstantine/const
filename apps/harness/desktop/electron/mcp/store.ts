@@ -7,6 +7,7 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { McpConnection, McpSaveInput } from "../../src/lib/mcp/types";
+import { ARTCRAFT_IDS } from "../../src/lib/mcp/artcraft";
 
 const pairs = z.record(z.string().min(1).max(200), z.string().max(16_384));
 const inputSchema = z.object({
@@ -20,7 +21,17 @@ const inputSchema = z.object({
   scope: z.enum(["user", "workspace"]),
   workspacePath: z.string().optional(),
   transport: z.enum(["http", "stdio", "builtin"]),
-  builtin: z.literal("obsidian").optional(),
+  builtin: z.enum(["obsidian", "artcraft"]).optional(),
+  artcraftApp: z
+    .enum(
+      ARTCRAFT_IDS as [
+        (typeof ARTCRAFT_IDS)[number],
+        ...(typeof ARTCRAFT_IDS)[number][],
+      ],
+    )
+    .optional(),
+  runtimePath: z.string().max(4096).optional(),
+  localFileAccess: z.boolean().optional(),
   vaultPath: z.string().max(4096).optional(),
   url: z.string().max(2048).optional(),
   command: z.string().max(2048).optional(),
@@ -105,7 +116,7 @@ export function validateEndpoint(value: string): URL {
 function validateBuiltin(input: McpSaveInput) {
   if (input.transport === "builtin") {
     if (
-      input.builtin !== "obsidian" ||
+      !["obsidian", "artcraft"].includes(input.builtin ?? "") ||
       input.auth !== "none" ||
       input.url ||
       input.command ||
@@ -121,7 +132,26 @@ function validateBuiltin(input: McpSaveInput) {
       throw new Error("invalid");
     if (input.vaultPath && !path.isAbsolute(input.vaultPath))
       throw new Error("invalid");
-  } else if (input.builtin !== undefined || input.vaultPath !== undefined)
+    if (input.builtin === "artcraft") {
+      if (
+        !input.artcraftApp ||
+        input.vaultPath ||
+        (input.runtimePath && !path.isAbsolute(input.runtimePath))
+      )
+        throw new Error("invalid");
+    } else if (
+      input.artcraftApp !== undefined ||
+      input.runtimePath !== undefined ||
+      input.localFileAccess !== undefined
+    )
+      throw new Error("invalid");
+  } else if (
+    input.builtin !== undefined ||
+    input.vaultPath !== undefined ||
+    input.artcraftApp !== undefined ||
+    input.runtimePath !== undefined ||
+    input.localFileAccess !== undefined
+  )
     throw new Error("invalid");
 }
 
@@ -197,6 +227,9 @@ export class McpStore {
           record.scopes,
           ...(record.transport === "builtin"
             ? [record.builtin, record.vaultPath]
+            : []),
+          ...(record.builtin === "artcraft"
+            ? [record.artcraftApp, record.runtimePath, record.localFileAccess]
             : []),
         ]),
       )

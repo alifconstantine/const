@@ -1,0 +1,21 @@
+{
+  "name": "designcraft",
+  "version": "1.0.0",
+  "description": "Create page layouts and publishing documents. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "DesignCraft",
+    "icon": "designcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "designcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/designcraft"
+    }
+  }
+}

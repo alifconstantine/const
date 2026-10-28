@@ -1,0 +1,21 @@
+{
+  "name": "gridcraft",
+  "version": "1.0.0",
+  "description": "Edit spreadsheets, formulas and workbooks. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "GridCraft",
+    "icon": "gridcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "gridcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/gridcraft"
+    }
+  }
+}

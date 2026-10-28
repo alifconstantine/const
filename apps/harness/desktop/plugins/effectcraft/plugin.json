@@ -1,0 +1,21 @@
+{
+  "name": "effectcraft",
+  "version": "1.0.0",
+  "description": "Build motion graphics and render visual effects. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "EffectCraft",
+    "icon": "effectcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "effectcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/effectcraft"
+    }
+  }
+}

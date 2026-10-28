@@ -93,6 +93,7 @@ export const desktopChannels = [
   "computer:list-apps",
   "mcp:app-view",
   "mcp:choose-vault",
+  "mcp:configure-artcraft",
   "mcp:app-call",
   "mcp:app-context",
   "mcp:diagram-save",

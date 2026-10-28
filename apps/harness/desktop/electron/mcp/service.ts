@@ -43,6 +43,13 @@ import { McpAppsStore, type StoredApp } from "./apps-store";
 import type { McpAppView } from "../../src/lib/mcp/apps";
 import path from "node:path";
 import { ObsidianVault, obsidianTransport } from "./obsidian";
+import {
+  ArtcraftRuntimeManager,
+  artcraftApp,
+  findArtcraftRuntime,
+  ARTCRAFT_GATEWAYS,
+} from "./artcraft";
+import { ARTCRAFT_APPS, isArtCraftApp } from "../../src/lib/mcp/artcraft";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
 const SEARCH_TOOLS = "mcp_search_tools";
@@ -110,6 +117,7 @@ export function exposedToolName(id: string, tool: string) {
 }
 
 export class McpService {
+  private readonly artcraft: ArtcraftRuntimeManager;
   private live = new Map<string, LiveConnection>();
   private states = new Map<
     string,
@@ -131,10 +139,16 @@ export class McpService {
     ) => resolveSkillRegistry(workspace).plugins,
     github?: GitHubOAuthClient,
     google?: GoogleOAuthClient,
+    artcraft?: ArtcraftRuntimeManager,
   ) {
     this.github = github ?? new GitHubOAuthClient(store);
     this.google = google ?? new GoogleOAuthClient(store);
     this.apps = new McpAppsStore(store.home);
+    this.artcraft = artcraft ?? new ArtcraftRuntimeManager();
+    this.artcraft.onUnexpectedClose = (id) => {
+      this.states.set(id, { status: "error", error: "connection" });
+      this.changed();
+    };
   }
 
   private configurations(workspace?: string): McpConnection[] {
@@ -156,6 +170,10 @@ export class McpService {
             workspacePath: plugin.workspacePath,
             transport: server.transport,
             builtin: server.builtin,
+            artcraftApp: isArtCraftApp(server.artcraftApp)
+              ? server.artcraftApp
+              : undefined,
+            timeoutMs: server.builtin === "artcraft" ? 180_000 : undefined,
             url: server.url,
             command: server.command,
             args: server.args,
@@ -272,6 +290,9 @@ export class McpService {
       return {
         ...record,
         isEffective,
+        detectedRuntime: artcraftApp(record)
+          ? findArtcraftRuntime(artcraftApp(record)!, record.runtimePath)
+          : undefined,
         hasCredentials,
         accountEmail,
         lastConnectedAt: this.store.lastConnectedAt(record),
@@ -286,7 +307,10 @@ export class McpService {
                 ? "needs_auth"
                 : "disconnected")),
         error: state?.error,
-        tools: this.live.get(record.id)?.tools ?? [],
+        tools:
+          record.builtin === "artcraft"
+            ? this.artcraft.tools(record.id)
+            : (this.live.get(record.id)?.tools ?? []),
       };
     });
   }
@@ -300,8 +324,18 @@ export class McpService {
     if (
       input.transport === "builtin" &&
       (!input.id ||
-        this.store.get(input.id, input.workspacePath).key !==
-          "plugin-obsidian-vault")
+        (!(
+          input.builtin === "obsidian" &&
+          this.store.get(input.id, input.workspacePath).key ===
+            "plugin-obsidian-vault"
+        ) &&
+          !(
+            input.builtin === "artcraft" &&
+            artcraftApp({
+              ...input,
+              key: this.store.get(input.id, input.workspacePath).key,
+            } as McpConnection)
+          )))
     )
       throw new Error("invalid");
     if (input.id) {
@@ -320,6 +354,29 @@ export class McpService {
     // Custom callers cannot impersonate a plugin or mint a plugin-managed key.
     const { key: _key, pluginId: _plugin, pluginName: _name, ...safe } = input;
     this.store.save(safe);
+    this.changed();
+  }
+  async configureArtcraft(
+    id: string,
+    workspace: string | undefined,
+    choose?: () => Promise<string | null>,
+  ) {
+    const record = this.get(id, workspace);
+    const app = artcraftApp(record);
+    if (!app || !this.store.isTrusted(record)) throw new Error("invalid");
+    const fingerprint = this.store.fingerprint(record);
+    const selected = choose ? await choose() : undefined;
+    if (selected === null) return;
+    const runtime = findArtcraftRuntime(app, selected);
+    if (!runtime) throw new Error("runtime");
+    await this.disconnect(id);
+    const current = this.get(id, workspace);
+    if (
+      !this.store.isTrusted(current) ||
+      this.store.fingerprint(current) !== fingerprint
+    )
+      throw new Error("invalid");
+    this.store.save({ ...current, runtimePath: runtime });
     this.changed();
   }
   async chooseVault(
@@ -389,6 +446,7 @@ export class McpService {
     this.changed();
   }
   async disconnect(id: string, _workspace?: string) {
+    await this.artcraft.disconnect(id);
     if (this.login?.id === id) this.login.abort();
     this.controllers.get(id)?.abort();
     this.controllers.delete(id);
@@ -416,15 +474,23 @@ export class McpService {
     this.changed();
   }
   async invalidate() {
+    await this.artcraft.close();
     const login = this.login;
     login?.abort();
     await Promise.all(
-      [...new Set([...this.live.keys(), ...this.pending.keys()])].map((id) =>
-        this.disconnect(id),
-      ),
+      [
+        ...new Set([
+          ...this.live.keys(),
+          ...this.pending.keys(),
+          ...this.states.keys(),
+        ]),
+      ].map((id) => this.disconnect(id)),
     );
     await login?.done;
     this.changed();
+  }
+  async releaseConversation(conversation: string) {
+    await this.artcraft.releaseConversation(conversation);
   }
   private provider(
     record: McpConnection,
@@ -713,6 +779,43 @@ export class McpService {
     const record = this.get(id, workspace);
     if (!this.store.isTrusted(record)) throw new Error("invalid");
     const fingerprint = this.store.fingerprint(record);
+    if (artcraftApp(record)) {
+      if (!workspace) throw new Error("runtime");
+      this.states.set(id, { status: "connecting" });
+      this.changed();
+      const probe = `settings-probe-${record.id}`;
+      try {
+        // A probe has its own document/library; never reuse a chat engine for Settings.
+        const active = await this.artcraft.connect(
+          record,
+          fingerprint,
+          workspace,
+          probe,
+        );
+        const current = this.get(id, workspace);
+        if (
+          !this.store.isTrusted(current) ||
+          this.store.fingerprint(current) !== fingerprint
+        )
+          throw new Error("invalid");
+        this.store.markConnected(record);
+        this.states.set(id, { status: "connected" });
+        this.changed();
+        return active;
+      } catch (error) {
+        this.states.set(id, {
+          status: "error",
+          error:
+            error instanceof Error && error.message === "runtime"
+              ? "runtime"
+              : "connection",
+        });
+        this.changed();
+        throw error;
+      } finally {
+        await this.artcraft.releaseConversation(probe);
+      }
+    }
     const active = this.live.get(id);
     if (active?.fingerprint === fingerprint) return active;
     const pending = this.pending.get(id);
@@ -932,7 +1035,13 @@ export class McpService {
       (record) =>
         record.isEffective &&
         record.enabled &&
-        (record.transport !== "builtin" || !!record.vaultPath) &&
+        (record.builtin !== "obsidian" || !!record.vaultPath) &&
+        (record.builtin !== "artcraft" ||
+          (!!artcraftApp(record) &&
+            !!record.detectedRuntime &&
+            !!workspace &&
+            (ARTCRAFT_APPS[artcraftApp(record)!].roots ||
+              !!record.localFileAccess))) &&
         record.status !== "needs_auth" &&
         this.store.isTrusted(record) &&
         (record.auth === "none" || record.hasCredentials) &&
@@ -943,6 +1052,19 @@ export class McpService {
     await Promise.all(
       eligible.map(async (record) => {
         if (signal?.aborted) return;
+        if (artcraftApp(record)) {
+          for (const tool of ARTCRAFT_GATEWAYS)
+            definitions.push({
+              type: "function",
+              requiresApproval: true,
+              function: {
+                name: exposedToolName(record.id, tool.name),
+                description: `[${record.name}] ${ARTCRAFT_APPS[artcraftApp(record)!].keywords}. ${tool.description}`,
+                parameters: tool.inputSchema,
+              },
+            });
+          return;
+        }
         try {
           const operation = this.connect(record.id, workspace);
           let onAbort: (() => void) | undefined;
@@ -1002,6 +1124,7 @@ export class McpService {
     args: Record<string, unknown>,
     workspace?: string,
     signal?: AbortSignal,
+    conversation?: string,
   ): Promise<ToolExecutionResult> {
     try {
       if (name === "mcp_read_app_context") {
@@ -1093,6 +1216,7 @@ export class McpService {
           args.arguments as Record<string, unknown>,
           workspace,
           signal,
+          conversation,
         );
       }
       for (const record of this.list(workspace)) {
@@ -1102,6 +1226,62 @@ export class McpService {
           !this.store.isTrusted(record)
         )
           continue;
+        if (artcraftApp(record)) {
+          const gateway = ARTCRAFT_GATEWAYS.find(
+            (tool) => exposedToolName(record.id, tool.name) === name,
+          );
+          if (!gateway) continue;
+          if (!workspace || !conversation)
+            return {
+              result:
+                "ArtCraft needs a workspace and a stable chat session. Open a Main Chat and try again.",
+              isError: true,
+            };
+          const fingerprint = this.store.fingerprint(record);
+          const result = await this.artcraft.execute(
+            record,
+            fingerprint,
+            workspace,
+            conversation,
+            gateway.name,
+            args,
+            signal,
+            () => {
+              const current = this.get(record.id, workspace);
+              if (
+                !this.store.isTrusted(current) ||
+                this.store.fingerprint(current) !== fingerprint
+              )
+                throw new Error("invalid");
+            },
+          );
+          this.store.markConnected(record);
+          this.states.set(record.id, { status: "connected" });
+          this.changed();
+          const images = result.content.flatMap((item) =>
+            item.type === "image" && item.data.length < 8_000_000
+              ? [{ data: item.data, mimeType: item.mimeType }]
+              : [],
+          );
+          const payload = JSON.stringify({
+            content: result.content.filter((item) => item.type !== "image"),
+            structuredContent:
+              "structuredContent" in result
+                ? result.structuredContent
+                : undefined,
+          });
+          return {
+            result:
+              payload.length <= 100_000
+                ? payload
+                : JSON.stringify({
+                    truncated: true,
+                    content: [{ type: "text", text: payload.slice(0, 90_000) }],
+                  }),
+            images,
+            isError: "isError" in result && result.isError === true,
+          };
+        }
         const active = this.live.get(record.id);
         const tool = active?.tools.find(
           (item) =>

@@ -1,0 +1,21 @@
+{
+  "name": "lightcraft",
+  "version": "1.0.0",
+  "description": "Organize photos and develop images in a local library. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "LightCraft",
+    "icon": "lightcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "lightcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/lightcraft"
+    }
+  }
+}

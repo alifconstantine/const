@@ -9,6 +9,7 @@ import {
 } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
 import type { McpConnectionView } from "../../lib/mcp/types";
+import { ARTCRAFT_APPS } from "../../lib/mcp/artcraft";
 import {
   FIGMA_DESKTOP_URL,
   FIGMA_REMOTE_URL,
@@ -20,13 +21,88 @@ export function ProviderSetup({
   connection,
   busy,
   run,
+  workspacePath,
 }: {
   connection: McpConnectionView;
   busy: boolean;
+  workspacePath?: string;
   run: (id: string, operation: () => Promise<unknown>) => Promise<void>;
 }) {
   const { t, language } = useTranslation();
   const bridge = window.electron?.mcp;
+  if (connection.builtin === "artcraft" && connection.artcraftApp) {
+    const profile = ARTCRAFT_APPS[connection.artcraftApp];
+    return (
+      <div className="space-y-3 text-sm text-[#969696]">
+        <p>{t("mcp.artcraftSetup")}</p>
+        <p className="break-all text-xs text-[#d4d4d4]">
+          {connection.detectedRuntime ?? t("mcp.artcraftMissing")}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {(["detect", "browse"] as const).map((action) => (
+            <Button
+              key={action}
+              size="sm"
+              variant="ghost"
+              disabled={busy || !connection.enabled || !connection.isEffective}
+              onClick={() =>
+                bridge &&
+                void run(connection.id, () =>
+                  bridge.configureArtcraft(
+                    connection.id,
+                    action,
+                    workspacePath,
+                    language,
+                  ),
+                )
+              }
+            >
+              {t(
+                action === "detect"
+                  ? "mcp.artcraftDetect"
+                  : "mcp.artcraftBrowse",
+              )}
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              void window.electron?.openExternal(
+                `https://getartcraft.com/apps/${connection.artcraftApp}`,
+              )
+            }
+          >
+            {t("mcp.artcraftDownload")}
+          </Button>
+        </div>
+        <p className="text-xs">{t("mcp.artcraftFiles")}</p>
+        {!workspacePath && (
+          <p className="text-xs">{t("mcp.artcraftWorkspace")}</p>
+        )}
+        {!profile.roots && (
+          <label className="flex items-start gap-2 text-xs leading-relaxed">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-white"
+              checked={!!connection.localFileAccess}
+              disabled={busy || !connection.enabled || !connection.isEffective}
+              onChange={(event) =>
+                bridge &&
+                void run(connection.id, () =>
+                  bridge.save({
+                    ...connection,
+                    localFileAccess: event.target.checked,
+                  }),
+                )
+              }
+            />
+            <span>{t("mcp.artcraftLocalAccess")}</span>
+          </label>
+        )}
+      </div>
+    );
+  }
   if (connection.builtin === "obsidian")
     return (
       <div className="space-y-3 text-sm text-[#969696]">

@@ -1,0 +1,21 @@
+{
+  "name": "photocraft",
+  "version": "1.0.0",
+  "description": "Edit layered images and export raster artwork. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "PhotoCraft",
+    "icon": "photocraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "photocraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/photocraft"
+    }
+  }
+}

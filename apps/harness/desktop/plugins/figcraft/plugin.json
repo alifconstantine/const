@@ -1,0 +1,21 @@
+{
+  "name": "figcraft",
+  "version": "1.0.0",
+  "description": "Design interfaces and prototypes in local files. Uses the official local ArtCraft CLI; no OAuth or API key.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "FigCraft",
+    "icon": "figcraft"
+  },
+  "mcpServers": {
+    "engine": {
+      "transport": "builtin",
+      "builtin": "artcraft",
+      "artcraftApp": "figcraft",
+      "auth": "none",
+      "setupUrl": "https://getartcraft.com/apps/figcraft"
+    }
+  }
+}
