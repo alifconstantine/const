@@ -4,7 +4,9 @@ import path from "node:path";
 export default defineConfig({
   base: "/remote/",
   plugins: [react()],
-  define: { "process.env.NODE_ENV": JSON.stringify("production") },
+  // OpenUI also reads process.env["NODE_ENV"], which a dotted define misses.
+  // Only this fixed public value is embedded; no host environment is exposed.
+  define: { "process.env": JSON.stringify({ NODE_ENV: "production" }) },
   resolve: {
     alias: [
       { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
