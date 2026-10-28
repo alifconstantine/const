@@ -9,6 +9,7 @@ import {
 import { FilePreviewTab } from "./right-pane/file-preview-tab";
 import { useTranslation } from "../lib/i18n";
 import { remoteCopy } from "@const/remote/copy";
+import { useRemoteRuntime } from "../lib/remote-runtime";
 
 export function RemoteDirectoryPicker({
   initialPath,
@@ -20,6 +21,7 @@ export function RemoteDirectoryPicker({
   close: () => void;
 }) {
   const { t, language } = useTranslation();
+  const remote = useRemoteRuntime();
   const copy = remoteCopy(language);
   const [path, setPath] = useState(initialPath);
   const [error, setError] = useState(false);
@@ -31,7 +33,10 @@ export function RemoteDirectoryPicker({
         if (!open) close();
       }}
     >
-      <DialogContent className="w-[720px] h-[70dvh] flex flex-col border-0 rounded-2xl bg-white dark:bg-[#161616]">
+      <DialogContent
+        onOpenAutoFocus={event => { if (remote?.mobile) event.preventDefault(); }}
+        className={`flex flex-col border-0 rounded-2xl bg-white dark:bg-[#161616] ${remote?.mobile ? "w-[calc(100vw-24px)] h-[calc(var(--remote-height,100dvh)-24px)] gap-3 p-4" : "w-[720px] h-[70dvh]"}`}
+      >
         <DialogTitle>{copy("project")}</DialogTitle>
         <DialogDescription>{copy("title")}</DialogDescription>
         <input

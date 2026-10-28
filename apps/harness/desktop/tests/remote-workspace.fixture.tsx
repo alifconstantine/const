@@ -8,10 +8,12 @@ import { RemoteRuntimeContext } from "../src/lib/remote-runtime";
 import { createDesktopBridge } from "../src/lib/desktop-bridge";
 import { initThemeListener } from "../src/lib/theme";
 import { Toaster } from "@const/ui";
+import { RemoteDirectoryPicker } from "../src/components/remote-directory-picker";
 import "../src/index.css";
 import "../src/remote.css";
 
 const listeners = new Map<string, Set<(...args: any[]) => void>>();
+let directoryResolver: ((path: string | null) => void) | undefined;
 const emit = (channel: string, ...args: any[]) => {
   for (const listener of listeners.get(channel) || []) listener({}, ...args);
 };
@@ -46,6 +48,13 @@ const conversations: any[] = [
     ],
   },
 ];
+const longMenus = new URLSearchParams(location.search).has("long-menus");
+if (longMenus) {
+  for (let index = 1; index <= 24; index++) conversations.push({
+    id: `preview-project-${index}`, title: `Workspace ${index}`, project: `/workspace/project-${index}`,
+    createdAt: Date.now(), updatedAt: Date.now(), messages: [],
+  });
+}
 const tasks: any[] = [];
 const config: any = {
   activeModel: "test-model",
@@ -60,23 +69,27 @@ api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
       if (channel === "config:get") return config;
-      if (channel === "dialog:open-directory") return "/workspace/mobile-picked";
+      if (channel === "dialog:open-directory") return new Promise(resolve => {
+        directoryResolver?.(null);
+        directoryResolver = resolve;
+        window.dispatchEvent(new Event("fixture:open-directory"));
+      });
       if (channel === "usage:list") return conversations.flatMap(conversation => Object.values(conversation.telemetry?.requests || {}).map((request: any) => ({ id: `llm_${conversation.id}_${request.requestId}`, requestId: `llm_${conversation.id}_${request.requestId}`, conversationId: conversation.id, model: request.model, promptTokens: request.promptTokens, completionTokens: request.completionTokens, totalTokens: request.totalTokens, durationMs: request.durationMs, status: 200, createdAt: request.startedAt })));
       if (channel === "config:save") {
         Object.assign(config, args[0]);
         return config;
       }
       if (channel === "agent:get-models")
-        return [
+        return Array.from({ length: longMenus ? 30 : 1 }, (_, index) => (
           {
-            id: "test-model",
-            name: "Test model",
-            displayName: "Test model",
+            id: index ? `test-model-${index}` : "test-model",
+            name: index ? `Test model ${index}` : "Test model",
+            displayName: index ? `Test model ${index}` : "Test model",
             provider: "const",
             contextWindow: 128000,
             inputTypes: ["text", "image"],
-          },
-        ];
+          }
+        ));
       if (
         channel === "conversations:list" ||
         channel === "conversations:list-archived"
@@ -188,7 +201,7 @@ api = createDesktopBridge(
       if (channel === "browser:get-control")
         return { controller: "user", requested: false };
       if (channel === "workspace:read-directory")
-        return { path: "D:/Projects/Const", entries: [] };
+        return args[0] ? [] : [{ name: "mobile-picked", path: "mobile-picked", isDirectory: true, size: 0, lastModified: Date.now() }];
       if (channel === "workspace:resolve-path") return "D:/Projects/Const";
       if (channel === "workspace:list-files") return [];
       if (channel === "remote:get-status")
@@ -227,10 +240,25 @@ document.documentElement.classList.add("dark");
 ] = true;
 function Preview() {
   const [mobile, setMobile] = React.useState(innerWidth < 768);
+  const [directoryPicker, setDirectoryPicker] = React.useState(false);
   React.useEffect(() => {
-    const resize = () => setMobile(innerWidth < 768);
+    const open = () => setDirectoryPicker(true);
+    addEventListener("fixture:open-directory", open);
+    return () => { removeEventListener("fixture:open-directory", open); directoryResolver?.(null); directoryResolver = undefined; };
+  }, []);
+  React.useEffect(() => {
+    const resize = () => {
+      setMobile(innerWidth < 768);
+      document.body.classList.toggle("remote-mobile-root", innerWidth < 768);
+      document.documentElement.style.setProperty("--remote-height", `${visualViewport?.height || innerHeight}px`);
+    };
+    resize();
     addEventListener("resize", resize);
-    return () => removeEventListener("resize", resize);
+    return () => {
+      removeEventListener("resize", resize);
+      document.body.classList.remove("remote-mobile-root");
+      document.documentElement.style.removeProperty("--remote-height");
+    };
   }, []);
   return (
     <I18nProvider>
@@ -245,6 +273,9 @@ function Preview() {
               onSignOut={() => {}}
               onSwitchAccount={() => {}}
             />
+            {directoryPicker && <RemoteDirectoryPicker initialPath="/workspace" select={async path => {
+              directoryResolver?.(path); directoryResolver = undefined; setDirectoryPicker(false);
+            }} close={() => { directoryResolver?.(null); directoryResolver = undefined; setDirectoryPicker(false); }} />}
             <Toaster />
           </div>
         </ConvexClientProvider>

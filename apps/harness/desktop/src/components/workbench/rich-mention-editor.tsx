@@ -41,7 +41,7 @@ export interface RichMentionEditorRef {
   insertCommand: (cmd: string) => void;
   clear: () => void;
   getText: () => string;
-  setText: (text: string) => void;
+  setText: (text: string, options?: { focus?: boolean }) => void;
   getElement: () => HTMLDivElement | null;
 }
 
@@ -525,11 +525,11 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
         getText: () => {
           return editorRef.current ? serializeContainer(editorRef.current) : "";
         },
-        setText: (text: string) => {
+        setText: (text: string, options?: { focus?: boolean }) => {
           lastEmittedValueRef.current = text;
           lastPropValueRef.current = text;
           setEditorFromSerializedText(text);
-          if (editorRef.current) {
+          if (editorRef.current && options?.focus !== false) {
             editorRef.current.focus();
             const range = document.createRange();
             range.selectNodeContents(editorRef.current);
@@ -1029,15 +1029,16 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     };
 
     return (
-      <div className="relative w-full min-h-[28px] flex flex-col justify-start">
+      <div data-composer-editor className="relative w-full min-h-[28px] grid min-w-0">
         {isEmpty && (
-          <div className="absolute top-0.5 left-0 pointer-events-none select-none text-[14px] leading-5 text-[#a9a9a9] dark:text-[#5d5d5d] font-sans">
+          <div data-composer-placeholder className="col-start-1 row-start-1 min-w-0 pointer-events-none select-none text-[14px] leading-5 py-0.5 pr-2 whitespace-pre-wrap break-words text-[#a9a9a9] dark:text-[#5d5d5d] font-sans">
             {effectivePlaceholder}
           </div>
         )}
 
         <ScrollArea
-          className="w-full max-h-48"
+          data-composer-scroll
+          className="col-start-1 row-start-1 w-full max-h-48 min-w-0 min-h-0"
           viewportClassName="[&>div[style]]:!block"
         >
           <div

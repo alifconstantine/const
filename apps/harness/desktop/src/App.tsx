@@ -485,6 +485,20 @@ export function AuthenticatedContent({
   const [taskFindIndex, setTaskFindIndex] = useState(0);
   const greeting = getGreeting(t);
 
+  useEffect(() => {
+    if (!remote?.mobile) return;
+    // A tap on a menu/control dismisses the software keyboard. Search fields
+    // and the composer still receive focus when the user taps them directly.
+    const releaseTextFocus = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('button,[role="button"],[role="menuitem"]')) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && (active.isContentEditable || active.matches("input,textarea"))) active.blur();
+    };
+    document.addEventListener("pointerdown", releaseTextFocus, true);
+    return () => document.removeEventListener("pointerdown", releaseTextFocus, true);
+  }, [remote?.mobile]);
+
   const handleOpenSettings = (tab: string = "general") => {
     if (remote?.mobile) setIsSidebarOpen(false);
     if (tab === "skills" || tab === "marketplace" || tab === "plugins") {

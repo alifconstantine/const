@@ -67,6 +67,19 @@ import { useResolvedSkills } from "../../lib/skills/use-skills";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
 
 
+function ComposerMenuContent(props: React.ComponentProps<typeof PopoverContent>) {
+  const remote = useRemoteRuntime();
+  return <PopoverContent
+    side="top" align="start" sideOffset={8} collisionPadding={12}
+    onOpenAutoFocus={event => { if (remote?.mobile) event.preventDefault(); }}
+    onCloseAutoFocus={event => {
+      const active = document.activeElement;
+      if (remote?.mobile || (active instanceof HTMLElement && (active.isContentEditable || active.matches("input,textarea")))) event.preventDefault();
+    }}
+    {...props}
+  />;
+}
+
 function formatTokenDisplay(tokens: number): string {
   if (!tokens || isNaN(tokens) || tokens <= 0) return "0";
   const rounded = Math.round(tokens);
@@ -460,10 +473,9 @@ export function ChatCard({
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [previewItem, setPreviewItem] = useState<AttachedFile | null>(null);
   const [isPlusOpen, setIsPlusOpen] = useState(false);
-  const plusMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    editorRef.current?.focus();
+    if (!remote?.mobile) editorRef.current?.focus();
     return () => {
       attachments.forEach((a) => {
         if (a.url && a.url.startsWith("blob:")) {
@@ -479,8 +491,7 @@ export function ChatCard({
     if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
       if (initialPrompt !== "") {
-        editorRef.current?.focus();
-        editorRef.current?.setText(initialPrompt);
+        editorRef.current?.setText(initialPrompt, { focus: !remote?.mobile });
       }
     }
   }, [initialPrompt]);
@@ -723,7 +734,6 @@ export function ChatCard({
       return [];
     }
   });
-  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // 2. Access Mode State (request_review, ask_before_changes, full_access)
   const [mode, setMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => {
@@ -738,7 +748,6 @@ export function ChatCard({
   }, [controlledMode]);
 
   const [isModeOpen, setIsModeOpen] = useState(false);
-  const modeMenuRef = useRef<HTMLDivElement>(null);
 
   // 3. Model Selector State (Persistent in localStorage & ~/.const/config.json)
   const isConstProvider = (p?: string) => {
@@ -887,7 +896,6 @@ export function ChatCard({
   const [isModelOpen, setIsModelOpen] = useState(false);
   const [isModelClosing, setIsModelClosing] = useState(false);
   const closeModelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
 
   // Active Model Object & Dynamic Thinking Level Support
   const currentModelItem = useMemo(() => {
@@ -1196,22 +1204,6 @@ export function ChatCard({
 
   // Handle click outside to close dropdowns
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (projectMenuRef.current && !projectMenuRef.current.contains(target)) {
-        setIsProjectOpen(false);
-      }
-      if (modeMenuRef.current && !modeMenuRef.current.contains(target)) {
-        setIsModeOpen(false);
-      }
-      if (modelMenuRef.current && !modelMenuRef.current.contains(target)) {
-        handleCloseModelPopoverRef.current();
-      }
-      if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
-        setIsPlusOpen(false);
-      }
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsProjectOpen(false);
@@ -1222,10 +1214,8 @@ export function ChatCard({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
@@ -1389,6 +1379,7 @@ export function ChatCard({
   return (
     <div
       ref={cardContainerRef}
+      data-composer
       className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0"
     >
       {/* Unified Card */}
@@ -1400,15 +1391,13 @@ export function ChatCard({
         {/* Top Header Strip: Choose Project (Visible in landing view or when showProjectHeader is true) */}
         {(!compact || showProjectHeader) && (
           <div data-workspace-selector className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
-            <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
+            <Popover open={isProjectOpen} onOpenChange={(open) => {
+              if (open) { closeAllMenus(); setSearchWorkspace(""); }
+              setIsProjectOpen(open);
+            }}>
+              <PopoverTrigger asChild>
               <button
                 type="button"
-                onClick={() => {
-                  const next = !isProjectOpen;
-                  closeAllMenus();
-                  if (next) setSearchWorkspace("");
-                  setIsProjectOpen(next);
-                }}
                 className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
                 title={currentProject}
               >
@@ -1416,14 +1405,22 @@ export function ChatCard({
                 <span className="truncate max-w-[200px] sm:max-w-[320px]">{displayProjectName}</span>
                 <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
               </button>
+              </PopoverTrigger>
 
               {/* Choose Project Dropdown Popover */}
               {isProjectOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                <ComposerMenuContent
+                  data-composer-menu="project"
+                  side={compact ? "top" : "bottom"}
+                  align="start"
+                  sideOffset={8}
+                  collisionPadding={12}
+                  className="w-64 sm:w-72 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none outline-none ring-0"
+                >
                   {/* Real Workspaces List (only shown if real folders were opened) */}
                   {availableWorkspaces.length > 0 && (
                     <>
-                      <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 border-b border-[#e2e2e4] dark:border-[#383838]/60">
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 shrink-0">
                         <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
                         <input
                           type="text"
@@ -1431,11 +1428,11 @@ export function ChatCard({
                           onChange={(e) => setSearchWorkspace(e.target.value)}
                           placeholder={t("workbench.searchWorkspaces")}
                           className="w-full bg-transparent text-[13px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#5d5d5d] outline-none font-sans"
-                          autoFocus
+                          autoFocus={!remote?.mobile}
                         />
                       </div>
 
-                      <ScrollArea className="max-h-48">
+                      <ScrollArea className="max-h-48 min-h-0 flex-1">
                         <div className="flex flex-col gap-0.5 py-0.5">
                           {filteredWorkspaces.map((ws) => {
                             const wsName = ws.replace(/\\/g, "/").split("/").filter(Boolean).pop() || ws;
@@ -1477,7 +1474,6 @@ export function ChatCard({
                         </div>
                       </ScrollArea>
 
-                      <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#383838]/60 my-1" />
                     </>
                   )}
 
@@ -1509,9 +1505,9 @@ export function ChatCard({
                       <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0" />
                     )}
                   </button>
-                </div>
+                </ComposerMenuContent>
               )}
-            </div>
+            </Popover>
           </div>
         )}
 
@@ -1554,7 +1550,7 @@ export function ChatCard({
             />
           )}
 
-          <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0 relative">
+          <div data-composer-body className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0 relative">
             {/* Mention Autocomplete Popover */}
             {mentionToken && (
               <MentionPopover
@@ -1687,8 +1683,10 @@ export function ChatCard({
           {/* Auto-growing Textarea with Inline Mentions matching Screenshot */}
           {/* Inline Rich Mention Editor matching Antigravity & Image 1 */}
           <div
-            onClick={() => {
-              editorRef.current?.focus();
+            onClick={(event) => {
+              const target = event.target as Element;
+              if (target.closest("button,a,[role=button],[data-mention-token]")) return;
+              if (!target.closest('[contenteditable="true"]')) editorRef.current?.focus();
             }}
             className="w-full py-0.5 cursor-text"
           >
@@ -1810,18 +1808,15 @@ export function ChatCard({
           </div>
 
           {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
-          <div className={cn("flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5", isAnyBottomMenuOpen ? "z-40" : "z-10")}>
+          <div data-composer-actions className={cn("flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5", isAnyBottomMenuOpen ? "z-40" : "z-10")}>
             {/* Left Actions: Plus and Mode Selector */}
             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 shrink">
               {/* Plus Button & Add Context Dropdown */}
-              <div className="relative shrink-0" ref={plusMenuRef}>
+              <div className="relative shrink-0">
+                <Popover open={isPlusOpen} onOpenChange={open => { if (open) closeAllMenus(); setIsPlusOpen(open); }}>
+                <PopoverTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !isPlusOpen;
-                    closeAllMenus();
-                    setIsPlusOpen(next);
-                  }}
                   className={cn(
                     "w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer",
                     isPlusOpen
@@ -1833,6 +1828,7 @@ export function ChatCard({
                 >
                   <Plus className="w-4 h-4 stroke-[1.75]" />
                 </button>
+                </PopoverTrigger>
 
                 {/* Hidden File Input for Media */}
                 <input
@@ -1847,7 +1843,8 @@ export function ChatCard({
 
                 {/* Add Context Popover Menu */}
                 {isPlusOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <ComposerMenuContent data-composer-menu="add-context" align="start" className="w-44 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    <ScrollArea className="min-h-0 max-h-[inherit]">
                     <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#777777]">
                       {t("workbench.addContext")}
                     </div>
@@ -1933,19 +1930,18 @@ export function ChatCard({
                       <Globe className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
                       <span className="text-[13px]">{t("rightPane.browser")}</span>
                     </button>
-                  </div>
+                    </ScrollArea>
+                  </ComposerMenuContent>
                 )}
+                </Popover>
               </div>
 
               {/* Access Mode Selector: Ask before changes vs Full access */}
-              <div className="relative min-w-0 shrink" ref={modeMenuRef}>
+              <div className="relative min-w-0 shrink">
+                <Popover open={isModeOpen} onOpenChange={open => { if (open) closeAllMenus(); setIsModeOpen(open); }}>
+                <PopoverTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !isModeOpen;
-                    closeAllMenus();
-                    setIsModeOpen(next);
-                  }}
                   className={cn(
                     "inline-flex items-center transition-colors cursor-pointer",
                     isNarrow
@@ -1989,10 +1985,12 @@ export function ChatCard({
                     </>
                   )}
                 </button>
+                </PopoverTrigger>
 
                 {/* Mode Selector Popover (3 items: Request review, Ask before changes & Full access) */}
                 {isModeOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <ComposerMenuContent data-composer-menu="mode" align="start" className="w-64 sm:w-72 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    <ScrollArea className="min-h-0 max-h-[inherit]">
                     {/* 1. Request review */}
                     <button
                       type="button"
@@ -2064,18 +2062,21 @@ export function ChatCard({
                         <Check className="w-3.5 h-3.5 text-[#e79737] shrink-0 ml-auto mt-0.5" />
                       )}
                     </button>
-                  </div>
+                    </ScrollArea>
+                  </ComposerMenuContent>
                 )}
+                </Popover>
               </div>
             </div>
 
             {/* Right Actions: Model Selector, Send Button */}
             <div className="flex items-center gap-1 sm:gap-2 shrink min-w-0 ml-auto">
               {/* Model Selector Dropdown */}
-              <div className="relative min-w-0 shrink" ref={modelMenuRef}>
+              <div className="relative min-w-0 shrink">
+                <Popover open={isModelOpen} onOpenChange={open => { if (open) handleOpenModelPopover(); else handleCloseModelPopover(); }}>
+                <PopoverTrigger asChild>
                 <button
                   type="button"
-                  onClick={handleToggleModelPopover}
                   className={cn(
                     "inline-flex items-center transition-colors cursor-pointer text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal",
                     (isModelOpen || isModelClosing) && "bg-black/5 dark:bg-white/10 text-black dark:text-white",
@@ -2094,12 +2095,13 @@ export function ChatCard({
                     </>
                   )}
                 </button>
+                </PopoverTrigger>
 
                 {/* Unified Model & Thinking Level Popover */}
                 {(isModelOpen || isModelClosing) && (
-                  <div
+                  <ComposerMenuContent data-composer-menu="model" align="end"
                     className={cn(
-                      "absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none",
+                      "w-[260px] max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#2c2c2e] rounded-2xl shadow-2xl z-[60] flex flex-col text-left select-none",
                       isModelClosing
                         ? "animate-popover-slide-out"
                         : "animate-popover-slide-in",
@@ -2192,7 +2194,7 @@ export function ChatCard({
                       /* Image 2: Model Search and List */
                       <div
                         key="select-model"
-                        className="flex flex-col text-left animate-in fade-in-0 duration-150 ease-out"
+                        className="min-h-0 flex flex-col text-left animate-in fade-in-0 duration-150 ease-out"
                       >
                         {models.length > 0 ? (
                           <>
@@ -2213,7 +2215,7 @@ export function ChatCard({
                                 onChange={(e) => setSearchModelQuery(e.target.value)}
                                 placeholder={t("workbench.searchModels")}
                                 className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#71717a] outline-none font-sans"
-                                autoFocus
+                                autoFocus={!remote?.mobile}
                               />
                               {searchModelQuery && (
                                 <button
@@ -2357,8 +2359,9 @@ export function ChatCard({
                         )}
                       </div>
                     )}
-                  </div>
+                  </ComposerMenuContent>
                 )}
+                </Popover>
               </div>
 
               {/* 3. Send or Stop Generation Button */}
@@ -2431,6 +2434,7 @@ export function ChatCard({
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.sessionStatistics")}
+                      data-telemetry-control="statistics"
                       aria-label={t("workbench.sessionStatistics")}
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -2503,6 +2507,7 @@ export function ChatCard({
                       )}
                       title={`${t("workbench.telemetryContextTitle")}: ~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)}`}
                       aria-label={t("workbench.telemetryContextTitle")}
+                      data-telemetry-control="context"
                     >
                       <svg
                         className="w-3.5 h-3.5 shrink-0 transform -rotate-90"
@@ -2668,6 +2673,7 @@ export function ChatCard({
                       type="button"
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.telemetryUsage")}
+                      data-telemetry-control="usage"
                       aria-label={t("workbench.telemetryUsage")}
                     >
                       <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />

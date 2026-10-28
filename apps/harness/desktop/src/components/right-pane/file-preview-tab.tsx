@@ -24,6 +24,7 @@ import { highlightCodeToHtmlLines } from "../../lib/code-highlighter";
 import { useCodeFontSize } from "../../lib/theme";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
+import { useRemoteRuntime } from "../../lib/remote-runtime";
 const ExcalidrawEditor = React.lazy(() => import("../mcp-apps/excalidraw-editor"));
 
 interface FilePreviewTabProps {
@@ -60,6 +61,7 @@ function StandardFilePreviewTab({
   onUpdateTab,
 }: FilePreviewTabProps) {
   const { t } = useTranslation();
+  const remote = useRemoteRuntime();
   const [codeFontSize] = useCodeFontSize();
 
   // Active workspace path (prop or from tab cwd/project)
@@ -92,7 +94,7 @@ function StandardFilePreviewTab({
   const [content, setContent] = useState<string>(tab.newContent || tab.previousContent || "");
   const [isLoading, setIsLoading] = useState<boolean>(!content && Boolean(tab.filePath));
   const [copied, setCopied] = useState(false);
-  const [isWorkspaceTreeOpen, setIsWorkspaceTreeOpen] = useState(true);
+  const [isWorkspaceTreeOpen, setIsWorkspaceTreeOpen] = useState(() => !remote?.mobile);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Popover menus state
@@ -995,7 +997,7 @@ function StandardFilePreviewTab({
             /* Directory Explorer View for clicked folder or workspace root */
             <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col bg-[#141414]">
               {/* Directory Header Bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#242424] bg-[#161616] shrink-0">
+              <div className={cn("flex justify-between px-4 py-2.5 bg-[#161616] shrink-0", remote?.mobile ? "flex-col items-stretch gap-2" : "items-center")}>
                 <div className="flex items-center gap-2 min-w-0">
                   <Folder className="w-4 h-4 text-neutral-400 shrink-0" />
                   <span className="text-sm font-semibold text-white truncate">
@@ -1008,14 +1010,14 @@ function StandardFilePreviewTab({
 
                 {/* Directory Controls */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="relative flex items-center">
+                  <div className={cn("relative flex items-center", remote?.mobile && "flex-1 min-w-0")}>
                     <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2 pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t("rightPane.filterFiles") || "Filter files..."}
-                      className="w-36 focus:w-48 transition-all pl-7 pr-6 py-1 text-xs rounded-md bg-[#202020] border border-[#2e2e2e] text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-sans"
+                      className={cn("transition-all pl-7 pr-6 py-1 text-xs rounded-md bg-[#202020] border border-[#2e2e2e] text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-sans", remote?.mobile ? "w-full text-base" : "w-36 focus:w-48")}
                     />
                     {searchQuery && (
                       <button
@@ -1169,7 +1171,7 @@ function StandardFilePreviewTab({
 
         {/* Right Side: Collapsible Workspace Tree Panel matching Image 2 */}
         {workspacePath && isWorkspaceTreeOpen && (
-          <div className="w-64 max-w-[40%] min-w-[200px] h-full border-l border-[#282828] bg-[#141414] flex flex-col shrink-0 select-none">
+          <div className={cn("h-full bg-[#141414] flex flex-col shrink-0 select-none", remote?.mobile ? "w-[45%] min-w-0" : "w-64 max-w-[40%] min-w-[200px]")}>
             {/* Header: Workspace ˇ + Refresh Button */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-[#282828] shrink-0">
               <div className="flex items-center gap-1 text-xs font-semibold text-neutral-300">
