@@ -4644,7 +4644,6 @@ export function AuthenticatedContent({
                         activeModelItem?.id
                       }
                       compact
-                      showProjectHeader={!!remote?.mobile}
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
                       onAbort={() => handleAbort()}

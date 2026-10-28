@@ -1385,7 +1385,7 @@ export function ChatCard({
       {/* Unified Card */}
       <div
         className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
-          compact ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
+          compact && !showProjectHeader ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
         }`}
       >
         {/* Top Header Strip: Choose Project (Visible in landing view or when showProjectHeader is true) */}
@@ -1529,7 +1529,7 @@ export function ChatCard({
           onDrop={handleDrop}
           className={cn(
             "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors min-w-0 relative",
-            compact
+            compact && !showProjectHeader
               ? isExecuting && queuedMessages && queuedMessages.length > 0
                 ? "max-w-full rounded-b-2xl rounded-t-none border-t border-[#e2e2e4] dark:border-[#383838]"
                 : "max-w-full rounded-2xl"

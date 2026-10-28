@@ -4,7 +4,6 @@ import {
   SquareTerminal,
   MessageCirclePlus,
   PanelLeft,
-  Menu,
   Folder,
   MoreHorizontal,
   Globe,
@@ -170,7 +169,7 @@ export function TopToolbar({
         className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden mr-2"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {!isSidebarOpen && (
+        {!isSidebarOpen && !remote?.mobile && (
           <>
             <button
               type="button"
@@ -183,7 +182,7 @@ export function TopToolbar({
               title={t("topToolbar.toggleSidebar")}
               aria-label={t("topToolbar.toggleSidebar")}
             >
-              {remote?.mobile ? <Menu className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />}
+              <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
             </button>
 
             <button
@@ -198,11 +197,17 @@ export function TopToolbar({
           </>
         )}
 
-        {remote?.mobile && <div id="remote-header-telemetry" className="flex-1 min-w-0" />}
         {/* Conversation Title & Project Pill */}
         {(conversationTitle || remote) && (
           <div className="workspace-title-group flex items-center gap-2 min-w-0 pl-1">
-            {!remote?.mobile && <AutoScrollTitle
+            {remote?.mobile ? <button
+              type="button"
+              data-remote-chat-menu
+              onClick={event => { event.currentTarget.blur(); onToggleSidebar(); }}
+              className="min-w-0 max-w-full truncate text-left text-[13px] font-medium text-[#161616] dark:text-[#ececec] cursor-pointer outline-none focus-visible:outline-none ring-0"
+              title={conversationTitle || t("sidebar.newChat")}
+              aria-label={`${conversationTitle || t("sidebar.newChat")} — ${t("topToolbar.toggleSidebar")}`}
+            >{conversationTitle || t("sidebar.newChat")}</button> : <AutoScrollTitle
               text={conversationTitle || remote?.deviceName || ""}
               className="max-w-[280px]"
               textClassName="text-sm font-medium text-[#161616] dark:text-[#ececec]"
@@ -220,7 +225,7 @@ export function TopToolbar({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer data-[state=open]:bg-black/5 dark:data-[state=open]:bg-[#222222] data-[state=open]:text-white"
+                  className="shrink-0 p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer data-[state=open]:bg-black/5 dark:data-[state=open]:bg-[#222222] data-[state=open]:text-white"
                   title={t("topToolbar.taskOptions")}
                   aria-label={t("topToolbar.taskOptions")}
                 >
@@ -316,6 +321,7 @@ export function TopToolbar({
             </DropdownMenu>
           </div>
         )}
+        {remote?.mobile && <div id="remote-header-telemetry" className="shrink-0" />}
       </div>
 
       {/* Right section: Terminal, Browser, and spacing to fixed controls */}
