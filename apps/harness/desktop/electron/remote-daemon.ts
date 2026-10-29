@@ -162,7 +162,15 @@ export class RemoteDaemon {
 
   private connect(ws: WebSocket, req: http.IncomingMessage): void {
     const id = crypto.randomUUID();
-    const device = { id, name: req.socket.remoteAddress ?? "", connectedAt: Date.now() };
+    const ua = (req.headers["user-agent"] as string) || "";
+    let name = req.socket.remoteAddress ?? "Local Device";
+    if (/iPad/i.test(ua)) name = "iPad";
+    else if (/iPhone/i.test(ua)) name = "iPhone";
+    else if (/Android/i.test(ua)) name = /Mobile/i.test(ua) ? "Android Phone" : "Android";
+    else if (/Macintosh|Mac OS X/i.test(ua)) name = "Mac";
+    else if (/Windows/i.test(ua)) name = "Windows PC";
+    else if (ua) name = "Browser";
+    const device = { id, name, connectedAt: Date.now() };
     const client: Client = { ws, device, alive: true, pending: 0 };
     this.clients.set(id, client);
     ws.on("error", () => ws.terminate());

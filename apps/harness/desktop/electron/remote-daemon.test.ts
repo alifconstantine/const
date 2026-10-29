@@ -68,6 +68,11 @@ test("authenticates before upgrade and rejects wrong origin, session and key", a
   const client = await connect(status);
   t.after(() => client.terminate());
   assert.equal(daemon.getStatus().status, "connected");
+  assert.equal(daemon.getStatus().connectedDevices.length, 1);
+  const [connectedDevice] = daemon.getStatus().connectedDevices;
+  assert.ok(connectedDevice);
+  assert.ok(connectedDevice.name);
+  assert.ok(connectedDevice.connectedAt > 0);
 });
 
 test("validates commands, correlates replies, broadcasts, and handles malformed JSON", async (t) => {

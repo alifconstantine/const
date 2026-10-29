@@ -1,3 +1,24 @@
+export function detectClientDeviceName(): string {
+  if (typeof navigator === "undefined" || !navigator.userAgent) return "Browser";
+  const ua = navigator.userAgent;
+  if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && typeof navigator.maxTouchPoints === "number" && navigator.maxTouchPoints > 1)) {
+    return "iPad";
+  }
+  if (/iPhone/i.test(ua)) {
+    return "iPhone";
+  }
+  if (/Android/i.test(ua)) {
+    return /Mobile/i.test(ua) ? "Android Phone" : "Android";
+  }
+  if (/Macintosh|Mac OS X/i.test(ua)) {
+    return "Mac";
+  }
+  if (/Windows/i.test(ua)) {
+    return "Windows PC";
+  }
+  return "Browser";
+}
+
 import { ConvexClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { broker, type RemoteCommand, type RemotePacket } from "./protocol";
@@ -91,11 +112,7 @@ export class RemoteClient {
         sessionId: this.sessionId,
         pairHash,
         secretHash,
-        name: navigator.userAgent.includes("Android")
-          ? "Android"
-          : navigator.userAgent.includes("iPhone")
-            ? "iPhone"
-            : "Browser",
+        name: detectClientDeviceName(),
       });
       if (this.closed) throw new Error("REMOTE_DISCONNECTED");
       this.grant = { sessionId: this.sessionId, deviceId, secretHash };

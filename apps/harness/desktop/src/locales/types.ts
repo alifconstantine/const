@@ -26,6 +26,17 @@ export interface TranslationDictionary {
     startError: string;
     actionError: string;
     expired: string;
+    connectedDevicesTitle: string;
+    noDevicesConnected: string;
+    waitingForDevice: string;
+    deviceActive: string;
+    justNow: string;
+    minutesAgo: string;
+    hoursAgo: string;
+    pairedDevices: string;
+    hostDevice: string;
+    scanHint: string;
+    unknownDevice: string;
     mobileConnecting: string;
     mobileConnected: string;
     mobileDisconnected: string;
