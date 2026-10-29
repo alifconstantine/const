@@ -160,6 +160,15 @@ export interface TranslationDictionary {
     newTaskIn: string;
   };
   intelligenceUi: {
+    formValues: string;
+    widgetReset: string;
+    widgetExport: string;
+    widgetAsk: string;
+    widgetSend: string;
+    widgetOpenLink: string;
+    widgetQuestion: string;
+    widgetRuntimeError: string;
+    widgetExportNotice: string;
     preparing: string;
     unavailable: string;
     showSource: string;

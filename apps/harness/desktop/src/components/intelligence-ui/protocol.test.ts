@@ -12,11 +12,13 @@ import { normalizeUiMessages } from "../../lib/conversation-store";
 import { definitions, intelligenceSchema } from "./schema";
 import { intelligenceLibrary } from "./library";
 import { INTELLIGENCE_UI_PROMPT } from "./prompt";
+import { generateIntelligenceUiPrompt } from "./prompt-source";
 import {
   compareTableValues,
   formatFormSubmission,
   serializeTableCsv,
   serializeTableTsv,
+  submissionFields,
 } from "./format";
 
 const program =
@@ -113,6 +115,19 @@ test("empty or invalid programs do not throw and retain inspectable source", () 
   assert.equal(uiProgramToText("not a UI program"), "not a UI program");
 });
 
+test("clipboard projection preserves native chart and inline text values", () => {
+  const text = uiProgramToText(
+    'root = Stack([chart, pie])\nchart = BarChart(["A", "B"], [Series("Delta", [-30, 0])])\npie = PieChart(["Yes", "No"], [3, 2])',
+  );
+  assert.ok(text.includes("Delta: A: -30, B: 0"));
+  assert.ok(text.includes("Yes: 3\nNo: 2"));
+  const grouped = uiProgramToText(
+    'root = Stack([card, sections])\ncard = Card([metric])\nmetric = BoldText("number", "42", "+3", "metric")\nsections = SectionBlock([section])\nsection = SectionItem("details", "Details", [body])\nbody = TextContent("Native section content")',
+  );
+  assert.ok(grouped.includes("42 +3"));
+  assert.ok(grouped.includes("Details\nNative section content"));
+});
+
 test("unknown components produce validation errors instead of arbitrary execution", () => {
   const parser = createParser(
     intelligenceSchema.toJSONSchema(),
@@ -136,18 +151,23 @@ test("unknown components produce validation errors instead of arbitrary executio
 
 test("component schemas bound chart values and reject invalid form types", () => {
   assert.equal(
-    definitions.BarChart.props.safeParse({
-      title: "Chart",
-      items: [{ label: "a", value: Infinity }],
+    definitions.BarChart!.props.safeParse({
+      labels: ["a"],
+      series: [
+        {
+          type: "element",
+          typeName: "Series",
+          props: { name: "a", data: [Infinity] },
+          partial: false,
+        },
+      ],
     }).success,
     false,
   );
   assert.equal(
-    definitions.Form.props.safeParse({
-      name: "form",
-      title: "Form",
-      fields: [{ name: "secret", label: "Secret", type: "password" }],
-      submitLabel: "Go",
+    definitions.Input!.props.safeParse({
+      name: "secret",
+      type: "password",
     }).success,
     false,
   );
@@ -171,6 +191,7 @@ test("message state is isolated by message and block and survives JSON persisten
 });
 
 test("the agent prompt derives from the same allowed component contracts", () => {
+  assert.equal(INTELLIGENCE_UI_PROMPT, generateIntelligenceUiPrompt());
   for (const name of [
     "Table",
     "Col",
@@ -233,6 +254,23 @@ test("history normalization retains form state when assistant and tool turns mer
 });
 
 test("form submission uses visible labels and localized boolean values without runtime metadata", () => {
+  assert.deepEqual(
+    submissionFields(
+      {
+        review: {
+          notes: { value: "Side review", componentType: "Input" },
+          amount: { value: 0 },
+          enabled: { value: false },
+        },
+      },
+      "review",
+    ),
+    [
+      { label: "notes", value: "Side review" },
+      { label: "amount", value: 0 },
+      { label: "enabled", value: false },
+    ],
+  );
   assert.equal(
     formatFormSubmission(
       "Pilihan",

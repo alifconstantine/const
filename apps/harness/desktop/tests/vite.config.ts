@@ -5,7 +5,25 @@ import fs from "node:fs";
 
 // Isolated browser fixture: no Electron process, credentials, or model calls.
 export default defineConfig({
-  optimizeDeps: { entries: process.env.CONST_FIXTURE_ENTRY || undefined },
+  optimizeDeps: {
+    entries: process.env.CONST_FIXTURE_ENTRY || "tests/intelligence-ui.html",
+    include: [
+      "react",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "lucide-react",
+      "@thesvg/react",
+      "@iconify/react",
+      "@openuidev/react-ui/genui-lib",
+      "@openuidev/react-lang",
+      "@openuidev/lang-core",
+      "dompurify",
+      "marked",
+      "mermaid",
+    ],
+    // Restrict scanning to the selected fixture rather than every desktop page.
+  },
   plugins: [
     react(),
     {

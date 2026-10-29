@@ -1,4 +1,11 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   BuiltinActionType,
   Renderer,
@@ -8,7 +15,12 @@ import {
 } from "@openuidev/react-lang";
 import { ScrollArea, toast } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
-import { intelligenceLibrary, InteractionContext } from "./library";
+import { intelligenceLibrary } from "./library";
+import { validUiState } from "./schema";
+import { validateUiProgram } from "./validation";
+import { safeWidgetLink } from "./widget-contract";
+import { formatFormSubmission, submissionFields } from "./format";
+import { scopeControlIds } from "./control-ids";
 
 export interface IntelligenceBlockProps {
   program: string;
@@ -50,7 +62,23 @@ export default function IntelligenceBlock({
   onOpenBrowser,
 }: IntelligenceBlockProps) {
   const { t } = useTranslation();
-  const [initialState] = useState(() => state || {});
+  const controlRoot = useRef<HTMLFieldSetElement>(null);
+  const controlPrefix = `const-ui-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+  useLayoutEffect(() => {
+    const root = controlRoot.current;
+    if (!root) return;
+    const scope = () => scopeControlIds(root, controlPrefix);
+    scope();
+    const observer = new MutationObserver(scope);
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["id", "for"],
+    });
+    return () => observer.disconnect();
+  }, [controlPrefix]);
+  const [initialState] = useState(() => (validUiState(state) ? state : {}));
   const [errors, setErrors] = useState<OpenUIError[]>([]);
   const [hasRoot, setHasRoot] = useState(false);
   const [incomplete, setIncomplete] = useState(false);
@@ -63,17 +91,28 @@ export default function IntelligenceBlock({
       Boolean(result?.meta.incomplete || result?.meta.unresolved.length),
     );
   }, []);
+  const validation = useMemo(
+    () => (complete ? validateUiProgram(program) : null),
+    [complete, program],
+  );
+  const invalid = Boolean(validation?.errors.length);
   const unavailable =
-    !isStreaming && (!complete || incomplete || errors.length > 0 || !hasRoot);
+    !isStreaming &&
+    (!complete ||
+      incomplete ||
+      errors.some((error) => error.severity !== "warning") ||
+      !hasRoot ||
+      invalid);
 
   const onAction = async (event: ActionEvent) => {
     if (disabled || isStreaming || !complete || unavailable) return;
 
     if (
       event.type === "open_url" ||
-      (typeof BuiltinActionType !== "undefined" && event.type === BuiltinActionType.OpenUrl)
+      (typeof BuiltinActionType !== "undefined" &&
+        event.type === BuiltinActionType.OpenUrl)
     ) {
-      const url = String(event.params?.url || "");
+      const url = safeWidgetLink(event.params?.url);
       if (url) {
         if (onOpenBrowser) {
           onOpenBrowser(url);
@@ -86,7 +125,8 @@ export default function IntelligenceBlock({
 
     if (
       (event.type === "continue_conversation" ||
-        (typeof BuiltinActionType !== "undefined" && event.type === BuiltinActionType.ContinueConversation)) &&
+        (typeof BuiltinActionType !== "undefined" &&
+          event.type === BuiltinActionType.ContinueConversation)) &&
       onSubmit &&
       !submitting.current
     ) {
@@ -94,9 +134,29 @@ export default function IntelligenceBlock({
       setPending(true);
       try {
         let msg = event.humanFriendlyMessage || "";
-        if (event.formState && Object.keys(event.formState).length > 0) {
-          msg += `\n\nForm values: ${JSON.stringify(event.formState, null, 2)}`;
+        if (
+          validUiState(event.formState) &&
+          Object.keys(event.formState).length > 0
+        ) {
+          const fields = submissionFields(event.formState, event.formName).map(
+            (field) => {
+              const input = [
+                ...(controlRoot.current?.querySelectorAll<HTMLInputElement>(
+                  "input[name],select[name],textarea[name]",
+                ) || []),
+              ].find((element) => element.name === field.label);
+              return {
+                ...field,
+                label: input?.labels?.[0]?.textContent?.trim() || field.label,
+              };
+            },
+          );
+          msg = formatFormSubmission(msg, fields, {
+            yes: t("common.yes"),
+            no: t("common.no"),
+          });
         }
+        if (!msg.trim()) return;
         await onSubmit(msg);
       } catch {
         toast.error(t("intelligenceUi.submitFailed"));
@@ -113,35 +173,50 @@ export default function IntelligenceBlock({
       data-intelligence-ui="true"
       aria-busy={isStreaming || pending}
     >
-      <InteractionContext.Provider
-        value={{
-          disabled:
-            disabled ||
-            isStreaming ||
-            !complete ||
-            unavailable ||
-            pending ||
-            !onSubmit,
-        }}
+      <fieldset
+        ref={controlRoot}
+        className="m-0 min-w-0 border-0 p-0 disabled:opacity-60"
+        disabled={
+          disabled ||
+          isStreaming ||
+          !complete ||
+          unavailable ||
+          pending ||
+          !onSubmit
+        }
+        inert={
+          disabled ||
+          isStreaming ||
+          !complete ||
+          unavailable ||
+          pending ||
+          !onSubmit
+        }
       >
-        <Renderer
-          response={program}
-          library={intelligenceLibrary}
-          isStreaming={isStreaming}
-          initialState={initialState}
-          onParseResult={onParseResult}
-          onError={setErrors}
-          onStateUpdate={(nextState) => {
-            const serialized = JSON.stringify(nextState);
-            if (serialized === lastState.current) return;
-            lastState.current = serialized;
-            onStateChange?.(nextState);
-          }}
-          onAction={(event) => {
-            void onAction(event);
-          }}
-        />
-      </InteractionContext.Provider>
+        {!invalid && (
+          <Renderer
+            response={program}
+            library={intelligenceLibrary}
+            isStreaming={isStreaming || disabled || pending || !onSubmit}
+            initialState={initialState}
+            onParseResult={onParseResult}
+            onError={setErrors}
+            onStateUpdate={(nextState) => {
+              if (disabled || isStreaming || !complete || pending || !onSubmit)
+                return;
+              if (!validUiState(nextState)) return;
+              const serialized = JSON.stringify(nextState);
+              if (serialized === lastState.current) return;
+              lastState.current = serialized;
+              onStateChange?.(nextState);
+            }}
+            onAction={(event) => {
+              void onAction(event);
+            }}
+            publishObservability={false}
+          />
+        )}
+      </fieldset>
       {isStreaming && !hasRoot && (
         <p
           role="status"

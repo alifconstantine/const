@@ -6,6 +6,7 @@ import { splitAssistantResponse } from "./protocol";
 import type { IntelligenceUiState } from "./schema";
 
 const IntelligenceBlock = lazy(() => import("./intelligence-block"));
+const WidgetBlock = lazy(() => import("./widget-block"));
 
 interface AssistantResponseProps {
   content: string;
@@ -54,8 +55,9 @@ export function AssistantResponse({
   );
   return (
     <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
-      {parts.map((part) =>
-        part.kind === "markdown" ? (
+      {parts.map((part) => {
+        const Block = part.kind === "widget" ? WidgetBlock : IntelligenceBlock;
+        return part.kind === "markdown" ? (
           <MarkdownContent
             key={part.id}
             content={part.content}
@@ -92,7 +94,7 @@ export function AssistantResponse({
                 </p>
               }
             >
-              <IntelligenceBlock
+              <Block
                 program={part.content}
                 complete={part.complete}
                 isStreaming={isStreaming && !part.complete}
@@ -108,8 +110,8 @@ export function AssistantResponse({
               />
             </Suspense>
           </BlockBoundary>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
