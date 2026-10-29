@@ -76,7 +76,7 @@ test("live SSE decoding rejects empty and token-limited generations", async () =
 
 test("live UI validation checks every nested component and all requested formats", () => {
   const program =
-    'root = Stack([card, table, chart, form])\ncard = Card([TextContent("Six projects")])\ntable = Table([Col("Project", ["Alpha"])])\nchart = BarChart(["Alpha"], [Series("Delta", [-30])])\nform = Form("priority", Buttons([Button("Send")]), [])';
+    'root = Stack([card, table, chart, form])\ncard = Card("Summary", [Text("Six projects"), Metric("Projects", "6")])\ntable = Table("Data", ["Project"], [["Alpha"]])\nchart = BarChart("Delta", [{label: "Alpha", value: -30}], "million")\nform = Form("priority", "Choose", [{name: "project", label: "Project", type: "text"}], "Send")';
   assert.deepEqual(
     validateGeneratedUi(`\`\`\`openui-lang\n${program}\n\`\`\``).errors,
     [],

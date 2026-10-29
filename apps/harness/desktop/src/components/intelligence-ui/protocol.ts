@@ -1,10 +1,9 @@
 import { createParser } from "@openuidev/lang-core";
-import { intelligenceSchema, validUiState } from "./schema";
+import { intelligenceLibrary } from "./library";
 import type { IntelligenceUiState } from "./schema";
-import { parseWidget } from "./widget-contract";
 
 export interface ResponsePart {
-  kind: "markdown" | "ui" | "widget";
+  kind: "markdown" | "ui";
   id: string;
   content: string;
   complete: boolean;
@@ -18,12 +17,7 @@ export function splitAssistantResponse(
   const parts: ResponsePart[] = [];
   const lines = content.match(/[^\n]*\n|[^\n]+$/g) || [];
   let fence:
-    | {
-        character: string;
-        length: number;
-        kind: "ui" | "widget" | null;
-        offset: number;
-      }
+    | { character: string; length: number; ui: boolean; offset: number }
     | undefined;
   let buffer = "";
   let offset = 0;
@@ -43,21 +37,15 @@ export function splitAssistantResponse(
     const trimmed = line.replace(/\r?\n$/, "");
     const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(trimmed);
     if (!fence && match) {
-      const language = match[2]!.trim();
-      const kind =
-        language === "openui-lang"
-          ? "ui"
-          : language === "const-widget"
-            ? "widget"
-            : null;
-      if (kind) markdown();
+      const ui = match[2]!.trim() === "openui-lang";
+      if (ui) markdown();
       fence = {
         character: match[1]![0]!,
         length: match[1]!.length,
-        kind,
+        ui,
         offset,
       };
-      if (!kind) buffer += line;
+      if (!ui) buffer += line;
     } else if (
       fence &&
       match &&
@@ -65,9 +53,9 @@ export function splitAssistantResponse(
       match[1]!.length >= fence.length &&
       !match[2]!.trim()
     ) {
-      if (fence.kind) {
+      if (fence.ui) {
         parts.push({
-          kind: fence.kind,
+          kind: "ui",
           id: `ui-${fence.offset}`,
           content: buffer,
           complete: true,
@@ -81,9 +69,9 @@ export function splitAssistantResponse(
     }
     offset += line.length;
   }
-  if (fence?.kind) {
+  if (fence?.ui) {
     parts.push({
-      kind: fence.kind,
+      kind: "ui",
       id: `ui-${fence.offset}`,
       content: buffer,
       complete: false,
@@ -93,13 +81,11 @@ export function splitAssistantResponse(
     if (
       streaming &&
       fence &&
-      ["openui-lang", "const-widget"].some((language) =>
-        language.startsWith(
-          buffer
-            .split(/\r?\n/)
-            .at(-1)
-            ?.replace(/^ {0,3}(`{3,}|~{3,})\s*/, "") || "",
-        ),
+      "openui-lang".startsWith(
+        buffer
+          .split(/\r?\n/)
+          .at(-1)
+          ?.replace(/^ {0,3}(`{3,}|~{3,})\s*/, "") || "",
       )
     ) {
       buffer = buffer.slice(0, buffer.lastIndexOf("\n") + 1);
@@ -110,8 +96,8 @@ export function splitAssistantResponse(
 }
 
 const parser = createParser(
-  intelligenceSchema.toJSONSchema(),
-  intelligenceSchema.root,
+  intelligenceLibrary.toJSONSchema(),
+  intelligenceLibrary.root,
 );
 
 /** Plain-text projection for clipboard, side-to-main transfer, and accessibility. */
@@ -133,85 +119,78 @@ export function uiProgramToText(program: string): string {
         case "Stack":
           return visit(p.children);
         case "Card":
-          return visit(p.children);
+          return [p.title, visit(p.children)].filter(Boolean).join("\n");
         case "CardHeader":
           return [p.title, p.subtitle].filter(Boolean).join(" - ");
         case "Text":
-        case "BoldText":
-          return [p.value, p.subtext]
-            .filter((value) => value != null && value !== "")
-            .join(" ");
         case "TextContent":
           return String(p.text ?? "");
+        case "BoldText":
+          return [p.title, p.value, p.sub].filter(Boolean).join(" ");
         case "Callout":
         case "TextCallout":
           return [p.title, p.description].filter(Boolean).join("\n");
+        case "Metric":
+          return [`${p.label ?? ""}: ${p.value ?? ""}`, p.detail]
+            .filter(Boolean)
+            .join("\n");
         case "Table": {
-          if (Array.isArray(p.columns)) {
+          if (Array.isArray(p.columns) && p.columns.length > 0 && (p.columns[0] as any)?.typeName === "Col") {
             const headers = p.columns.map((c: any) => c.props?.label ?? "");
-            const colData = p.columns.map((c: any) =>
-              Array.isArray(c.props?.data) ? c.props.data : [],
-            );
+            const colData = p.columns.map((c: any) => (Array.isArray(c.props?.data) ? c.props.data : []));
             const maxRows = Math.max(0, ...colData.map((d: any[]) => d.length));
             const rows: string[] = [];
             for (let i = 0; i < maxRows; i++) {
-              rows.push(
-                colData
-                  .map((d: any[]) => (d[i] == null ? "" : String(d[i])))
-                  .join("\t"),
-              );
+              rows.push(colData.map((d: any[]) => (d[i] == null ? "" : String(d[i]))).join("\t"));
             }
             return [headers.join("\t"), ...rows].join("\n");
           }
-          return "";
+          return [
+            p.title,
+            ((p.columns as unknown[]) || []).join("\t"),
+            ...((p.rows as unknown[][]) || []).map((row) =>
+              row.map((c) => (c == null ? "" : String(c))).join("\t"),
+            ),
+          ].filter(Boolean).join("\n");
         }
         case "BarChart":
         case "LineChart":
         case "AreaChart":
         case "HorizontalBarChart":
-        case "RadarChart":
-        case "RadialChart":
-        case "SingleStackedBarChart":
         case "PieChart": {
-          if (Array.isArray(p.labels) && Array.isArray(p.values))
-            return p.labels
-              .map(
-                (label, index) =>
-                  `${label}: ${(p.values as unknown[])[index] ?? ""}`,
-              )
-              .join("\n");
           if (Array.isArray(p.labels) && Array.isArray(p.series)) {
             const labels = p.labels as string[];
             const seriesStrs = (p.series as any[]).map((s) => {
-              const name = s.props?.category || "";
-              const data = (s.props?.values || []) as number[];
-              return (
-                `${name}: ` +
-                labels.map((l, i) => `${l}: ${data[i] ?? ""}`).join(", ")
-              );
+              const name = s.props?.name || "";
+              const data = (s.props?.data || []) as number[];
+              return `${name}: ` + labels.map((l, i) => `${l}: ${data[i] ?? ""}`).join(", ");
             });
             return seriesStrs.join("\n");
           }
-          return "";
+          return [
+            p.title,
+            ...((p.items as Array<{ label: string; value: number }>) || []).map(
+              (item) =>
+                `${item.label}: ${item.value}${p.unit ? ` ${p.unit}` : ""}`,
+            ),
+          ].filter(Boolean).join("\n");
         }
         case "Tabs":
         case "Accordion":
         case "Steps":
-          return visit(p.items);
         case "Carousel":
-          return visit(p.children);
         case "SectionBlock":
-          return visit(p.sections);
+          return visit(p.items || p.content || p.children);
         case "TabItem":
         case "AccordionItem":
         case "SectionItem":
-          return [p.trigger, visit(p.content)]
-            .filter(Boolean)
-            .join("\n");
+          return [p.trigger || p.header, visit(p.content)].filter(Boolean).join("\n");
         case "Form":
-          return [p.name, visit(p.buttons), visit(p.fields)]
-            .filter(Boolean)
-            .join("\n");
+          return [
+            p.name || p.title,
+            visit(p.buttons),
+            visit(p.fields),
+          ].filter(Boolean).join("\n");
         case "FormControl":
           return [p.label, visit(p.input)].filter(Boolean).join(": ");
         case "Buttons":
@@ -219,39 +198,11 @@ export function uiProgramToText(program: string): string {
         case "Button":
           return String(p.label ?? "");
         case "FollowUpBlock":
-          return visit(p.items);
+          return visit(p.items || p.children);
         case "FollowUpItem":
-          return String(p.text ?? "");
-        case "Input":
-        case "TextArea":
-        case "Select":
-          return [p.placeholder, p.value, visit(p.items)]
-            .filter(Boolean)
-            .join("\n");
-        case "SelectItem":
-          return String(p.label ?? p.value ?? "");
-        case "StepsItem":
-          return [p.title, p.details].filter(Boolean).join("\n");
+          return String(p.text || p.label || "");
         default:
-          return Object.entries(p)
-            .filter(([key]) =>
-              [
-                "title",
-                "label",
-                "text",
-                "value",
-                "description",
-                "alt",
-                "children",
-                "items",
-                "content",
-                "datasets",
-                "points",
-              ].includes(key),
-            )
-            .map(([, value]) => visit(value))
-            .filter(Boolean)
-            .join("\n");
+          return "";
       }
     };
     return visit(result.root).trim() || program;
@@ -263,14 +214,7 @@ export function uiProgramToText(program: string): string {
 export function assistantResponseToText(content: string): string {
   return splitAssistantResponse(content)
     .map((part) =>
-      part.kind === "ui"
-        ? uiProgramToText(part.content)
-        : part.kind === "widget"
-          ? (() => {
-              const widget = parseWidget(part.content);
-              return widget ? `${widget.title}\n${widget.description}` : "";
-            })()
-          : part.content.trim(),
+      part.kind === "ui" ? uiProgramToText(part.content) : part.content.trim(),
     )
     .filter(Boolean)
     .join("\n\n");
@@ -284,7 +228,6 @@ export function updateIntelligenceUiState<
   blockId: string,
   state: Record<string, unknown>,
 ): T[] {
-  if (!validUiState(state) || !/^ui-\d+$/.test(blockId)) return messages;
   return messages.map((message) =>
     message.id !== messageId
       ? message

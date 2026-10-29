@@ -4,9 +4,26 @@ import { I18nProvider } from "../src/lib/i18n";
 import { AssistantResponse } from "../src/components/intelligence-ui/assistant-response";
 import type { IntelligenceUiState } from "../src/components/intelligence-ui/schema";
 import "../src/index.css";
-import { widgetFence } from "./widget.fixture";
-import { sampleOpenUiProgram as program } from "./openui.fixture";
 
+const program = [
+  "root = Stack([overview, tabs, callout, accordion])",
+  "overview = Card([header, desc])",
+  'header = CardHeader("OpenUI Native Runtime", "Harness Desktop Implementation Review")',
+  'desc = TextContent("Native OpenUI components rendered with official tokens and styles across Main Chat and Side Chat.")',
+  "tabs = Tabs([tab1, tab2])",
+  'tab1 = TabItem("chart", "Activity Chart", [chart])',
+  'tab2 = TabItem("table", "Modified Files", [files])',
+  'chart = BarChart(["Added", "Removed", "Unchanged"], [s1], "grouped", "Category", "Lines", 200)',
+  's1 = Series("Lines", [120, 30, 45])',
+  "files = Table([c1, c2, c3])",
+  'c1 = Col("File", ["App.tsx", "side-chat-tab.tsx", "protocol.ts", "library.tsx", "prompt.ts"])',
+  'c2 = Col("Lines", [20, 12, 80, 120, 30], "number")',
+  'c3 = Col("Status", ["Updated", "Updated", "Updated", "Migrated", "Generated"])',
+  'callout = Callout("success", "Audit Complete", "All 82+ native components available with responsive layouts and dark/light mode.")',
+  "accordion = Accordion([acc1])",
+  'acc1 = AccordionItem("tech", "Technical Architecture", [techDesc])',
+  'techDesc = TextContent("Powered by @openuidev/react-ui and @openuidev/react-lang with Radix UI primitives and D3 charts.")',
+].join("\n");
 const content = `## Review\n\nThese are test values for the shared response renderer.\n\n\`\`\`openui-lang\n${program}\n\`\`\`\n\n| Legacy Markdown | Status |\n|---|---|\n| Shared table | Ready |`;
 
 function Fixture() {
@@ -40,7 +57,6 @@ function Fixture() {
   const [streaming, setStreaming] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [isDark, setIsDark] = useState(true);
-  const [view, setView] = useState("mixed");
   const [submissions, setSubmissions] = useState<
     Array<{ scope: string; prompt: string }>
   >([]);
@@ -58,13 +74,7 @@ function Fixture() {
         </p>
       </main>
     );
-  const responseContent =
-    liveResult?.content ||
-    (view === "openui"
-      ? content
-      : view === "widget"
-        ? widgetFence
-        : `${content}\n\n${widgetFence}\n\n\`\`\`mermaid\nflowchart LR\n  Input --> Validate --> Calculate --> Result\n\`\`\``);
+  const responseContent = liveResult?.content || content;
   return (
     <main className="min-h-screen bg-white p-6 font-sans text-[#262626] dark:bg-[#161616] dark:text-white">
       <h1 className="mb-4 text-lg">Intelligence UI browser fixture</h1>
@@ -74,17 +84,6 @@ function Fixture() {
         </p>
       )}
       <nav className="mb-6 flex flex-wrap gap-4 text-sm">
-        <label>
-          Renderer{" "}
-          <select
-            value={view}
-            onChange={(event) => setView(event.target.value)}
-          >
-            <option value="mixed">Mixed</option>
-            <option value="openui">OpenUI</option>
-            <option value="widget">Widget</option>
-          </select>
-        </label>
         <label>
           <input
             type="checkbox"
@@ -119,16 +118,10 @@ function Fixture() {
             setIsDark(next);
             if (next) {
               document.documentElement.classList.add("dark");
-              document.documentElement.setAttribute(
-                "data-openui-theme",
-                "dark",
-              );
+              document.documentElement.setAttribute("data-openui-theme", "dark");
             } else {
               document.documentElement.classList.remove("dark");
-              document.documentElement.setAttribute(
-                "data-openui-theme",
-                "light",
-              );
+              document.documentElement.setAttribute("data-openui-theme", "light");
             }
           }}
           className="border border-black/20 dark:border-white/20 rounded px-2 py-0.5 text-xs hover:bg-black/5 dark:hover:bg-white/10"
@@ -146,7 +139,7 @@ function Fixture() {
       >
         {["main", "side"].map((scope) => (
           <section
-            key={`${view}-${scope}-${revision}`}
+            key={`${scope}-${revision}`}
             data-fixture={scope}
             className="min-w-0"
             style={{
@@ -169,15 +162,12 @@ function Fixture() {
               }
               isStreaming={streaming}
               disabled={busy || streaming}
-              state={states[`${view}-${scope}`]}
+              state={states[scope]}
               onStateChange={(blockId, state) =>
                 setStates((previous) => {
                   const next = {
                     ...previous,
-                    [`${view}-${scope}`]: {
-                      ...previous[`${view}-${scope}`],
-                      [blockId]: state,
-                    },
+                    [scope]: { ...previous[scope], [blockId]: state },
                   };
                   localStorage.setItem(storageKey, JSON.stringify(next));
                   return next;

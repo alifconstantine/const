@@ -72,7 +72,7 @@ async function run() {
   }
 
   const prompt =
-    "Gunakan Intelligent UI dalam satu blok root Stack untuk data proyek berikut. Alpha: selesai 12, delta anggaran -30; Bima: selesai 8, delta 120; Cakra: selesai 15, delta -2; Damar: selesai 6, delta 12; Elang: selesai 10, delta 0; Fajar: selesai 9, delta 25. Semua delta dalam juta rupiah. Buat Card ringkasan berisi TextContent jumlah proyek, Table dengan Col untuk seluruh enam proyek, BarChart dengan Series delta termasuk nilai negatif dan nol, dan Form native dengan Buttons dan Button berisi pilihan prioritas (Select) serta catatan (Input), tombol Kirim pilihan. Tunggu submit sebelum membuat rencana. Berikan pengantar Markdown. Gunakan hanya data yang diberikan tanpa menyimpulkan arti positif/negatif delta. Jangan menjalankan tool atau mengubah file.";
+    "Gunakan Intelligent UI dalam satu blok untuk data proyek berikut. Alpha: selesai 12, delta anggaran -30; Bima: selesai 8, delta 120; Cakra: selesai 15, delta -2; Damar: selesai 6, delta 12; Elang: selesai 10, delta 0; Fajar: selesai 9, delta 25. Semua delta dalam juta rupiah. Buat Card ringkasan berisi Text dan Metric jumlah proyek, Table seluruh enam proyek, BarChart delta termasuk nilai negatif dan nol, dan Form berisi pilihan prioritas (select) serta catatan (text), tombol Kirim pilihan. Tunggu submit sebelum membuat rencana. Berikan pengantar Markdown. Gunakan hanya data yang diberikan tanpa menyimpulkan arti positif/negatif delta. Jangan menjalankan tool atau mengubah file.";
   const started = Date.now();
   const response = await fetch(endpoint, {
     method: "POST",

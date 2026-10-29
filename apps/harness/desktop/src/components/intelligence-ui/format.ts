@@ -1,43 +1,4 @@
 /** Keep form submissions readable; runtime field metadata stays in saved state. */
-export function submissionFields(
-  state: Record<string, unknown>,
-  formName?: string,
-) {
-  const fields: Array<{
-    label: string;
-    value: string | number | boolean | undefined;
-  }> = [];
-  const visit = (value: unknown, label: string) => {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const object = value as Record<string, unknown>;
-      if (
-        "value" in object &&
-        Object.keys(object).every((key) =>
-          ["value", "componentType"].includes(key),
-        )
-      ) {
-        visit(object.value, label);
-        return;
-      }
-      for (const [key, item] of Object.entries(object)) {
-        if (key !== "componentType")
-          visit(item, label ? `${label}.${key}` : key);
-      }
-    } else
-      fields.push({
-        label,
-        value:
-          value == null
-            ? undefined
-            : Array.isArray(value)
-              ? JSON.stringify(value)
-              : (value as string | number | boolean),
-      });
-  };
-  visit(formName && state[formName] ? state[formName] : state, "");
-  return fields;
-}
-
 export function formatFormSubmission(
   title: string,
   fields: Array<{
