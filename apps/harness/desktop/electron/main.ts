@@ -917,12 +917,27 @@ app.whenReady().then(() => {
       if (!ownWindow || event.senderFrame !== event.sender.mainFrame) throw new Error("invalid");
       try { return await handler(...args); }
       catch (error) {
-        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup", "vault", "runtime"].includes(error.message) ? error.message : "invalid";
+        const code = error instanceof Error && ["auth", "storage", "busy", "connection", "setup", "vault", "runtime", "editor_setup", "editor_project", "editor_wait", "editor_cancelled"].includes(error.message) ? error.message : "invalid";
         throw new Error(code);
       }
     });
   };
   handleMcp("mcp:list", (workspace?: string) => mcpService.list(workspace));
+  handleMcp("mcp:configure-editor", (id: string, action: import("../src/lib/mcp/editors").EditorAction, workspace?: string, language?: string) => {
+    return mcpService.configureEditor(id, action, workspace, async (app) => {
+      const { mcpTranslations } = await import("../src/locales/mcp");
+      const labels = mcpTranslations[language as keyof typeof mcpTranslations] ?? mcpTranslations.en;
+      const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      if (!window) throw new Error("connection");
+      const result = await dialog.showOpenDialog(window, {
+        title: labels.editorChooseProject,
+        defaultPath: workspace,
+        properties: app === "blender" || app === "unreal" ? ["openFile"] : ["openDirectory"],
+        ...(app === "blender" || app === "unreal" ? { filters: [{ name: app === "blender" ? "Blender" : "Unreal Engine", extensions: [app === "blender" ? "blend" : "uproject"] }] } : {}),
+      });
+      return result.canceled ? null : result.filePaths[0] ?? null;
+    }, (file) => shell.showItemInFolder(file));
+  });
   handleMcp("mcp:configure-artcraft", (id: string, action: string, workspace?: string, language?: string) => {
     if (action !== "detect" && action !== "browse") throw new Error("invalid");
     return mcpService.configureArtcraft(id, workspace, action === "browse" ? async () => {

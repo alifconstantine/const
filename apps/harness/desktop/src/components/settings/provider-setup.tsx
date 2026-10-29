@@ -1,3 +1,4 @@
+import { EditorSetupPanel } from "./editor-setup";
 import { FolderOpen } from "lucide-react";
 import {
   Button,
@@ -30,6 +31,15 @@ export function ProviderSetup({
 }) {
   const { t, language } = useTranslation();
   const bridge = window.electron?.mcp;
+  if (connection.builtin === "editor" && connection.editorApp)
+    return (
+      <EditorSetupPanel
+        connection={connection}
+        busy={busy}
+        workspacePath={workspacePath}
+        run={run}
+      />
+    );
   if (connection.builtin === "artcraft" && connection.artcraftApp) {
     const profile = ARTCRAFT_APPS[connection.artcraftApp];
     return (

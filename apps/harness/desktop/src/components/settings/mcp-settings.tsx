@@ -40,6 +40,9 @@ import { ProviderSetup } from "./provider-setup";
 
 function mcpErrorKey(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("editor_setup")) return "mcp.errorEditorSetup";
+  if (message.includes("editor_project")) return "mcp.errorEditorProject";
+  if (message.includes("editor_wait")) return "mcp.errorEditorWait";
   if (message.includes("runtime")) return "mcp.errorRuntime";
   if (message.includes("vault")) return "mcp.errorVault";
   if (message.includes("setup")) return "mcp.errorSetup";
@@ -480,7 +483,10 @@ export function McpSettings({
     try {
       await operation();
     } catch (failure) {
-      toast.error(t(mcpErrorKey(failure)));
+      if (!(
+        failure instanceof Error && failure.message.includes("editor_cancelled")
+      ))
+        toast.error(t(mcpErrorKey(failure)));
     } finally {
       setPending(null);
       refresh();
@@ -591,9 +597,11 @@ export function McpSettings({
             <span className="min-w-0 break-all">
               {connection.transport === "builtin"
                 ? t(
-                    connection.builtin === "artcraft"
-                      ? "mcp.artcraftRuntime"
-                      : "mcp.localVault",
+                    connection.builtin === "editor"
+                      ? "mcp.editorRuntime"
+                      : connection.builtin === "artcraft"
+                        ? "mcp.artcraftRuntime"
+                        : "mcp.localVault",
                   )
                 : connection.transport === "http"
                   ? connection.url
@@ -666,6 +674,11 @@ export function McpSettings({
                     variant="ghost"
                     disabled={
                       !!pending ||
+                      (connection.builtin === "editor" &&
+                        (!workspacePath ||
+                          !connection.editorPrepared ||
+                          !connection.detectedProject ||
+                          connection.editorInstalling)) ||
                       (connection.builtin === "obsidian" &&
                         !connection.vaultPath) ||
                       (connection.builtin === "artcraft" &&

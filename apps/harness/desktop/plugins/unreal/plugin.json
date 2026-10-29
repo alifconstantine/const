@@ -1,0 +1,21 @@
+{
+  "name": "unreal",
+  "version": "1.0.0",
+  "description": "Work with actors, Blueprints, materials and levels through Unreal MCP.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "Unreal Engine",
+    "icon": "unreal"
+  },
+  "mcpServers": {
+    "editor": {
+      "transport": "builtin",
+      "builtin": "editor",
+      "editorApp": "unreal",
+      "auth": "none",
+      "setupUrl": "https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-mcp-in-unreal-editor"
+    }
+  }
+}

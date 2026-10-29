@@ -7,6 +7,7 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { McpConnection, McpSaveInput } from "../../src/lib/mcp/types";
+import { EDITOR_IDS } from "../../src/lib/mcp/editors";
 import { ARTCRAFT_IDS } from "../../src/lib/mcp/artcraft";
 
 const pairs = z.record(z.string().min(1).max(200), z.string().max(16_384));
@@ -21,7 +22,7 @@ const inputSchema = z.object({
   scope: z.enum(["user", "workspace"]),
   workspacePath: z.string().optional(),
   transport: z.enum(["http", "stdio", "builtin"]),
-  builtin: z.enum(["obsidian", "artcraft"]).optional(),
+  builtin: z.enum(["obsidian", "artcraft", "editor"]).optional(),
   artcraftApp: z
     .enum(
       ARTCRAFT_IDS as [
@@ -30,6 +31,9 @@ const inputSchema = z.object({
       ],
     )
     .optional(),
+  editorApp: z.enum(EDITOR_IDS).optional(),
+  editorProjectPath: z.string().max(4096).optional(),
+  editorPort: z.number().int().min(1024).max(65535).optional(),
   runtimePath: z.string().max(4096).optional(),
   localFileAccess: z.boolean().optional(),
   vaultPath: z.string().max(4096).optional(),
@@ -116,7 +120,7 @@ export function validateEndpoint(value: string): URL {
 function validateBuiltin(input: McpSaveInput) {
   if (input.transport === "builtin") {
     if (
-      !["obsidian", "artcraft"].includes(input.builtin ?? "") ||
+      !["obsidian", "artcraft", "editor"].includes(input.builtin ?? "") ||
       input.auth !== "none" ||
       input.url ||
       input.command ||
@@ -132,7 +136,24 @@ function validateBuiltin(input: McpSaveInput) {
       throw new Error("invalid");
     if (input.vaultPath && !path.isAbsolute(input.vaultPath))
       throw new Error("invalid");
-    if (input.builtin === "artcraft") {
+    if (
+      input.builtin !== "editor" &&
+      (input.editorApp !== undefined ||
+        input.editorProjectPath !== undefined ||
+        input.editorPort !== undefined)
+    )
+      throw new Error("invalid");
+    if (input.builtin === "editor") {
+      if (
+        !input.editorApp ||
+        input.artcraftApp !== undefined ||
+        input.runtimePath !== undefined ||
+        input.vaultPath !== undefined ||
+        input.localFileAccess !== undefined ||
+        (input.editorProjectPath && !path.isAbsolute(input.editorProjectPath))
+      )
+        throw new Error("invalid");
+    } else if (input.builtin === "artcraft") {
       if (
         !input.artcraftApp ||
         input.vaultPath ||
@@ -146,6 +167,9 @@ function validateBuiltin(input: McpSaveInput) {
     )
       throw new Error("invalid");
   } else if (
+    input.editorApp !== undefined ||
+    input.editorProjectPath !== undefined ||
+    input.editorPort !== undefined ||
     input.builtin !== undefined ||
     input.vaultPath !== undefined ||
     input.artcraftApp !== undefined ||
@@ -227,6 +251,9 @@ export class McpStore {
           record.scopes,
           ...(record.transport === "builtin"
             ? [record.builtin, record.vaultPath]
+            : []),
+          ...(record.builtin === "editor"
+            ? [record.editorApp, record.editorProjectPath, record.editorPort]
             : []),
           ...(record.builtin === "artcraft"
             ? [record.artcraftApp, record.runtimePath, record.localFileAccess]

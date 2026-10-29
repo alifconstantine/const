@@ -49,6 +49,17 @@ import {
   findArtcraftRuntime,
   ARTCRAFT_GATEWAYS,
 } from "./artcraft";
+import {
+  EditorRuntimeManager,
+  editorApp,
+  editorProject,
+  EDITOR_GATEWAYS,
+} from "./editors";
+import {
+  isEditorApp,
+  EDITORS,
+  type EditorAction,
+} from "../../src/lib/mcp/editors";
 import { ARTCRAFT_APPS, isArtCraftApp } from "../../src/lib/mcp/artcraft";
 
 const CALLBACK = "http://127.0.0.1:24139/oauth/callback";
@@ -118,6 +129,7 @@ export function exposedToolName(id: string, tool: string) {
 
 export class McpService {
   private readonly artcraft: ArtcraftRuntimeManager;
+  private readonly editors: EditorRuntimeManager;
   private live = new Map<string, LiveConnection>();
   private states = new Map<
     string,
@@ -140,11 +152,13 @@ export class McpService {
     github?: GitHubOAuthClient,
     google?: GoogleOAuthClient,
     artcraft?: ArtcraftRuntimeManager,
+    editors?: EditorRuntimeManager,
   ) {
     this.github = github ?? new GitHubOAuthClient(store);
     this.google = google ?? new GoogleOAuthClient(store);
     this.apps = new McpAppsStore(store.home);
     this.artcraft = artcraft ?? new ArtcraftRuntimeManager();
+    this.editors = editors ?? new EditorRuntimeManager(store.home);
     this.artcraft.onUnexpectedClose = (id) => {
       this.states.set(id, { status: "error", error: "connection" });
       this.changed();
@@ -173,7 +187,12 @@ export class McpService {
             artcraftApp: isArtCraftApp(server.artcraftApp)
               ? server.artcraftApp
               : undefined,
-            timeoutMs: server.builtin === "artcraft" ? 180_000 : undefined,
+            editorApp: isEditorApp(server.editorApp)
+              ? server.editorApp
+              : undefined,
+            timeoutMs: ["artcraft", "editor"].includes(server.builtin ?? "")
+              ? 180_000
+              : undefined,
             url: server.url,
             command: server.command,
             args: server.args,
@@ -286,10 +305,31 @@ export class McpService {
           tools: [],
         };
       }
-      const state = this.states.get(record.id);
+      let state = this.states.get(record.id);
+      if (
+        editorApp(record) &&
+        state?.status === "connected" &&
+        !this.editors.connected(record, workspace)
+      )
+        state = undefined;
       return {
         ...record,
         isEffective,
+        editorPrepared: editorApp(record)
+          ? this.editors.setup.prepared(editorApp(record)!)
+          : undefined,
+        editorInstalling: editorApp(record)
+          ? this.editors.setup.busy(editorApp(record)!)
+          : undefined,
+        detectedProject: editorApp(record)
+          ? (() => {
+              try {
+                return editorProject(record, workspace);
+              } catch {
+                return undefined;
+              }
+            })()
+          : undefined,
         detectedRuntime: artcraftApp(record)
           ? findArtcraftRuntime(artcraftApp(record)!, record.runtimePath)
           : undefined,
@@ -308,9 +348,11 @@ export class McpService {
                 : "disconnected")),
         error: state?.error,
         tools:
-          record.builtin === "artcraft"
-            ? this.artcraft.tools(record.id)
-            : (this.live.get(record.id)?.tools ?? []),
+          record.builtin === "editor"
+            ? this.editors.tools(record, workspace)
+            : record.builtin === "artcraft"
+              ? this.artcraft.tools(record.id)
+              : (this.live.get(record.id)?.tools ?? []),
       };
     });
   }
@@ -330,8 +372,8 @@ export class McpService {
             "plugin-obsidian-vault"
         ) &&
           !(
-            input.builtin === "artcraft" &&
-            artcraftApp({
+            ["artcraft", "editor"].includes(input.builtin ?? "") &&
+            (input.builtin === "editor" ? editorApp : artcraftApp)({
               ...input,
               key: this.store.get(input.id, input.workspacePath).key,
             } as McpConnection)
@@ -355,6 +397,88 @@ export class McpService {
     const { key: _key, pluginId: _plugin, pluginName: _name, ...safe } = input;
     this.store.save(safe);
     this.changed();
+  }
+  async configureEditor(
+    id: string,
+    action: EditorAction,
+    workspace: string | undefined,
+    choose?: (app: string) => Promise<string | null>,
+    reveal?: (file: string) => void,
+  ) {
+    const record = this.get(id, workspace);
+    const app = editorApp(record);
+    if (!app || !this.store.isTrusted(record)) throw new Error("invalid");
+    if (action === "cancel") {
+      this.editors.setup.cancel(app);
+      return;
+    }
+    const fingerprint = this.store.fingerprint(record);
+    const authorize = () => {
+      const current = this.get(id, workspace);
+      if (
+        !this.store.isTrusted(current) ||
+        this.store.fingerprint(current) !== fingerprint
+      )
+        throw new Error("invalid");
+    };
+    if (action === "project") {
+      if (!workspace || !choose) throw new Error("editor_project");
+      const selected = await choose(app);
+      if (!selected) return;
+      authorize();
+      const project = editorProject(
+        { ...record, editorProjectPath: selected },
+        workspace,
+      );
+      await this.editors.disconnect(id);
+      authorize();
+      if (record.scope === "user") {
+        const { id: _id, ...fields } = record;
+        this.store.save({
+          ...fields,
+          scope: "workspace",
+          workspacePath: workspace,
+          editorProjectPath: project,
+        });
+      } else this.store.save({ ...record, editorProjectPath: project });
+      this.changed();
+      return;
+    }
+    if (action === "reveal") {
+      if (app !== "blender" || !this.editors.setup.prepared(app))
+        throw new Error("editor_setup");
+      reveal?.(path.join(this.editors.setup.root(app), "mcp-1.0.3.zip"));
+      return;
+    }
+    if (!["install", "login", "pipeline"].includes(action))
+      throw new Error("invalid");
+    const project = editorProject(record, workspace);
+    const prepare = this.editors.setup.prepare(app);
+    this.changed();
+    try {
+      await prepare;
+      authorize();
+      // Re-resolve symlinks after asynchronous downloads before writing any project files.
+      if (editorProject(this.get(id, workspace), workspace) !== project)
+        throw new Error("editor_project");
+      if (action === "install")
+        this.editors.setup.installProject(
+          app,
+          app === "unreal" ? path.dirname(project) : project,
+        );
+      else {
+        if (app !== "unity") throw new Error("invalid");
+        const job = this.editors.setup.unityAction(
+          action as "login" | "pipeline",
+          project,
+        );
+        this.changed();
+        await job;
+        authorize();
+      }
+    } finally {
+      this.changed();
+    }
   }
   async configureArtcraft(
     id: string,
@@ -441,12 +565,15 @@ export class McpService {
       ...fields,
       scope: "workspace",
       workspacePath: workspace,
-      ...(record.transport === "builtin" ? { vaultPath: undefined } : {}),
+      ...(record.transport === "builtin"
+        ? { vaultPath: undefined, editorProjectPath: undefined }
+        : {}),
     });
     this.changed();
   }
   async disconnect(id: string, _workspace?: string) {
     await this.artcraft.disconnect(id);
+    await this.editors.disconnect(id);
     if (this.login?.id === id) this.login.abort();
     this.controllers.get(id)?.abort();
     this.controllers.delete(id);
@@ -475,6 +602,8 @@ export class McpService {
   }
   async invalidate() {
     await this.artcraft.close();
+    await this.editors.close();
+    await this.editors.setup.close();
     const login = this.login;
     login?.abort();
     await Promise.all(
@@ -779,6 +908,38 @@ export class McpService {
     const record = this.get(id, workspace);
     if (!this.store.isTrusted(record)) throw new Error("invalid");
     const fingerprint = this.store.fingerprint(record);
+    if (editorApp(record)) {
+      if (!workspace) throw new Error("editor_project");
+      await this.editors.disconnect(id);
+      this.states.set(id, { status: "connecting" });
+      this.changed();
+      try {
+        const active = await this.editors.probe(record, workspace, () => {
+          const current = this.get(id, workspace);
+          if (
+            !this.store.isTrusted(current) ||
+            this.store.fingerprint(current) !== fingerprint
+          )
+            throw new Error("invalid");
+        });
+        this.store.markConnected(record);
+        this.states.set(id, { status: "connected" });
+        this.changed();
+        return { ...active, fingerprint };
+      } catch (error) {
+        const code =
+          error instanceof Error &&
+          ["editor_setup", "editor_project", "editor_wait"].includes(
+            error.message,
+          )
+            ? (error.message as
+                "editor_setup" | "editor_project" | "editor_wait")
+            : "connection";
+        this.states.set(id, { status: "error", error: code });
+        this.changed();
+        throw error;
+      }
+    }
     if (artcraftApp(record)) {
       if (!workspace) throw new Error("runtime");
       this.states.set(id, { status: "connecting" });
@@ -1036,6 +1197,18 @@ export class McpService {
         record.isEffective &&
         record.enabled &&
         (record.builtin !== "obsidian" || !!record.vaultPath) &&
+        (record.builtin !== "editor" ||
+          (!!editorApp(record) &&
+            !!record.editorPrepared &&
+            !!workspace &&
+            (() => {
+              try {
+                editorProject(record, workspace);
+                return true;
+              } catch {
+                return false;
+              }
+            })())) &&
         (record.builtin !== "artcraft" ||
           (!!artcraftApp(record) &&
             !!record.detectedRuntime &&
@@ -1055,14 +1228,16 @@ export class McpService {
     await Promise.all(
       eligible.map(async (record) => {
         if (signal?.aborted) return;
-        if (artcraftApp(record)) {
-          for (const tool of ARTCRAFT_GATEWAYS)
+        if (artcraftApp(record) || editorApp(record)) {
+          for (const tool of editorApp(record)
+            ? EDITOR_GATEWAYS
+            : ARTCRAFT_GATEWAYS)
             definitions.push({
               type: "function",
               requiresApproval: true,
               function: {
                 name: exposedToolName(record.id, tool.name),
-                description: `[${record.name}] ${ARTCRAFT_APPS[artcraftApp(record)!].keywords}. ${tool.description}`,
+                description: `[${record.name}] ${editorApp(record) ? EDITORS[editorApp(record)!].name : ARTCRAFT_APPS[artcraftApp(record)!].keywords}. ${tool.description}`,
                 parameters: tool.inputSchema,
               },
             });
@@ -1230,35 +1405,60 @@ export class McpService {
           !this.store.isTrusted(record)
         )
           continue;
-        if (artcraftApp(record)) {
-          const gateway = ARTCRAFT_GATEWAYS.find(
-            (tool) => exposedToolName(record.id, tool.name) === name,
-          );
+        if (artcraftApp(record) || editorApp(record)) {
+          const gateway = (
+            editorApp(record) ? EDITOR_GATEWAYS : ARTCRAFT_GATEWAYS
+          ).find((tool) => exposedToolName(record.id, tool.name) === name);
           if (!gateway) continue;
-          if (!workspace || !conversation)
+          if (!workspace || (!editorApp(record) && !conversation))
             return {
-              result:
-                "ArtCraft needs a workspace and a stable chat session. Open a Main Chat and try again.",
+              result: editorApp(record)
+                ? "The editor plugin needs an open workspace containing its selected project."
+                : "ArtCraft needs a workspace and a stable chat session. Open a Main Chat and try again.",
               isError: true,
             };
           const fingerprint = this.store.fingerprint(record);
-          const result = await this.artcraft.execute(
-            record,
-            fingerprint,
-            workspace,
-            conversation,
-            gateway.name,
-            args,
-            signal,
-            () => {
-              const current = this.get(record.id, workspace);
-              if (
-                !this.store.isTrusted(current) ||
-                this.store.fingerprint(current) !== fingerprint
-              )
-                throw new Error("invalid");
-            },
-          );
+          const authorize = () => {
+            const current = this.get(record.id, workspace);
+            if (
+              !this.store.isTrusted(current) ||
+              this.store.fingerprint(current) !== fingerprint
+            )
+              throw new Error("invalid");
+          };
+          const result = editorApp(record)
+            ? await this.editors
+                .execute(
+                  record,
+                  workspace,
+                  gateway.name,
+                  args,
+                  signal,
+                  authorize,
+                )
+                .catch((error: unknown) => {
+                  const code =
+                    error instanceof Error &&
+                    ["editor_setup", "editor_project", "editor_wait"].includes(
+                      error.message,
+                    )
+                      ? (error.message as
+                          "editor_setup" | "editor_project" | "editor_wait")
+                      : "connection";
+                  this.states.set(record.id, { status: "error", error: code });
+                  this.changed();
+                  throw error;
+                })
+            : await this.artcraft.execute(
+                record,
+                fingerprint,
+                workspace,
+                conversation!,
+                gateway.name,
+                args,
+                signal,
+                authorize,
+              );
           this.store.markConnected(record);
           this.states.set(record.id, { status: "connected" });
           this.changed();

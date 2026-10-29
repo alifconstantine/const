@@ -1,0 +1,21 @@
+{
+  "name": "godot",
+  "version": "1.0.0",
+  "description": "Build scenes, edit scripts and test games in the Godot editor.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "Godot",
+    "icon": "godot"
+  },
+  "mcpServers": {
+    "editor": {
+      "transport": "builtin",
+      "builtin": "editor",
+      "editorApp": "godot",
+      "auth": "none",
+      "setupUrl": "https://github.com/NPGameDev/godot-mcp-toolkit"
+    }
+  }
+}

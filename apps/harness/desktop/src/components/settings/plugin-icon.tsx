@@ -2,6 +2,10 @@ import { Blocks } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
 import { ARTCRAFT_IDS, isArtCraftApp } from "../../lib/mcp/artcraft";
 import {
+  Blender,
+  Godot,
+  Unity,
+  UnrealEngine,
   Github,
   Canva,
   GoogleDrive,
@@ -18,6 +22,10 @@ import {
 
 export const PLUGIN_LOGOS = new Set([
   ...ARTCRAFT_IDS,
+  "blender",
+  "godot",
+  "unity",
+  "unreal",
   "const-guide",
   "github",
   "canva",
@@ -90,6 +98,10 @@ export function PluginIcon({
     );
   const GoogleIcon = (
     {
+      blender: Blender,
+      godot: Godot,
+      unity: Unity,
+      unreal: UnrealEngine,
       figma: Figma,
       obsidian: Obsidian,
       "google-drive": GoogleDrive,

@@ -1,0 +1,21 @@
+{
+  "name": "blender",
+  "version": "1.0.0",
+  "description": "Model, inspect, animate and render in a live Blender project.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "Blender",
+    "icon": "blender"
+  },
+  "mcpServers": {
+    "editor": {
+      "transport": "builtin",
+      "builtin": "editor",
+      "editorApp": "blender",
+      "auth": "none",
+      "setupUrl": "https://www.blender.org/lab/mcp-server/"
+    }
+  }
+}

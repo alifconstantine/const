@@ -1,0 +1,21 @@
+{
+  "name": "unity",
+  "version": "1.0.0",
+  "description": "Create and inspect game objects, assets and tests through the official Unity CLI.",
+  "author": {
+    "name": "Const"
+  },
+  "interface": {
+    "displayName": "Unity",
+    "icon": "unity"
+  },
+  "mcpServers": {
+    "editor": {
+      "transport": "builtin",
+      "builtin": "editor",
+      "editorApp": "unity",
+      "auth": "none",
+      "setupUrl": "https://docs.unity.com/en-us/unity-cli/use-unity-cli"
+    }
+  }
+}

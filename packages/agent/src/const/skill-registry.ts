@@ -24,8 +24,9 @@ export interface PluginManifest {
 }
 export interface PluginMcpServer {
   transport: "http" | "stdio" | "builtin";
-  builtin?: "obsidian" | "artcraft";
+  builtin?: "obsidian" | "artcraft" | "editor";
   artcraftApp?: string;
+  editorApp?: string;
   url?: string;
   command?: string;
   args?: string[];
@@ -126,9 +127,11 @@ export function readPluginManifest(root: string): PluginManifest {
     for (const [name, server] of Object.entries(manifest.mcpServers)) {
       if (!validName.test(name) || !server || !["none", "oauth", "api-key"].includes(server.auth) ||
         !["http", "stdio", "builtin"].includes(server.transport) ||
-        (server.transport === "builtin" && (!["obsidian", "artcraft"].includes(server.builtin ?? "") || server.auth !== "none" || server.url !== undefined || server.command !== undefined)) ||
+        (server.transport === "builtin" && (!["obsidian", "artcraft", "editor"].includes(server.builtin ?? "") || server.auth !== "none" || server.url !== undefined || server.command !== undefined)) ||
         (server.builtin === "artcraft" && (!/^(photo|vector|film|light|pdf|effect|design|fig|word|sound|deck|cad|grid)craft$/.test(server.artcraftApp ?? "") || manifest.name !== server.artcraftApp)) ||
         (server.builtin !== "artcraft" && server.artcraftApp !== undefined) ||
+        (server.builtin === "editor" && (!["blender", "godot", "unity", "unreal"].includes(server.editorApp ?? "") || manifest.name !== server.editorApp)) ||
+        (server.builtin !== "editor" && server.editorApp !== undefined) ||
         (server.transport !== "builtin" && server.builtin !== undefined) ||
         (server.transport === "http" && (typeof server.url !== "string" || !/^https?:\/\//.test(server.url))) ||
         (server.transport === "stdio" && (typeof server.command !== "string" || !server.command.trim())) ||

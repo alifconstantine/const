@@ -17,8 +17,11 @@ export interface McpConnection {
   pluginId?: string;
   pluginName?: string;
   transport: "http" | "stdio" | "builtin";
-  builtin?: "obsidian" | "artcraft";
+  builtin?: "obsidian" | "artcraft" | "editor";
   artcraftApp?: import("./artcraft").ArtCraftApp;
+  editorApp?: import("./editors").EditorApp;
+  editorProjectPath?: string;
+  editorPort?: number;
   runtimePath?: string;
   localFileAccess?: boolean;
   vaultPath?: string;
@@ -43,6 +46,9 @@ export interface McpToolInfo {
   appOnly?: boolean;
 }
 export interface McpConnectionView extends McpConnection {
+  detectedProject?: string;
+  editorPrepared?: boolean;
+  editorInstalling?: boolean;
   detectedRuntime?: string;
   authOptions?: McpAuth[];
   apiKeyUrl?: string;
@@ -65,6 +71,9 @@ export interface McpConnectionView extends McpConnection {
     | "setup"
     | "vault"
     | "runtime"
+    | "editor_setup"
+    | "editor_project"
+    | "editor_wait"
     | "scope"
     | "account";
 }
@@ -79,6 +88,12 @@ export interface McpSaveInput extends Partial<McpConnection> {
   env?: Record<string, string>;
 }
 export interface McpBridge {
+  configureEditor(
+    id: string,
+    action: import("./editors").EditorAction,
+    workspacePath?: string,
+    language?: string,
+  ): Promise<void>;
   configureArtcraft(
     id: string,
     action: "detect" | "browse",

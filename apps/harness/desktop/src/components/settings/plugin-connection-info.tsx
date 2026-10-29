@@ -1,9 +1,13 @@
 import type { PluginCatalogEntry } from "../../lib/plugins/types";
 import type { McpConnectionView } from "../../lib/mcp/types";
 import { useTranslation } from "../../lib/i18n";
+import { isEditorApp, EDITOR_IDS } from "../../lib/mcp/editors";
 import { ARTCRAFT_IDS, isArtCraftApp } from "../../lib/mcp/artcraft";
 
 export const pluginDescriptionKeys: Record<string, string> = {
+  ...Object.fromEntries(
+    EDITOR_IDS.map((app) => [app, `mcp.${app}Description`]),
+  ),
   ...Object.fromEntries(
     ARTCRAFT_IDS.map((app) => [app, `mcp.${app}Description`]),
   ),
@@ -30,6 +34,10 @@ export const pluginDescriptionKeys: Record<string, string> = {
 };
 
 export function connectionAccountLabel(connection: McpConnectionView) {
+  if (connection.builtin === "editor")
+    return connection.editorPrepared
+      ? "mcp.editorPrepared"
+      : "mcp.editorNeedsSetup";
   if (connection.builtin === "artcraft")
     return connection.detectedRuntime
       ? "mcp.artcraftReady"
@@ -85,19 +93,21 @@ export function PluginConnectionInfo({
     <div className="flex flex-col gap-1 text-[11px] leading-relaxed text-[#969696]">
       <span>
         {t(
-          isArtCraftApp(plugin.name)
-            ? "mcp.artcraftRuntime"
-            : plugin.name === "obsidian"
-              ? "mcp.localVault"
-              : plugin.name === "figma"
-                ? connections[0]?.auth === "oauth"
-                  ? "mcp.requiresAccount"
-                  : "mcp.figmaDesktop"
-                : account
-                  ? "mcp.requiresAccount"
-                  : key
-                    ? "mcp.requiresKey"
-                    : "mcp.noAccount",
+          isEditorApp(plugin.name)
+            ? "mcp.editorRuntime"
+            : isArtCraftApp(plugin.name)
+              ? "mcp.artcraftRuntime"
+              : plugin.name === "obsidian"
+                ? "mcp.localVault"
+                : plugin.name === "figma"
+                  ? connections[0]?.auth === "oauth"
+                    ? "mcp.requiresAccount"
+                    : "mcp.figmaDesktop"
+                  : account
+                    ? "mcp.requiresAccount"
+                    : key
+                      ? "mcp.requiresKey"
+                      : "mcp.noAccount",
         )}
       </span>
       {connections.map((connection) => (
