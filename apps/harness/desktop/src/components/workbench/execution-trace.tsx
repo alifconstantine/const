@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -501,6 +501,51 @@ function ThoughtItem({
     return () => clearInterval(interval);
   }, [isExecuting, startTime]);
 
+  // 3. Overflow and scroll state detection for gradient fade indicator (matching Image 1)
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isInitiallyLong = useMemo(
+    () => (thinking || "").length > 200 || (thinking || "").split("\n").length > 4,
+    [thinking]
+  );
+  const [canScrollDown, setCanScrollDown] = useState(isInitiallyLong);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollHeight > el.clientHeight + 4;
+    const moreBelow = hasOverflow && el.scrollHeight - el.scrollTop - el.clientHeight > 6;
+    const moreAbove = hasOverflow && el.scrollTop > 6;
+    setCanScrollDown(moreBelow);
+    setCanScrollUp(moreAbove);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+  }, [thinking, isOpen, checkScroll]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => checkScroll());
+    ro.observe(el);
+    if (el.firstElementChild) {
+      ro.observe(el.firstElementChild);
+    }
+    return () => ro.disconnect();
+  }, [checkScroll, isOpen]);
+
+  const maskStyle = useMemo(() => {
+    if (!canScrollDown && !canScrollUp) return undefined;
+    if (canScrollDown && canScrollUp) {
+      return "linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 36px), transparent 100%)";
+    }
+    if (canScrollDown) {
+      return "linear-gradient(to bottom, black calc(100% - 36px), transparent 100%)";
+    }
+    return "linear-gradient(to bottom, transparent 0%, black 24px, black 100%)";
+  }, [canScrollDown, canScrollUp]);
+
   const thoughtLabel = () => {
     if (isExecuting) {
       if (liveStepDuration >= 1000) {
@@ -533,15 +578,35 @@ function ThoughtItem({
       </button>
 
       <SmoothCollapse isOpen={isOpen}>
-        <div className="pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
-          {/* Scroll area bounded max height matching Image 1 */}
-          <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
+        <div className="relative pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
+          {/* Scroll area bounded max height with fade matching Image 1 */}
+          <ScrollArea
+            viewportRef={viewportRef}
+            onScroll={checkScroll}
+            viewportStyle={
+              maskStyle
+                ? {
+                    WebkitMaskImage: maskStyle,
+                    maskImage: maskStyle,
+                  }
+                : undefined
+            }
+            className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block"
+          >
             <MarkdownContent
               content={thinking}
               onOpenBrowser={onOpenBrowser}
               className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
             />
           </ScrollArea>
+
+          {/* Gradient fade indicator matching Image 1 to visually indicate more content below */}
+          {canScrollDown && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-2 left-0.5 right-2.5 h-8 bg-gradient-to-t from-[#f8f8f8] via-[#f8f8f8]/80 dark:from-[#161616] dark:via-[#161616]/80 to-transparent transition-opacity duration-200"
+            />
+          )}
         </div>
       </SmoothCollapse>
     </div>

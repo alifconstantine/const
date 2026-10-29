@@ -10,6 +10,7 @@ interface ScrollAreaProps
   scrollBarClassName?: string;
   thumbClassName?: string;
   viewportClassName?: string;
+  viewportStyle?: React.CSSProperties;
   viewportRef?: React.Ref<HTMLDivElement>;
   onScroll?: React.UIEventHandler<HTMLDivElement>;
   orientation?: "vertical" | "horizontal" | "both";
@@ -18,7 +19,7 @@ interface ScrollAreaProps
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   ScrollAreaProps
->(({ className, children, scrollBarClassName, thumbClassName, viewportClassName, viewportRef, onScroll, orientation = "vertical", ...props }, ref) => (
+>(({ className, children, scrollBarClassName, thumbClassName, viewportClassName, viewportStyle, viewportRef, onScroll, orientation = "vertical", ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
     className={cn("relative overflow-hidden flex flex-col", className)}
@@ -27,6 +28,7 @@ const ScrollArea = React.forwardRef<
     <ScrollAreaPrimitive.Viewport
       ref={viewportRef}
       onScroll={onScroll}
+      style={viewportStyle}
       className={cn(
         "h-full w-full rounded-[inherit] max-h-[inherit] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
         orientation !== "vertical" ? "[&>div]:!table [&>div]:!min-w-full" : "[&>div]:!block",

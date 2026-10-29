@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Waypoints,
   Copy,
@@ -366,6 +366,76 @@ interface TrajectoryStepCardProps {
   onOpenBrowser?: (url: string) => void;
 }
 
+function TrajectoryThinkingView({ thinking }: { thinking: string }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isInitiallyLong = useMemo(
+    () => (thinking || "").length > 200 || (thinking || "").split("\n").length > 4,
+    [thinking]
+  );
+  const [canScrollDown, setCanScrollDown] = useState(isInitiallyLong);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollHeight > el.clientHeight + 4;
+    const moreBelow = hasOverflow && el.scrollHeight - el.scrollTop - el.clientHeight > 6;
+    const moreAbove = hasOverflow && el.scrollTop > 6;
+    setCanScrollDown(moreBelow);
+    setCanScrollUp(moreAbove);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+  }, [thinking, checkScroll]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => checkScroll());
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [checkScroll]);
+
+  const maskStyle = useMemo(() => {
+    if (!canScrollDown && !canScrollUp) return undefined;
+    if (canScrollDown && canScrollUp) {
+      return "linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 32px), transparent 100%)";
+    }
+    if (canScrollDown) {
+      return "linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)";
+    }
+    return "linear-gradient(to bottom, transparent 0%, black 20px, black 100%)";
+  }, [canScrollDown, canScrollUp]);
+
+  return (
+    <div className="relative px-3 pb-3 pt-1 border-t border-[#282828] select-text">
+      <ScrollArea
+        viewportRef={viewportRef}
+        onScroll={checkScroll}
+        viewportStyle={
+          maskStyle
+            ? {
+                WebkitMaskImage: maskStyle,
+                maskImage: maskStyle,
+              }
+            : undefined
+        }
+        className="max-h-56 w-full pr-1 text-xs text-[#d4d4d4] font-sans leading-relaxed whitespace-pre-wrap select-text [&>div>div[style]]:!block"
+      >
+        {thinking}
+      </ScrollArea>
+      {canScrollDown && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-3 left-3 right-3 h-8 bg-gradient-to-t from-[#1b1b1b] via-[#1b1b1b]/80 to-transparent transition-opacity duration-200"
+        />
+      )}
+    </div>
+  );
+}
+
 export function TrajectoryStepCard({
   message,
   stepIndex,
@@ -457,9 +527,7 @@ export function TrajectoryStepCard({
               </button>
 
               {isThinkingExpanded && (
-                <div className="px-3 pb-3 pt-1 text-xs text-[#d4d4d4] font-sans leading-relaxed whitespace-pre-wrap border-t border-[#282828] select-text">
-                  {message.thinking}
-                </div>
+                <TrajectoryThinkingView thinking={message.thinking} />
               )}
             </div>
           )}
