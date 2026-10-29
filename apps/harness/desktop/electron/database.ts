@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { TranscriptWriter } from "./transcript-writer";
 import { DatabaseSync } from "node:sqlite";
 import { mergeTelemetry, reduceTelemetry, telemetryForHistory, type ChatTelemetry } from "../src/lib/chat-telemetry";
 import type { ConversationRightPaneState, ConversationUiPatch, SideConversationItem } from "../src/lib/conversation-store";
@@ -46,6 +47,8 @@ export class ConversationDatabase {
   private db: DatabaseSync;
   private harnessHome: string;
   private brainDir: string;
+  private transcriptWriter = new TranscriptWriter();
+  private deletedConversations = new Set<string>();
 
   constructor(harnessHome: string) {
     this.harnessHome = harnessHome;
@@ -218,7 +221,7 @@ export class ConversationDatabase {
   }
 
   public saveConversation(convo: ConversationRecord): void {
-    if (!convo?.id || convo.id.startsWith("side_conversation_") || convo.id.startsWith("side_chat_")) {
+    if (!convo?.id || this.deletedConversations.has(convo.id) || convo.id.startsWith("side_conversation_") || convo.id.startsWith("side_chat_")) {
       return;
     }
     const now = Date.now();
@@ -353,7 +356,10 @@ export class ConversationDatabase {
     return telemetry;
   }
 
-  public deleteConversation(id: string): void {
+  public async deleteConversation(id: string): Promise<void> {
+    // Revoke stale checkpoints and trailing stream events before the first await.
+    this.deletedConversations.add(id);
+    await this.flushTranscriptEvents(id);
     this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(id);
     this.db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
 
@@ -414,17 +420,24 @@ export class ConversationDatabase {
   }
 
   public appendTranscriptEvent(conversationId: string, event: any): void {
+    if (this.deletedConversations.has(conversationId)) return;
     try {
-      const logsDir = path.join(this.brainDir, conversationId, ".system_generated", "logs");
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      const transcriptPath = path.join(logsDir, "events.jsonl");
-      const line = JSON.stringify({ timestamp: new Date().toISOString(), ...event }) + "\n";
-      fs.appendFileSync(transcriptPath, line, "utf-8");
+      this.transcriptWriter.append(this.transcriptPath(conversationId), event);
     } catch (err) {
       console.warn("[ConversationDB] Failed to append transcript event:", err);
     }
+  }
+
+  private transcriptPath(conversationId: string): string {
+    return path.join(this.brainDir, conversationId, ".system_generated", "logs", "events.jsonl");
+  }
+
+  public flushTranscriptEvents(conversationId?: string): Promise<void> {
+    return this.transcriptWriter.flush(conversationId ? this.transcriptPath(conversationId) : undefined);
+  }
+
+  public closeTranscriptEvents(): Promise<void> {
+    return this.transcriptWriter.close();
   }
 
   public importLegacyConversations(convos: ConversationRecord[]): void {

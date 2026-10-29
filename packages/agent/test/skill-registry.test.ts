@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { formatSkillsForSystemPrompt } from "../src/const/const-agent.js";
 import {
   installPluginFromDirectory,
   pluginInvocationInstructions,
@@ -58,6 +59,19 @@ afterEach(() => {
 });
 
 describe("plugin lifecycle and shared skill resolution", () => {
+  it("installs the OpenUI reference on demand and disabling its plugin removes the skill from discovery", () => {
+    const bundled = fileURLToPath(new URL("../../../apps/harness/desktop/plugins/intelligence-ui/", import.meta.url));
+    const plugin = installPluginFromDirectory(bundled, "user", undefined, options);
+    const skills = resolveSkillRegistry(undefined, options).skills.filter(skill => skill.isEnabled);
+    const discovery = formatSkillsForSystemPrompt(skills);
+    expect(discovery).toContain("intelligence-ui:intelligence-ui");
+    expect(discovery.length).toBeLessThan(2000);
+    const reference = path.join(plugin.path, "skills", "intelligence-ui", "references", "openui.md");
+    expect(fs.readFileSync(reference, "utf8").length).toBeGreaterThan(30_000);
+    setCapabilityEnabled(plugin.id, false, undefined, options);
+    expect(resolveSkillRegistry(undefined, options).skills.filter(skill => skill.isEnabled)).toHaveLength(0);
+  });
+
   it("installs full files and exposes namespaced skills without an explicit mention", () => {
     const plugin = installPluginFromDirectory(
       source,

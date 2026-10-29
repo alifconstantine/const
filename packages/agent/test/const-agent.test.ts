@@ -340,8 +340,13 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
       tempDir
     );
     expect(res.isError).toBe(false);
-    expect(res.result).toContain("[Output truncated:");
-    expect(res.result).toContain("total characters");
+    expect(res.result).toContain("[OUTPUT TRUNCATED:");
+    expect(res.result).toContain("Full unclipped output");
+    expect(res.result.length).toBeLessThan(40_000);
+    const artifacts = await fs.readdir(path.join(tempDir, ".const", "artifacts"));
+    const outputFile = artifacts.find(file => file.startsWith("bash_"));
+    expect(outputFile).toBeDefined();
+    expect((await fs.readFile(path.join(tempDir, ".const", "artifacts", outputFile!), "utf8")).trim()).toBe("A".repeat(60000));
   });
 });
 

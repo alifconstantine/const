@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { resolveSkillRegistry, pluginInvocationInstructions } from "./skill-registry.js";
+import { nativeCapabilityForTool, nativePluginLoader, type NativeCapability } from "./deferred-tools.js";
 import type {
   AgentConfig,
   AgentEvent,
@@ -299,11 +300,12 @@ export function compactHistoryForContext(
   messages: AgentMessage[],
   preserveRecentCount = 4
 ): AgentMessage[] {
-  if (!messages || messages.length <= preserveRecentCount) {
+  if (!messages || messages.length === 0) {
     return messages;
   }
 
   const cutoffIndex = messages.length - preserveRecentCount;
+  const latestAssistantIndex = messages.findLastIndex(message => message.role === "assistant");
 
   // Identify the latest user message index
   let latestUserIndex = -1;
@@ -315,6 +317,13 @@ export function compactHistoryForContext(
   }
 
   return messages.map((m, index) => {
+    // Every result of the newest tool batch must reach the model at least once,
+    // including batches larger than preserveRecentCount.
+    if (m.role === "tool" && index > latestAssistantIndex) return m;
+    if (index >= cutoffIndex && m.role === "tool" && typeof m.content === "string" && m.content.length > 16_000 &&
+        ["read", "readfile", "bash", "powershell", "pwsh", "exec", "terminal", "sh", "runcommand", "runterminal"].includes(normalizeToolName(m.name ?? ""))) {
+      return { ...m, content: `${m.content.slice(0, 10_000)}\n\n[Previously observed tool output: ${m.content.length} characters; middle omitted. Read or search the source again for omitted details.]\n\n${m.content.slice(-6_000)}` };
+    }
     if (index >= cutoffIndex) {
       return m;
     }
@@ -821,6 +830,7 @@ export class ConstAgent {
     const deadline = timeoutMs > 0 ? setTimeout(() => { deadlineReached = true; this.abortController?.abort(); }, timeoutMs) : undefined;
 
     const conversationHistory: AgentMessage[] = [...messages];
+    const loadedNativePlugins = new Set<NativeCapability>();
     let toolVisionUnavailable = false;
     let currentTurn = 0;
     const runId = `llm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -925,11 +935,13 @@ export class ConstAgent {
 
         const isCompanion = this.config.sessionKind === "companion";
         const baseTools = isCompanion ? [] : this.config.tools ?? (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
+        const enabledNativePlugins = [...new Set(baseTools.map(tool => nativeCapabilityForTool(tool.function.name)))]
+          .filter((capability): capability is NativeCapability => !!capability && this.config.nativeCapabilityEnabled?.(capability) !== false);
         const activeTools = [...baseTools.filter((tool) => {
-          const capability = tool.function.name.startsWith("browser_") ? "browser-use"
-            : tool.function.name.startsWith("computer_") ? "computer-use" : undefined;
-          return !capability || this.config.nativeCapabilityEnabled?.(capability) !== false;
+          const capability = nativeCapabilityForTool(tool.function.name);
+          return !capability || (enabledNativePlugins.includes(capability) && (!this.config.deferNativeTools || loadedNativePlugins.has(capability)));
         }), ...(isCompanion ? [] : await this.config.externalTools?.(signal) ?? [])];
+        if (this.config.deferNativeTools && enabledNativePlugins.length) activeTools.push(nativePluginLoader(enabledNativePlugins));
         // Approval metadata is local policy, not part of a model provider's function schema.
         const requestTools = activeTools.map(({ requiresApproval: _approval, ...definition }) => definition);
 
@@ -939,7 +951,7 @@ export class ConstAgent {
             ? buildLearnSystemPrompt(workspacePath, this.config.systemPrompt)
             : buildConstSystemPrompt(workspacePath, this.config.systemPrompt, activeTools);
 
-        let effectiveSystemPrompt = systemPrompt;
+        const turnInstructions: string[] = [];
         const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === "user" && !message.toolObservationId);
         const latestUserText = typeof latestUserMessage?.content === "string"
           ? latestUserMessage.content
@@ -947,22 +959,24 @@ export class ConstAgent {
             ? latestUserMessage.content.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n")
             : "";
         const pluginInstructions = isCompanion ? "" : pluginInvocationInstructions(latestUserText, resolveSkillRegistry(workspacePath).plugins);
-        if (pluginInstructions) effectiveSystemPrompt += "\n\n" + pluginInstructions;
-        if (recoveryInstruction) effectiveSystemPrompt += "\n\n" + recoveryInstruction;
+        if (pluginInstructions) turnInstructions.push(pluginInstructions);
+        if (recoveryInstruction) turnInstructions.push(recoveryInstruction);
         if (this.config.softTurnBudget && currentTurn >= this.config.softTurnBudget) {
-          effectiveSystemPrompt += `\n\n[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns, hard limit: ${maxTurns} turns). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`;
+          turnInstructions.push(`[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns, hard limit: ${maxTurns} turns). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`);
         }
 
-        contextSystemPrompt = effectiveSystemPrompt;
+        contextSystemPrompt = systemPrompt;
         contextTools = requestTools;
         const historyForContext = compactHistoryForContext(conversationHistory);
+        // Request-only reminders preserve the stable prefix and never become human instructions in stored history.
+        const requestHistory: AgentMessage[] = [...historyForContext, ...(turnInstructions.length ? [{ role: "system" as const, content: turnInstructions.join("\n\n") }] : [])];
 
         const formattedMessages = [
           {
             role: "system",
-            content: effectiveSystemPrompt,
+            content: systemPrompt,
           },
-          ...historyForContext.map((m, mIdx) => {
+          ...requestHistory.map((m, mIdx) => {
             const item: Record<string, any> = {
               role: m.role,
               content: m.content ?? "",
@@ -989,9 +1003,9 @@ export class ConstAgent {
 
         // Token meter (DeepSeek Harness adaptation): Compute accurate context breakdown across system prompt, active tools, and message history
         const breakdown = calculateContextBreakdown({
-          systemPrompt: effectiveSystemPrompt,
+          systemPrompt,
           tools: requestTools,
-          messages: historyForContext,
+          messages: requestHistory,
         });
 
         const activeModelInfo = DEFAULT_MODELS.find((m) => m.id === this.config.model);
@@ -2075,7 +2089,13 @@ export class ConstAgent {
 
           const toolStartedAt = Date.now();
           let questionWaitingMs = 0;
-          const { result, isError, images } = await executeNativeTool(
+          const requestedPlugin = effectiveArgs.plugin as NativeCapability;
+          const isPluginLoader = tc.function.name === "load_plugin_tools" && this.config.deferNativeTools;
+          const canLoadPlugin = enabledNativePlugins.includes(requestedPlugin) && this.config.nativeCapabilityEnabled?.(requestedPlugin) !== false;
+          if (isPluginLoader && canLoadPlugin) loadedNativePlugins.add(requestedPlugin);
+          const { result, isError, images } = isPluginLoader
+            ? { result: canLoadPlugin ? `Loaded ${requestedPlugin}. Its native tool schemas are available in the next request. Follow the plugin's available skill.` : "This plugin is unavailable or disabled.", isError: !canLoadPlugin, images: undefined }
+            : await executeNativeTool(
             tc.function.name,
             effectiveArgs,
             workspacePath,
@@ -2133,6 +2153,20 @@ export class ConstAgent {
               imageHandler: this.config.imageHandler,
             }
           );
+
+          // Reading the plugin's own skill is also an on-demand activation, avoiding a second loader roundtrip.
+          if (this.config.deferNativeTools && !isError && ["read", "readfile"].includes(normalizeToolName(tc.function.name))) {
+            const readPath = extractPathArg(effectiveArgs);
+            if (readPath) {
+              const resolved = path.resolve(workspacePath, readPath);
+              for (const plugin of resolveSkillRegistry(workspacePath).plugins) {
+                if (!plugin.isEffective || !plugin.isEnabled || !plugin.skills.some(skill => skill.isEnabled && path.resolve(skill.filePath) === resolved)) continue;
+                for (const capability of plugin.nativeCapabilities ?? []) {
+                  if (enabledNativePlugins.includes(capability) && this.config.nativeCapabilityEnabled?.(capability) !== false) loadedNativePlugins.add(capability);
+                }
+              }
+            }
+          }
 
           onEvent({
             type: "tool_result",

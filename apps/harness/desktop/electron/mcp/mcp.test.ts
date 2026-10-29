@@ -420,6 +420,31 @@ test("real SDK initializes, discovers tools, routes calls, and rejects disabled 
     await server.close();
   }
 });
+test("on-demand catalog avoids connection discovery until search and still blocks disabled tools", async () => {
+  const f = fixture();
+  const server = await testServer();
+  try {
+    const record = f.store.save({ name: "Fixture", scope: "user", transport: "http", url: server.url, auth: "none" });
+    const tools = await f.service.tools(undefined, undefined, 0);
+    assert.deepEqual(tools.map(tool => tool.function.name), ["mcp_search_tools", "mcp_call_tool"]);
+    assert.equal(server.methods.length, 0);
+    const result = await f.service.execute("mcp_search_tools", { query: "query" });
+    assert.equal(result.isError, false);
+    const tool = JSON.parse(result.result).tools[0];
+    assert.ok(tool?.inputSchema);
+    assert.ok(server.methods.includes("tools/list"));
+    const called = await f.service.execute("mcp_call_tool", { toolName: tool.toolName, arguments: { query: "deferred" } });
+    assert.equal(called.isError, false);
+    assert.match(called.result, /deferred/);
+    f.store.save({ ...record, enabled: false });
+    assert.deepEqual(await f.service.tools(undefined, undefined, 0), []);
+    assert.equal((await f.service.execute("mcp_call_tool", { toolName: tool.toolName, arguments: { query: "blocked" } })).isError, true);
+  } finally {
+    await f.cleanup();
+    await server.close();
+  }
+});
+
 test("expired MCP sessions are rediscovered for the next call without replaying an uncertain action", async () => {
   const f = fixture();
   const server = await testServer();

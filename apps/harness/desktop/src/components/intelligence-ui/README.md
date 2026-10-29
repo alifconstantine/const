@@ -4,9 +4,12 @@ The main chat and side chat share `AssistantResponse`. Ordinary Markdown keeps
 its existing renderer; explicit `openui-lang` fences render with OpenUI's React
 runtime. User messages and normal code examples are never interpreted as UI.
 
-`schema.ts` defines the allowed components and positional prop order. Both the
-Electron system prompt (`prompt.ts`) and React library (`library.tsx`) derive
-from these contracts. Existing tools and agent permissions remain in the agent
+`schema.ts` defines the allowed components and positional prop order. The
+generated prompt fixture (`prompt.ts`), bundled Intelligence UI skill reference,
+and React library (`library.tsx`) use the component contracts. The full OpenUI
+reference is loaded through the skill when needed, rather than injected into
+every Electron system prompt. Regenerate it with `generate:intelligence-prompt`.
+Existing tools and agent permissions remain in the agent
 execution path. This library exposes no tool provider or arbitrary code/HTML.
 Every rendered component also validates its props with Zod: the streaming parser
 alone does not enforce constraints such as array limits or identifier patterns.

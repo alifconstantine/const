@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
-import { sanitizeInlineMarkdown } from "../../lib/safe-markdown";
+import { isPlainInlineText, sanitizeInlineMarkdown } from "../../lib/safe-markdown";
 import { Check, Copy } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { ResponseTable } from "../intelligence-ui/response-table";
-import { MermaidBlock } from "./mermaid-block";
 import { FileIcon } from "./file-icon";
 import { renderMentionBadgeHtml } from "./rich-mention-editor";
 import { useTranslation } from "../../lib/i18n";
 import { resolveMarkdownLink, type ResolvedMarkdownLink } from "./markdown-links";
+
+const MermaidBlock = React.lazy(() => import("./mermaid-block").then(module => ({ default: module.MermaidBlock })));
 
 export { resolveMarkdownLink, type ResolvedMarkdownLink };
 
@@ -262,7 +263,7 @@ const TokenRenderer = React.memo(function TokenRenderer({
       const code = token as Tokens.Code;
       const lang = (code.lang || "text").toLowerCase().trim().split(/[\s:{]/)[0] || "";
       if (lang === "mermaid") {
-        return <MermaidBlock code={code.text} isStreaming={isStreaming} />;
+        return <React.Suspense fallback={<pre className="whitespace-pre-wrap">{code.text}</pre>}><MermaidBlock code={code.text} isStreaming={isStreaming} /></React.Suspense>;
       }
       return <CodeBlock code={code.text} language={code.lang || "text"} />;
     }
@@ -449,6 +450,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
 const InlineRenderer = React.memo(function InlineRenderer({ text }: { text: string }) {
   // Parse inline markdown: bold, italic, inline code, links
   const html = useMemo(() => {
+    if (isPlainInlineText(text)) return null;
     const parsed = marked.parseInline(text, { gfm: true, breaks: true });
     return typeof parsed === "string" ? sanitizeInlineMarkdown(parsed) : null;
   }, [text]);

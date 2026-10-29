@@ -30,6 +30,9 @@ async function generate() {
 
   const outPath = path.resolve(__dirname, "../src/components/intelligence-ui/prompt-text.ts");
   fs.writeFileSync(outPath, "export const INTELLIGENCE_UI_PROMPT = " + JSON.stringify(prompt) + ";\n");
+  const referencePath = path.resolve(__dirname, "../plugins/intelligence-ui/skills/intelligence-ui/references/openui.md");
+  fs.mkdirSync(path.dirname(referencePath), { recursive: true });
+  fs.writeFileSync(referencePath, prompt + "\n");
   console.log(`Generated ${outPath} (${prompt.length} chars)`);
 }
 

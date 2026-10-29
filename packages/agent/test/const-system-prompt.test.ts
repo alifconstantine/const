@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildConstSystemPrompt, buildLearnSystemPrompt, createConstAgent } from "../src/const/const-agent.js";
+import { buildConstSystemPrompt, buildLearnSystemPrompt, createConstAgent, compactHistoryForContext } from "../src/const/const-agent.js";
 import { CONST_DEFAULT_TOOLS } from "../src/const/tools.js";
 import { buildToolGuidance, promptFileExcerpt } from "../src/const/prompt-guidance.js";
-import { pluginInvocationInstructions } from "../src/const/skill-registry.js";
+import { pluginInvocationInstructions, resolveSkillRegistry } from "../src/const/skill-registry.js";
 import type { AgentConfig } from "../src/const/types.js";
 import { normalizeUiMessages } from "../../../apps/harness/desktop/src/lib/conversation-store";
 
 vi.mock("../src/const/skill-registry.js", () => ({
-  resolveSkillRegistry: () => ({ skills: [], plugins: [] }),
+  resolveSkillRegistry: vi.fn(() => ({ skills: [], plugins: [] })),
   pluginInvocationInstructions: vi.fn(() => ""),
 }));
 
@@ -18,6 +18,7 @@ let workspace: string;
 beforeEach(async () => {
   workspace = await mkdtemp(path.join(tmpdir(), "const-prompt-test-"));
   vi.mocked(pluginInvocationInstructions).mockClear();
+  vi.mocked(resolveSkillRegistry).mockReturnValue({ skills: [], plugins: [] });
 });
 afterEach(async () => {
   vi.unstubAllGlobals();
@@ -66,6 +67,53 @@ describe("context excerpts", () => {
 });
 
 describe("request-specific capability guidance", () => {
+  it("loads only the requested native plugin on demand", async () => {
+    let browserCalls = 0;
+    const { requests, run } = fixture(turn => turn === 1
+      ? { delta: { tool_calls: [{ index: 0, id: "load", type: "function", function: { name: "load_plugin_tools", arguments: '{"plugin":"browser-use"}' } }] }, finish_reason: "tool_calls" }
+      : turn === 2
+        ? { delta: { tool_calls: [{ index: 0, id: "snapshot", type: "function", function: { name: "browser_snapshot", arguments: '{}' } }] }, finish_reason: "tool_calls" }
+        : { delta: { content: "Inspected." } }, {
+      deferNativeTools: true,
+      nativeCapabilityEnabled: () => true,
+      browserHandler: async () => { browserCalls++; return { result: "Page inspected", isError: false }; },
+    });
+    await run("Inspect the browser page");
+    expect(requests[0]!.tools?.some(tool => /^(browser_|computer_)/.test(tool.function.name))).toBe(false);
+    expect(requests[0]!.messages[0]!.content).not.toContain("NATIVE BROWSER AUTOMATION");
+    expect(requests[1]!.tools?.some(tool => tool.function.name === "browser_snapshot")).toBe(true);
+    expect(requests[1]!.tools?.some(tool => tool.function.name.startsWith("computer_"))).toBe(false);
+    expect(browserCalls).toBe(1);
+  });
+
+  it("rejects plugin loading when disabled while a model request is in flight", async () => {
+    let enabled = true;
+    const { requests, run } = fixture(turn => {
+      enabled = false;
+      return turn === 1
+        ? { delta: { tool_calls: [{ index: 0, id: "load", type: "function", function: { name: "load_plugin_tools", arguments: '{"plugin":"computer-use"}' } }] }, finish_reason: "tool_calls" }
+        : { delta: { content: "Plugin is disabled." } };
+    }, { deferNativeTools: true, nativeCapabilityEnabled: () => enabled });
+    const history = await run();
+    expect(history.some(message => message.role === "tool" && String(message.content).includes("unavailable or disabled"))).toBe(true);
+    expect(requests[1]!.tools?.some(tool => /^(browser_|computer_|load_plugin_tools$)/.test(tool.function.name))).toBe(false);
+  });
+
+  it("reading the installed plugin skill activates schemas without an extra loader roundtrip", async () => {
+    const skillPath = path.join(workspace, "SKILL.md");
+    await writeFile(skillPath, "Inspect the browser using browser_snapshot.");
+    vi.mocked(resolveSkillRegistry).mockReturnValue({ skills: [], plugins: [{
+      name: "browser-use", isEffective: true, isEnabled: true, nativeCapabilities: ["browser-use"],
+      skills: [{ isEnabled: true, filePath: skillPath }],
+    } as any] });
+    const { requests, run } = fixture(turn => turn === 1
+      ? { delta: { tool_calls: [{ index: 0, id: "read", type: "function", function: { name: "read", arguments: JSON.stringify({ path: skillPath }) } }] }, finish_reason: "tool_calls" }
+      : { delta: { content: "Ready." } }, { deferNativeTools: true, nativeCapabilityEnabled: () => true });
+    await run();
+    expect(requests[1]!.tools?.some(tool => tool.function.name === "browser_snapshot")).toBe(true);
+    expect(requests[1]!.tools?.some(tool => tool.function.name.startsWith("computer_"))).toBe(false);
+  });
+
   it("removes disabled protocols from the next request as well as its schemas", async () => {
     await writeFile(path.join(workspace, "input.txt"), "Fixture");
     let enabled = true;
@@ -111,6 +159,17 @@ describe("request-specific capability guidance", () => {
 });
 
 describe("recovery preserves the actual user request", () => {
+  it("turn budgets change only the request reminder, not the system prefix or saved human request", async () => {
+    await writeFile(path.join(workspace, "file.txt"), "Fixture");
+    const { requests, run } = fixture(turn => turn === 1
+      ? { delta: { tool_calls: [{ index: 0, id: "read", type: "function", function: { name: "read", arguments: '{"path":"file.txt"}' } }] }, finish_reason: "tool_calls" }
+      : { delta: { content: "Done." } }, { softTurnBudget: 1 });
+    const history = await run();
+    expect(requests[1]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
+    expect(requests[0]!.messages.at(-1)!.content).toContain("reached turn 1");
+    expect(requests[1]!.messages.at(-1)!.content).toContain("reached turn 2");
+    expect(history.some(message => message.role === "system")).toBe(false);
+  });
   it("recovers a truncated read-only answer without inventing a user write instruction", async () => {
     const { requests, run } = fixture(turn => turn === 1
       ? { delta: { content: "Hasil audit awal yang terpotong" }, finish_reason: "length" }
@@ -118,7 +177,9 @@ describe("recovery preserves the actual user request", () => {
     const history = await run();
     expect(requests).toHaveLength(2);
     expect(requests[1]!.messages.filter(message => message.role === "user")).toEqual([{ role: "user", content: "Audit kode saja; jangan ubah file." }]);
-    expect(requests[1]!.messages[0]!.content).toContain("do not turn an explanation or review into file creation");
+    expect(requests[1]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
+    expect(requests[1]!.messages.at(-1)!.role).toBe("system");
+    expect(requests[1]!.messages.at(-1)!.content).toContain("do not turn an explanation or review into file creation");
     expect(requests[1]!.messages[0]!.content).toContain("user's primary language");
     expect(requests[1]!.messages.some(message => message.reasoning_content?.includes("Hasil audit awal yang terpotong"))).toBe(true);
     const visibleText = normalizeUiMessages(history).filter(message => message.role === "assistant").map(message => message.content).join("");
@@ -133,7 +194,8 @@ describe("recovery preserves the actual user request", () => {
       : { delta: { content: "Audit selesai." } });
     await run();
     expect(requests).toHaveLength(3);
-    expect(requests[2]!.messages[0]!.content).toContain("Keep read-only tasks read-only");
+    expect(requests[2]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
+    expect(requests[2]!.messages.at(-1)!.content).toContain("Keep read-only tasks read-only");
     expect(JSON.stringify(requests)).not.toContain("concrete file modifications");
     expect(requests[2]!.messages.filter(message => message.role === "user")).toHaveLength(1);
     expect(await readdir(workspace)).toEqual([]);
@@ -149,5 +211,27 @@ describe("recovery preserves the actual user request", () => {
     await run("Use @diagram to inspect the app");
     expect(requests[1]!.messages.some(message => Array.isArray(message.content))).toBe(true);
     expect(vi.mocked(pluginInvocationInstructions).mock.calls.map(args => args[0])).toEqual(["Use @diagram to inspect the app", "Use @diagram to inspect the app"]);
+  });
+});
+
+describe("tool result context budgets", () => {
+  it("preserves every unseen result even when one tool batch exceeds the recent-message window", () => {
+    const results = Array.from({ length: 8 }, (_, index) => ({ role: "tool" as const, name: "read", tool_call_id: `read_${index}`, content: "x".repeat(40_000) }));
+    const history = [{ role: "user" as const, content: "Read these files" }, { role: "assistant" as const, content: "Reading" }, ...results];
+    const compacted = compactHistoryForContext(history);
+    expect(compacted.slice(2)).toEqual(results);
+    expect(compacted[2]).toBe(results[0]);
+  });
+
+  it("bounds already observed large read output within the recent window without mutating saved history", () => {
+    const content = "HEAD" + "x".repeat(40_000) + "TAIL";
+    const original = { role: "tool" as const, name: "read", tool_call_id: "read", content };
+    const history = [{ role: "assistant" as const, content: "Reading" }, original, { role: "assistant" as const, content: "Next action" }, { role: "tool" as const, content: "Newest result" }];
+    const compacted = compactHistoryForContext(history);
+    expect(compacted[1]!.content.length).toBeLessThan(17_000);
+    expect(compacted[1]!.content).toContain("HEAD");
+    expect(compacted[1]!.content).toContain("TAIL");
+    expect(original.content).toBe(content);
+    expect(compacted[3]).toBe(history[3]);
   });
 });

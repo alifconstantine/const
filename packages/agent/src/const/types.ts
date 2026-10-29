@@ -274,6 +274,8 @@ export interface AgentConfig {
   externalTools?: (signal?: AbortSignal) => Promise<NativeToolDefinition[]>;
   externalToolHandler?: (name: string, args: Record<string, any>, signal?: AbortSignal) => Promise<ToolExecutionResult>;
   nativeCapabilityEnabled?: (capability: "browser-use" | "computer-use") => boolean;
+  /** Advertise browser/computer schemas only after loading their plugin or skill. */
+  deferNativeTools?: boolean;
   systemPrompt?: string;
   workspacePath?: string;
   learnId?: string;

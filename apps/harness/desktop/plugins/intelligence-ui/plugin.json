@@ -1,0 +1,9 @@
+{
+  "name": "intelligence-ui",
+  "version": "1.0.0",
+  "description": "Interactive chat responses with OpenUI tables, charts, forms and dashboards.",
+  "author": { "name": "Const" },
+  "interface": { "displayName": "Intelligence UI", "icon": "blocks" },
+  "entrypoint": "intelligence-ui",
+  "defaultInstalled": true
+}

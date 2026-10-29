@@ -1172,6 +1172,7 @@ export class SubAgentManager {
           externalTools: agentDef.readOnly ? undefined : context.parentConfig.externalTools,
           externalToolHandler: agentDef.readOnly ? undefined : context.parentConfig.externalToolHandler,
           nativeCapabilityEnabled: context.parentConfig.nativeCapabilityEnabled,
+          deferNativeTools: context.parentConfig.deferNativeTools,
         };
 
         const childAgent = new ConstAgent(childConfig);

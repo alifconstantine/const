@@ -7,7 +7,7 @@ import { ConversationDatabase } from "./database";
 import { selectAgentAutosaveMessages } from "./agent-history";
 import { AgentSessionRegistry } from "./agent-sessions";
 
-test("cancelled run autosave retains renderer traces and duration after reopening", () => {
+test("cancelled run autosave retains renderer traces and duration after reopening", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-history-"));
   let database: ConversationDatabase | undefined;
   try {
@@ -20,6 +20,7 @@ test("cancelled run autosave retains renderer traces and duration after reopenin
     const conversation = { id: "session_test", title: "Background job", project: dir, createdAt: 1, updatedAt: 2, messages };
     database.saveConversation(conversation);
     database.appendTranscriptEvent(conversation.id, { type: "tool_result", result: "server ready" });
+    await database.flushTranscriptEvents(conversation.id);
     database.saveConversation({ ...conversation, messages: selectAgentAutosaveMessages(
       database.getConversation(conversation.id)!.messages,
       [{ role: "user", content: messages[0]!.content }, { role: "assistant", content: "partial raw response" }],
@@ -49,6 +50,30 @@ test("raw history is the fallback when renderer has not saved a response for the
   const updated = [...existing.slice(0, -1), { role: "assistant", content: "new answer" }];
   assert.equal(selectAgentAutosaveMessages(existing, updated), updated);
   assert.equal(selectAgentAutosaveMessages(existing, []), existing);
+});
+
+test("deleting a conversation drains buffered events before removing its logs", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-history-delete-"));
+  const database = new ConversationDatabase(dir);
+  try {
+    const conversation = { id: "deleted", title: "Delete", project: dir, createdAt: 1, updatedAt: 1, messages: [] };
+    database.saveConversation(conversation);
+    database.appendTranscriptEvent("deleted", { type: "token", token: "Buffered" });
+    const deletion = database.deleteConversation("deleted");
+    database.appendTranscriptEvent("deleted", { type: "token", token: "During deletion" });
+    database.saveConversation(conversation); // A stale renderer checkpoint during flush.
+    await deletion;
+    database.appendTranscriptEvent("deleted", { type: "done" });
+    database.saveConversation(conversation); // An agent autosave after deletion.
+    await database.flushTranscriptEvents();
+    assert.equal(database.getConversation("deleted"), null);
+    assert.equal(fs.existsSync(path.join(dir, "brain", "deleted")), false);
+  } finally {
+    await database.flushTranscriptEvents();
+    (database as any).db.close();
+    assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir()) + path.sep));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("aborting keeps run ownership until cleanup and cannot release a replacement", () => {

@@ -60,7 +60,7 @@ import { McpService } from "./mcp/service";
 import type { McpSaveInput } from "../src/lib/mcp/types";
 import { fetchSkillsCatalog } from "../src/lib/skills/skills-sh-service";
 import { WINDOWS_APP_ID, loadWindowBranding, applyWindowBranding } from "./window-branding";
-import { INTELLIGENCE_UI_PROMPT } from "../src/components/intelligence-ui/prompt";
+import { createStreamBatcher } from "../src/lib/stream-batcher";
 import { ROUTER_DEFAULT_MODELS as DEFAULT_MODELS, DEFAULT_ROUTER_MODEL_ID } from "../src/lib/router-models";
 import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/model-identity";
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
@@ -118,10 +118,18 @@ const mcpService = new McpService(new McpStore(harnessHomeDir, {
   for (const window of BrowserWindow.getAllWindows()) sendDesktopEvent(window.webContents, "mcp:changed");
 }, (url) => shell.openExternal(url));
 let mcpShuttingDown = false;
+let mcpShutdownComplete = false;
 app.on("before-quit", (event) => {
+  if (mcpShutdownComplete) return;
+  event.preventDefault();
   if (mcpShuttingDown) return;
-  event.preventDefault(); mcpShuttingDown = true;
-  void mcpService.invalidate().finally(() => app.quit());
+  mcpShuttingDown = true;
+  // Disconnecting integrations can produce final events. Seal and drain the
+  // logger afterwards so no accepted batch is left behind during shutdown.
+  void mcpService.invalidate()
+    .catch(error => console.warn("[Electron Main] MCP shutdown failed:", error))
+    .then(() => conversationDb.closeTranscriptEvents())
+    .finally(() => { mcpShutdownComplete = true; app.quit(); });
 });
 
 // Legacy root config fallback / migration
@@ -1541,7 +1549,7 @@ app.whenReady().then(() => {
       }
 
       // Assemble personalization systemPrompt from user configuration
-      const personalizationParts: string[] = [INTELLIGENCE_UI_PROMPT];
+      const personalizationParts: string[] = [];
       if (config.personalizationWorkRole?.trim()) {
         personalizationParts.push(`Primary Domain / Role of User: ${config.personalizationWorkRole.trim()}`);
       }
@@ -1557,7 +1565,8 @@ app.whenReady().then(() => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
-        externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
+        externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
+        deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
         nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
@@ -1631,11 +1640,16 @@ app.whenReady().then(() => {
         sendDesktopEvent(win.webContents, "agent:session-started", { conversationId: convoId, runId });
       }
 
-      const eventForwarder = createAgentEventForwarder((agentEvent) => {
+      const streamBatcher = createStreamBatcher((agentEvent) => {
         if (!activeSessions.owns(convoId, runId)) return false;
         const live = remoteLive.get(convoId);
         if (live) updateRemoteSessionState(live, agentEvent);
         if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, runId, remoteSequence: live?.revision });
+        return true;
+      });
+      const eventForwarder = createAgentEventForwarder((agentEvent) => {
+        if (!activeSessions.owns(convoId, runId)) return false;
+        streamBatcher.forward(agentEvent);
         return true;
       });
       try {
@@ -1684,6 +1698,7 @@ app.whenReady().then(() => {
           }
         );
 
+        streamBatcher.flush();
         // A replaced run must never overwrite its successor's history.
         if (!activeSessions.owns(convoId, runId)) {
           return { success: false, aborted: true, messages: updatedMessages };
@@ -1745,6 +1760,8 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
+        streamBatcher.flush();
+        await conversationDb.flushTranscriptEvents(convoId);
         const live = remoteLive.get(convoId);
         if (live) { remoteRevisions.set(convoId, { runId, revision: live.revision }); if (remoteRevisions.size > 200) remoteRevisions.delete(remoteRevisions.keys().next().value!); }
         remoteLive.delete(convoId);
@@ -2109,7 +2126,7 @@ app.whenReady().then(() => {
 
   handleDesktopIpc("conversations:delete", async (event, id: string) => {
     await mcpService.releaseConversation(id);
-    conversationDb.deleteConversation(id);
+    await conversationDb.deleteConversation(id);
     broadcastLocalConversationChange(event, id);
     return true;
   });
@@ -2567,7 +2584,8 @@ app.whenReady().then(() => {
         baseUrl,
         apiKey,
         model,
-        externalTools: (signal) => mcpService.tools(targetWorkspace, signal),
+        externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
+        deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
         nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
@@ -2616,15 +2634,12 @@ app.whenReady().then(() => {
         blockerId = powerSaveBlocker.start("prevent-app-suspension");
       } catch {}
 
+      const scheduledStream = createStreamBatcher(agentEvent => {
+        if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, isScheduled: true });
+      });
       try {
         const updatedMessages = await agent.run(messagesToRun, (agentEvent: any) => {
-          if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "agent:stream-event", {
-              ...agentEvent,
-              conversationId: convoId,
-              isScheduled: true,
-            });
-          }
+          scheduledStream.forward(agentEvent);
           conversationDb.appendTranscriptEvent(convoId, agentEvent);
         });
 
@@ -2650,6 +2665,8 @@ app.whenReady().then(() => {
 
         return { sessionId: convoId };
       } finally {
+        scheduledStream.flush();
+        await conversationDb.flushTranscriptEvents(convoId);
         computerController.releaseSession(convoId);
         if (blockerId !== null && powerSaveBlocker.isStarted(blockerId)) {
           try {

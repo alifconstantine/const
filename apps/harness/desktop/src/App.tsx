@@ -1499,7 +1499,7 @@ export function AuthenticatedContent({
     return list;
   }, [messages]);
 
-  const handleOpenFileDiff = (mutation: FileMutationRecord) => {
+  const handleOpenFileDiff = useCallback((mutation: FileMutationRecord) => {
     setIsRightSidebarOpen(true);
     const filePath = mutation.filePath || mutation.targetFile;
     const fileName =
@@ -1546,9 +1546,9 @@ export function AuthenticatedContent({
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
-  };
+  }, [rightPaneTabs]);
 
-  const handleOpenFilePreview = (filePath: string, content?: string) => {
+  const handleOpenFilePreview = useCallback((filePath: string, content?: string) => {
     setIsRightSidebarOpen(true);
     const fileName =
       filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
@@ -1587,7 +1587,7 @@ export function AuthenticatedContent({
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
-  };
+  }, [rightPaneTabs]);
 
   useEffect(() => {
     if (!remote) return;
@@ -1596,7 +1596,7 @@ export function AuthenticatedContent({
     return () => window.removeEventListener("const:remote-open-directory", open);
   }, [remote, handleOpenFilePreview]);
 
-  const handleOpenReview = (mutationsToReview?: FileMutationRecord[]) => {
+  const handleOpenReview = useCallback((mutationsToReview?: FileMutationRecord[]) => {
     setIsRightSidebarOpen(true);
     if (mutationsToReview && mutationsToReview.length > 0) {
       setSidebarReviewMutations(mutationsToReview);
@@ -1616,7 +1616,7 @@ export function AuthenticatedContent({
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
-  };
+  }, [rightPaneTabs]);
 
   const conversationsRef = React.useRef(conversations);
   useEffect(() => {
@@ -1896,6 +1896,10 @@ export function AuthenticatedContent({
     }
     return foundAgents.length > 0 ? foundAgents : null;
   }, [conversationSubAgents, conversationId, messages]);
+  const activeSubAgentsRef = useRef(activeSubAgents);
+  useEffect(() => {
+    activeSubAgentsRef.current = activeSubAgents;
+  }, [activeSubAgents]);
 
   const handleKillSubAgent = async (agentId: string) => {
     if (window.electron?.killSubAgent) {
@@ -1916,7 +1920,7 @@ export function AuthenticatedContent({
     });
   };
 
-  const handleOpenSubAgent = (subAgent: SubAgentItem) => {
+  const handleOpenSubAgent = useCallback((subAgent: SubAgentItem) => {
     const tabId = `subagent_${subAgent.id}`;
     const existingTab = rightPaneTabs.find((t) => t.id === tabId || t.subAgentId === subAgent.id);
     if (existingTab) {
@@ -1925,7 +1929,7 @@ export function AuthenticatedContent({
       return;
     }
 
-    const index = activeSubAgents?.findIndex((a) => a.id === subAgent.id) ?? -1;
+    const index = activeSubAgentsRef.current?.findIndex((a) => a.id === subAgent.id) ?? -1;
     const handlePrefix = subAgent.name ? `${subAgent.name}: ` : index >= 0 ? `Sub-agent ${index + 1}: ` : "Sub-agent: ";
     const displayTitle = subAgent.description.toLowerCase().startsWith("sub-agent")
       ? subAgent.description
@@ -1943,9 +1947,9 @@ export function AuthenticatedContent({
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
     setIsRightSidebarOpen(true);
-  };
+  }, [rightPaneTabs]);
 
-  const handleOpenSubAgentFromTrace = (step: any) => {
+  const handleOpenSubAgentFromTrace = useCallback((step: any) => {
     const args = step.args || {};
     const resultStr = typeof step.result === "string" ? step.result : "";
     const idMatch = resultStr.match(/id="([^"]+)"/);
@@ -1959,7 +1963,7 @@ export function AuthenticatedContent({
       args.label ||
       (typeof promptText === "string" && promptText ? promptText.slice(0, 50) : "Subagent Task");
 
-    const matching = activeSubAgents?.find(
+    const matching = activeSubAgentsRef.current?.find(
       (a) =>
         (extractedId && a.id === extractedId) ||
         (extractedName && a.name && a.name.toLowerCase() === String(extractedName).toLowerCase()) ||
@@ -2000,9 +2004,9 @@ export function AuthenticatedContent({
     };
 
     handleOpenSubAgent(fallbackAgent);
-  };
+  }, [handleOpenSubAgent]);
 
-  const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
+  const handleAnswerQuestion = useCallback(async (toolCallId: string, answer: any) => {
     setPendingQuestions((prev) => {
       const next = new Map(prev);
       next.delete(conversationId);
@@ -2030,7 +2034,7 @@ export function AuthenticatedContent({
     if (window.electron?.answerQuestion) {
       await window.electron.answerQuestion(toolCallId, answer);
     }
-  };
+  }, [conversationId]);
 
   useEffect(() => {
     if (!isExecuting) {
@@ -2078,7 +2082,7 @@ export function AuthenticatedContent({
     };
   }, [expandedUserMessageId]);
 
-  const handleCopyMessage = async (id: string, text: string) => {
+  const handleCopyMessage = useCallback(async (id: string, text: string) => {
     try {
       const isAssistant = messagesRef.current.find((message) => message.id === id)?.role === "assistant";
       await navigator.clipboard.writeText(isAssistant ? assistantResponseToText(text) : text);
@@ -2088,33 +2092,35 @@ export function AuthenticatedContent({
     } catch {
       toast.error(t("toast.copyFailed"));
     }
-  };
+  }, [t]);
 
-  const handleFeedback = (id: string, type: "good" | "bad") => {
+  const handleFeedback = useCallback((id: string, type: "good" | "bad") => {
     setFeedbackMap((prev) => ({
       ...prev,
       [id]: prev[id] === type ? undefined! : type,
     }));
     toast.success(type === "good" ? t("toast.responseHelpful") : t("toast.feedbackRecorded"));
-  };
+  }, [t]);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
-  const handleStartEditMessage = (id: string) => {
+  const handleStartEditMessage = useCallback((id: string) => {
     if (isExecuting) return;
     setEditingMessageId(id);
-  };
+  }, [isExecuting]);
 
-  const handleCancelEditMessage = () => {
+  const handleCancelEditMessage = useCallback(() => {
     setEditingMessageId(null);
-  };
+  }, []);
 
-  const handleSubmitEditMessage = async (
+  const handleSubmitEditMessage = useCallback(async (
     messageId: string,
     newContent: string,
     messageIdx: number,
     attachments?: AttachedFile[]
   ) => {
+    const messages = messagesRef.current;
+    const conversations = conversationsRef.current;
     if (isExecuting) {
       toast.warning(t("toast.waitBeforeEditing"));
       return;
@@ -2237,9 +2243,9 @@ export function AuthenticatedContent({
         activeSessionMessagesRef.current.delete(conversationId);
       }
     }
-  };
+  }, [isExecuting, t, conversationId, activeModelItem, currentProject, currentMode, token]);
 
-  const renderMessageAttachment = (att: AttachedFile) => {
+  const renderMessageAttachment = useCallback((att: AttachedFile) => {
     return (
       <MessageAttachmentItem
         key={att.id}
@@ -2247,7 +2253,7 @@ export function AuthenticatedContent({
         onPreview={(item) => setPreviewMedia(item)}
       />
     );
-  };
+  }, []);
 
   // Clean display project name (e.g. "small-web" instead of full path)
   const displayProject = useMemo(() => {
@@ -2615,7 +2621,7 @@ export function AuthenticatedContent({
         if (target) {
           target.telemetry = telemetry;
           if (telemetry.context) target.contextUsage = telemetry.context;
-          saveConversation(target);
+          cacheConversation(target);
         }
         for (const request of Object.values(telemetry.requests)) {
           if (request.totalTokens !== undefined && request !== previous?.requests[request.requestId]) localDb.recordModelRequest(targetConvoId, request).catch(() => {});
@@ -3410,7 +3416,7 @@ export function AuthenticatedContent({
   };
   handleSendMessageRef.current = handleSendMessage;
 
-  const handleRollback = async (record: FileMutationRecord) => {
+  const handleRollback = useCallback(async (record: FileMutationRecord) => {
     if (!window.electron?.rollbackFile) {
       toast.error(t("toast.rollbackDesktopOnly"));
       return;
@@ -3442,9 +3448,9 @@ export function AuthenticatedContent({
     } catch (err: any) {
       toast.error(err.message || "Rollback error");
     }
-  };
+  }, [t, conversationId]);
 
-  const handleRollbackAll = async (records: FileMutationRecord[]) => {
+  const handleRollbackAll = useCallback(async (records: FileMutationRecord[]) => {
     if (!window.electron?.rollbackFile) {
       toast.error(t("toast.rollbackDesktopOnly"));
       return;
@@ -3485,17 +3491,18 @@ export function AuthenticatedContent({
         return next;
       });
     }
-  };
+  }, [t, conversationId]);
 
 
   const handleIntelligenceSubmitMessage = useCallback((prompt: string) => {
-    handleSendMessage({
+    const model = activeModelItemRef.current;
+    handleSendMessageRef.current?.({
       prompt,
-      project: currentProject,
-      mode: currentMode,
-      model: activeModelItem?.id || activeModelItem?.name,
+      project: currentProjectRef.current,
+      mode: currentModeRef.current,
+      model: model?.id || model?.name,
     });
-  }, [handleSendMessage, currentProject, currentMode, activeModelItem]);
+  }, []);
 
   const handleAbort = async (targetId?: string) => {
     const rawTarget =
@@ -4594,11 +4601,11 @@ export function AuthenticatedContent({
                       onIntelligenceSubmit={handleIntelligenceSubmitMessage}
                       idx={idx}
                       isExecuting={isExecuting && idx === messages.length - 1}
-                      liveDurationMs={liveDurationMs}
-                      activeApproval={activeApproval}
-                      expandedUserMessageId={expandedUserMessageId}
-                      onToggleExpandUserMessage={(id) => setExpandedUserMessageId(id)}
-                      copiedId={copiedId}
+                      liveDurationMs={isExecuting && idx === messages.length - 1 ? liveDurationMs : undefined}
+                      activeApproval={idx === messages.length - 1 ? activeApproval : undefined}
+                      expandedUserMessageId={expandedUserMessageId === msg.id ? expandedUserMessageId : null}
+                      onToggleExpandUserMessage={setExpandedUserMessageId}
+                      copiedId={copiedId === msg.id ? copiedId : null}
                       onCopyMessage={handleCopyMessage}
                       onFeedback={handleFeedback}
                       feedback={feedbackMap[msg.id]}

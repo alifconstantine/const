@@ -1048,6 +1048,9 @@ export class McpService {
         (this.retryAfter.get(record.id) ?? 0) <= Date.now(),
     );
     const definitions: NativeToolDefinition[] = [];
+    // Desktop chat advertises a small catalog without waiting for network/stdio
+    // discovery. Search connects integrations only when the model needs them.
+    if (maxDirectTools === 0) return eligible.length ? CATALOG_TOOLS : [];
     let supportsApps = false;
     await Promise.all(
       eligible.map(async (record) => {
@@ -1117,6 +1120,7 @@ export class McpService {
           },
         },
       });
+    definitions.sort((a, b) => a.function.name.localeCompare(b.function.name));
     return definitions.length > maxDirectTools ? CATALOG_TOOLS : definitions;
   }
   async execute(

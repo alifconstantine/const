@@ -214,6 +214,13 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
 const STORAGE_KEY = "const_harness_conversations";
 let cachedConversations: ConversationItem[] | null = null;
 
+function persistConversationCache(list: ConversationItem[]): void {
+  // SQLite (or the remote host) owns desktop histories. Mirroring every payload
+  // into synchronous Web Storage blocks rendering and can exceed its quota.
+  if (typeof window !== "undefined" && window.electron?.saveConversation) return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+}
+
 /** Cache a hydrated host record without writing it back to the host. */
 export function cacheConversation(conversation: ConversationItem): void {
   const list = loadConversations();
@@ -221,7 +228,7 @@ export function cacheConversation(conversation: ConversationItem): void {
   if (index < 0) list.push(conversation);
   else list[index] = conversation;
   cachedConversations = list;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+  persistConversationCache(list);
 }
 
 /**
@@ -273,15 +280,15 @@ export async function initConversationStore(): Promise<ConversationItem[]> {
     // 1. Check if Electron disk database is available
     if (typeof window !== "undefined" && window.electron?.listConversations) {
       // Check if we need to migrate local storage to SQLite
-      const raw = localStorage.getItem(STORAGE_KEY);
+      let raw: string | null = null;
+      try { raw = localStorage.getItem(STORAGE_KEY); } catch {}
+      let legacyImported = !raw;
       if (raw && window.electron.importLegacyConversations) {
         try {
           const localList: ConversationItem[] = JSON.parse(raw);
-          if (Array.isArray(localList) && localList.length > 0) {
+          if (Array.isArray(localList)) {
             const cleanList = localList.filter((c) => !isSideChatConversation(c.id));
-            if (cleanList.length > 0) {
-              await window.electron.importLegacyConversations(cleanList);
-            }
+            legacyImported = cleanList.length === 0 || await window.electron.importLegacyConversations(cleanList) === true;
           }
         } catch (e) {
           console.warn("[ConversationStore] Legacy migration error:", e);
@@ -300,7 +307,10 @@ export async function initConversationStore(): Promise<ConversationItem[]> {
             messages: normalizeUiMessages(c.messages || []),
           }));
         cachedConversations = normalized;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        // Remove the legacy copy only after migration and disk hydration succeeded.
+        if (legacyImported) {
+          try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        }
         return normalized;
       }
     }
@@ -334,7 +344,7 @@ export async function refreshConversationsFromDisk(): Promise<ConversationItem[]
             };
           });
         cachedConversations = normalized;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        persistConversationCache(normalized);
         return normalized;
       }
     } catch (err) {
@@ -391,7 +401,7 @@ export function saveConversation(conversation: ConversationItem): void {
       list.unshift(updatedConvo);
     }
     cachedConversations = list;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    persistConversationCache(list);
 
     // Persist asynchronously to SQLite disk database
     if (typeof window !== "undefined" && window.electron?.saveConversation) {
@@ -411,7 +421,7 @@ export function deleteConversation(id: string): void {
   try {
     const list = loadConversations().filter((c) => c.id !== id);
     cachedConversations = list;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    persistConversationCache(list);
 
     // Delete from SQLite disk database
     if (typeof window !== "undefined" && window.electron?.deleteConversation) {
@@ -435,7 +445,7 @@ export function renameConversation(id: string, title: string): void {
       item.title = title;
       item.updatedAt = Date.now();
       cachedConversations = list;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      persistConversationCache(list);
     }
 
     if (typeof window !== "undefined" && window.electron?.renameConversation) {
@@ -457,7 +467,7 @@ export function archiveConversation(id: string): void {
       item.isArchived = true;
       item.updatedAt = Date.now();
       cachedConversations = list.filter((c) => c.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      persistConversationCache(list);
     }
 
     if (typeof window !== "undefined" && window.electron?.archiveConversation) {
@@ -487,7 +497,7 @@ export async function unarchiveConversation(id: string): Promise<void> {
         target.isArchived = false;
         target.updatedAt = Date.now();
         cachedConversations = list;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        persistConversationCache(list);
       }
     }
   } catch {}
@@ -504,7 +514,7 @@ export async function pinConversation(id: string, isPinned: boolean): Promise<vo
       item.isPinned = isPinned;
       item.updatedAt = Date.now();
       cachedConversations = list;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      persistConversationCache(list);
     }
 
     if (typeof window !== "undefined" && window.electron?.pinConversation) {
