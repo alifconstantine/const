@@ -163,7 +163,7 @@ export function DownloadPage({
 
   return (
     <div
-      className="landing-page font-sans min-h-screen flex flex-col bg-[#fafafa] dark:bg-[#0a0a0a] text-zinc-900 dark:text-zinc-100 transition-colors duration-300"
+      className="landing-page ch-download-list-page font-sans min-h-screen flex flex-col bg-[#fafafa] dark:bg-[#0a0a0a] text-zinc-900 dark:text-zinc-100 transition-colors duration-300"
       style={{
         fontFamily:
           "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif)",

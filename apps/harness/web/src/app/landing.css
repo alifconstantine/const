@@ -216,7 +216,10 @@ body:has(.ch-download-page) .ch-header-cta:hover {
   background: transparent;
   color: inherit;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 .ch-header .ch-theme-toggle {
   background: #ffffff20;
@@ -399,8 +402,13 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14), 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ch-hero-download-btn:hover {
@@ -451,8 +459,7 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
 .ch-hero .ch-hero-preview-container .ch-desk-window {
   /* Keep the shadow inside the hero's bottom padding to avoid a clipped seam. */
   --ch-desk-win-shadow:
-    0 16px 40px -16px rgba(0, 0, 0, 0.24),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
+    0 16px 40px -16px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 /* =========================================================================
@@ -470,15 +477,17 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   overflow: hidden;
   position: relative;
   border-radius: 14px;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease;
 
   /* --- Light Mode Variables (Desktop App Theme) --- */
   --ch-desk-win-bg: #f8f8f8;
   --ch-desk-win-border: #dedee2;
   --ch-desk-win-shadow:
     0 24px 70px -15px rgba(0, 0, 0, 0.16),
-    0 10px 30px -10px rgba(0, 0, 0, 0.08),
-    0 0 0 1px rgba(0, 0, 0, 0.06);
+    0 10px 30px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.06);
 
   --ch-desk-sidebar-bg: #ececee;
   --ch-desk-sidebar-border: #dedee2;
@@ -542,8 +551,7 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   --ch-desk-win-bg: #161616;
   --ch-desk-win-border: #2a2a2a;
   --ch-desk-win-shadow:
-    0 30px 80px -15px rgba(0, 0, 0, 0.95),
-    0 12px 35px -8px rgba(0, 0, 0, 0.7),
+    0 30px 80px -15px rgba(0, 0, 0, 0.95), 0 12px 35px -8px rgba(0, 0, 0, 0.7),
     0 0 0 1px rgba(255, 255, 255, 0.06);
 
   --ch-desk-sidebar-bg: #101011;
@@ -1098,7 +1106,10 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   border-radius: 16px;
   box-shadow: var(--ch-desk-card-shadow);
   overflow: hidden;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .ch-desk-chat-card:focus-within {
@@ -1142,7 +1153,9 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   padding: 10px 14px 8px;
   display: flex;
   flex-direction: column;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .ch-desk-input-container {
@@ -1423,7 +1436,6 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
     font-size: 11px;
   }
 }
-
 
 .ch-statement {
   background: var(--ch-canvas);
@@ -1782,7 +1794,9 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   background: #f8f9fa;
   border: 1px solid var(--ch-line);
   box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.04);
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .dark .ch-download-panel {
@@ -2426,5 +2440,152 @@ body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
   }
   .ch-hero-shortcuts a {
     min-width: 60px;
+  }
+}
+
+/* Mobile reading and touch ergonomics. */
+.ch-comparison-mobile {
+  display: none;
+}
+@media (min-width: 951px) {
+  .ch-mobile-nav {
+    display: none;
+  }
+}
+@media (max-width: 950px) {
+  .ch-header .ch-brand {
+    min-height: 44px;
+  }
+  .ch-header .ch-theme-toggle,
+  .ch-menu-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  .ch-header-cta {
+    min-height: 44px;
+  }
+  .ch-mobile-nav a {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+  }
+  .ch-mobile-nav a:hover,
+  .ch-mobile-nav a[aria-current="page"] {
+    background: var(--ch-surface-muted);
+  }
+}
+@media (max-width: 767px) {
+  .ch-header-inner {
+    min-height: 64px;
+    padding-inline: 16px;
+    gap: 12px;
+  }
+  .ch-brand {
+    font-size: 17px;
+    letter-spacing: -0.03em;
+  }
+  .ch-header-actions {
+    gap: 6px;
+  }
+  .ch-comparison-wrap {
+    display: none;
+  }
+  .ch-comparison-mobile {
+    display: grid;
+    gap: 36px;
+    margin-top: 36px;
+  }
+  .ch-comparison-mobile h3 {
+    font-size: 21px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0 0 20px;
+  }
+  .ch-comparison-mobile dl {
+    margin: 0;
+  }
+  .ch-comparison-mobile dt {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .ch-comparison-mobile dd {
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ch-ink-muted);
+    margin: 0 0 22px;
+  }
+  .ch-comparison-mobile dd:last-child {
+    margin-bottom: 0;
+  }
+  .ch-hero-download-btn,
+  .ch-hero-platform-pill {
+    min-height: 44px;
+  }
+  .ch-hero-main-title {
+    font-size: clamp(40px, 10vw, 56px);
+  }
+  .ch-hero-main-subtitle {
+    font-size: 16px;
+  }
+  .ch-task-title {
+    font-size: clamp(21px, 5.5vw, 25px);
+  }
+  .ch-footer-links {
+    gap: 4px;
+  }
+  .ch-footer-link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    line-height: 1.5;
+  }
+  .ch-footer-heading {
+    margin-bottom: 14px;
+  }
+  .ch-footer-controls {
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .ch-footer-controls a,
+  .ch-footer .ch-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .ch-locale-select {
+    min-height: 44px;
+    max-width: 160px;
+    font-size: 16px;
+  }
+  .ch-download-cta-panel {
+    min-height: 0;
+    padding: 48px 24px;
+  }
+  .ch-download-cta-actions {
+    display: grid;
+    width: 100%;
+  }
+  .ch-download-cta-actions a {
+    justify-content: center;
+    min-height: 44px;
+  }
+  .ch-download-list-page main {
+    padding: 108px 20px 72px;
+  }
+  .ch-download-list-page button {
+    min-height: 44px;
+  }
+  .ch-download-list-page pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 480px) {
+  .ch-header-cta {
+    display: none;
   }
 }

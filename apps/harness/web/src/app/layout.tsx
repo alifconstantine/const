@@ -4,6 +4,7 @@ import { I18nProvider } from "@/context/I18nContext";
 import { en } from "@/i18n/en";
 import "./globals.css";
 import "./landing.css";
+import "./content.css";
 
 export const metadata: Metadata = {
   title: "Const Harness — Local-first agentic workbench for developers",

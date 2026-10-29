@@ -15,67 +15,48 @@ export function Footer() {
     {
       heading: t("footer.col.product"),
       links: [
-        [t("footer.col.capabilities"), "/#features"],
-        [t("footer.link.tasks"), "/#capabilities"],
-        [t("footer.col.platforms"), "/#platforms"],
-        [t("footer.link.comparison"), "/#comparison"],
+        [t("nav.product"), "/product"],
+        [t("nav.integrations"), "/integrations"],
+        [t("footer.link.remote"), "/docs/remote-control"],
+        [t("footer.link.scheduled"), "/docs/scheduled-tasks"],
         [t("footer.link.download"), "/download"],
-      ],
-    },
-    {
-      heading: t("footer.col.platforms"),
-      links: [
-        ["Web", "/download?os=web"],
-        ["Windows", "/download?os=windows"],
-        ["macOS", "/download?os=macos"],
-        ["Linux", "/download?os=linux"],
-        ["Android", "/download?os=android"],
-        ["iOS", "/download?os=ios"],
-      ],
-    },
-    {
-      heading: t("footer.col.capabilities"),
-      links: [
-        [t("capabilities.0.title"), "/#features"],
-        [t("capabilities.1.title"), "/#features"],
-        [t("capabilities.2.title"), "/#features"],
-        [t("capabilities.3.title"), "/#features"],
-        [t("capabilities.4.title"), "/#remote"],
-      ],
-    },
-    {
-      heading: t("footer.col.ecosystem"),
-      links: [
-        [t("footer.link.router"), LINKS.router],
-        [t("footer.link.accounts"), LINKS.accounts],
-        [t("footer.link.learn"), LINKS.learn],
-        ["Model Context Protocol", "https://modelcontextprotocol.io"],
       ],
     },
     {
       heading: t("footer.col.resources"),
       links: [
         [t("footer.link.docs"), LINKS.docs],
-        [t("footer.link.changelog"), LINKS.changelog],
-        [t("footer.link.releases"), LINKS.releases],
-        [t("faq.short"), "/#faq"],
-        [t("nav.start"), "/#get-started"],
+        [t("nav.start"), "/docs/getting-started"],
+        [t("footer.link.models"), "/docs/models"],
+        [t("footer.link.data"), "/docs/privacy-and-data"],
+        [t("footer.link.issues"), LINKS.issues],
+      ],
+    },
+    {
+      heading: t("footer.col.ecosystem"),
+      links: [
+        [t("nav.ecosystem"), "/ecosystem"],
+        [t("footer.link.router"), LINKS.router],
+        [t("footer.link.accounts"), LINKS.accounts],
+        [t("footer.link.learn"), LINKS.learn],
+        [t("footer.link.platform"), "https://const.web.id"],
       ],
     },
     {
       heading: t("footer.col.company"),
       links: [
-        [t("footer.link.platform"), "https://const.web.id"],
         [t("footer.link.source"), LINKS.repository],
-        [t("footer.link.issues"), LINKS.issues],
-        [t("footer.link.pullRequests"), LINKS.pulls],
+        [t("footer.link.releases"), LINKS.releases],
+        [t("footer.link.changelog"), LINKS.changelog],
+        [t("footer.link.privacy"), "/privacy-policy"],
+        [t("footer.link.terms"), "/terms-of-service"],
       ],
     },
   ];
   return (
     <footer className="ch-footer">
       <div className="ch-shell ch-shell-wide">
-        <div className="ch-footer-grid">
+        <div className="ch-footer-grid ch-footer-grid-pages">
           {columns.map((column) => (
             <nav key={column.heading} aria-label={column.heading}>
               <h3 className="ch-footer-heading">{column.heading}</h3>

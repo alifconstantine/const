@@ -1,6 +1,6 @@
 # AGENTS.md — Const Harness Development Guide for AI Agents
 
-Welcome, Agent. This document establishes the operational principles, technical guidelines, design system rules, and verification protocols for working in `@const/harness` (`apps/harness/desktop` & `apps/harness/cli`).
+Welcome, Agent. This document establishes the operational principles, technical guidelines, design system rules, and verification protocols for working in `@const/harness` (`apps/harness/desktop` & `apps/harness/web`).
 
 ---
 

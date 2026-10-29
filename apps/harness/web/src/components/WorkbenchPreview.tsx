@@ -565,9 +565,9 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
           <div className="ch-desk-canvas-center">
             <div className="ch-desk-canvas-inner">
               {/* Centered Greeting Text (Matching exact proportions from Image 2: font-size 19px, color #d4d4d4, margin 14px) */}
-              <h1 className="ch-desk-greeting">
+              <p className="ch-desk-greeting">
                 Morning, how can I help?
-              </h1>
+              </p>
 
               {/* Two-Tier ChatCard (Audited from chat-card.tsx lines 1258-1420 & Image 2) */}
               <div className="ch-desk-chat-card">

@@ -89,6 +89,8 @@ export function TaskExplorerSection() {
               alt={t(`tasks.${current.index}.title`)}
               width={1400}
               height={1144}
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </motion.div>

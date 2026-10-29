@@ -1,5 +1,14 @@
 import type { Copy } from "./en";
 export const es: Copy = {
+  "nav.integrations": "Integraciones",
+  "nav.ecosystem": "Ecosistema",
+  "footer.link.remote": "Control remoto",
+  "footer.link.scheduled": "Tareas programadas",
+  "footer.link.models": "Modelos y proveedores",
+  "footer.link.data": "Privacidad y datos",
+  "footer.link.privacy": "Política de privacidad",
+  "footer.link.terms": "Términos del servicio",
+
   "builds.unavailable":
     "No se han podido cargar las descargas publicadas. Consulta las versiones o compila desde el código.",
   "meta.title": "Const Harness — Workbench agéntico local para desarrolladores",
@@ -11,7 +20,8 @@ export const es: Copy = {
   "nav.cta": "Descargar",
   "nav.menu": "Abrir menú",
   "nav.skip": "Saltar al contenido",
-  "hero.subtitle": "Desde programación hasta trabajo de oficina, Const Harness conecta tus archivos locales, herramientas y navegador para ayudarte a ejecutar, organizar, verificar y convertir ideas en resultados entregables.",
+  "hero.subtitle":
+    "Desde programación hasta trabajo de oficina, Const Harness conecta tus archivos locales, herramientas y navegador para ayudarte a ejecutar, organizar, verificar y convertir ideas en resultados entregables.",
   "hero.downloadButton": "Descargar Const Harness",
   "statement.title":
     "Const Harness es un entorno de IA de escritorio para desarrolladores, investigadores y creadores. Reúne proyectos, modelos y herramientas para convertir una idea en código funcional, investigación útil y trabajos terminados.",

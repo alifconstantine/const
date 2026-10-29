@@ -1,5 +1,14 @@
 import type { Copy } from "./en";
 export const ja: Copy = {
+  "nav.integrations": "連携",
+  "nav.ecosystem": "エコシステム",
+  "footer.link.remote": "リモート操作",
+  "footer.link.scheduled": "スケジュールタスク",
+  "footer.link.models": "モデルとプロバイダー",
+  "footer.link.data": "プライバシーとデータ",
+  "footer.link.privacy": "プライバシーポリシー",
+  "footer.link.terms": "利用規約",
+
   "builds.unavailable":
     "公開済みダウンロードを読み込めませんでした。リリースページを確認するか、ソースからビルドしてください。",
   "meta.title":
@@ -12,7 +21,8 @@ export const ja: Copy = {
   "nav.cta": "ダウンロード",
   "nav.menu": "メニューを開く",
   "nav.skip": "本文へスキップ",
-  "hero.subtitle": "コーディングから日常のオフィスワークまで、Const Harness はローカルファイル、ツール、ブラウザを連携し、実行、整理、検証、そしてアイデアの実現を支援します。",
+  "hero.subtitle":
+    "コーディングから日常のオフィスワークまで、Const Harness はローカルファイル、ツール、ブラウザを連携し、実行、整理、検証、そしてアイデアの実現を支援します。",
   "hero.downloadButton": "Const Harness をダウンロード",
   "statement.title":
     "Const Harnessは開発者、研究者、クリエイターのためのデスクトップAIワークベンチです。プロジェクト、モデル、ツールをまとめて、アイデアを動くコード、有用な調査、完成した作品へと変えます。",

@@ -1,5 +1,14 @@
 import type { Copy } from "./en";
 export const zh: Copy = {
+  "nav.integrations": "集成",
+  "nav.ecosystem": "生态系统",
+  "footer.link.remote": "远程控制",
+  "footer.link.scheduled": "定时任务",
+  "footer.link.models": "模型与提供商",
+  "footer.link.data": "隐私与数据",
+  "footer.link.privacy": "隐私政策",
+  "footer.link.terms": "服务条款",
+
   "builds.unavailable":
     "无法加载已发布的下载文件。请查看发布页面或从源码构建。",
   "meta.title": "Const Harness — 面向开发者的本地优先 AI 智能体工作台",
@@ -11,7 +20,8 @@ export const zh: Copy = {
   "nav.cta": "下载",
   "nav.menu": "打开菜单",
   "nav.skip": "跳到正文",
-  "hero.subtitle": "从编程开发到日常办公，Const Harness 连接您的本地文件、工具和浏览器，助您执行、整理、验证并将创意转化为可交付成果。",
+  "hero.subtitle":
+    "从编程开发到日常办公，Const Harness 连接您的本地文件、工具和浏览器，助您执行、整理、验证并将创意转化为可交付成果。",
   "hero.downloadButton": "下载 Const Harness",
   "statement.title":
     "Const Harness 是为开发者、研究者和创作者打造的桌面 AI 工作台。将项目、模型与工具汇集一处，把想法变成可运行的代码、有价值的研究和完成的作品。",
@@ -167,8 +177,7 @@ export const zh: Copy = {
   "footer.link.pullRequests": "合并请求",
   "footer.link.tasks": "任务工作流",
   "footer.link.comparison": "工作流对比",
-  "preview.alt":
-    "Const Harness 工作台示意图，展示项目对话与文件审查。",
+  "preview.alt": "Const Harness 工作台示意图，展示项目对话与文件审查。",
   "preview.new": "新任务",
   "preview.projects": "项目",
   "preview.task": "构建落地页",

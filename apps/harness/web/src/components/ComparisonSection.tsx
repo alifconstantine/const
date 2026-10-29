@@ -18,6 +18,19 @@ export function ComparisonSection() {
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
+          <div className="ch-comparison-mobile">
+            {([0, 1, 2, 3, 4] as const).map((index) => (
+              <section key={index}>
+                <h3>{t(`comparison.rows.${index}.label`)}</h3>
+                <dl>
+                  <dt>Const Harness</dt>
+                  <dd>{t(`comparison.${index}.harness`)}</dd>
+                  <dt>{t("comparison.other")}</dt>
+                  <dd>{t(`comparison.${index}.other`)}</dd>
+                </dl>
+              </section>
+            ))}
+          </div>
           <ScrollArea
             orientation="horizontal"
             className="ch-comparison-wrap"

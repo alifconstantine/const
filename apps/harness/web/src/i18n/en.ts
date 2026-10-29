@@ -1,4 +1,13 @@
 export const en = {
+  "nav.integrations": "Integrations",
+  "nav.ecosystem": "Ecosystem",
+  "footer.link.remote": "Remote control",
+  "footer.link.scheduled": "Scheduled tasks",
+  "footer.link.models": "Models & providers",
+  "footer.link.data": "Privacy & data",
+  "footer.link.privacy": "Privacy Policy",
+  "footer.link.terms": "Terms of Service",
+
   "builds.unavailable":
     "Published downloads could not be loaded. Check the releases page or build from source.",
   "meta.title": "Const Harness — Local-first agentic workbench for developers",
@@ -10,7 +19,8 @@ export const en = {
   "nav.cta": "Download",
   "nav.menu": "Open menu",
   "nav.skip": "Skip to content",
-  "hero.subtitle": "From coding to office work, Const Harness connects to your local files, tools, and browser to help you execute, organize, verify, and turn ideas into deliverable results.",
+  "hero.subtitle":
+    "From coding to office work, Const Harness connects to your local files, tools, and browser to help you execute, organize, verify, and turn ideas into deliverable results.",
   "hero.downloadButton": "Download Const Harness",
   "statement.title":
     "Const Harness is a desktop AI workbench for developers, researchers, and creators. Bring your projects, models, and tools together to turn an idea into working code, useful research, and finished creative work.",

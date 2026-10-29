@@ -1,5 +1,14 @@
 import type { Copy } from "./en";
 export const id: Copy = {
+  "nav.integrations": "Integrasi",
+  "nav.ecosystem": "Ekosistem",
+  "footer.link.remote": "Kontrol jarak jauh",
+  "footer.link.scheduled": "Tugas terjadwal",
+  "footer.link.models": "Model & penyedia",
+  "footer.link.data": "Privasi & data",
+  "footer.link.privacy": "Kebijakan Privasi",
+  "footer.link.terms": "Ketentuan Layanan",
+
   "builds.unavailable":
     "Daftar download belum dapat dimuat. Periksa halaman rilis atau build dari source.",
   "meta.title": "Const Harness — Workbench agen AI lokal untuk developer",
@@ -11,7 +20,8 @@ export const id: Copy = {
   "nav.cta": "Unduh",
   "nav.menu": "Buka menu",
   "nav.skip": "Lompat ke konten",
-  "hero.subtitle": "Dari coding hingga pekerjaan kantor, Const Harness menghubungkan berkas lokal, alat, dan browser untuk membantu Anda mengeksekusi, mengorganisir, memverifikasi, dan mewujudkan ide menjadi hasil nyata.",
+  "hero.subtitle":
+    "Dari coding hingga pekerjaan kantor, Const Harness menghubungkan berkas lokal, alat, dan browser untuk membantu Anda mengeksekusi, mengorganisir, memverifikasi, dan mewujudkan ide menjadi hasil nyata.",
   "hero.downloadButton": "Unduh Const Harness",
   "statement.title":
     "Const Harness adalah workbench AI desktop untuk developer, peneliti, dan kreator. Satukan proyek, model, dan alat untuk mengubah ide menjadi kode yang berjalan, riset yang berguna, dan karya kreatif yang selesai.",

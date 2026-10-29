@@ -12,7 +12,7 @@ export function DownloadCtaSection() {
     <section className="download-section-container ch-download py-16" id="download">
       <div className="max-w-7xl mx-auto px-6">
         <div
-          className="relative rounded-3xl overflow-hidden py-28 sm:py-36 px-8 sm:px-16 border border-zinc-200 dark:border-[#262626] bg-[#f8f9fa] dark:bg-[#0a0a0a] min-h-[460px] flex items-center transition-colors duration-300"
+          className="ch-download-cta-panel relative rounded-3xl overflow-hidden py-28 sm:py-36 px-8 sm:px-16 border border-zinc-200 dark:border-[#262626] bg-[#f8f9fa] dark:bg-[#0a0a0a] min-h-[460px] flex items-center transition-colors duration-300"
           style={{ isolation: "isolate" }}
         >
           {/* Cosmic Particle Backdrop */}
@@ -34,7 +34,7 @@ export function DownloadCtaSection() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="ch-download-cta-actions flex flex-wrap items-center gap-3">
               <Link
                 href="/download?arch=x64"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#111827] text-white hover:bg-black dark:bg-white dark:text-black dark:hover:bg-zinc-200 font-medium text-sm transition-all shadow-md"
