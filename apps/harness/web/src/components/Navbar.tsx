@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, Radio, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/context/I18nContext";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -77,6 +77,15 @@ export function Navbar() {
         </nav>
         <div className="ch-header-actions">
           <ThemeToggle />
+          <Link
+            href="/remote"
+            className="ch-header-remote-btn"
+            aria-label="Remote Workspace"
+            title="Remote Workspace"
+          >
+            <Radio size={15} />
+            <span className="hidden sm:inline">Remote</span>
+          </Link>
           <Link href="/download" className="ch-button ch-header-cta">
             {t("nav.cta")}
           </Link>
@@ -118,6 +127,9 @@ export function Navbar() {
               </Link>
             );
           })}
+          <Link href="/remote" onClick={() => setOpen(false)}>
+            Remote Workspace
+          </Link>
           <Link href="/download" onClick={() => setOpen(false)}>
             {t("nav.cta")}
           </Link>

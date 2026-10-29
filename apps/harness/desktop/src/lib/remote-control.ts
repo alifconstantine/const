@@ -12,6 +12,7 @@ export interface RemoteDaemonStatus {
   deviceId: string;
   sessionId: string | null;
   pairingUrl: string | null;
+  pairingCode?: string | null;
   localBridgeUrl: string | null;
   expiresAt: number | null;
   connectedDevices: RemoteConnectedDevice[];

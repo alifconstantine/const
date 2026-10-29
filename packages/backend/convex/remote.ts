@@ -58,7 +58,13 @@ function packet(value: string) {
 }
 
 export const create = mutation({
-  args: { deviceName: v.string(), hostHash: v.string(), pairHash: v.string() },
+  args: {
+    deviceName: v.string(),
+    hostHash: v.string(),
+    pairHash: v.string(),
+    pairingCode: v.optional(v.string()),
+    encryptedSecret: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const ownerId = await getAuthUserId(ctx);
     if (
@@ -110,6 +116,62 @@ export const create = mutation({
       { sessionId: id },
     );
     return id;
+  },
+});
+
+export const listMySessions = query({
+  args: {},
+  handler: async (ctx) => {
+    const ownerId = await getAuthUserId(ctx);
+    if (!ownerId) return [];
+    const sessions = await ctx.db
+      .query("remoteSessions")
+      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .collect();
+    const now = Date.now();
+    return sessions
+      .filter((s) => !s.revoked && s.expiresAt > now)
+      .map((s) => ({
+        sessionId: s._id,
+        deviceName: s.deviceName,
+        pairingCode: s.pairingCode,
+        isOnline: now - s.heartbeatAt < 45_000,
+        expiresAt: s.expiresAt,
+        pairExpiresAt: s.pairExpiresAt,
+        hasPairingCode: !!s.pairingCode && s.pairExpiresAt > now,
+      }));
+  },
+});
+
+export const resolvePairingCode = query({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    const ownerId = await getAuthUserId(ctx);
+    if (!ownerId) throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
+    const normalized = args.code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (normalized.length !== 6) throw new ConvexError({ code: "INVALID_CODE" });
+    const formatted = `${normalized.slice(0, 3)}-${normalized.slice(3)}`;
+    const session = await ctx.db
+      .query("remoteSessions")
+      .withIndex("by_pairing_code", (q) => q.eq("pairingCode", formatted))
+      .first();
+    const now = Date.now();
+    if (
+      !session ||
+      session.ownerId !== ownerId ||
+      session.revoked ||
+      session.expiresAt <= now ||
+      session.pairExpiresAt <= now ||
+      !session.encryptedSecret
+    ) {
+      throw new ConvexError({ code: "PAIRING_CODE_NOT_FOUND" });
+    }
+    return {
+      sessionId: session._id,
+      deviceName: session.deviceName,
+      encryptedSecret: session.encryptedSecret,
+      pairHash: session.pairHash,
+    };
   },
 });
 export const join = mutation({

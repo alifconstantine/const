@@ -159,10 +159,12 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
   const [qr, setQr] = useState<{ url: string; image: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [error, setError] = useState<"startError" | "actionError" | null>(null);
   const [now, setNow] = useState(Date.now());
   const generation = useRef(0);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const codeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pairingUrl = useRef(status?.pairingUrl);
   pairingUrl.current = status?.pairingUrl;
 
@@ -201,6 +203,7 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
       unsubscribe?.();
       clearInterval(timer);
       if (copyTimer.current) clearTimeout(copyTimer.current);
+      if (codeTimer.current) clearTimeout(codeTimer.current);
     };
   }, [isOpen]);
 
@@ -208,7 +211,9 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
     let cancelled = false;
     setQr(null);
     setCopied(false);
+    setCopiedCode(false);
     if (copyTimer.current) clearTimeout(copyTimer.current);
+    if (codeTimer.current) clearTimeout(codeTimer.current);
     const url = status?.pairingUrl;
     if (isOpen && url) {
       void QRCode.toDataURL(url, {
@@ -282,6 +287,19 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      if (generation.current === current) setError("actionError");
+    }
+  };
+
+  const copyCode = async (code: string) => {
+    const current = generation.current;
+    try {
+      await navigator.clipboard.writeText(code);
+      if (generation.current !== current) return;
+      setCopiedCode(true);
+      if (codeTimer.current) clearTimeout(codeTimer.current);
+      codeTimer.current = setTimeout(() => setCopiedCode(false), 2000);
     } catch {
       if (generation.current === current) setError("actionError");
     }
@@ -381,7 +399,31 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
                     {t("remoteControl.expired")}
                   </p>
                 ) : !stopped ? (
-                  <div className="flex flex-col items-center gap-0.5">
+                  <div className="flex flex-col items-center gap-2">
+                    {status?.pairingCode && (
+                      <div className="w-full flex flex-col items-center gap-1 py-2 px-3 rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-[#dedee2] dark:border-[#303030]">
+                        <span className="text-[10px] uppercase font-semibold tracking-wider text-[#737373] dark:text-[#8e8e93]">
+                          Pairing Code
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-lg font-bold tracking-widest text-[#111111] dark:text-white select-all">
+                            {status.pairingCode}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void copyCode(status.pairingCode!)}
+                            className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[#737373] dark:text-[#8e8e93] transition-colors"
+                            title="Copy code"
+                          >
+                            {copiedCode ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <p className="text-xs font-medium text-[#262626] dark:text-[#e5e5e5]">
                       {t("remoteControl.scan")}
                     </p>

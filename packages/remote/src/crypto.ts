@@ -67,3 +67,29 @@ export async function open<T>(
   );
   return JSON.parse(new TextDecoder().decode(decrypted)) as T;
 }
+
+export function normalizePairingCode(code: string): string {
+  return code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+export function generatePairingCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[bytes[i]! % chars.length];
+  }
+  return `${code.slice(0, 3)}-${code.slice(3)}`;
+}
+
+export async function sealWithCode(code: string, secret: string): Promise<string> {
+  const normalized = normalizePairingCode(code);
+  const codeKey = await digest(normalized);
+  return seal(codeKey, "pairing:code", secret);
+}
+
+export async function openWithCode(code: string, encrypted: string): Promise<string> {
+  const normalized = normalizePairingCode(code);
+  const codeKey = await digest(normalized);
+  return open<string>(codeKey, "pairing:code", encrypted);
+}

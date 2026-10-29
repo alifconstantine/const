@@ -112,6 +112,8 @@ export const broker = Object.fromEntries(
     "pingDevice",
     "revoke",
     "leave",
+    "listMySessions",
+    "resolvePairingCode",
     "uploadChunk", "commandChunk", "writeResponseChunk", "responseChunk",
   ].map((name) => [
     name,

@@ -14,7 +14,11 @@ export const remoteTables = {
     revision: v.number(),
     rateWindow: v.optional(v.number()),
     rateCount: v.optional(v.number()),
-  }).index("by_owner", ["ownerId"]),
+    pairingCode: v.optional(v.string()),
+    encryptedSecret: v.optional(v.string()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_pairing_code", ["pairingCode"]),
   remoteDevices: defineTable({
     sessionId: v.id("remoteSessions"),
     secretHash: v.string(),

@@ -6,7 +6,13 @@ import {
   type RemoteCommand,
   type RemotePacket,
 } from "@const/remote/protocol";
-import { digest, randomSecret, seal } from "@const/remote/crypto";
+import {
+  digest,
+  generatePairingCode,
+  randomSecret,
+  seal,
+  sealWithCode,
+} from "@const/remote/crypto";
 import { packTransfer, unpackTransfer } from "@const/remote/transfer";
 import type { RemoteDaemonStatus } from "../src/lib/remote-control";
 
@@ -57,6 +63,8 @@ export class RemoteRelay {
     this.client = this.createClient(convexUrl);
     this.client.setAuth(async () => authToken);
     this.secret = randomSecret();
+    const pairingCode = generatePairingCode();
+    const encryptedSecret = await sealWithCode(pairingCode, this.secret);
     const hostHash = await digest(randomSecret());
     let startupTimer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -65,6 +73,8 @@ export class RemoteRelay {
           deviceName: this.deviceId,
           hostHash,
           pairHash: await digest(this.secret),
+          pairingCode,
+          encryptedSecret,
         }),
         new Promise<never>((_resolve, reject) => {
           startupTimer = setTimeout(
@@ -80,6 +90,7 @@ export class RemoteRelay {
         status: "waiting",
         sessionId,
         pairingUrl: `${origin.origin}/r/${sessionId}#key=${this.secret}`,
+        pairingCode,
         expiresAt: Date.now() + 15 * 60_000,
       };
       this.unsubscribe = this.client.onUpdate(
@@ -270,6 +281,7 @@ export class RemoteRelay {
       status: "idle",
       sessionId: null,
       pairingUrl: null,
+      pairingCode: null,
       expiresAt: null,
       connectedDevices: [],
     };

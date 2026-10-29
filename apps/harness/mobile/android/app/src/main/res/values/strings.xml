@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Const Harness</string>
+    <string name="title_activity_main">Const Harness</string>
+    <string name="package_name">id.web.constapp.harness</string>
+    <string name="custom_url_scheme">id.web.constapp.harness</string>
+</resources>

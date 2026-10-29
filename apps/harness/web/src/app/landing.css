@@ -130,7 +130,8 @@ main[id] {
     color 0.25s;
 }
 .ch-header[data-scrolled="true"],
-body:has(.ch-download-page) .ch-header {
+body:has(.ch-download-page) .ch-header,
+body:has(.ch-remote-page) .ch-header {
   background: color-mix(in srgb, var(--ch-canvas) 94%, transparent);
   color: var(--ch-ink);
   backdrop-filter: blur(16px);
@@ -191,12 +192,50 @@ body:has(.ch-download-page) .ch-header {
 .ch-header-cta:hover {
   background: #ffffff35;
 }
+.ch-header-remote-btn {
+  min-height: 34px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: #ffffff20;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
+}
+.ch-header-remote-btn:hover {
+  background: #ffffff35;
+}
 .ch-header[data-scrolled="true"] .ch-header-cta,
-body:has(.ch-download-page) .ch-header-cta {
+body:has(.ch-download-page) .ch-header-cta,
+body:has(.ch-remote-page) .ch-header-cta {
   background: var(--ch-surface-muted);
 }
 .ch-header[data-scrolled="true"] .ch-header-cta:hover,
-body:has(.ch-download-page) .ch-header-cta:hover {
+body:has(.ch-download-page) .ch-header-cta:hover,
+body:has(.ch-remote-page) .ch-header-cta:hover {
+  background: var(--ch-line);
+}
+.ch-header[data-scrolled="true"] .ch-header-remote-btn,
+body:has(.ch-download-page) .ch-header-remote-btn,
+body:has(.ch-remote-page) .ch-header-remote-btn {
+  background: var(--ch-surface-muted);
+  border-color: var(--ch-line);
+  color: var(--ch-ink);
+}
+.ch-header[data-scrolled="true"] .ch-header-remote-btn:hover,
+body:has(.ch-download-page) .ch-header-remote-btn:hover,
+body:has(.ch-remote-page) .ch-header-remote-btn:hover {
   background: var(--ch-line);
 }
 .ch-header .ch-icon-button {
@@ -231,13 +270,15 @@ body:has(.ch-download-page) .ch-header-cta:hover {
   background: #ffffff35;
 }
 .ch-header[data-scrolled="true"] .ch-theme-toggle,
-body:has(.ch-download-page) .ch-header .ch-theme-toggle {
+body:has(.ch-download-page) .ch-header .ch-theme-toggle,
+body:has(.ch-remote-page) .ch-header .ch-theme-toggle {
   background: var(--ch-surface-muted);
   border-color: transparent;
   color: var(--ch-ink);
 }
 .ch-header[data-scrolled="true"] .ch-theme-toggle:hover,
-body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover {
+body:has(.ch-download-page) .ch-header .ch-theme-toggle:hover,
+body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   background: var(--ch-line);
 }
 .ch-footer .ch-theme-toggle {
