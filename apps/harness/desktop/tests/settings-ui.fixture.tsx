@@ -1,6 +1,6 @@
 // Real components with in-memory native/Convex adapters. No credentials, OS
 // discovery, model calls, or user configuration are accessed by this fixture.
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ConvexProvider, type ConvexReactClient } from "convex/react";
 import { ScrollArea, SonnerToaster } from "@const/ui";
@@ -24,6 +24,15 @@ const state = {
   config: { enableComputerUse: true, enableBrowserUse: false },
   saves: [] as Record<string, unknown>[],
   nativeCalls: 0,
+  profileMutations: [] as Record<string, unknown>[],
+  memoryFiles: [
+    {
+      path: "/fixture/project/.const/memory/MEMORY.md",
+      name: "MEMORY.md",
+      preview: "Project conventions",
+      formattedDate: "Oct 29, 2026",
+    },
+  ],
   rejectSaves: false,
   rejectLoads: params.has("failLoad"),
 };
@@ -60,6 +69,16 @@ window.electron = {
     Object.assign(state.config, value);
     return { ...state.config };
   },
+  memory: {
+    getConfig: async () => ({ workspaceMemoryEnabled: true }),
+    saveConfig: async () => ({}),
+    list: async () => state.memoryFiles,
+    read: async () => "# Project conventions\n\nUse the shared design tokens.",
+    save: async () => true,
+    delete: async () => true,
+    openInFolder: async () => {},
+  },
+  getProjects: async () => [],
   computer: {
     getCapabilities: async () => {
       state.nativeCalls++;
@@ -112,8 +131,41 @@ const convex = {
     localQueryLogs: () => [],
     journal: () => undefined,
   }),
-  mutation: async () => null,
+  mutation: async (_name: unknown, args: Record<string, unknown>) => {
+    state.profileMutations.push(args);
+    return null;
+  },
 } as unknown as ConvexReactClient;
+function SettingsFixture({ view }: { view: string }) {
+  const [profile, setProfile] = useState(() => {
+    let local = {};
+    try {
+      local = JSON.parse(
+        localStorage.getItem("const_custom_user_profile") || "{}",
+      );
+    } catch {
+      /* Empty fixture profile. */
+    }
+    return {
+      id: "fixture",
+      name: "Settings fixture",
+      email: "fixture@example.test",
+      ...local,
+    };
+  });
+  useEffect(() => {
+    const update = (event: Event) =>
+      setProfile((previous) => ({
+        ...previous,
+        ...(event as CustomEvent).detail,
+      }));
+    window.addEventListener("const:user-profile-updated", update);
+    return () =>
+      window.removeEventListener("const:user-profile-updated", update);
+  }, []);
+  return <SettingsView initialTab={view} user={profile} />;
+}
+
 const view = params.get("view") || "computer-use";
 const inner =
   view === "computer-use" ? (
@@ -131,14 +183,7 @@ const inner =
   ) : view === "quota" ? (
     <WeeklyQuotaCard quota={params.has("loadingQuota") ? undefined : quota} />
   ) : (
-    <SettingsView
-      initialTab={view}
-      user={{
-        id: "fixture",
-        name: "Settings fixture",
-        email: "fixture@example.test",
-      }}
-    />
+    <SettingsFixture view={view} />
   );
 
 createRoot(document.getElementById("root")!).render(

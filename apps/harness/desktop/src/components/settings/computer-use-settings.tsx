@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Switch, toast } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
+import { settingsPanel } from "./settings-controls";
 
 type ToggleKey = "enableComputerUse" | "enableBrowserUse";
 type AutomationConfig = Record<ToggleKey, boolean>;
@@ -93,11 +95,8 @@ export function ComputerUseSettings() {
   );
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-2xl pb-6">
-      <div
-        className="rounded-2xl bg-[#f3f3f3] dark:bg-[#222222] p-4 sm:p-5 flex flex-col gap-6"
-        aria-busy={loading}
-      >
+    <div className="flex flex-col gap-4 w-full min-w-0 pb-6">
+      <div className={settingsPanel} aria-busy={loading}>
         {(
           [
             [
@@ -112,17 +111,20 @@ export function ComputerUseSettings() {
             ],
           ] as const
         ).map(([key, title, description]) => (
-          <div key={key} className="flex items-start justify-between gap-5">
+          <div
+            key={key}
+            className="flex items-center justify-between gap-5 py-3"
+          >
             <div className="flex flex-col gap-1 min-w-0">
               <label
                 htmlFor={`setting-${key}`}
-                className="text-sm font-medium text-[#262626] dark:text-white cursor-pointer"
+                className="text-[13px] font-normal text-[#262626] dark:text-white cursor-pointer"
               >
                 {t(`settings.${title}`)}
               </label>
               <p
                 id={`description-${key}`}
-                className="text-[13px] leading-relaxed text-[#737373] dark:text-[#969696]"
+                className="text-xs leading-snug text-[#737373] dark:text-[#969696]"
               >
                 {t(`settings.${description}`)}
               </p>
@@ -133,7 +135,7 @@ export function ComputerUseSettings() {
               onCheckedChange={(checked) => void handleToggle(key, checked)}
               disabled={loading || !config || !canConfigure || saving.has(key)}
               aria-describedby={`description-${key}`}
-              className="shrink-0 mt-0.5 data-[state=checked]:bg-[#262626] dark:data-[state=checked]:bg-white"
+              className="shrink-0"
             />
           </div>
         ))}
@@ -164,17 +166,12 @@ export function ComputerUseSettings() {
         )}
       </div>
 
-      <section
-        aria-labelledby="computer-tools-title"
-        className="flex flex-col gap-4"
-      >
-        <h3
-          id="computer-tools-title"
-          className="text-sm font-medium text-[#262626] dark:text-white"
-        >
+      <details className={`${settingsPanel} group py-3`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[13px] font-medium text-[#262626] dark:text-white [&::-webkit-details-marker]:hidden">
           {t("settings.computerAvailableTools")}
-        </h3>
-        <div className="rounded-2xl bg-[#f3f3f3] dark:bg-[#222222] p-4 sm:p-5 flex flex-col gap-4">
+          <ChevronDown className="size-4 text-neutral-500 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="pt-5 flex flex-col gap-4">
           {COMPUTER_TOOLS.map(([name, description]) => (
             <div
               key={name}
@@ -189,7 +186,7 @@ export function ComputerUseSettings() {
             </div>
           ))}
         </div>
-      </section>
+      </details>
     </div>
   );
 }

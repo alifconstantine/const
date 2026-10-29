@@ -154,9 +154,9 @@ function ConnectionForm({
       setBusy(false);
     }
   };
-  const field = "space-y-2 block text-sm text-[#d4d4d4]";
+  const field = "space-y-2 block text-sm text-neutral-600 dark:text-[#d4d4d4]";
   const input =
-    "bg-[#2b2b2b] border-[#383838] text-white placeholder:text-[#969696] rounded-xl";
+    "bg-neutral-100 dark:bg-[#2b2b2b] border-[#383838] text-neutral-900 dark:text-white placeholder:text-neutral-500 dark:placeholder:text-[#969696] rounded-xl";
   return (
     <Dialog
       open
@@ -166,7 +166,7 @@ function ConnectionForm({
     >
       <DialogContent
         hideClose
-        className="flex max-h-[90vh] w-[calc(100%-32px)] max-w-xl flex-col gap-5 rounded-2xl border-0 bg-[#222222] p-6 text-white shadow-none outline-none ring-0"
+        className="flex max-h-[90vh] w-[calc(100%-32px)] max-w-xl flex-col gap-5 rounded-2xl border-0 bg-neutral-50 dark:bg-[#222222] p-6 text-neutral-900 dark:text-white shadow-none outline-none ring-0"
       >
         <div className="flex items-center justify-between gap-4">
           <DialogTitle>{t(connection ? "mcp.edit" : "mcp.add")}</DialogTitle>
@@ -180,7 +180,7 @@ function ConnectionForm({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <DialogDescription className="text-sm text-[#969696]">
+        <DialogDescription className="text-sm text-neutral-500 dark:text-[#969696]">
           {t("mcp.intro")}
         </DialogDescription>
         <form onSubmit={submit} className="min-h-0 flex flex-col gap-5">
@@ -239,7 +239,7 @@ function ConnectionForm({
                           auth: transport === "stdio" ? "none" : form.auth,
                         })
                       }
-                      className={`rounded-lg px-3 py-2 text-sm ${form.transport === transport ? "bg-[#383838] text-white" : "text-[#969696] hover:text-white"}`}
+                      className={`rounded-lg px-3 py-2 text-sm ${form.transport === transport ? "bg-neutral-200 dark:bg-[#383838] text-neutral-900 dark:text-white" : "text-neutral-500 dark:text-[#969696] hover:text-neutral-900 dark:hover:text-white"}`}
                     >
                       {t(transport === "http" ? "mcp.remote" : "mcp.local")}
                     </button>
@@ -287,7 +287,7 @@ function ConnectionForm({
                       className={input}
                     />
                   </label>
-                  <p className="text-xs text-[#969696]">
+                  <p className="text-xs text-neutral-500 dark:text-[#969696]">
                     {t("mcp.localHint")} {t("mcp.localEnvHint")}
                   </p>
                 </>
@@ -335,11 +335,11 @@ function ConnectionForm({
                 </label>
               )}
               {form.auth === "oauth" && (
-                <p className="text-xs leading-relaxed text-[#969696]">
+                <p className="text-xs leading-relaxed text-neutral-500 dark:text-[#969696]">
                   {t("mcp.oauthHint")}
                 </p>
               )}
-              <details className="rounded-xl bg-[#2b2b2b] p-4">
+              <details className="rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] p-4">
                 <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
                   <ChevronDown className="h-4 w-4" />
                   {t("mcp.advanced")}
@@ -395,7 +395,7 @@ function ConnectionForm({
                       }
                       className={`${input} w-full resize-y p-3 outline-none`}
                     />
-                    <span className="text-xs text-[#969696]">
+                    <span className="text-xs text-neutral-500 dark:text-[#969696]">
                       {t("mcp.savedFields", {
                         names:
                           (form.transport === "http"
@@ -423,7 +423,10 @@ function ConnectionForm({
             </fieldset>
           </ScrollArea>
           {error && (
-            <p role="alert" className="text-sm text-white">
+            <p
+              role="alert"
+              className="text-sm text-neutral-900 dark:text-white"
+            >
               {error}
             </p>
           )}
@@ -439,7 +442,7 @@ function ConnectionForm({
             <Button
               type="submit"
               disabled={busy}
-              className="rounded-xl bg-white text-black hover:bg-[#d4d4d4]"
+              className="rounded-xl bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-[#d4d4d4]"
             >
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("mcp.save")}
@@ -492,14 +495,11 @@ export function McpSettings({
     <div className="space-y-5">
       {!compact && (
         <>
-          <p className="text-sm leading-relaxed text-[#969696]">
-            {t("mcp.intro")}
-          </p>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Select value={scope} onValueChange={setScope}>
               <SelectTrigger
                 aria-label={t("mcp.scope")}
-                className="w-52 rounded-xl bg-[#2b2b2b]"
+                className="w-52 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b]"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -513,7 +513,7 @@ export function McpSettings({
             </Select>
             <Button
               onClick={() => setEditor("new")}
-              className="rounded-xl bg-white text-black hover:bg-[#d4d4d4]"
+              className="rounded-xl bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-[#d4d4d4]"
             >
               <Plus className="mr-2 h-4 w-4" />
               {t("mcp.add")}
@@ -522,7 +522,10 @@ export function McpSettings({
         </>
       )}
       {error && (
-        <p role="alert" className="text-sm text-[#d4d4d4]">
+        <p
+          role="alert"
+          className="text-sm text-neutral-600 dark:text-[#d4d4d4]"
+        >
           {t("mcp.errorConnection")}
         </p>
       )}
@@ -533,12 +536,14 @@ export function McpSettings({
         />
       )}
       {!loading && !error && visible.length === 0 && (
-        <p className="py-5 text-sm text-[#969696]">{t("mcp.empty")}</p>
+        <p className="py-5 text-sm text-neutral-500 dark:text-[#969696]">
+          {t("mcp.empty")}
+        </p>
       )}
       {visible.map((connection) => (
         <section
           key={connection.id}
-          className={`space-y-4 rounded-2xl p-5 ${compact ? "bg-[#2b2b2b]" : "bg-[#222222]"}`}
+          className={`settings-surface space-y-4 rounded-2xl p-5 ${compact ? "bg-neutral-100 dark:bg-[#2b2b2b]" : "bg-neutral-50 dark:bg-[#222222]"}`}
         >
           <div className="flex items-center gap-3">
             {connection.pluginId ? (
@@ -548,13 +553,13 @@ export function McpSettings({
                   .replace(/-[^-]+$/, "")}
               />
             ) : (
-              <Cable className="h-6 w-6 text-[#d4d4d4]" />
+              <Cable className="h-6 w-6 text-neutral-600 dark:text-[#d4d4d4]" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="break-words text-sm font-medium text-white">
+              <p className="break-words text-sm font-medium text-neutral-900 dark:text-white">
                 {connection.name}
               </p>
-              <p className="text-xs text-[#969696]">
+              <p className="text-xs text-neutral-500 dark:text-[#969696]">
                 {t(
                   connection.scope === "workspace"
                     ? "mcp.workspace"
@@ -577,7 +582,7 @@ export function McpSettings({
               }
             />
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-[#969696]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-neutral-500 dark:text-[#969696]">
             <span>
               {connection.isEffective
                 ? t(`mcp.${connection.status}`)
@@ -595,7 +600,7 @@ export function McpSettings({
                   : connection.command}
             </span>
           </div>
-          <div className="space-y-1 text-xs text-[#969696]">
+          <div className="space-y-1 text-xs text-neutral-500 dark:text-[#969696]">
             <p>{t(connectionAccountLabel(connection))}</p>
             {connection.accountEmail && (
               <p className="break-all">{connection.accountEmail}</p>
@@ -614,7 +619,7 @@ export function McpSettings({
             {connection.setupUrl && connection.key !== "plugin-figma-figma" && (
               <button
                 type="button"
-                className="underline underline-offset-4 hover:text-white"
+                className="underline underline-offset-4 hover:text-neutral-900 dark:hover:text-white"
                 onClick={() =>
                   void window.electron?.openExternal(connection.setupUrl!)
                 }
@@ -634,7 +639,10 @@ export function McpSettings({
             run={run}
           />
           {connection.error && (
-            <p role="alert" className="text-xs text-[#d4d4d4]">
+            <p
+              role="alert"
+              className="text-xs text-neutral-600 dark:text-[#d4d4d4]"
+            >
               {t(mcpErrorKey(new Error(connection.error)))}
             </p>
           )}
@@ -769,19 +777,21 @@ export function McpSettings({
             )}
           </div>
           <details>
-            <summary className="cursor-pointer text-xs text-[#969696]">
+            <summary className="cursor-pointer text-xs text-neutral-500 dark:text-[#969696]">
               {t("mcp.tools", { count: connection.tools.length })}
             </summary>
             <div className="space-y-3 pt-3">
               {connection.tools.length === 0 ? (
-                <p className="text-xs text-[#969696]">{t("mcp.noTools")}</p>
+                <p className="text-xs text-neutral-500 dark:text-[#969696]">
+                  {t("mcp.noTools")}
+                </p>
               ) : (
                 connection.tools.map((tool) => (
                   <div key={tool.name}>
-                    <p className="break-words text-sm text-white">
+                    <p className="break-words text-sm text-neutral-900 dark:text-white">
                       {tool.name}
                     </p>
-                    <p className="break-words text-xs leading-relaxed text-[#969696]">
+                    <p className="break-words text-xs leading-relaxed text-neutral-500 dark:text-[#969696]">
                       {tool.description}
                     </p>
                   </div>
@@ -790,7 +800,7 @@ export function McpSettings({
             </div>
           </details>
           {removeId === connection.id && (
-            <div className="space-y-3 rounded-xl bg-[#2b2b2b] p-4">
+            <div className="space-y-3 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] p-4">
               <p className="text-sm">{t("mcp.removeConfirm")}</p>
               <div className="flex gap-2">
                 <Button

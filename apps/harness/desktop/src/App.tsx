@@ -417,14 +417,6 @@ export function AuthenticatedContent({
       const saved = localStorage.getItem("const_custom_user_profile");
       if (!saved) return {};
       const parsed = JSON.parse(saved);
-      if (parsed.image !== undefined && (!parsed.image || !parsed.image.trim())) {
-        delete parsed.image;
-        if (Object.keys(parsed).length > 0) {
-          localStorage.setItem("const_custom_user_profile", JSON.stringify(parsed));
-        } else {
-          localStorage.removeItem("const_custom_user_profile");
-        }
-      }
       return parsed;
     } catch {
       return {};
@@ -458,7 +450,7 @@ export function AuthenticatedContent({
     return {
       ...(activeUser || { id: "local-user-session", email: "Local Workspace" }),
       name: customName ? customName : activeUser?.name,
-      image: customImage ? customImage : activeUser?.image,
+      image: localProfile.image !== undefined ? customImage || undefined : activeUser?.image,
     };
   }, [activeUser, localProfile]);
 

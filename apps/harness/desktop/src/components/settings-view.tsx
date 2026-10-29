@@ -1,19 +1,11 @@
+import "./settings/settings.css";
 import { SkillsSettings } from "./settings/skills-settings";
 import { CONST_ROUTER_LLM_MODELS } from "../lib/models-config";
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-  ScrollArea,
-  Switch,
-  toast,
-  cn,
-} from "@const/ui";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { ScrollArea, Switch, toast, cn } from "@const/ui";
 import {
   Settings2,
   Cable,
-  PencilSparkles,
   UserRound,
   UserRoundPen,
   Keyboard,
@@ -21,48 +13,24 @@ import {
   Box,
   Brain,
   Bot,
-  Blocks,
   BarChart3,
   Settings,
-  Plus,
-  Minus,
   RotateCcw,
-  Check,
-  Info,
   X,
   Sun,
   Moon,
-  LogOut,
-  ArrowLeftRight,
-  ChevronDown,
   Search,
-  Copy,
   Monitor,
-  Volume2,
-  Image as ImageIcon,
-  Video as VideoIcon,
   FolderOpen,
-  Globe,
-  ShieldCheck,
-  Bell,
-  RefreshCw,
   Play,
-  ExternalLink,
-  Laptop,
-  Layers,
-  Camera,
   Pencil,
-  Sparkles,
   Trash2,
-  Upload,
-  Mail,
 } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
-import { useKeyboardShortcuts, DEFAULT_KEYBOARD_SHORTCUTS, type ShortcutItem } from "../lib/shortcuts";
+import { useKeyboardShortcuts, type ShortcutItem } from "../lib/shortcuts";
 import type { UserProfile } from "./sidebar";
 
-import type { UserConfig } from "../vite-env";
 import {
   useTheme,
   useConversationWidth,
@@ -87,10 +55,18 @@ import { ComputerUseSettings } from "./settings/computer-use-settings";
 import { McpSettings } from "./settings/mcp-settings";
 
 import { UsageStatsView } from "./settings/usage-stats-view";
-import { WeeklyQuotaCard } from "./settings/weekly-quota-card";
 import { ProfileSettings } from "./settings/profile-settings";
-import { loadMultiModalConfig } from "../lib/models-config";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
+import {
+  SettingsSection,
+  SettingsRow,
+  SettingsChoice,
+  SettingsSelect,
+  SettingsStepper,
+  settingsButton,
+  settingsInput,
+  settingsPrimaryButton,
+} from "./settings/settings-controls";
 import { playTaskCompletionSound } from "../lib/sound";
 
 export interface SettingsViewProps {
@@ -108,39 +84,6 @@ export const CONST_ROUTER_DEFAULT_URL = "https://router.const.web.id/v1";
 
 export const BUILTIN_CONST_MODELS = CONST_ROUTER_LLM_MODELS;
 
-export const AVATAR_PRESETS = [
-  {
-    id: "cosmic",
-    name: "Cosmic Indigo",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%236366f1"/><stop offset="100%" stop-color="%23a855f7"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g1)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-  {
-    id: "emerald",
-    name: "Emerald Spark",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23059669"/><stop offset="100%" stop-color="%2310b981"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g2)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-  {
-    id: "solar",
-    name: "Solar Sunset",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23f97316"/><stop offset="100%" stop-color="%23ec4899"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g3)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-  {
-    id: "cyber",
-    name: "Neon Cyber",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2306b6d4"/><stop offset="100%" stop-color="%233b82f6"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g4)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-  {
-    id: "amber",
-    name: "Mystic Pulse",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23d97706"/><stop offset="100%" stop-color="%23ef4444"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g5)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-  {
-    id: "obsidian",
-    name: "Obsidian Core",
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231e293b"/><stop offset="100%" stop-color="%230f172a"/></linearGradient></defs><rect width="80" height="80" rx="40" fill="url(%23g6)"/><circle cx="40" cy="31" r="13" fill="%23ffffff" fill-opacity="0.95"/><path d="M22 65c0-10 8-18 18-18s18 8 18 18" fill="%23ffffff" fill-opacity="0.95"/></svg>`,
-  },
-];
-
 export function SettingsView({
   open = true,
   onClose,
@@ -153,10 +96,12 @@ export function SettingsView({
 }: SettingsViewProps) {
   // Normalize legacy and alias tab names
   const normalizedInitialTab = useMemo(() => {
-    if (initialTab === "model" || initialTab === "models") return "model-settings";
+    if (initialTab === "model" || initialTab === "models")
+      return "model-settings";
     if (initialTab === "shortcuts") return "keyboard-shortcuts";
     if (initialTab === "user" || initialTab === "account") return "profile";
-    if (initialTab === "data-and-stats" || initialTab === "usage") return "usage-stats";
+    if (initialTab === "data-and-stats" || initialTab === "usage")
+      return "usage-stats";
     return initialTab || "general";
   }, [initialTab]);
 
@@ -173,17 +118,61 @@ export function SettingsView({
     else if (onBackToWorkspace) onBackToWorkspace();
   };
 
-  // Keyboard shortcut: Escape to close
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const recordingRef = useRef(false);
+
+  // Keep keyboard focus inside Settings and return it to the workspace on close.
   useEffect(() => {
     if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    dialogRef.current?.focus({ preventScroll: true });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || recordingRef.current) return;
+      if (event.key === "Escape") {
+        if (
+          document.querySelector(
+            '[role="dialog"][data-state="open"], [role="listbox"]',
+          )
+        )
+          return;
+        event.preventDefault();
         handleClose();
+      }
+      if (event.key === "Tab") {
+        if (
+          document.querySelector(
+            '[role="dialog"][data-state="open"], [role="listbox"]',
+          )
+        )
+          return;
+        const items = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), input:not(:disabled):not([type="hidden"]), textarea:not(:disabled), [tabindex="0"]',
+          ) || [],
+        ).filter((element) => element.getClientRects().length > 0);
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (!dialogRef.current?.contains(document.activeElement)) {
+          event.preventDefault();
+          first?.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [open, onClose, onBackToWorkspace]);
 
   // Appearance & Theme settings
   const { t, language, setLanguage } = useTranslation();
@@ -195,10 +184,16 @@ export function SettingsView({
   const [diffMarks, setDiffMarks] = useDiffMarks();
 
   // Local configuration
-  const [config, setConfig] = useState<UserConfig | null>(null);
   const [activeModel, setActiveModel] = useState<string>(() => {
     const saved = localStorage.getItem("const_harness_active_model");
-    if (!saved || saved === "Const" || saved === "gemini-3.6-flash" || saved === "gemini-3.7-flash" || saved === "qwen-3.8-27b") return "gemini-3.8-flash";
+    if (
+      !saved ||
+      saved === "Const" ||
+      saved === "gemini-3.6-flash" ||
+      saved === "gemini-3.7-flash" ||
+      saved === "qwen-3.8-27b"
+    )
+      return "gemini-3.8-flash";
     if (saved === "Gemini 3.8 Flash") return "gemini-3.8-flash";
     if (saved === "GLM 5.3 Flash") return "glm-5.3-flash";
     if (saved === "Deepseek v4.1 Flash") return "deepseek-v4.1-flash";
@@ -207,26 +202,30 @@ export function SettingsView({
     return saved;
   });
 
-  const multiModalConfig = useMemo(() => loadMultiModalConfig(), [activeTab]);
-
   // General Settings State
-  const [defaultProjectLocation, setDefaultProjectLocation] = useState<string>(() => {
-    return localStorage.getItem("const_harness_default_project_location") || "";
-  });
+  const [defaultProjectLocation, setDefaultProjectLocation] = useState<string>(
+    () => {
+      return (
+        localStorage.getItem("const_harness_default_project_location") || ""
+      );
+    },
+  );
 
   const [defaultConfirmationMode, setDefaultConfirmationMode] = useState<
     "ask_before_changes" | "full_access" | "request_review"
   >(() => {
     return (
       (localStorage.getItem("const_harness_default_mode") as
-        | "ask_before_changes"
-        | "full_access"
-        | "request_review") || "ask_before_changes"
+        "ask_before_changes" | "full_access" | "request_review") ||
+      "ask_before_changes"
     );
   });
 
   const [queueMode, setQueueMode] = useState<"queue" | "steer">(() => {
-    return (localStorage.getItem("const_harness_queue_mode") as "queue" | "steer") || "queue";
+    return (
+      (localStorage.getItem("const_harness_queue_mode") as "queue" | "steer") ||
+      "queue"
+    );
   });
 
   const [taskNotifications, setTaskNotifications] = useState<boolean>(() => {
@@ -245,44 +244,20 @@ export function SettingsView({
     return localStorage.getItem("const_harness_launch_on_startup") === "true";
   });
 
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
-  const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
-  const presetDropdownRef = useRef<HTMLDivElement>(null);
-
-  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
-  const languageDropdownRef = useRef<HTMLDivElement>(null);
-
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const roleDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target as Node)) {
-        setIsPresetDropdownOpen(false);
-      }
-      if (languageDropdownRef.current && !languageDropdownRef.current.contains(e.target as Node)) {
-        setIsLanguageDropdownOpen(false);
-      }
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
-        setIsRoleDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   const handleBrowseDefaultLocation = async () => {
     if (window.electron?.openDirectoryDialog) {
       const selected = await window.electron.openDirectoryDialog();
       if (selected) {
         setDefaultProjectLocation(selected);
-        localStorage.setItem("const_harness_default_project_location", selected);
+        localStorage.setItem(
+          "const_harness_default_project_location",
+          selected,
+        );
         if (window.electron?.saveConfig) {
-          window.electron.saveConfig({ defaultProjectLocation: selected }).catch(() => {});
+          window.electron
+            .saveConfig({ defaultProjectLocation: selected })
+            .catch(() => {});
         }
-        toast.success("Default project location updated");
       }
     }
   };
@@ -291,17 +266,18 @@ export function SettingsView({
     setDefaultProjectLocation("");
     localStorage.removeItem("const_harness_default_project_location");
     if (window.electron?.saveConfig) {
-      window.electron.saveConfig({ defaultProjectLocation: "" }).catch(() => {});
+      window.electron
+        .saveConfig({ defaultProjectLocation: "" })
+        .catch(() => {});
     }
-    toast.success("Reset to default project location");
   };
 
-  const LANGUAGE_OPTIONS: { id: SupportedLanguage; label: string; native: string }[] = [
-    { id: "en", label: "English", native: "English (US)" },
-    { id: "id", label: "Indonesian", native: "Bahasa Indonesia" },
-    { id: "ja", label: "Japanese", native: "日本語" },
-    { id: "zh", label: "Chinese", native: "中文 (简体)" },
-    { id: "es", label: "Spanish", native: "Español" },
+  const LANGUAGE_OPTIONS: { id: SupportedLanguage; native: string }[] = [
+    { id: "en", native: "English (US)" },
+    { id: "id", native: "Bahasa Indonesia" },
+    { id: "ja", native: "日本語" },
+    { id: "zh", native: "中文 (简体)" },
+    { id: "es", native: "Español" },
   ];
 
   const handleSetLanguage = (lang: SupportedLanguage) => {
@@ -310,51 +286,47 @@ export function SettingsView({
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ language: lang }).catch(() => {});
     }
-    setIsLanguageDropdownOpen(false);
-    toast.success(`Language set to ${LANGUAGE_OPTIONS.find((l) => l.id === lang)?.native || lang}`);
   };
 
-  const handleSetDefaultMode = (mode: "ask_before_changes" | "full_access" | "request_review") => {
+  const handleSetDefaultMode = (
+    mode: "ask_before_changes" | "full_access" | "request_review",
+  ) => {
     setDefaultConfirmationMode(mode);
     localStorage.setItem("const_harness_default_mode", mode);
-    window.dispatchEvent(new CustomEvent("const:default-mode-changed", { detail: mode }));
+    window.dispatchEvent(
+      new CustomEvent("const:default-mode-changed", { detail: mode }),
+    );
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ defaultPermission: mode }).catch(() => {});
     }
-    setIsPresetDropdownOpen(false);
-    const modeLabel =
-      mode === "full_access"
-        ? "Full Machine"
-        : mode === "request_review"
-        ? "Request Review"
-        : "Ask Before Changes";
-    toast.success(`Default permission set to ${modeLabel}`);
   };
 
   const handleSetQueueMode = (mode: "queue" | "steer") => {
     setQueueMode(mode);
     localStorage.setItem("const_harness_queue_mode", mode);
-    window.dispatchEvent(new CustomEvent("const:queue-mode-changed", { detail: mode }));
+    window.dispatchEvent(
+      new CustomEvent("const:queue-mode-changed", { detail: mode }),
+    );
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ queueMode: mode }).catch(() => {});
     }
-    toast.success(
-      mode === "queue"
-        ? "Messages will be queued while agent is executing"
-        : "Messages will steer the active agent immediately"
-    );
   };
 
   const handleToggleTaskNotifications = (enabled: boolean) => {
     setTaskNotifications(enabled);
     localStorage.setItem("const_harness_task_notifications", String(enabled));
     if (window.electron?.saveConfig) {
-      window.electron.saveConfig({ taskNotifications: enabled }).catch(() => {});
+      window.electron
+        .saveConfig({ taskNotifications: enabled })
+        .catch(() => {});
     }
-    if (enabled && typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (
+      enabled &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission();
     }
-    toast.success(enabled ? "Task notifications enabled" : "Task notifications disabled");
   };
 
   const handleToggleSoundAlerts = (enabled: boolean) => {
@@ -366,7 +338,6 @@ export function SettingsView({
     if (enabled) {
       playTaskCompletionSound();
     }
-    toast.success(enabled ? "Sound alerts enabled" : "Sound alerts disabled");
   };
 
   const handleToggleAutoUpdates = (enabled: boolean) => {
@@ -375,7 +346,6 @@ export function SettingsView({
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ autoCheckUpdates: enabled }).catch(() => {});
     }
-    toast.success(enabled ? "Automatic updates enabled" : "Automatic updates disabled");
   };
 
   const handleToggleLaunchOnStartup = (enabled: boolean) => {
@@ -384,112 +354,96 @@ export function SettingsView({
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ launchOnStartup: enabled }).catch(() => {});
     }
-    toast.success(enabled ? "Launch on startup enabled" : "Launch on startup disabled");
   };
 
-  const handleCheckUpdates = () => {
-    setIsCheckingUpdate(true);
-    setTimeout(() => {
-      setIsCheckingUpdate(false);
-      toast.success("Const Harness v0.1.0-alpha is up to date");
-    }, 700);
-  };
-
-  const handleOpenDataFolder = () => {
-    if (window.electron?.openConstFolder) {
-      window.electron.openConstFolder();
-      toast.success("Opening local .const data directory");
+  const handleOpenDataFolder = async () => {
+    try {
+      if (!(await window.electron?.openConstFolder?.()))
+        throw new Error("Unavailable");
+    } catch {
+      toast.error(t("settings.failedToOpenDataFolder"));
     }
   };
 
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // Real-time reactive query for 7M Token Quota from Convex
+  // Reactive account quota.
   const quota = useQuery(api.router.quotas.getUserQuota, {});
 
-  // Load config on mount or refresh
+  // Load native preferences on mount.
   useEffect(() => {
     if (window.electron?.getConfig) {
-      window.electron.getConfig().then((cfg) => {
-        setConfig(cfg);
-        if (cfg?.activeModel) {
-          setActiveModel(cfg.activeModel);
-        }
-        if (cfg?.defaultProjectLocation !== undefined) {
-          setDefaultProjectLocation(cfg.defaultProjectLocation);
-        }
-        if (cfg?.defaultPermission) {
-          setDefaultConfirmationMode(cfg.defaultPermission);
-        }
-        if (cfg?.queueMode) {
-          setQueueMode(cfg.queueMode);
-        }
-        if (cfg?.taskNotifications !== undefined) {
-          setTaskNotifications(cfg.taskNotifications);
-        }
-        if (cfg?.autoCheckUpdates !== undefined) {
-          setAutoUpdates(cfg.autoCheckUpdates);
-        }
-        if (cfg?.launchOnStartup !== undefined) {
-          setLaunchOnStartup(cfg.launchOnStartup);
-        }
-        if (cfg?.soundAlerts !== undefined) {
-          setSoundAlerts(cfg.soundAlerts);
-        }
-        if (cfg?.personalizationWorkRole !== undefined) {
-          setWorkRole(cfg.personalizationWorkRole);
-        }
-        if (cfg?.personalizationCustomInstructions !== undefined) {
-          setCustomInstructions(cfg.personalizationCustomInstructions);
-        }
-      });
+      let cancelled = false;
+      window.electron
+        .getConfig()
+        .then((cfg) => {
+          if (cancelled) return;
+          if (cfg?.activeModel) {
+            setActiveModel(cfg.activeModel);
+          }
+          if (cfg?.defaultProjectLocation !== undefined) {
+            setDefaultProjectLocation(cfg.defaultProjectLocation);
+          }
+          if (cfg?.defaultPermission) {
+            setDefaultConfirmationMode(cfg.defaultPermission);
+          }
+          if (cfg?.queueMode) {
+            setQueueMode(cfg.queueMode);
+          }
+          if (cfg?.taskNotifications !== undefined) {
+            setTaskNotifications(cfg.taskNotifications);
+          }
+          if (cfg?.autoCheckUpdates !== undefined) {
+            setAutoUpdates(cfg.autoCheckUpdates);
+          }
+          if (cfg?.launchOnStartup !== undefined) {
+            setLaunchOnStartup(cfg.launchOnStartup);
+          }
+          if (cfg?.soundAlerts !== undefined) {
+            setSoundAlerts(cfg.soundAlerts);
+          }
+          if (cfg?.personalizationWorkRole !== undefined) {
+            setWorkRole(cfg.personalizationWorkRole);
+          }
+          if (cfg?.personalizationCustomInstructions !== undefined) {
+            setCustomInstructions(cfg.personalizationCustomInstructions);
+          }
+        })
+        .catch(() => toast.error(t("settings.preferencesSaveFailed")));
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [refreshKey]);
+  }, []);
 
   // Personalization settings state
   const [workRole, setWorkRole] = useState<string>(() => {
     return localStorage.getItem("const_personalization_work_role") || "";
   });
   const [customInstructions, setCustomInstructions] = useState<string>(() => {
-    return localStorage.getItem("const_personalization_custom_instructions") || "";
+    return (
+      localStorage.getItem("const_personalization_custom_instructions") || ""
+    );
   });
   const [isSavingPersonalization, setIsSavingPersonalization] = useState(false);
 
-  const WORK_ROLE_OPTIONS = useMemo(
-    () => [
-      { id: "", label: "Select..." },
-      { id: "Software Engineer / Developer", label: "Software Engineer / Developer" },
-      { id: "Full-Stack Engineer", label: "Full-Stack Engineer" },
-      { id: "Frontend Engineer", label: "Frontend Engineer" },
-      { id: "Backend Engineer", label: "Backend Engineer" },
-      { id: "AI / ML Researcher", label: "AI / ML Researcher" },
-      { id: "Data Scientist / Analyst", label: "Data Scientist / Analyst" },
-      { id: "DevOps / Infrastructure Engineer", label: "DevOps / Infrastructure Engineer" },
-      { id: "Product Manager", label: "Product Manager" },
-      { id: "Student / Academic", label: "Student / Academic" },
-      { id: "Designer / Creative", label: "Designer / Creative" },
-      { id: "Technical Writer", label: "Technical Writer" },
-      { id: "Other", label: "Other" },
-    ],
-    []
-  );
-
-  const handleSavePersonalization = () => {
+  const handleSavePersonalization = async () => {
+    if (isSavingPersonalization) return;
     setIsSavingPersonalization(true);
-    localStorage.setItem("const_personalization_work_role", workRole);
-    localStorage.setItem("const_personalization_custom_instructions", customInstructions);
-    if (window.electron?.saveConfig) {
-      window.electron
-        .saveConfig({
-          personalizationWorkRole: workRole,
-          personalizationCustomInstructions: customInstructions,
-        })
-        .catch(() => {});
-    }
-    setTimeout(() => {
+    try {
+      localStorage.setItem("const_personalization_work_role", workRole);
+      localStorage.setItem(
+        "const_personalization_custom_instructions",
+        customInstructions,
+      );
+      await window.electron?.saveConfig?.({
+        personalizationWorkRole: workRole,
+        personalizationCustomInstructions: customInstructions,
+      });
+      toast.success(t("settings.personalizationSaved"));
+    } catch {
+      toast.error(t("settings.preferencesSaveFailed"));
+    } finally {
       setIsSavingPersonalization(false);
-      toast.success("Personalization saved successfully");
-    }, 200);
+    }
   };
 
   const handleSelectActiveModel = (modelId: string) => {
@@ -497,9 +451,10 @@ export function SettingsView({
     localStorage.setItem("const_harness_active_model", modelId);
   };
 
-  // Keyboard Shortcuts state & definitions matching ZCode
+  // Keyboard shortcut editing.
   const [shortcutsSearch, setShortcutsSearch] = useState<string>("");
-  const { shortcuts, updateShortcut, deleteShortcut, resetAll } = useKeyboardShortcuts();
+  const { shortcuts, updateShortcut, deleteShortcut, resetAll } =
+    useKeyboardShortcuts();
   const [recordingTarget, setRecordingTarget] = useState<{
     id: string;
     comboIndex: number;
@@ -507,18 +462,25 @@ export function SettingsView({
     keys: string[];
   } | null>(null);
 
+  recordingRef.current = Boolean(recordingTarget);
+
   const isMac = useMemo(() => {
-    return typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+    return (
+      typeof navigator !== "undefined" &&
+      /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
+    );
   }, []);
 
   const getCommandName = useCallback(
     (item: ShortcutItem) => {
-      const camelId = item.id.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      const camelId = item.id.replace(/_([a-z])/g, (_, letter) =>
+        letter.toUpperCase(),
+      );
       const transKey = `shortcuts.${camelId}` as any;
       const translated = t(transKey);
       return translated && translated !== transKey ? translated : item.command;
     },
-    [t]
+    [t],
   );
 
   const getScopeName = useCallback(
@@ -527,7 +489,7 @@ export function SettingsView({
       const translated = t(transKey);
       return translated && translated !== transKey ? translated : scope;
     },
-    [t]
+    [t],
   );
 
   // Listen to keyboard recording when changing keybindings
@@ -550,7 +512,9 @@ export function SettingsView({
           nextCombos[recordingTarget.comboIndex] = recordingTarget.keys;
           updateShortcut(recordingTarget.id, nextCombos);
           const cmdName = getCommandName(item);
-          toast.success(t("shortcuts.updatedToast" as any, { command: cmdName }));
+          toast.success(
+            t("shortcuts.updatedToast" as any, { command: cmdName }),
+          );
         }
         setRecordingTarget(null);
         return;
@@ -577,7 +541,8 @@ export function SettingsView({
     };
 
     window.addEventListener("keydown", handleKeyRecord, { capture: true });
-    return () => window.removeEventListener("keydown", handleKeyRecord, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleKeyRecord, { capture: true });
   }, [recordingTarget, shortcuts, updateShortcut, isMac, getCommandName, t]);
 
   const filteredShortcuts = useMemo(() => {
@@ -589,7 +554,7 @@ export function SettingsView({
       const scopeName = getScopeName(item.scope).toLowerCase();
       const rawScope = item.scope.toLowerCase();
       const matchCombo = item.keybindings.some((combo) =>
-        combo.some((k) => k.toLowerCase().includes(q))
+        combo.some((k) => k.toLowerCase().includes(q)),
       );
       return (
         cmdName.includes(q) ||
@@ -610,8 +575,16 @@ export function SettingsView({
         { id: "profile", label: t("settings.profile"), icon: UserRound },
         { id: "appearance", label: t("settings.appearance"), icon: Palette },
         { id: "model-settings", label: t("settings.models"), icon: Box },
-        { id: "personalization", label: t("settings.personalization"), icon: UserRoundPen },
-        { id: "keyboard-shortcuts", label: t("settings.keyboardShortcuts"), icon: Keyboard },
+        {
+          id: "personalization",
+          label: t("settings.personalization"),
+          icon: UserRoundPen,
+        },
+        {
+          id: "keyboard-shortcuts",
+          label: t("settings.keyboardShortcuts"),
+          icon: Keyboard,
+        },
       ],
     },
     {
@@ -631,77 +604,10 @@ export function SettingsView({
     },
   ];
 
-
-
-  const tabHeader = useMemo(() => {
-    switch (activeTab) {
-      case "general":
-        return {
-          title: t("settings.general"),
-          desc: "Manage default workbench preferences, agent execution modes, and system environment.",
-        };
-      case "profile":
-        return {
-          title: t("settings.profile"),
-          desc: "Manage your personal account profile, authentication, and token quota.",
-        };
-      case "appearance":
-        return {
-          title: t("settings.appearance"),
-          desc: "Configure theme mode and conversation workbench layout.",
-        };
-      case "model-settings":
-        return {
-          title: t("settings.models"),
-          desc: "Configure multi-modal AI models for LLM reasoning, speech synthesis, image generation, and cinematic video.",
-        };
-      case "personalization":
-        return {
-          title: t("settings.personalization"),
-          desc: "Give Const extra guidance and context for all your chats and tasks.",
-        };
-      case "keyboard-shortcuts":
-        return {
-          title: t("settings.keyboardShortcuts"),
-          desc: "Keyboard shortcuts and hotkeys for fast navigation across the workbench.",
-        };
-      case "usage-stats":
-        return {
-          title: t("settings.usageStatistic"),
-          desc: "Monitor your weekly token consumption and account usage limits.",
-        };
-      case "computer-use":
-        return {
-          title: t("settings.computerUseTitle"),
-          desc: t("settings.computerUseSubtitle"),
-        };
-      case "memory":
-        return {
-          title: t("settings.memory"),
-          desc: "Save and reuse long-term context across your workspaces and global sessions.",
-        };
-      case "mcp-servers":
-        return {
-          title: t("settings.mcpServers"),
-          desc: t("mcp.settingsDescription"),
-        };
-      case "subagents":
-        return {
-          title: t("settings.subagents"),
-          desc: "Configure autonomous subagent swarms and delegation capabilities.",
-        };
-      case "plugins":
-        return {
-          title: t("settings.plugins"),
-          desc: t("marketplace.subtitle"),
-        };
-      default:
-        return {
-          title: activeTab.replace(/-/g, " "),
-          desc: t("settings.capabilityUpcoming"),
-        };
-    }
-  }, [activeTab, t]);
+  const tabTitle =
+    navCategories
+      .flatMap((category) => category.items)
+      .find((item) => item.id === activeTab)?.label || t("settings.title");
 
   if (!open) return null;
 
@@ -714,14 +620,13 @@ export function SettingsView({
       aria-label={t("settings.title")}
     >
       <div
-        className="workspace-settings w-[980px] max-w-[95vw] h-[670px] max-h-[88vh] bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex overflow-hidden text-[#262626] dark:text-[#d4d4d4] font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 shadow-2xl dark:shadow-[0_24px_70px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-[0.985] duration-150"
+        ref={dialogRef}
+        className="workspace-settings w-[1040px] max-w-[96vw] h-[720px] max-h-[90vh] bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex overflow-hidden text-[#262626] dark:text-[#d4d4d4] font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 animate-in fade-in zoom-in-[0.985] duration-150"
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
       >
-        {/* ----------------------------------------------------------- */}
         {/* Left Sidebar inside Modal                                   */}
-        {/* ----------------------------------------------------------- */}
-        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col shrink-0 bg-[#f8f9fa] dark:bg-[#181818] border-r border-neutral-200/80 dark:border-[#282828] p-3 select-none">
+        <aside className="w-[208px] h-full flex flex-col shrink-0 bg-[#f8f9fa] dark:bg-[#222222] p-3 select-none">
           {/* Top Heading */}
           <div className="px-2.5 pt-2 pb-2 shrink-0 mb-1">
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
@@ -734,7 +639,7 @@ export function SettingsView({
             <div className="flex flex-col gap-4 pt-1">
               {navCategories.map((cat) => (
                 <div key={cat.label} className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider px-2.5 pt-1.5 pb-0.5">
+                  <span className="text-[11px] font-medium text-neutral-500 dark:text-[#969696] px-2.5 pt-1.5 pb-1">
                     {cat.label}
                   </span>
                   <div className="flex flex-col gap-0.5">
@@ -746,19 +651,20 @@ export function SettingsView({
                           key={item.id}
                           type="button"
                           onClick={() => setActiveTab(item.id)}
+                          aria-current={isActive ? "page" : undefined}
                           className={cn(
-                            "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left outline-none focus:outline-none",
+                            "settings-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-[8px] text-xs font-medium transition-colors cursor-pointer text-left outline-none focus:outline-none",
                             isActive
-                              ? "bg-neutral-200/80 dark:bg-[#2c2c2c] text-neutral-900 dark:text-white font-semibold shadow-2xs"
-                              : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-[#222222]"
+                              ? "bg-neutral-200/80 dark:bg-[#383838] text-neutral-900 dark:text-white font-medium"
+                              : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/50 dark:hover:bg-white/5",
                           )}
                         >
                           <Icon
                             className={cn(
                               "w-4 h-4 shrink-0 transition-colors",
                               isActive
-                                ? "text-blue-600 dark:text-white"
-                                : "text-neutral-400 dark:text-neutral-500"
+                                ? "text-neutral-900 dark:text-white"
+                                : "text-neutral-500 dark:text-[#969696]",
                             )}
                           />
                           <span className="truncate">{item.label}</span>
@@ -771,20 +677,14 @@ export function SettingsView({
             </div>
           </ScrollArea>
         </aside>
-
-        {/* ----------------------------------------------------------- */}
         {/* Right Main Content Area                                     */}
-        {/* ----------------------------------------------------------- */}
         <main className="flex-1 h-full flex flex-col min-w-0 bg-[#ffffff] dark:bg-[#161616] overflow-hidden">
           {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' */}
-          <div className="flex-none px-6 sm:px-8 pt-6 pb-3 flex items-start justify-between gap-4 select-none">
+          <div className="flex-none px-6 sm:px-10 pt-6 pb-4 flex items-start justify-between gap-4 select-none">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-neutral-900 dark:text-white capitalize">
-                {tabHeader.title}
+              <h1 className="text-[22px] font-normal tracking-tight text-neutral-900 dark:text-white">
+                {tabTitle}
               </h1>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                {tabHeader.desc}
-              </p>
             </div>
 
             {/* Top-Right Close Button 'X' */}
@@ -800,7 +700,11 @@ export function SettingsView({
           </div>
 
           {/* Dynamic Section Content wrapped in Radix ScrollArea */}
-          <ScrollArea className="flex-1 min-h-0 w-full px-6 sm:px-8 py-4">
+          <ScrollArea
+            key={activeTab}
+            className="settings-content flex-1 min-h-0 w-full px-6 sm:px-10 pb-4"
+            thumbClassName="bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30"
+          >
             {activeTab === "profile" ? (
               <ProfileSettings
                 user={user}
@@ -809,404 +713,156 @@ export function SettingsView({
                 onSwitchAccount={onSwitchAccount}
               />
             ) : activeTab === "general" ? (
-              /* --------------------------------------------------------- */
-              /* General Settings Tab                                      */
-              /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* 1. Workspace & Execution Section */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    {t("settings.workspaceAndExecution")}
-                  </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
-                    {/* Default Project Location */}
-                    <div className="flex flex-col gap-2.5">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.defaultProjectLocation")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.defaultProjectLocationDesc")}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 rounded-lg bg-[#ffffff] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#333333]">
-                        <div className="flex items-center gap-2 min-w-0 flex-1 px-1">
-                          <FolderOpen className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
-                          <span className="font-mono text-xs text-[#262626] dark:text-[#d4d4d4] truncate">
-                            {defaultProjectLocation || "Default (~/.const/harness/brain)"}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0 justify-end">
-                          <button
-                            type="button"
-                            onClick={handleBrowseDefaultLocation}
-                            className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5" />
-                            <span>{t("settings.browse")}</span>
-                          </button>
-                          {defaultProjectLocation && (
-                            <button
-                              type="button"
-                              onClick={handleResetDefaultLocation}
-                              className="px-2 py-1 text-[11px] font-medium rounded-md border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838] hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
-                              title={t("settings.resetDefaultLocation")}
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Reset</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Agent Permissions */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.defaultPermission")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.defaultPermissionDesc")}
-                        </span>
-                      </div>
-
-                      <div className="relative shrink-0" ref={presetDropdownRef}>
+              <div className="w-full min-w-0 space-y-6 pb-6">
+                <SettingsSection title={t("settings.workspaceAndExecution")}>
+                  <SettingsRow label={t("settings.defaultProjectLocation")}>
+                    <div className="flex max-w-full items-center gap-2">
+                      <span
+                        className="min-w-0 max-w-40 truncate text-xs text-neutral-500 dark:text-[#969696] select-text"
+                        title={
+                          defaultProjectLocation || "~/.const/harness/brain"
+                        }
+                      >
+                        {defaultProjectLocation || "~/.const/harness/brain"}
+                      </span>
+                      {defaultProjectLocation && (
                         <button
                           type="button"
-                          onClick={() => setIsPresetDropdownOpen((prev) => !prev)}
-                          className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] border border-[#dedee2] dark:border-[#383838] text-[12px] font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
+                          className={`${settingsButton} px-2`}
+                          title={t("settings.resetDefaultLocation")}
+                          onClick={handleResetDefaultLocation}
                         >
-                          <span>
-                            {defaultConfirmationMode === "full_access"
-                              ? t("settings.fullMachine")
-                              : defaultConfirmationMode === "request_review"
-                              ? t("settings.requestReview")
-                              : t("settings.askBeforeChanges")}
-                          </span>
-                          <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                          <RotateCcw className="size-3.5" />
                         </button>
-
-                        {isPresetDropdownOpen && (
-                          <div className="absolute right-0 top-full mt-1.5 w-64 bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
-                            <button
-                              type="button"
-                              onClick={() => handleSetDefaultMode("ask_before_changes")}
-                              className={cn(
-                                "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
-                                defaultConfirmationMode === "ask_before_changes"
-                                  ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                                  : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                              )}
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-[12px]">{t("settings.askBeforeChangesDefault")}</span>
-                                <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  {t("settings.askBeforeChangesDesc")}
-                                </span>
-                              </div>
-                              {defaultConfirmationMode === "ask_before_changes" && (
-                                <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSetDefaultMode("full_access")}
-                              className={cn(
-                                "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
-                                defaultConfirmationMode === "full_access"
-                                  ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                                  : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                              )}
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-[12px]">{t("settings.fullMachine")}</span>
-                                <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  {t("settings.fullMachineDesc")}
-                                </span>
-                              </div>
-                              {defaultConfirmationMode === "full_access" && (
-                                <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSetDefaultMode("request_review")}
-                              className={cn(
-                                "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none",
-                                defaultConfirmationMode === "request_review"
-                                  ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                                  : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                              )}
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-[12px]">{t("settings.requestReview")}</span>
-                                <span className="text-[10px] text-[#737373] dark:text-[#969696] font-normal">
-                                  {t("settings.requestReviewDesc")}
-                                </span>
-                              </div>
-                              {defaultConfirmationMode === "request_review" && (
-                                <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Message Queuing Behavior */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.queueMessageTitle")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.queueMessageDesc")}
-                        </span>
-                      </div>
-
-                      <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleSetQueueMode("queue")}
-                          className={cn(
-                            "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
-                            queueMode === "queue"
-                              ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.queueModeQueueTitle")}
-                        >
-                          <span>{t("settings.queueModeQueue")}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetQueueMode("steer")}
-                          className={cn(
-                            "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
-                            queueMode === "steer"
-                              ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.queueModeSteerTitle")}
-                        >
-                          <span>{t("settings.queueModeSteer")}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Preferences & System Section */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    {t("settings.preferencesAndSystem")}
-                  </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
-                    {/* Interface Language */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Globe className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.interfaceLanguage")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.interfaceLanguageDesc")}
-                        </span>
-                      </div>
-
-                      <div className="relative shrink-0" ref={languageDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsLanguageDropdownOpen((prev) => !prev)}
-                          className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] border border-[#dedee2] dark:border-[#383838] text-[12px] font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
-                        >
-                          <Globe className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                          <span>
-                            {LANGUAGE_OPTIONS.find((l) => l.id === language)?.native || "English (US)"}
-                          </span>
-                          <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        </button>
-
-                        {isLanguageDropdownOpen && (
-                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
-                            {LANGUAGE_OPTIONS.map((opt) => {
-                              const isSelected = language === opt.id;
-                              return (
-                                <button
-                                  key={opt.id}
-                                  type="button"
-                                  onClick={() => handleSetLanguage(opt.id)}
-                                  className={cn(
-                                    "w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer outline-none focus:outline-none text-xs",
-                                    isSelected
-                                      ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                                      : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                                  )}
-                                >
-                                  <div className="flex flex-col">
-                                    <span>{opt.native}</span>
-                                    <span className="text-[10px] text-[#737373] dark:text-[#969696]">
-                                      {opt.label}
-                                    </span>
-                                  </div>
-                                  {isSelected && (
-                                    <Check className="w-3.5 h-3.5 shrink-0 text-[#262626] dark:text-white" />
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Desktop Notifications */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Bell className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.taskNotifications")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.taskNotificationsDesc")}
-                        </span>
-                      </div>
-
-                      <Switch
-                        checked={taskNotifications}
-                        onCheckedChange={handleToggleTaskNotifications}
-                      />
-                    </div>
-
-                    {/* Completion Sound Effects */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Volume2 className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.completionSounds")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.completionSoundsDesc")}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => playTaskCompletionSound()}
-                          className="px-2 py-1 text-[11px] rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#d4d4d4] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1 outline-none focus:outline-none"
-                          title={t("settings.previewChime")}
-                        >
-                          <Play className="w-3 h-3 fill-current" />
-                          <span>{t("settings.test")}</span>
-                        </button>
-                        <Switch
-                          checked={soundAlerts}
-                          onCheckedChange={handleToggleSoundAlerts}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Automatic Updates */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <RefreshCw className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.autoUpdates")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.autoUpdatesDesc")}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={isCheckingUpdate}
-                          onClick={handleCheckUpdates}
-                          className="px-2.5 py-1 text-[11px] font-medium rounded-md border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none disabled:opacity-50"
-                        >
-                          <RefreshCw className={cn("w-3 h-3", isCheckingUpdate && "animate-spin")} />
-                          <span>{isCheckingUpdate ? t("settings.checkingUpdates") : t("settings.checkUpdates")}</span>
-                        </button>
-                        <Switch
-                          checked={autoUpdates}
-                          onCheckedChange={handleToggleAutoUpdates}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Launch on Startup */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Laptop className="w-4 h-4 text-[#737373] dark:text-[#969696]" />
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.launchOnStartup")}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.launchOnStartupDesc")}
-                        </span>
-                      </div>
-
-                      <Switch
-                        checked={launchOnStartup}
-                        onCheckedChange={handleToggleLaunchOnStartup}
-                      />
-                    </div>
-
-                    {/* Local Storage & System Info */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                            {t("settings.localStorageTitle")}
-                          </span>
-                          <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-black/5 dark:bg-white/10 text-[#737373] dark:text-[#a3a3a3]">
-                            v0.1.0-alpha
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                          {t("settings.localStorageDesc")}
-                        </span>
-                      </div>
-
+                      )}
                       <button
                         type="button"
-                        onClick={handleOpenDataFolder}
-                        className="self-start sm:self-center px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none shrink-0"
+                        className={settingsButton}
+                        onClick={handleBrowseDefaultLocation}
                       >
-                        <FolderOpen className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span>{t("settings.openFolder")}</span>
+                        {t("settings.browse")}
                       </button>
                     </div>
-                  </div>
-                </div>
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.defaultPermission")}>
+                    <SettingsSelect
+                      label={t("settings.defaultPermission")}
+                      value={defaultConfirmationMode}
+                      onChange={(value) =>
+                        handleSetDefaultMode(
+                          value as typeof defaultConfirmationMode,
+                        )
+                      }
+                      options={[
+                        {
+                          value: "ask_before_changes",
+                          label: t("settings.askBeforeChanges"),
+                          hint: t("settings.askBeforeChangesDesc"),
+                        },
+                        {
+                          value: "full_access",
+                          label: t("settings.fullMachine"),
+                          hint: t("settings.fullMachineDesc"),
+                        },
+                        {
+                          value: "request_review",
+                          label: t("settings.requestReview"),
+                          hint: t("settings.requestReviewDesc"),
+                        },
+                      ]}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.queueMessageTitle")}>
+                    <SettingsChoice
+                      label={t("settings.queueMessageTitle")}
+                      value={queueMode}
+                      onChange={handleSetQueueMode}
+                      options={[
+                        { value: "queue", label: t("settings.queueModeQueue") },
+                        { value: "steer", label: t("settings.queueModeSteer") },
+                      ]}
+                    />
+                  </SettingsRow>
+                </SettingsSection>
+                <SettingsSection title={t("settings.preferencesAndSystem")}>
+                  <SettingsRow label={t("settings.interfaceLanguage")}>
+                    <SettingsSelect
+                      label={t("settings.interfaceLanguage")}
+                      value={language}
+                      onChange={(value) =>
+                        handleSetLanguage(value as SupportedLanguage)
+                      }
+                      options={LANGUAGE_OPTIONS.map((option) => ({
+                        value: option.id,
+                        label: option.native,
+                      }))}
+                    />
+                  </SettingsRow>
+                  <SettingsRow
+                    label={t("settings.taskNotifications")}
+                    htmlFor="settings-notifications"
+                  >
+                    <Switch
+                      id="settings-notifications"
+                      checked={taskNotifications}
+                      onCheckedChange={handleToggleTaskNotifications}
+                    />
+                  </SettingsRow>
+                  <SettingsRow
+                    label={t("settings.completionSounds")}
+                    htmlFor="settings-sounds"
+                  >
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className={settingsButton}
+                        title={t("settings.previewChime")}
+                        onClick={() => playTaskCompletionSound()}
+                      >
+                        <Play className="size-3" />
+                        {t("settings.test")}
+                      </button>
+                      <Switch
+                        id="settings-sounds"
+                        checked={soundAlerts}
+                        onCheckedChange={handleToggleSoundAlerts}
+                      />
+                    </div>
+                  </SettingsRow>
+                  <SettingsRow
+                    label={t("settings.autoUpdates")}
+                    htmlFor="settings-updates"
+                  >
+                    <Switch
+                      id="settings-updates"
+                      checked={autoUpdates}
+                      onCheckedChange={handleToggleAutoUpdates}
+                    />
+                  </SettingsRow>
+                  <SettingsRow
+                    label={t("settings.launchOnStartup")}
+                    htmlFor="settings-startup"
+                  >
+                    <Switch
+                      id="settings-startup"
+                      checked={launchOnStartup}
+                      onCheckedChange={handleToggleLaunchOnStartup}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.localStorageTitle")}>
+                    <button
+                      type="button"
+                      className={settingsButton}
+                      onClick={handleOpenDataFolder}
+                    >
+                      <FolderOpen className="size-3.5" />
+                      {t("settings.openFolder")}
+                    </button>
+                  </SettingsRow>
+                </SettingsSection>
               </div>
             ) : activeTab === "keyboard-shortcuts" ? (
-              /* --------------------------------------------------------- */
               /* Keyboard Shortcuts Tab (Matching ZCode UI & Hotkeys)      */
-              /* --------------------------------------------------------- */
               <div className="flex flex-col gap-4 w-full pb-8 select-none">
                 {/* Search Bar & Reset to defaults */}
                 <div className="flex items-center justify-between gap-3">
@@ -1239,18 +895,26 @@ export function SettingsView({
                 </div>
 
                 {/* Shortcuts Table */}
-                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] overflow-hidden">
+                <div className="rounded-xl bg-neutral-50 dark:bg-[#222222] overflow-hidden">
                   {/* Table Header */}
-                  <div className="px-4 py-2.5 border-b border-[#dedee2] dark:border-[#383838] bg-[#f0f0f4] dark:bg-[#282828] grid grid-cols-12 text-xs font-medium text-[#737373] dark:text-[#a0a0a5] select-none">
-                    <div className="col-span-5">{t("shortcuts.columnCommand")}</div>
-                    <div className="col-span-4 pl-1">{t("shortcuts.columnKeybinding")}</div>
-                    <div className="col-span-2 text-left">{t("shortcuts.columnScope")}</div>
-                    <div className="col-span-1 text-right pr-1">{t("shortcuts.columnActions")}</div>
+                  <div className="px-4 py-2.5 border-[#dedee2] dark:border-[#383838] bg-[#f0f0f4] dark:bg-[#282828] grid grid-cols-12 text-xs font-medium text-[#737373] dark:text-[#a0a0a5] select-none">
+                    <div className="col-span-5">
+                      {t("shortcuts.columnCommand")}
+                    </div>
+                    <div className="col-span-4 pl-1">
+                      {t("shortcuts.columnKeybinding")}
+                    </div>
+                    <div className="col-span-2 text-left">
+                      {t("shortcuts.columnScope")}
+                    </div>
+                    <div className="col-span-1 text-right pr-1">
+                      {t("shortcuts.columnActions")}
+                    </div>
                   </div>
 
                   {/* Table Body */}
                   {filteredShortcuts.length > 0 ? (
-                    <div className="divide-y divide-[#dedee2] dark:divide-[#333333]">
+                    <div className="space-y-1">
                       {filteredShortcuts.map((item) => {
                         const cmdName = getCommandName(item);
                         return (
@@ -1267,12 +931,15 @@ export function SettingsView({
                             <div className="col-span-4 pl-1 flex flex-col gap-1.5">
                               {item.keybindings.length > 0 ? (
                                 item.keybindings.map((combo, comboIdx) => (
-                                  <div key={comboIdx} className="flex items-center gap-2">
+                                  <div
+                                    key={comboIdx}
+                                    className="flex items-center gap-2"
+                                  >
                                     <div className="flex items-center gap-1">
                                       {combo.map((k, kIdx) => (
                                         <kbd
                                           key={kIdx}
-                                          className="px-2 py-0.5 text-[11px] font-mono font-medium rounded-md bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-[#f0f0f0] shadow-xs"
+                                          className="px-2 py-0.5 text-[11px] font-sans font-medium rounded-md bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-[#f0f0f0] shadow-xs"
                                         >
                                           {isMac && k === "Ctrl" ? "⌘" : k}
                                         </kbd>
@@ -1289,7 +956,9 @@ export function SettingsView({
                                         })
                                       }
                                       className="p-1 rounded text-[#737373] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
-                                      title={t("shortcuts.editTooltip", { command: cmdName })}
+                                      title={t("shortcuts.editTooltip", {
+                                        command: cmdName,
+                                      })}
                                     >
                                       <Pencil className="w-3 h-3" />
                                     </button>
@@ -1324,10 +993,16 @@ export function SettingsView({
                                 type="button"
                                 onClick={() => {
                                   deleteShortcut(item.id);
-                                  toast.info(t("shortcuts.clearedToast", { command: cmdName }));
+                                  toast.info(
+                                    t("shortcuts.clearedToast", {
+                                      command: cmdName,
+                                    }),
+                                  );
                                 }}
                                 className="p-1.5 rounded-lg text-[#737373] dark:text-[#888888] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer opacity-70 group-hover:opacity-100"
-                                title={t("shortcuts.clearTooltip", { command: cmdName })}
+                                title={t("shortcuts.clearTooltip", {
+                                  command: cmdName,
+                                })}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1347,494 +1022,184 @@ export function SettingsView({
                 </div>
               </div>
             ) : activeTab === "appearance" ? (
-              /* --------------------------------------------------------- */
-              /* Appearance Settings Tab                                   */
-              /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* Theme & Layout Card */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    {t("settings.themeAndLayout")}
-                  </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
-                    {/* 1. App Theme */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.appTheme")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.appThemeDesc")}
-                        </span>
-                      </div>
-
-                      {/* Segmented Control */}
-                      <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setTheme("system")}
-                          className={cn(
-                            "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
-                            theme === "system"
-                              ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.themeSystemTitle")}
-                        >
-                          <Monitor className="w-3.5 h-3.5" />
-                          <span>{t("settings.themeSystem")}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTheme("light")}
-                          className={cn(
-                            "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
-                            theme === "light"
-                              ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.themeLightTitle")}
-                        >
-                          <Sun className="w-3.5 h-3.5" />
-                          <span>{t("settings.themeLight")}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTheme("dark")}
-                          className={cn(
-                            "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5 outline-none focus:outline-none",
-                            theme === "dark"
-                              ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.themeDarkTitle")}
-                        >
-                          <Moon className="w-3.5 h-3.5" />
-                          <span>{t("settings.themeDark")}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 2. Conversation Width */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.conversationWidth")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.conversationWidthDesc")}
-                        </span>
-                      </div>
-
-                      {/* Segmented Control */}
-                      <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                        {(["default", "narrow", "wide"] as const).map((w) => {
-                          const isSelected = conversationWidth === w;
-                          const label = w === "default" ? t("settings.widthDefault") : w === "narrow" ? t("settings.widthNarrow") : t("settings.widthWide");
-                          const sizeHint = w === "default" ? "672px" : w === "narrow" ? "540px" : "896px";
-                          return (
-                            <button
-                              key={w}
-                              type="button"
-                              onClick={() => setConversationWidth(w)}
-                              className={cn(
-                                "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer outline-none focus:outline-none",
-                                isSelected
-                                  ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-2xs font-medium"
-                                  : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                              )}
-                              title={`${label} width (${sizeHint})`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Typography & Rendering Card */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                    {t("settings.typographyAndCode")}
-                  </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-4">
-                    {/* 3. UI Font Size */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.uiFontSize")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.uiFontSizeDesc")}
-                        </span>
-                      </div>
-
-                      {/* Stepper Control: [-] [16px] [+] and Reset */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                          <button
-                            type="button"
-                            disabled={uiFontSize <= MIN_UI_FONT_SIZE}
-                            onClick={() => setUiFontSize(Math.max(MIN_UI_FONT_SIZE, uiFontSize - 1))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              uiFontSize <= MIN_UI_FONT_SIZE
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Decrease UI font size (${Math.max(MIN_UI_FONT_SIZE, uiFontSize - 1)}px)`}
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-
-                          <span className="min-w-[44px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
-                            {uiFontSize}px
-                          </span>
-
-                          <button
-                            type="button"
-                            disabled={uiFontSize >= MAX_UI_FONT_SIZE}
-                            onClick={() => setUiFontSize(Math.min(MAX_UI_FONT_SIZE, uiFontSize + 1))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              uiFontSize >= MAX_UI_FONT_SIZE
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Increase UI font size (${Math.min(MAX_UI_FONT_SIZE, uiFontSize + 1)}px)`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {uiFontSize !== DEFAULT_UI_FONT_SIZE && (
-                          <button
-                            type="button"
-                            onClick={() => setUiFontSize(DEFAULT_UI_FONT_SIZE)}
-                            className="px-2 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
-                            title="Reset UI font size to default (16px)"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Reset</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 4. Code Font Size */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.codeFontSize")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.codeFontSizeDesc")}
-                        </span>
-                      </div>
-
-                      {/* Stepper Control: [-] [12px] [+] and Reset */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                          <button
-                            type="button"
-                            disabled={codeFontSize <= MIN_CODE_FONT_SIZE}
-                            onClick={() => setCodeFontSize(Math.max(MIN_CODE_FONT_SIZE, codeFontSize - 1))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              codeFontSize <= MIN_CODE_FONT_SIZE
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Decrease code font size (${Math.max(MIN_CODE_FONT_SIZE, codeFontSize - 1)}px)`}
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-
-                          <span className="min-w-[44px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
-                            {codeFontSize}px
-                          </span>
-
-                          <button
-                            type="button"
-                            disabled={codeFontSize >= MAX_CODE_FONT_SIZE}
-                            onClick={() => setCodeFontSize(Math.min(MAX_CODE_FONT_SIZE, codeFontSize + 1))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              codeFontSize >= MAX_CODE_FONT_SIZE
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Increase code font size (${Math.min(MAX_CODE_FONT_SIZE, codeFontSize + 1)}px)`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {codeFontSize !== DEFAULT_CODE_FONT_SIZE && (
-                          <button
-                            type="button"
-                            onClick={() => setCodeFontSize(DEFAULT_CODE_FONT_SIZE)}
-                            className="px-2 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
-                            title="Reset code font size to default (12px)"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Reset</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 5. Diff marks (matching user Image 1) */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.diffMarksTitle")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.diffMarksDesc")}
-                        </span>
-                      </div>
-
-                      {/* Segmented Control matching user Image 1: Color | +/- */}
-                      <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setDiffMarks("color")}
-                          className={cn(
-                            "px-3 py-1 text-[11px] rounded-md transition-all cursor-pointer font-medium outline-none focus:outline-none",
-                            diffMarks === "color"
-                              ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.diffMarksColorTitle")}
-                        >
-                          {t("settings.diffMarksColor")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDiffMarks("symbols")}
-                          className={cn(
-                            "px-3 py-1 text-[11px] rounded-md transition-all cursor-pointer font-medium outline-none focus:outline-none",
-                            diffMarks === "symbols"
-                              ? "bg-[#ffffff] dark:bg-[#e6e6e6] text-[#111111] dark:text-black shadow-2xs"
-                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                          )}
-                          title={t("settings.diffMarksSymbolsTitle")}
-                        >
-                          {t("settings.diffMarksSymbols")}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 6. Interface Scale / Zoom */}
-                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                          {t("settings.windowScale")}
-                        </span>
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                          {t("settings.windowScaleDesc", { min: MIN_ZOOM, max: MAX_ZOOM })}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                          <button
-                            type="button"
-                            disabled={zoom <= MIN_ZOOM}
-                            onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              zoom <= MIN_ZOOM
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Decrease window zoom (${Math.max(MIN_ZOOM, zoom - ZOOM_STEP)}%)`}
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-
-                          <span className="min-w-[48px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
-                            {zoom}%
-                          </span>
-
-                          <button
-                            type="button"
-                            disabled={zoom >= MAX_ZOOM}
-                            onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
-                            className={cn(
-                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                              zoom >= MAX_ZOOM
-                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                            )}
-                            title={`Increase window zoom (${Math.min(MAX_ZOOM, zoom + ZOOM_STEP)}%)`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {zoom !== DEFAULT_ZOOM && (
-                          <button
-                            type="button"
-                            onClick={() => setZoom(DEFAULT_ZOOM)}
-                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
-                            title="Reset window zoom to default (100%)"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>Reset</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="w-full min-w-0 space-y-6 pb-6">
+                <SettingsSection title={t("settings.themeAndLayout")}>
+                  <SettingsRow label={t("settings.appTheme")}>
+                    <SettingsChoice
+                      label={t("settings.appTheme")}
+                      value={theme}
+                      onChange={setTheme}
+                      options={[
+                        {
+                          value: "system",
+                          label: t("settings.themeSystem"),
+                          icon: <Monitor className="size-3.5" />,
+                        },
+                        {
+                          value: "light",
+                          label: t("settings.themeLight"),
+                          icon: <Sun className="size-3.5" />,
+                        },
+                        {
+                          value: "dark",
+                          label: t("settings.themeDark"),
+                          icon: <Moon className="size-3.5" />,
+                        },
+                      ]}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.conversationWidth")}>
+                    <SettingsChoice
+                      label={t("settings.conversationWidth")}
+                      value={conversationWidth}
+                      onChange={setConversationWidth}
+                      options={[
+                        { value: "narrow", label: t("settings.widthNarrow") },
+                        { value: "default", label: t("settings.widthDefault") },
+                        { value: "wide", label: t("settings.widthWide") },
+                      ]}
+                    />
+                  </SettingsRow>
+                </SettingsSection>
+                <SettingsSection title={t("settings.typographyAndCode")}>
+                  <SettingsRow label={t("settings.uiFontSize")}>
+                    <SettingsStepper
+                      label={t("settings.uiFontSize")}
+                      value={uiFontSize}
+                      min={MIN_UI_FONT_SIZE}
+                      max={MAX_UI_FONT_SIZE}
+                      defaultValue={DEFAULT_UI_FONT_SIZE}
+                      onChange={setUiFontSize}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.codeFontSize")}>
+                    <SettingsStepper
+                      label={t("settings.codeFontSize")}
+                      value={codeFontSize}
+                      min={MIN_CODE_FONT_SIZE}
+                      max={MAX_CODE_FONT_SIZE}
+                      defaultValue={DEFAULT_CODE_FONT_SIZE}
+                      onChange={setCodeFontSize}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.diffMarksTitle")}>
+                    <SettingsChoice
+                      label={t("settings.diffMarksTitle")}
+                      value={diffMarks}
+                      onChange={setDiffMarks}
+                      options={[
+                        { value: "color", label: t("settings.diffMarksColor") },
+                        {
+                          value: "symbols",
+                          label: t("settings.diffMarksSymbols"),
+                        },
+                      ]}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label={t("settings.windowScale")}>
+                    <SettingsStepper
+                      label={t("settings.windowScale")}
+                      value={zoom}
+                      min={MIN_ZOOM}
+                      max={MAX_ZOOM}
+                      defaultValue={DEFAULT_ZOOM}
+                      step={ZOOM_STEP}
+                      unit="%"
+                      onChange={setZoom}
+                    />
+                  </SettingsRow>
+                </SettingsSection>
               </div>
             ) : activeTab === "usage-stats" ? (
-              /* --------------------------------------------------------- */
               /* Usage Stats Tab (matching user Image 1 & Image 2)          */
-              /* --------------------------------------------------------- */
               <UsageStatsView
                 quota={quota}
                 activeModel={activeModel}
                 user={user}
               />
             ) : activeTab === "personalization" ? (
-              /* --------------------------------------------------------- */
-              /* Personalization Tab (matching user Image 2 & Image 3)    */
-              /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-5 max-w-2xl pb-6">
-                {/* 1. What best describes your work? (Image 2 & 3) */}
-                <div className="flex flex-col gap-2">
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                      {t("settings.whatBestDescribesWork")}
-                    </span>
-
-                    <div className="relative shrink-0 w-full sm:w-64" ref={roleDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsRoleDropdownOpen((prev) => !prev)}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] hover:bg-[#f9f9fb] dark:hover:bg-[#262626] text-[#262626] dark:text-white flex items-center justify-between gap-2 transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-primary"
-                      >
-                        <span className="truncate">
-                          {WORK_ROLE_OPTIONS.find((r) => r.id === workRole)?.label || t("settings.selectWorkRole")}
-                        </span>
-                        <ChevronDown className={cn("w-3.5 h-3.5 text-[#737373] dark:text-[#969696] shrink-0 transition-transform duration-150", isRoleDropdownOpen && "rotate-180")} />
-                      </button>
-
-                      {isRoleDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-1.5 w-full min-w-[240px] max-h-60 overflow-y-auto bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
-                          {WORK_ROLE_OPTIONS.map((opt) => {
-                            const isSelected = workRole === opt.id;
-                            return (
-                              <button
-                                key={opt.id || "empty"}
-                                type="button"
-                                onClick={() => {
-                                  setWorkRole(opt.id);
-                                  setIsRoleDropdownOpen(false);
-                                }}
-                                className={cn(
-                                  "w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer outline-none focus:outline-none",
-                                  isSelected
-                                    ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                                    : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                                )}
-                              >
-                                <span className="truncate">{opt.label}</span>
-                                {isSelected && (
-                                  <Check className="w-3.5 h-3.5 shrink-0 text-[#262626] dark:text-white" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              <div className="w-full min-w-0 space-y-5 pb-6">
+                <SettingsRow
+                  label={t("settings.workRole")}
+                  htmlFor="settings-work-role"
+                >
+                  <input
+                    id="settings-work-role"
+                    value={workRole}
+                    onChange={(event) => setWorkRole(event.target.value)}
+                    className={`${settingsInput} w-64 max-w-full`}
+                  />
+                </SettingsRow>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="settings-instructions"
+                    className="block text-[13px] text-neutral-900 dark:text-white"
+                  >
+                    {t("settings.customInstructions")}
+                  </label>
+                  <textarea
+                    id="settings-instructions"
+                    value={customInstructions}
+                    onChange={(event) =>
+                      setCustomInstructions(event.target.value)
+                    }
+                    placeholder={t("settings.customInstructionsPlaceholder")}
+                    rows={4}
+                    className={`${settingsInput} block resize-y min-h-28 max-h-72 leading-relaxed`}
+                  />
+                  <p className="text-xs text-neutral-500 dark:text-[#969696]">
+                    {t("settings.instructionsHint")}
+                  </p>
                 </div>
-
-                {/* 2. Custom Instructions (Image 3) */}
-                <div className="flex flex-col gap-2">
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-5 flex flex-col gap-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        {t("settings.customInstructions")}
-                      </span>
-                      <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
-                        {t("settings.customInstructionsDesc")}
-                        <button
-                          type="button"
-                          onClick={() => toast.info(t("settings.instructionsAppliedToast"))}
-                          className="ml-1 text-[#3b82f6] hover:underline cursor-pointer inline-block"
-                        >
-                          {t("settings.learnMore")}
-                        </button>
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                      <textarea
-                        value={customInstructions}
-                        onChange={(e) => setCustomInstructions(e.target.value)}
-                        placeholder={t("settings.customInstructionsPlaceholder")}
-                        rows={7}
-                        className="w-full p-3.5 text-xs font-mono leading-relaxed rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#171717] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a3a3a3] dark:placeholder:text-[#666666] focus:outline-none focus:ring-1 focus:ring-primary resize-y min-h-[160px] transition-colors"
-                      />
-
-                      {/* Save Button matching Image 3 */}
-                      <div className="flex items-center justify-end">
-                        <button
-                          type="button"
-                          disabled={isSavingPersonalization}
-                          onClick={handleSavePersonalization}
-                          className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[#262626] hover:bg-[#111111] dark:bg-[#ffffff] dark:hover:bg-[#ebebed] text-white dark:text-black transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                        >
-                          {isSavingPersonalization ? t("settings.saving") : t("settings.save")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className={settingsPrimaryButton}
+                    disabled={isSavingPersonalization}
+                    onClick={handleSavePersonalization}
+                  >
+                    {t(
+                      isSavingPersonalization
+                        ? "settings.saving"
+                        : "common.save",
+                    )}
+                  </button>
                 </div>
               </div>
             ) : activeTab === "model-settings" ? (
-              /* --------------------------------------------------------- */
               /* Model Settings View (LLM, Speech, Image, Video)          */
-              /* --------------------------------------------------------- */
               <ModelSettings
                 quota={quota}
-                onActiveModelChanged={(modelId) => handleSelectActiveModel(modelId)}
+                onActiveModelChanged={(modelId) =>
+                  handleSelectActiveModel(modelId)
+                }
               />
             ) : activeTab === "computer-use" ? (
-              /* --------------------------------------------------------- */
               /* Computer Use & Browser Settings View                      */
-              /* --------------------------------------------------------- */
               <ComputerUseSettings />
             ) : activeTab === "mcp-servers" ? (
               <McpSettings workspacePath={currentProject} />
             ) : activeTab === "plugins" ? (
-              <SkillsSettings key="plugins" workspacePath={currentProject} initialTab="plugins" isModal />
+              <SkillsSettings
+                key="plugins"
+                workspacePath={currentProject}
+                initialTab="plugins"
+                isModal
+              />
             ) : activeTab === "memory" ? (
-              /* --------------------------------------------------------- */
               /* Memory Settings View                                      */
-              /* --------------------------------------------------------- */
               <MemorySettings currentProject={currentProject} />
             ) : (
-              /* --------------------------------------------------------- */
               /* Generic Placeholder for other capabilities                */
               /* (subagents, plugins, mcp-servers, skills)                 */
-              /* --------------------------------------------------------- */
               (() => {
                 const currentItem = navCategories
                   .flatMap((c) => c.items)
                   .find((i) => i.id === activeTab);
                 const Icon = currentItem?.icon || Settings;
                 return (
-                  <div className="flex flex-col gap-3 pt-6 max-w-2xl pb-6">
-                    <div className="p-8 rounded-2xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] flex flex-col items-center justify-center text-center gap-3">
+                  <div className="w-full min-w-0 flex flex-col gap-3 pt-6 pb-6">
+                    <div className="p-8 rounded-2xl flex flex-col items-center justify-center text-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white">
                         <Icon className="w-6 h-6 text-[#262626] dark:text-white" />
                       </div>
@@ -1856,89 +1221,99 @@ export function SettingsView({
       </div>
 
       {/* Keybinding Recording Modal */}
-      {recordingTarget && (() => {
-        const targetItem = shortcuts.find((s) => s.id === recordingTarget.id);
-        const cmdName = targetItem ? getCommandName(targetItem) : recordingTarget.command;
-        return (
-          <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-            onClick={() => setRecordingTarget(null)}
-          >
+      {recordingTarget &&
+        (() => {
+          const targetItem = shortcuts.find((s) => s.id === recordingTarget.id);
+          const cmdName = targetItem
+            ? getCommandName(targetItem)
+            : recordingTarget.command;
+          return (
             <div
-              className="w-[420px] max-w-[95vw] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#262626] dark:text-white"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+              onClick={() => setRecordingTarget(null)}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold">{t("shortcuts.changeKeybinding")}</h3>
-                  <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
-                    {cmdName}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRecordingTarget(null)}
-                  className="p-1 rounded-lg text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="min-h-[76px] rounded-xl border border-dashed border-[#737373]/40 dark:border-[#555555]/50 bg-black/5 dark:bg-white/5 flex items-center justify-center p-3 select-none">
-                {recordingTarget.keys.length > 0 ? (
-                  <div className="flex items-center gap-1.5 flex-wrap justify-center">
-                    {recordingTarget.keys.map((k, idx) => (
-                      <kbd
-                        key={idx}
-                        className="px-2.5 py-1 text-xs font-mono font-medium rounded-lg bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-white shadow-xs"
-                      >
-                        {k}
-                      </kbd>
-                    ))}
+              <div
+                className="w-[420px] max-w-[95vw] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-[#262626] dark:text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">
+                      {t("shortcuts.changeKeybinding")}
+                    </h3>
+                    <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
+                      {cmdName}
+                    </p>
                   </div>
-                ) : (
-                  <span className="text-xs text-[#737373] dark:text-[#969696] animate-pulse">
-                    {t("shortcuts.pressKeysPrompt")}
-                  </span>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setRecordingTarget(null)}
+                    className="p-1 rounded-lg text-[#737373] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-              <p className="text-[11px] text-[#737373] dark:text-[#888888]">
-                {t("shortcuts.pressKeysHint")}
-              </p>
+                <div className="min-h-[76px] rounded-xl border border-dashed border-[#737373]/40 dark:border-[#555555]/50 bg-black/5 dark:bg-white/5 flex items-center justify-center p-3 select-none">
+                  {recordingTarget.keys.length > 0 ? (
+                    <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                      {recordingTarget.keys.map((k, idx) => (
+                        <kbd
+                          key={idx}
+                          className="px-2.5 py-1 text-xs font-sans font-medium rounded-lg bg-white dark:bg-[#2c2c2e] border border-[#dedee2] dark:border-[#3c3c40] text-[#262626] dark:text-white shadow-xs"
+                        >
+                          {k}
+                        </kbd>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-[#737373] dark:text-[#969696] animate-pulse">
+                      {t("shortcuts.pressKeysPrompt")}
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#dedee2] dark:border-[#383838]">
-                <button
-                  type="button"
-                  onClick={() => setRecordingTarget(null)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#111] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  {t("common.cancel") || "Cancel"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const item = shortcuts.find((s) => s.id === recordingTarget.id);
-                    if (item) {
-                      const nextCombos = [...item.keybindings];
-                      if (recordingTarget.keys.length > 0) {
-                        nextCombos[recordingTarget.comboIndex] = recordingTarget.keys;
+                <p className="text-[11px] text-[#737373] dark:text-[#888888]">
+                  {t("shortcuts.pressKeysHint")}
+                </p>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-[#dedee2] dark:border-[#383838]">
+                  <button
+                    type="button"
+                    onClick={() => setRecordingTarget(null)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#111] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const item = shortcuts.find(
+                        (s) => s.id === recordingTarget.id,
+                      );
+                      if (item) {
+                        const nextCombos = [...item.keybindings];
+                        if (recordingTarget.keys.length > 0) {
+                          nextCombos[recordingTarget.comboIndex] =
+                            recordingTarget.keys;
+                        }
+                        updateShortcut(recordingTarget.id, nextCombos);
+                        toast.success(
+                          t("shortcuts.updatedToast", { command: cmdName }),
+                        );
                       }
-                      updateShortcut(recordingTarget.id, nextCombos);
-                      toast.success(t("shortcuts.updatedToast", { command: cmdName }));
-                    }
-                    setRecordingTarget(null);
-                  }}
-                  disabled={recordingTarget.keys.length === 0}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#171717] dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity disabled:opacity-40 cursor-pointer"
-                >
-                  {t("shortcuts.saveKeybinding")}
-                </button>
+                      setRecordingTarget(null);
+                    }}
+                    disabled={recordingTarget.keys.length === 0}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#171717] dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity disabled:opacity-40 cursor-pointer"
+                  >
+                    {t("shortcuts.saveKeybinding")}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 }

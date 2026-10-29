@@ -1,0 +1,134 @@
+/* Shared interaction states for the Settings surface, including compact controls. */
+.workspace-settings .settings-surface {
+  border: 1px solid #e5e5e5;
+}
+.dark .workspace-settings .settings-surface {
+  border-color: #333333;
+}
+.workspace-settings [role="switch"] {
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+.workspace-settings .settings-content [role="switch"][data-state="checked"] {
+  background-color: #0066ff;
+}
+.workspace-settings .settings-content [role="switch"][data-state="unchecked"] {
+  background-color: #d4d4d4;
+}
+.dark
+  .workspace-settings
+  .settings-content
+  [role="switch"][data-state="unchecked"] {
+  background-color: #383838;
+}
+.workspace-settings .settings-content [role="switch"] > span {
+  background-color: white;
+  box-shadow: none;
+}
+.workspace-settings
+  :is(
+    button,
+    input,
+    textarea,
+    [tabindex="0"],
+    [role="combobox"]
+  ):focus-visible {
+  outline: 1px solid #737373;
+  outline-offset: 2px;
+}
+.dark
+  .workspace-settings
+  :is(
+    button,
+    input,
+    textarea,
+    [tabindex="0"],
+    [role="combobox"]
+  ):focus-visible {
+  outline-color: #969696;
+}
+.workspace-settings .settings-nav-item:focus-visible {
+  outline-offset: -2px;
+}
+.workspace-settings .settings-nav-item:focus:not(:focus-visible) {
+  outline: none;
+}
+.workspace-settings textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #969696 transparent;
+  caret-color: currentColor;
+}
+.workspace-settings ::selection {
+  background: #d4d4d4;
+  color: #161616;
+}
+@media (max-width: 760px) {
+  .workspace-settings {
+    width: 100%;
+    max-width: 96vw;
+  }
+  .workspace-settings > aside {
+    width: 176px;
+    padding: 8px;
+  }
+  .workspace-settings > main > div:first-child {
+    padding: 24px 20px 20px;
+  }
+  .workspace-settings .settings-content {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+@media (max-width: 540px) {
+  .workspace-settings {
+    flex-direction: column;
+    height: 90dvh;
+  }
+  .workspace-settings > aside {
+    width: 100%;
+    height: 152px;
+    padding: 8px 12px;
+  }
+  .workspace-settings > aside > div:first-child {
+    display: none;
+  }
+  .workspace-settings > aside [data-radix-scroll-area-viewport] > div > div {
+    gap: 8px;
+  }
+  .workspace-settings
+    > aside
+    [data-radix-scroll-area-viewport]
+    > div
+    > div
+    > div
+    > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace-settings
+    > aside
+    [data-radix-scroll-area-viewport]
+    > div
+    > div
+    > div
+    > span {
+    display: none;
+  }
+  .workspace-settings > main {
+    height: auto;
+    min-height: 0;
+  }
+  .workspace-settings .settings-row {
+    gap: 8px;
+  }
+  .workspace-settings .settings-row > div {
+    flex-basis: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-settings,
+  .workspace-settings * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

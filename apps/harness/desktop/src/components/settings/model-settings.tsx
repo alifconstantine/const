@@ -6,6 +6,9 @@ import {
   cn,
   ScrollArea,
   DropdownMenu,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -71,14 +74,18 @@ export function ModelSettings({
 }: ModelSettingsProps) {
   const { t } = useTranslation();
   // 1. Modality category state: "llm" | "speech" | "image" | "video"
-  const [activeCategory, setActiveCategory] = useState<ModelCategory>(initialCategory);
+  const [activeCategory, setActiveCategory] =
+    useState<ModelCategory>(initialCategory);
 
   // Tab indicator sliding animation refs
   const llmTabRef = useRef<HTMLButtonElement>(null);
   const speechTabRef = useRef<HTMLButtonElement>(null);
   const imageTabRef = useRef<HTMLButtonElement>(null);
   const videoTabRef = useRef<HTMLButtonElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
+  const [indicatorStyle, setIndicatorStyle] = useState<{
+    left: number;
+    width: number;
+  }>({
     left: 0,
     width: 0,
   });
@@ -109,7 +116,9 @@ export function ModelSettings({
   }, [activeCategory]);
 
   // 2. Multi-modal configuration state
-  const [config, setConfig] = useState<UnifiedMultiModalConfig>(() => loadMultiModalConfig());
+  const [config, setConfig] = useState<UnifiedMultiModalConfig>(() =>
+    loadMultiModalConfig(),
+  );
 
   // Reload config on category change or mount
   useEffect(() => {
@@ -117,7 +126,9 @@ export function ModelSettings({
   }, [activeCategory]);
 
   // 3. Provider Accordion Expansion State
-  const [expandedProviderId, setExpandedProviderId] = useState<string | null>(null);
+  const [expandedProviderId, setExpandedProviderId] = useState<string | null>(
+    null,
+  );
   const [editingProvider, setEditingProvider] = useState<any | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isTestingPing, setIsTestingPing] = useState(false);
@@ -205,12 +216,14 @@ export function ModelSettings({
   const handleDeleteProvider = (providerId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (providerId === "const-router" || providerId === "const") {
-      toast.error("Const Router gateway is the built-in default provider and cannot be removed.");
+      toast.error(t("settings.providerProtected"));
       return;
     }
 
     if (activeCategory === "llm") {
-      const updatedProviders = config.llm.providers.filter((p) => p.id !== providerId);
+      const updatedProviders = config.llm.providers.filter(
+        (p) => p.id !== providerId,
+      );
       const newActiveProvider = updatedProviders[0]?.id || "const-router";
       const newActiveModel =
         config.llm.activeProviderId === providerId
@@ -224,7 +237,9 @@ export function ModelSettings({
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
     } else if (activeCategory === "speech") {
-      const updatedProviders = config.speech.providers.filter((p) => p.id !== providerId);
+      const updatedProviders = config.speech.providers.filter(
+        (p) => p.id !== providerId,
+      );
       const newActiveProvider = updatedProviders[0]?.id || "";
       const newActiveModel = updatedProviders[0]?.models[0]?.id || "";
       const updated = {
@@ -236,7 +251,9 @@ export function ModelSettings({
       setConfig((prev) => ({ ...prev, speech: updated }));
       saveSpeechConfig(updated);
     } else if (activeCategory === "image") {
-      const updatedProviders = config.image.providers.filter((p) => p.id !== providerId);
+      const updatedProviders = config.image.providers.filter(
+        (p) => p.id !== providerId,
+      );
       const newActiveProvider = updatedProviders[0]?.id || "";
       const newActiveModel = updatedProviders[0]?.models[0]?.id || "";
       const updated = {
@@ -247,7 +264,9 @@ export function ModelSettings({
       setConfig((prev) => ({ ...prev, image: updated }));
       saveImageConfig(updated);
     } else if (activeCategory === "video") {
-      const updatedProviders = config.video.providers.filter((p) => p.id !== providerId);
+      const updatedProviders = config.video.providers.filter(
+        (p) => p.id !== providerId,
+      );
       const newActiveProvider = updatedProviders[0]?.id || "";
       const newActiveModel = updatedProviders[0]?.models[0]?.id || "";
       const updated = {
@@ -263,20 +282,20 @@ export function ModelSettings({
       setExpandedProviderId(null);
       setEditingProvider(null);
     }
-    toast.success("Provider removed.");
+    toast.success(t("settings.providerRemoved"));
   };
 
   // Save changes to current provider
   const handleApplyProviderEdit = () => {
     if (!editingProvider) return;
     if (!editingProvider.name.trim() || !editingProvider.baseUrl.trim()) {
-      toast.error("Provider Name and Base URL are required.");
+      toast.error(t("settings.providerFieldsRequired"));
       return;
     }
 
     if (activeCategory === "llm") {
       let updatedProviders = config.llm.providers.map((p) =>
-        p.id === editingProvider.id ? editingProvider : p
+        p.id === editingProvider.id ? editingProvider : p,
       );
       if (!config.llm.providers.some((p) => p.id === editingProvider.id)) {
         updatedProviders = [...config.llm.providers, editingProvider];
@@ -286,7 +305,7 @@ export function ModelSettings({
       saveLlmConfig(updated);
     } else if (activeCategory === "speech") {
       let updatedProviders = config.speech.providers.map((p) =>
-        p.id === editingProvider.id ? editingProvider : p
+        p.id === editingProvider.id ? editingProvider : p,
       );
       if (!config.speech.providers.some((p) => p.id === editingProvider.id)) {
         updatedProviders = [...config.speech.providers, editingProvider];
@@ -296,7 +315,7 @@ export function ModelSettings({
       saveSpeechConfig(updated);
     } else if (activeCategory === "image") {
       let updatedProviders = config.image.providers.map((p) =>
-        p.id === editingProvider.id ? editingProvider : p
+        p.id === editingProvider.id ? editingProvider : p,
       );
       if (!config.image.providers.some((p) => p.id === editingProvider.id)) {
         updatedProviders = [...config.image.providers, editingProvider];
@@ -306,7 +325,7 @@ export function ModelSettings({
       saveImageConfig(updated);
     } else if (activeCategory === "video") {
       let updatedProviders = config.video.providers.map((p) =>
-        p.id === editingProvider.id ? editingProvider : p
+        p.id === editingProvider.id ? editingProvider : p,
       );
       if (!config.video.providers.some((p) => p.id === editingProvider.id)) {
         updatedProviders = [...config.video.providers, editingProvider];
@@ -319,27 +338,29 @@ export function ModelSettings({
     setExpandedProviderId(null);
     setEditingProvider(null);
     setIsAddingModel(false);
-    toast.success(`Saved settings for ${editingProvider.name}`);
+    toast.success(t("settings.providerSaved"));
   };
 
   // Test provider latency / connection
   const handleTestConnection = async () => {
     if (!editingProvider || !editingProvider.baseUrl.trim()) {
-      toast.error("Please enter a valid Base URL to test connection.");
+      toast.error(t("settings.providerUrlRequired"));
       return;
     }
     setIsTestingPing(true);
     const res = await testEndpointPing(
       editingProvider.baseUrl,
       editingProvider.apiKey,
-      editingProvider.protocol
+      editingProvider.protocol,
     );
     setIsTestingPing(false);
 
     if (res.success) {
-      toast.success(`Connected successfully! Latency: ${res.latencyMs ?? 0}ms`);
+      toast.success(
+        t("settings.providerConnected", { latency: res.latencyMs ?? 0 }),
+      );
     } else {
-      toast.error(res.error || "Failed to connect to provider endpoint.");
+      toast.error(res.error || t("settings.providerConnectFailed"));
     }
   };
 
@@ -347,11 +368,16 @@ export function ModelSettings({
   const handleFetchModels = async () => {
     if (!editingProvider) return;
     setIsFetchingModels(true);
-    const res = await fetchRemoteModels(editingProvider.baseUrl, editingProvider.apiKey);
+    const res = await fetchRemoteModels(
+      editingProvider.baseUrl,
+      editingProvider.apiKey,
+    );
     setIsFetchingModels(false);
 
     if (res.success && res.models && res.models.length > 0) {
-      const existingIds = new Set((editingProvider.models || []).map((m: any) => m.id));
+      const existingIds = new Set(
+        (editingProvider.models || []).map((m: any) => m.id),
+      );
       const newlyAdded = res.models
         .filter((m) => !existingIds.has(m.id))
         .map((m) => ({
@@ -366,29 +392,34 @@ export function ModelSettings({
         ...editingProvider,
         models: merged,
       });
-      toast.success(`Discovered ${res.models.length} remote models from endpoint.`);
+      toast.success(
+        t("settings.modelsDiscovered", { count: res.models.length }),
+      );
     } else {
-      toast.error(res.error || "Failed to fetch models from endpoint.");
+      toast.error(res.error || t("settings.modelsFetchFailed"));
     }
   };
 
   // Restore models to default / clean state
   const handleRestoreDefaults = () => {
     if (!editingProvider) return;
-    if (editingProvider.id === "const-router" || editingProvider.id === "const") {
+    if (
+      editingProvider.id === "const-router" ||
+      editingProvider.id === "const"
+    ) {
       setEditingProvider({
         ...editingProvider,
         baseUrl: "https://router.const.web.id/v1",
         protocol: "openai-completions",
         models: CONST_ROUTER_LLM_MODELS,
       });
-      toast.success("Restored Const Router default models.");
+      toast.success(t("settings.modelsRestored"));
     } else {
       setEditingProvider({
         ...editingProvider,
         models: [],
       });
-      toast.success("Cleared model catalog for custom provider.");
+      toast.success(t("settings.modelsCleared"));
     }
   };
 
@@ -397,7 +428,7 @@ export function ModelSettings({
     if (!editingProvider || !newModelId.trim()) return;
     const cleanId = newModelId.trim();
     if ((editingProvider.models || []).some((m: any) => m.id === cleanId)) {
-      toast.error(`Model "${cleanId}" is already registered in this provider.`);
+      toast.error(t("settings.modelExists"));
       return;
     }
 
@@ -415,7 +446,7 @@ export function ModelSettings({
     setNewModelId("");
     setNewModelContext("");
     setIsAddingModel(false);
-    toast.success(`Added model ${cleanId}`);
+    toast.success(t("settings.modelAdded"));
   };
 
   // Remove a model from the provider form
@@ -423,7 +454,9 @@ export function ModelSettings({
     if (!editingProvider) return;
     setEditingProvider({
       ...editingProvider,
-      models: (editingProvider.models || []).filter((m: any) => m.id !== modelId),
+      models: (editingProvider.models || []).filter(
+        (m: any) => m.id !== modelId,
+      ),
     });
   };
 
@@ -496,7 +529,7 @@ export function ModelSettings({
     setExpandedProviderId(newProvider.id);
     setEditingProvider(JSON.parse(JSON.stringify(newProvider)));
     setIsPresetModalOpen(false);
-    toast.success(`Added ${preset.name} adapter.`);
+    toast.success(t("settings.providerAdded"));
   };
 
   // Add a Custom Provider
@@ -515,7 +548,11 @@ export function ModelSettings({
         models: [],
       };
       const activeProviderId = config.llm.activeProviderId || id;
-      const updated = { ...config.llm, activeProviderId, providers: [...config.llm.providers, newProvider] };
+      const updated = {
+        ...config.llm,
+        activeProviderId,
+        providers: [...config.llm.providers, newProvider],
+      };
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
     } else if (activeCategory === "speech") {
@@ -532,7 +569,11 @@ export function ModelSettings({
         models: [],
       };
       const activeProviderId = config.speech.activeProviderId || id;
-      const updated = { ...config.speech, activeProviderId, providers: [...config.speech.providers, newProvider] };
+      const updated = {
+        ...config.speech,
+        activeProviderId,
+        providers: [...config.speech.providers, newProvider],
+      };
       setConfig((prev) => ({ ...prev, speech: updated }));
       saveSpeechConfig(updated);
     } else if (activeCategory === "image") {
@@ -546,7 +587,11 @@ export function ModelSettings({
         models: [],
       };
       const activeProviderId = config.image.activeProviderId || id;
-      const updated = { ...config.image, activeProviderId, providers: [...config.image.providers, newProvider] };
+      const updated = {
+        ...config.image,
+        activeProviderId,
+        providers: [...config.image.providers, newProvider],
+      };
       setConfig((prev) => ({ ...prev, image: updated }));
       saveImageConfig(updated);
     } else if (activeCategory === "video") {
@@ -562,7 +607,11 @@ export function ModelSettings({
         models: [],
       };
       const activeProviderId = config.video.activeProviderId || id;
-      const updated = { ...config.video, activeProviderId, providers: [...config.video.providers, newProvider] };
+      const updated = {
+        ...config.video,
+        activeProviderId,
+        providers: [...config.video.providers, newProvider],
+      };
       setConfig((prev) => ({ ...prev, video: updated }));
       saveVideoConfig(updated);
     }
@@ -574,11 +623,8 @@ export function ModelSettings({
   // Speech test audio player
   const handlePlayTestSpeech = (voiceName: string, speed = 1.0) => {
     setIsPlayingSpeech(true);
-    playSampleSpeechAudio(
-      t("settings.ttsTestText"),
-      voiceName,
-      speed,
-      () => setIsPlayingSpeech(false)
+    playSampleSpeechAudio(t("settings.ttsTestText"), voiceName, speed, () =>
+      setIsPlayingSpeech(false),
     );
   };
 
@@ -587,39 +633,39 @@ export function ModelSettings({
     activeCategory === "llm"
       ? config.llm.providers
       : activeCategory === "speech"
-      ? config.speech.providers
-      : activeCategory === "image"
-      ? config.image.providers
-      : config.video.providers;
+        ? config.speech.providers
+        : activeCategory === "image"
+          ? config.image.providers
+          : config.video.providers;
 
   // Current active model ID
   const currentActiveModelId =
     activeCategory === "llm"
       ? config.llm.activeModelId
       : activeCategory === "speech"
-      ? config.speech.activeModelId
-      : activeCategory === "image"
-      ? config.image.activeModelId
-      : config.video.activeModelId;
+        ? config.speech.activeModelId
+        : activeCategory === "image"
+          ? config.image.activeModelId
+          : config.video.activeModelId;
 
   // Preset providers options for active category
   const activePresets =
     activeCategory === "llm"
       ? PRESET_LLM_PROVIDERS
       : activeCategory === "speech"
-      ? PRESET_SPEECH_PROVIDERS
-      : activeCategory === "image"
-      ? PRESET_IMAGE_PROVIDERS
-      : PRESET_VIDEO_PROVIDERS;
+        ? PRESET_SPEECH_PROVIDERS
+        : activeCategory === "image"
+          ? PRESET_IMAGE_PROVIDERS
+          : PRESET_VIDEO_PROVIDERS;
 
   return (
-    <div className="w-full flex flex-col space-y-6 font-sans">
+    <div className="w-full min-w-0 flex flex-col space-y-5 pb-6 font-sans">
       {/* Top Toolbar Row: Modality Sliding Switcher (Left) & Add Provider Dropdown (Right) */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         {/* Modality Sliding Pill Switcher - exact height h-9 */}
-        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
+        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-neutral-100 dark:bg-[#222222] w-fit">
           <div
-            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background  pointer-events-none transition-all duration-300"
             style={{
               transform: `translateX(${indicatorStyle.left}px)`,
               width: `${indicatorStyle.width}px`,
@@ -633,10 +679,10 @@ export function ModelSettings({
             type="button"
             onClick={() => setActiveCategory("llm")}
             className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
+              "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
               activeCategory === "llm"
                 ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Box className="w-3.5 h-3.5" />
@@ -648,10 +694,10 @@ export function ModelSettings({
             type="button"
             onClick={() => setActiveCategory("speech")}
             className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
+              "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
               activeCategory === "speech"
                 ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Volume2 className="w-3.5 h-3.5" />
@@ -663,10 +709,10 @@ export function ModelSettings({
             type="button"
             onClick={() => setActiveCategory("image")}
             className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
+              "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
               activeCategory === "image"
                 ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <ImageIcon className="w-3.5 h-3.5" />
@@ -678,10 +724,10 @@ export function ModelSettings({
             type="button"
             onClick={() => setActiveCategory("video")}
             className={cn(
-              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
+              "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
               activeCategory === "video"
                 ? "text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <VideoIcon className="w-3.5 h-3.5" />
@@ -728,9 +774,9 @@ export function ModelSettings({
       {/* ===================================================================== */}
       <div className="space-y-3">
         {currentProviders.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb]/40 dark:bg-[#222222]/30 py-12 px-6 flex flex-col items-center justify-center text-center select-none">
+          <div className="settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] py-12 px-6 flex flex-col items-center justify-center text-center select-none">
             {/* Category Icon */}
-            <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white mb-3.5 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white mb-3.5 ">
               {activeCategory === "speech" ? (
                 <Volume2 className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               ) : activeCategory === "image" ? (
@@ -747,19 +793,19 @@ export function ModelSettings({
               {activeCategory === "speech"
                 ? t("settings.noSpeechProviders")
                 : activeCategory === "image"
-                ? t("settings.noImageProviders")
-                : activeCategory === "video"
-                ? t("settings.noVideoProviders")
-                : t("settings.noLlmProviders")}
+                  ? t("settings.noImageProviders")
+                  : activeCategory === "video"
+                    ? t("settings.noVideoProviders")
+                    : t("settings.noLlmProviders")}
             </h3>
             <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1 leading-relaxed">
               {activeCategory === "speech"
                 ? t("settings.connectSpeechDesc")
                 : activeCategory === "image"
-                ? t("settings.connectImageDesc")
-                : activeCategory === "video"
-                ? t("settings.connectVideoDesc")
-                : t("settings.connectLlmDesc")}
+                  ? t("settings.connectImageDesc")
+                  : activeCategory === "video"
+                    ? t("settings.connectVideoDesc")
+                    : t("settings.connectLlmDesc")}
             </p>
 
             {/* Action Buttons */}
@@ -767,7 +813,7 @@ export function ModelSettings({
               <button
                 type="button"
                 onClick={() => setIsPresetModalOpen(true)}
-                className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer "
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{t("settings.chooseAdapter")}</span>
@@ -783,634 +829,756 @@ export function ModelSettings({
           </div>
         ) : (
           currentProviders.map((provider: any) => {
-          const isExpanded = expandedProviderId === provider.id;
+            const isExpanded = expandedProviderId === provider.id;
 
-          return (
-            <div
-              key={provider.id}
-              className={cn(
-                "rounded-2xl border border-border bg-card/60 transition-all duration-300 overflow-hidden",
-                isExpanded
-                  ? "bg-card/90 border-border/90 shadow-xs"
-                  : "hover:border-foreground/20 hover:bg-secondary/30"
-              )}
-            >
-              {/* Provider Card Header */}
+            return (
               <div
-                onClick={() => handleToggleExpand(provider)}
-                className="p-4 flex items-center justify-between gap-4 cursor-pointer select-none"
+                key={provider.id}
+                className={cn(
+                  "settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] transition-colors overflow-hidden",
+                  isExpanded
+                    ? "bg-neutral-100 dark:bg-[#222222]"
+                    : "hover:bg-neutral-100 dark:hover:bg-[#2b2b2b]",
+                )}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-sm font-semibold text-foreground tracking-tight truncate">
-                    {provider.name}
-                  </span>
-                  {provider.isCustom && (
-                    <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
-                      {t("settings.customBadge")}
-                    </span>
-                  )}
-                  {provider.isDefault && (
-                    <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
-                      {t("settings.defaultBadge")}
-                    </span>
-                  )}
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Provider Card Header */}
+                <div className="p-4 flex flex-wrap items-center justify-between gap-3 select-none">
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleExpand(provider);
-                    }}
-                    className={cn(
-                      "px-3.5 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer",
-                      isExpanded
-                        ? "bg-secondary text-foreground border-foreground/30 font-semibold"
-                        : "border-border hover:bg-secondary text-foreground"
-                    )}
+                    onClick={() => handleToggleExpand(provider)}
+                    aria-expanded={isExpanded}
+                    className="flex items-center gap-2.5 min-w-0 text-left"
                   >
-                    {isExpanded ? t("common.close") : t("common.edit")}
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {provider.name}
+                    </span>
+                    {provider.isCustom && (
+                      <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
+                        {t("settings.customBadge")}
+                      </span>
+                    )}
+                    {provider.isDefault && (
+                      <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
+                        {t("settings.defaultBadge")}
+                      </span>
+                    )}
                   </button>
-                  {!provider.isDefault && (
+
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={(e) => handleDeleteProvider(provider.id, e)}
-                      className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-xs font-medium transition-all cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleExpand(provider);
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer",
+                        isExpanded
+                          ? "bg-secondary text-foreground border-foreground/30 font-semibold"
+                          : "border-border hover:bg-secondary text-foreground",
+                      )}
                     >
-                      {t("common.delete")}
+                      {isExpanded ? t("common.close") : t("common.edit")}
                     </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Smooth Expandable Body */}
-              {isExpanded && editingProvider && (
-                <div className="px-5 pb-5 pt-2 space-y-5 border-t border-border/40 animate-in fade-in-50 duration-200">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      {editingProvider.name || t("settings.configureProvider")}
-                    </h3>
-                  </div>
-
-                  {/* 1. Display name */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground block">
-                      {t("settings.providerName")}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingProvider.name}
-                      onChange={(e) =>
-                        setEditingProvider({ ...editingProvider, name: e.target.value })
-                      }
-                      placeholder="e.g. Const Router, OpenAI, or Custom"
-                      className="w-full px-3.5 py-2 rounded-xl bg-secondary/30 border border-border text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                    />
-                  </div>
-
-                  {/* 2. Base URL */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground block">
-                      {t("settings.baseUrl")}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingProvider.baseUrl}
-                      onChange={(e) =>
-                        setEditingProvider({ ...editingProvider, baseUrl: e.target.value })
-                      }
-                      placeholder="https://..."
-                      className="w-full px-3.5 py-2 rounded-xl bg-secondary/30 border border-border text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors font-mono"
-                    />
-                  </div>
-
-                  {/* 3. API Protocol */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground block">
-                      {t("settings.apiProtocol")}
-                    </label>
-                    {activeCategory === "llm" ? (
-                      <Select
-                        value={editingProvider.protocol || "openai-completions"}
-                        onValueChange={(val) =>
-                          setEditingProvider({
-                            ...editingProvider,
-                            protocol: val,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                          <SelectValue placeholder="Select API protocol" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                          <SelectItem value="openai-completions" className="text-xs cursor-pointer">
-                            Chat completions (/chat/completions)
-                          </SelectItem>
-                          <SelectItem value="anthropic-messages" className="text-xs cursor-pointer">
-                            Anthropic messages (/v1/messages)
-                          </SelectItem>
-                          <SelectItem value="openai-responses" className="text-xs cursor-pointer">
-                            Responses (/responses)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : activeCategory === "speech" ? (
-                      <Select
-                        value={editingProvider.protocol || "openai-speech"}
-                        onValueChange={(val) =>
-                          setEditingProvider({
-                            ...editingProvider,
-                            protocol: val,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                          <SelectValue placeholder="Select API format" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                          <SelectItem value="openai-speech" className="text-xs cursor-pointer">
-                            OpenAI Speech (/v1/audio/speech)
-                          </SelectItem>
-                          <SelectItem value="custom" className="text-xs cursor-pointer">
-                            Custom Audio Endpoint
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : activeCategory === "image" ? (
-                      <Select
-                        value={editingProvider.protocol || "openrouter"}
-                        onValueChange={(val) =>
-                          setEditingProvider({
-                            ...editingProvider,
-                            protocol: val,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                          <SelectValue placeholder="Select API protocol" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                          <SelectItem value="openrouter" className="text-xs cursor-pointer">
-                            OpenRouter Images (/images)
-                          </SelectItem>
-                          <SelectItem value="openai-generations" className="text-xs cursor-pointer">
-                            OpenAI Image Generations (/images/generations)
-                          </SelectItem>
-                          <SelectItem value="custom" className="text-xs cursor-pointer">
-                            Custom Direct Endpoint
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select
-                        value={editingProvider.protocol || "openai-video"}
-                        onValueChange={(val) =>
-                          setEditingProvider({
-                            ...editingProvider,
-                            protocol: val,
-                          })
-                        }
-                      >
-                        <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                          <SelectValue placeholder="Select API protocol" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                          <SelectItem value="openai-video" className="text-xs cursor-pointer">
-                            OpenAI Video API
-                          </SelectItem>
-                          <SelectItem value="custom" className="text-xs cursor-pointer">
-                            Custom Direct Endpoint
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-
-                  {/* 4. API Key with Visibility Toggle */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground block">
-                      {t("settings.apiKey")}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? "text" : "password"}
-                        value={editingProvider.apiKey || ""}
-                        onChange={(e) =>
-                          setEditingProvider({ ...editingProvider, apiKey: e.target.value })
-                        }
-                        placeholder={
-                          editingProvider.isDefault
-                            ? "Configured — enter a new key to override"
-                            : "Enter API key, or leave blank to use router gateway"
-                        }
-                        className="w-full px-3.5 py-2 pr-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground placeholder:text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors font-mono"
-                      />
+                    {!provider.isDefault && (
                       <button
                         type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1"
-                        title={showApiKey ? "Hide Key" : "Show Key"}
+                        onClick={(e) => handleDeleteProvider(provider.id, e)}
+                        className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-xs font-medium transition-all cursor-pointer"
                       >
-                        {showApiKey ? (
-                          <EyeOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5" />
-                        )}
+                        {t("common.delete")}
                       </button>
-                    </div>
+                    )}
                   </div>
+                </div>
 
-                  {/* 5. Modality Specific Controls */}
-                  {activeCategory === "speech" && (
-                    <div className="space-y-4 pt-2 border-t border-border/40">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-foreground block">
-                            {t("settings.voice")}
-                          </label>
-                          <Select
-                            value={editingProvider.voice || "alloy"}
-                            onValueChange={(val) =>
-                              setEditingProvider({
-                                ...editingProvider,
-                                voice: val,
-                                voiceName: val,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                              <SelectValue placeholder="Select Voice Character" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                              {POPULAR_SPEECH_VOICES.map((v) => (
-                                <SelectItem key={v.id} value={v.id} className="text-xs cursor-pointer">
-                                  {v.name} - {v.desc}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-foreground block">
-                            {t("settings.speed")}: {editingProvider.speed || 1.0}x
-                          </label>
-                          <div className="flex items-center gap-2 pt-2">
-                            <input
-                              type="range"
-                              min="0.5"
-                              max="2.0"
-                              step="0.1"
-                              value={editingProvider.speed || 1.0}
-                              onChange={(e) =>
-                                setEditingProvider({
-                                  ...editingProvider,
-                                  speed: parseFloat(e.target.value),
-                                })
-                              }
-                              className="w-full accent-foreground cursor-pointer"
-                            />
-                            <span className="text-xs text-muted-foreground w-10 text-right">
-                              {editingProvider.speed || 1.0}x
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Live Speech Synthesis Playback */}
-                      <div className="p-3 rounded-xl bg-secondary/20 border border-border flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Volume2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-foreground truncate">
-                            {t("settings.playSampleAudio")} ({editingProvider.voice || "alloy"})
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handlePlayTestSpeech(
-                              editingProvider.voice || "alloy",
-                              editingProvider.speed || 1.0
-                            )
-                          }
-                          disabled={isPlayingSpeech}
-                          className="px-3 py-1.5 rounded-lg border border-border hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <Play className="w-3.5 h-3.5" />
-                          <span>{isPlayingSpeech ? t("settings.playing") : t("settings.playSampleAudio")}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeCategory === "image" && (
-                    <div className="space-y-1.5 pt-2 border-t border-border/40">
+                {/* Smooth Expandable Body */}
+                {isExpanded && editingProvider && (
+                  <div className="px-5 pb-5 pt-2 space-y-5 border-border/40 animate-in fade-in-50 duration-200">
+                    {/* 1. Display name */}
+                    <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground block">
-                        Default Aspect Ratio
+                        {t("settings.providerName")}
                       </label>
-                      <Select
-                        value={editingProvider.aspectRatio || "1:1"}
-                        onValueChange={(val) =>
+                      <input
+                        type="text"
+                        value={editingProvider.name}
+                        onChange={(e) =>
                           setEditingProvider({
                             ...editingProvider,
-                            aspectRatio: val,
+                            name: e.target.value,
                           })
                         }
-                      >
-                        <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                          <SelectValue placeholder="Select Aspect Ratio" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                          <SelectItem value="1:1" className="text-xs cursor-pointer">1:1 (Square)</SelectItem>
-                          <SelectItem value="16:9" className="text-xs cursor-pointer">16:9 (Landscape)</SelectItem>
-                          <SelectItem value="9:16" className="text-xs cursor-pointer">9:16 (Portrait)</SelectItem>
-                          <SelectItem value="4:3" className="text-xs cursor-pointer">4:3 (Classic)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        placeholder={t("settings.providerName")}
+                        className="w-full px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
+                      />
                     </div>
-                  )}
 
-                  {activeCategory === "video" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/40">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground block">
-                          Default Resolution
-                        </label>
+                    {/* 2. Base URL */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground block">
+                        {t("settings.baseUrl")}
+                      </label>
+                      <input
+                        type="text"
+                        value={editingProvider.baseUrl}
+                        onChange={(e) =>
+                          setEditingProvider({
+                            ...editingProvider,
+                            baseUrl: e.target.value,
+                          })
+                        }
+                        placeholder="https://..."
+                        className="w-full px-3.5 py-2 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors font-sans"
+                      />
+                    </div>
+
+                    {/* 3. API Protocol */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground block">
+                        {t("settings.apiProtocol")}
+                      </label>
+                      {activeCategory === "llm" ? (
                         <Select
-                          value={editingProvider.defaultResolution || "1080p"}
-                          onValueChange={(val: any) =>
+                          value={
+                            editingProvider.protocol || "openai-completions"
+                          }
+                          onValueChange={(val) =>
                             setEditingProvider({
                               ...editingProvider,
-                              defaultResolution: val,
+                              protocol: val,
                             })
                           }
                         >
-                          <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                            <SelectValue />
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue
+                              placeholder={t("settings.apiProtocol")}
+                            />
                           </SelectTrigger>
                           <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                            <SelectItem value="720p" className="text-xs cursor-pointer">720p HD</SelectItem>
-                            <SelectItem value="1080p" className="text-xs cursor-pointer">1080p Full HD</SelectItem>
+                            <SelectItem
+                              value="openai-completions"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.apiChatCompletions")}
+                            </SelectItem>
+                            <SelectItem
+                              value="anthropic-messages"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.apiAnthropicMessages")}
+                            </SelectItem>
+                            <SelectItem
+                              value="openai-responses"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.apiResponses")}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
-                      </div>
+                      ) : activeCategory === "speech" ? (
+                        <Select
+                          value={editingProvider.protocol || "openai-speech"}
+                          onValueChange={(val) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              protocol: val,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue
+                              placeholder={t("settings.apiProtocol")}
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem
+                              value="openai-speech"
+                              className="text-xs cursor-pointer"
+                            >
+                              OpenAI Speech (/v1/audio/speech)
+                            </SelectItem>
+                            <SelectItem
+                              value="custom"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.customEndpoint")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : activeCategory === "image" ? (
+                        <Select
+                          value={editingProvider.protocol || "openrouter"}
+                          onValueChange={(val) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              protocol: val,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue
+                              placeholder={t("settings.apiProtocol")}
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem
+                              value="openrouter"
+                              className="text-xs cursor-pointer"
+                            >
+                              OpenRouter Images (/images)
+                            </SelectItem>
+                            <SelectItem
+                              value="openai-generations"
+                              className="text-xs cursor-pointer"
+                            >
+                              OpenAI Image Generations (/images/generations)
+                            </SelectItem>
+                            <SelectItem
+                              value="custom"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.customEndpoint")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select
+                          value={editingProvider.protocol || "openai-video"}
+                          onValueChange={(val) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              protocol: val,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue
+                              placeholder={t("settings.apiProtocol")}
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem
+                              value="openai-video"
+                              className="text-xs cursor-pointer"
+                            >
+                              OpenAI Video API
+                            </SelectItem>
+                            <SelectItem
+                              value="custom"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.customEndpoint")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
 
-                      <div className="space-y-1.5">
+                    {/* 4. API Key with Visibility Toggle */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground block">
+                        {t("settings.apiKey")}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showApiKey ? "text" : "password"}
+                          value={editingProvider.apiKey || ""}
+                          onChange={(e) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              apiKey: e.target.value,
+                            })
+                          }
+                          placeholder={
+                            editingProvider.isDefault
+                              ? t("settings.apiKeyConfigured")
+                              : t("settings.apiKey")
+                          }
+                          className="w-full px-3.5 py-2 pr-10 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1"
+                          title={t(
+                            showApiKey
+                              ? "settings.hideApiKey"
+                              : "settings.showApiKey",
+                          )}
+                        >
+                          {showApiKey ? (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 5. Modality Specific Controls */}
+                    {activeCategory === "speech" && (
+                      <div className="space-y-4 pt-2 border-border/40">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground block">
+                              {t("settings.voice")}
+                            </label>
+                            <Select
+                              value={editingProvider.voice || "alloy"}
+                              onValueChange={(val) =>
+                                setEditingProvider({
+                                  ...editingProvider,
+                                  voice: val,
+                                  voiceName: val,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                                <SelectValue placeholder={t("common.select")} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                                {POPULAR_SPEECH_VOICES.map((v) => (
+                                  <SelectItem
+                                    key={v.id}
+                                    value={v.id}
+                                    className="text-xs cursor-pointer"
+                                  >
+                                    {v.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground block">
+                              {t("settings.speed")}:{" "}
+                              {editingProvider.speed || 1.0}x
+                            </label>
+                            <div className="flex items-center gap-2 pt-2">
+                              <input
+                                type="range"
+                                min="0.5"
+                                max="2.0"
+                                step="0.1"
+                                value={editingProvider.speed || 1.0}
+                                onChange={(e) =>
+                                  setEditingProvider({
+                                    ...editingProvider,
+                                    speed: parseFloat(e.target.value),
+                                  })
+                                }
+                                className="w-full accent-foreground cursor-pointer"
+                              />
+                              <span className="text-xs text-muted-foreground w-10 text-right">
+                                {editingProvider.speed || 1.0}x
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Live Speech Synthesis Playback */}
+                        <div className="p-3 rounded-xl bg-secondary/20 border border-border flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Volume2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-foreground truncate">
+                              {t("settings.playSampleAudio")} (
+                              {editingProvider.voice || "alloy"})
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handlePlayTestSpeech(
+                                editingProvider.voice || "alloy",
+                                editingProvider.speed || 1.0,
+                              )
+                            }
+                            disabled={isPlayingSpeech}
+                            className="px-3 py-1.5 rounded-lg border border-border hover:bg-secondary text-xs font-medium text-foreground flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            <span>
+                              {isPlayingSpeech
+                                ? t("settings.playing")
+                                : t("settings.playSampleAudio")}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeCategory === "image" && (
+                      <div className="space-y-1.5 pt-2 border-border/40">
                         <label className="text-xs font-medium text-foreground block">
-                          Aspect Ratio
+                          {t("settings.aspectRatio")}
                         </label>
                         <Select
-                          value={editingProvider.aspectRatio || "16:9"}
-                          onValueChange={(val: any) =>
+                          value={editingProvider.aspectRatio || "1:1"}
+                          onValueChange={(val) =>
                             setEditingProvider({
                               ...editingProvider,
                               aspectRatio: val,
                             })
                           }
                         >
-                          <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                            <SelectValue />
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue placeholder={t("common.select")} />
                           </SelectTrigger>
                           <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                            <SelectItem value="16:9" className="text-xs cursor-pointer">16:9 (Widescreen)</SelectItem>
-                            <SelectItem value="9:16" className="text-xs cursor-pointer">9:16 (Vertical)</SelectItem>
-                            <SelectItem value="1:1" className="text-xs cursor-pointer">1:1 (Square)</SelectItem>
+                            <SelectItem
+                              value="1:1"
+                              className="text-xs cursor-pointer"
+                            >
+                              1:1
+                            </SelectItem>
+                            <SelectItem
+                              value="16:9"
+                              className="text-xs cursor-pointer"
+                            >
+                              16:9
+                            </SelectItem>
+                            <SelectItem
+                              value="9:16"
+                              className="text-xs cursor-pointer"
+                            >
+                              9:16
+                            </SelectItem>
+                            <SelectItem
+                              value="4:3"
+                              className="text-xs cursor-pointer"
+                            >
+                              4:3 (Classic)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* 6. Models Catalog Section */}
-                  <div className="space-y-2 pt-2 border-t border-border/40">
-                    <div className="flex items-center justify-between pb-1">
-                      <div>
-                        <label className="text-xs font-medium text-foreground block">
-                          {t("settings.models")}
-                        </label>
-                        <span className="text-[11px] text-muted-foreground">
-                          Customized model catalog
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs">
-                        <button
-                          type="button"
-                          onClick={handleRestoreDefaults}
-                          className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                        >
-                          {t("settings.restoreDefaults")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleFetchModels}
-                          disabled={isFetchingModels}
-                          className="text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
-                        >
-                          <RefreshCw
-                            className={cn("w-3 h-3", isFetchingModels && "animate-spin")}
-                          />
-                          <span>{t("settings.fetchModels")}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Models List */}
-                    <div className="space-y-2">
-                      {(!editingProvider.models || editingProvider.models.length === 0) ? (
-                        <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
-                          {t("settings.noModelsRegistered")}
+                    {activeCategory === "video" && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-border/40">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-foreground block">
+                            {t("settings.resolution")}
+                          </label>
+                          <Select
+                            value={editingProvider.defaultResolution || "1080p"}
+                            onValueChange={(val: any) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                defaultResolution: val,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                              <SelectItem
+                                value="720p"
+                                className="text-xs cursor-pointer"
+                              >
+                                720p HD
+                              </SelectItem>
+                              <SelectItem
+                                value="1080p"
+                                className="text-xs cursor-pointer"
+                              >
+                                1080p Full HD
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      ) : (
-                        editingProvider.models.map((model: any) => {
-                          const isDefault = currentActiveModelId === model.id;
 
-                          return (
-                            <div
-                              key={model.id}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-foreground block">
+                            {t("settings.aspectRatio")}
+                          </label>
+                          <Select
+                            value={editingProvider.aspectRatio || "16:9"}
+                            onValueChange={(val: any) =>
+                              setEditingProvider({
+                                ...editingProvider,
+                                aspectRatio: val,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                              <SelectItem
+                                value="16:9"
+                                className="text-xs cursor-pointer"
+                              >
+                                16:9 (Widescreen)
+                              </SelectItem>
+                              <SelectItem
+                                value="9:16"
+                                className="text-xs cursor-pointer"
+                              >
+                                9:16 (Vertical)
+                              </SelectItem>
+                              <SelectItem
+                                value="1:1"
+                                className="text-xs cursor-pointer"
+                              >
+                                1:1
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 6. Models Catalog Section */}
+                    <div className="space-y-2 pt-2 border-border/40">
+                      <div className="flex items-center justify-between pb-1">
+                        <div>
+                          <label className="text-xs font-medium text-foreground block">
+                            {t("settings.models")}
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs">
+                          <button
+                            type="button"
+                            onClick={handleRestoreDefaults}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                          >
+                            {t("settings.restoreDefaults")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleFetchModels}
+                            disabled={isFetchingModels}
+                            className="text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw
                               className={cn(
-                                "p-3 rounded-xl border transition-colors flex items-center justify-between gap-3",
-                                isDefault
-                                  ? "bg-secondary/60 border-foreground/30"
-                                  : "bg-secondary/20 border-border"
+                                "w-3 h-3",
+                                isFetchingModels && "animate-spin",
                               )}
-                            >
-                              <div className="min-w-0 flex items-center gap-3">
-                                <div className="min-w-0">
-                                  <span className="block text-xs font-semibold text-foreground truncate">
-                                    {modelDisplayName(model.id, model.name)}
-                                  </span>
-                                  <span className="block text-[11px] text-muted-foreground truncate mt-1">
-                                    {model.id}
-                                  </span>
-                                </div>
-                                {model.contextWindow && (
-                                  <span className="text-[11px] text-muted-foreground font-sans px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 shrink-0">
-                                    {model.contextWindow}
-                                  </span>
-                                )}
-                                {model.badge && (
-                                  <span className="text-[10px] text-muted-foreground font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border/50 shrink-0">
-                                    {model.badge}
-                                  </span>
-                                )}
-                              </div>
+                            />
+                            <span>{t("settings.fetchModels")}</span>
+                          </button>
+                        </div>
+                      </div>
 
-                              <div className="flex items-center gap-3 shrink-0">
-                                {isDefault ? (
-                                  <span className="text-[11px] font-medium text-foreground/90 px-2.5 py-0.5 rounded-full bg-secondary/80 border border-border/80 flex items-center gap-1">
-                                    <Check className="w-3 h-3 text-emerald-500" />
-                                    <span>{t("settings.defaultBadge")}</span>
-                                  </span>
-                                ) : (
+                      {/* Models List */}
+                      <div className="space-y-2">
+                        {!editingProvider.models ||
+                        editingProvider.models.length === 0 ? (
+                          <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
+                            {t("settings.noModelsRegistered")}
+                          </div>
+                        ) : (
+                          editingProvider.models.map((model: any) => {
+                            const isDefault = currentActiveModelId === model.id;
+
+                            return (
+                              <div
+                                key={model.id}
+                                className={cn(
+                                  "p-3 rounded-xl border transition-colors flex items-center justify-between gap-3",
+                                  isDefault
+                                    ? "bg-secondary/60 border-foreground/30"
+                                    : "bg-secondary/20 border-border",
+                                )}
+                              >
+                                <div className="min-w-0 flex items-center gap-3">
+                                  <div className="min-w-0">
+                                    <span className="block text-xs font-semibold text-foreground truncate">
+                                      {modelDisplayName(model.id, model.name)}
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground truncate mt-1">
+                                      {model.id}
+                                    </span>
+                                  </div>
+                                  {model.contextWindow && (
+                                    <span className="text-[11px] text-muted-foreground font-sans px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 shrink-0">
+                                      {model.contextWindow}
+                                    </span>
+                                  )}
+                                  {model.badge && (
+                                    <span className="text-[10px] text-muted-foreground font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border/50 shrink-0">
+                                      {model.badge}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  {isDefault ? (
+                                    <span className="text-[11px] font-medium text-foreground/90 px-2.5 py-0.5 rounded-full bg-secondary/80 border border-border/80 flex items-center gap-1">
+                                      <Check className="w-3 h-3 text-emerald-500" />
+                                      <span>{t("settings.defaultBadge")}</span>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSetDefaultModel(
+                                          model.id,
+                                          editingProvider.id,
+                                        )
+                                      }
+                                      className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    >
+                                      {t("settings.setDefault")}
+                                    </button>
+                                  )}
+
                                   <button
                                     type="button"
-                                    onClick={() => handleSetDefaultModel(model.id, editingProvider.id)}
-                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                    onClick={() =>
+                                      handleRemoveModelFromForm(model.id)
+                                    }
+                                    className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-1"
+                                    title={t("common.remove")}
                                   >
-                                    {t("settings.setDefault")}
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
-                                )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveModelFromForm(model.id)}
-                                  className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-1"
-                                  title={t("common.remove")}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                        {/* Add Model Row */}
+                        {isAddingModel ? (
+                          <div className="p-3 rounded-xl border border-dashed border-border bg-secondary/30 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] text-muted-foreground block mb-1">
+                                  {t("settings.modelId")}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newModelId}
+                                  onChange={(e) =>
+                                    setNewModelId(e.target.value)
+                                  }
+                                  placeholder={t("settings.modelId")}
+                                  className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-muted-foreground block mb-1">
+                                  {t("settings.contextWindow")}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newModelContext}
+                                  onChange={(e) =>
+                                    setNewModelContext(e.target.value)
+                                  }
+                                  placeholder="128K"
+                                  className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40"
+                                />
                               </div>
                             </div>
-                          );
-                        })
-                      )}
-
-                      {/* Add Model Row */}
-                      {isAddingModel ? (
-                        <div className="p-3 rounded-xl border border-dashed border-border bg-secondary/30 space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[11px] text-muted-foreground block mb-1">
-                                {t("settings.modelId")}
-                              </label>
-                              <input
-                                type="text"
-                                value={newModelId}
-                                onChange={(e) => setNewModelId(e.target.value)}
-                                placeholder="e.g. gemini-2.5-flash or gpt-4o"
-                                className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] text-muted-foreground block mb-1">
-                                {t("settings.contextWindow")}
-                              </label>
-                              <input
-                                type="text"
-                                value={newModelContext}
-                                onChange={(e) => setNewModelContext(e.target.value)}
-                                placeholder="e.g. 1M or 128K"
-                                className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40"
-                              />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingModel(false)}
+                                className="px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                              >
+                                {t("common.cancel")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleAddModelToForm}
+                                className="px-3 py-1 rounded-lg bg-foreground text-background text-xs font-medium cursor-pointer"
+                              >
+                                {t("settings.addModel")}
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setIsAddingModel(false)}
-                              className="px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleAddModelToForm}
-                              className="px-3 py-1 rounded-lg bg-foreground text-background text-xs font-medium cursor-pointer"
-                            >
-                              Add
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingModel(true)}
-                          className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs text-foreground font-medium transition-colors cursor-pointer flex items-center gap-1.5 mt-2"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{t("settings.addCustomModel")}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 7. Expanded Card Bottom Actions */}
-                  <div className="flex items-center justify-between gap-2.5 pt-4 border-t border-border/70">
-                    <div>
-                      {editingProvider.baseUrl && (
-                        <button
-                          type="button"
-                          onClick={handleTestConnection}
-                          disabled={isTestingPing}
-                          className="px-3.5 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                        >
-                          {isTestingPing ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Unplug className="w-3.5 h-3.5" />
-                          )}
-                          <span>{isTestingPing ? t("settings.testingPing") : t("settings.testPing")}</span>
-                        </button>
-                      )}
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingModel(true)}
+                            className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs text-foreground font-medium transition-colors cursor-pointer flex items-center gap-1.5 mt-2"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{t("settings.addCustomModel")}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        className="px-4 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-colors cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleApplyProviderEdit}
-                        className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-                      >
-                        Apply
-                      </button>
+                    {/* 7. Expanded Card Bottom Actions */}
+                    <div className="flex items-center justify-between gap-2.5 pt-4 border-border/70">
+                      <div>
+                        {editingProvider.baseUrl && (
+                          <button
+                            type="button"
+                            onClick={handleTestConnection}
+                            disabled={isTestingPing}
+                            className="px-3.5 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          >
+                            {isTestingPing ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Unplug className="w-3.5 h-3.5" />
+                            )}
+                            <span>
+                              {isTestingPing
+                                ? t("settings.testingPing")
+                                : t("settings.testPing")}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="px-4 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-colors cursor-pointer"
+                        >
+                          {t("common.cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleApplyProviderEdit}
+                          className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
+                        >
+                          {t("settings.apply")}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* 3. Preset Adapter Picker Modal */}
       {isPresetModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#f9f9fb] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl w-full max-w-md p-5 space-y-4 shadow-xl">
+        <Dialog open onOpenChange={setIsPresetModalOpen}>
+          <DialogContent
+            hideClose
+            aria-describedby={undefined}
+            className="bg-white dark:bg-[#222222] border-0 rounded-2xl w-[calc(100%-32px)] max-w-md p-5 space-y-4 gap-0"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[#262626] dark:text-white">
-                {t("settings.addProviderAdapter")} ({activeCategory.toUpperCase()})
-              </h3>
+              <DialogTitle className="text-sm font-medium text-[#262626] dark:text-white">
+                {t("settings.addProviderAdapter")} (
+                {activeCategory.toUpperCase()})
+              </DialogTitle>
               <button
                 type="button"
                 onClick={() => setIsPresetModalOpen(false)}
                 className="text-xs text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer"
               >
-                Close
+                {t("common.close")}
               </button>
             </div>
-            <p className="text-xs text-[#737373] dark:text-[#969696]">
-              {t("settings.selectAdapterTemplate")}
-            </p>
 
             <ScrollArea className="max-h-72 pr-1">
               <div className="space-y-2">
@@ -1434,8 +1602,8 @@ export function ModelSettings({
                 ))}
               </div>
             </ScrollArea>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "../../lib/i18n";
 import {
   toast,
   cn,
   ScrollArea,
   Switch,
+  Dialog,
+  DialogContent,
+  DialogTitle,
 } from "@const/ui";
 import {
   Brain,
   Folder,
-  Globe,
   Search,
   RotateCw,
   ChevronDown,
@@ -18,12 +20,16 @@ import {
   FolderOpen,
   Trash2,
   X,
-  Check,
   Plus,
   Save,
   AlertTriangle,
 } from "lucide-react";
 import { Markdown } from "@thesvg/react";
+import {
+  SettingsSelect,
+  SettingsSection,
+  SettingsRow,
+} from "./settings-controls";
 import { MarkdownContent } from "../workbench/markdown-content";
 import type { MemoryFileInfo } from "../../vite-env";
 
@@ -44,7 +50,12 @@ function resolveActiveWorkspace(project?: string): string | null {
     (typeof window !== "undefined"
       ? localStorage.getItem("const_harness_current_project")
       : null);
-  if (!p || p === "Outside Project" || p === "[object Object]" || p.trim() === "") {
+  if (
+    !p ||
+    p === "Outside Project" ||
+    p === "[object Object]" ||
+    p.trim() === ""
+  ) {
     return null;
   }
   return p;
@@ -56,7 +67,9 @@ function formatProjectName(projPath: string): string {
   );
 }
 
-function getInitialProjectOptions(activeWorkspace: string | null): ProjectOption[] {
+function getInitialProjectOptions(
+  activeWorkspace: string | null,
+): ProjectOption[] {
   const list: ProjectOption[] = [
     { id: "global", name: "Global / Default", isGlobal: true },
   ];
@@ -76,6 +89,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   // 1. Workspace Memory master toggle
   const [memoryEnabled, setMemoryEnabled] = useState<boolean>(true);
   const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(true);
+  const [savingMemory, setSavingMemory] = useState(false);
 
   // 2. Scope & Project Selector state - initialize directly based on current workspace
   const [selectedScopeId, setSelectedScopeId] = useState<string>(() => {
@@ -84,8 +98,6 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   const [projectsList, setProjectsList] = useState<ProjectOption[]>(() => {
     return getInitialProjectOptions(resolveActiveWorkspace(currentProject));
   });
-  const [isScopeDropdownOpen, setIsScopeDropdownOpen] = useState(false);
-  const scopeDropdownRef = useRef<HTMLDivElement>(null);
 
   // 3. Memory files state
   const [files, setFiles] = useState<MemoryFileInfo[]>([]);
@@ -116,10 +128,10 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (scopeDropdownRef.current && !scopeDropdownRef.current.contains(e.target as Node)) {
-        setIsScopeDropdownOpen(false);
-      }
-      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+      if (
+        actionMenuRef.current &&
+        !actionMenuRef.current.contains(e.target as Node)
+      ) {
         setActiveMenuFileId(null);
       }
     };
@@ -130,12 +142,15 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   // Load config on mount
   useEffect(() => {
     if (window.electron?.memory?.getConfig) {
-      window.electron.memory.getConfig().then((res) => {
-        setMemoryEnabled(res.workspaceMemoryEnabled ?? true);
-        setIsLoadingConfig(false);
-      }).catch(() => {
-        setIsLoadingConfig(false);
-      });
+      window.electron.memory
+        .getConfig()
+        .then((res) => {
+          setMemoryEnabled(res.workspaceMemoryEnabled ?? true);
+          setIsLoadingConfig(false);
+        })
+        .catch(() => {
+          setIsLoadingConfig(false);
+        });
     } else {
       setIsLoadingConfig(false);
     }
@@ -171,26 +186,29 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
     }
 
     if (window.electron?.listConversations) {
-      window.electron.listConversations().then((convos) => {
-        for (const c of convos) {
-          if (
-            c.project &&
-            c.project !== "Outside Project" &&
-            c.project !== "[object Object]" &&
-            c.project.trim() !== "" &&
-            !seenProjects.has(c.project)
-          ) {
-            seenProjects.add(c.project);
-            list.push({
-              id: c.project,
-              name: formatProjectName(c.project),
-              path: c.project,
-              isGlobal: false,
-            });
+      window.electron
+        .listConversations()
+        .then((convos) => {
+          for (const c of convos) {
+            if (
+              c.project &&
+              c.project !== "Outside Project" &&
+              c.project !== "[object Object]" &&
+              c.project.trim() !== "" &&
+              !seenProjects.has(c.project)
+            ) {
+              seenProjects.add(c.project);
+              list.push({
+                id: c.project,
+                name: formatProjectName(c.project),
+                path: c.project,
+                isGlobal: false,
+              });
+            }
           }
-        }
-        setProjectsList(list);
-      }).catch(() => {});
+          setProjectsList(list);
+        })
+        .catch(() => {});
     }
   }, [currentProject]);
 
@@ -210,7 +228,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
 
       setFiles(Array.isArray(res) ? res : []);
     } catch (err) {
-      toast.error("Failed to load memory files");
+      toast.error(t("settings.memoryLoadFailed"));
     } finally {
       setIsLoadingFiles(false);
     }
@@ -222,14 +240,19 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
 
   // Handle Toggle Workspace Memory
   const handleToggleMemory = async (checked: boolean) => {
+    if (savingMemory || !window.electron?.memory?.saveConfig) return;
+    const previous = memoryEnabled;
+    setSavingMemory(true);
     setMemoryEnabled(checked);
-    if (window.electron?.memory?.saveConfig) {
-      try {
-        await window.electron.memory.saveConfig({ workspaceMemoryEnabled: checked });
-        toast.success(checked ? "Workspace memory enabled" : "Workspace memory disabled");
-      } catch {
-        toast.error("Failed to update memory setting");
-      }
+    try {
+      await window.electron.memory.saveConfig({
+        workspaceMemoryEnabled: checked,
+      });
+    } catch {
+      setMemoryEnabled(previous);
+      toast.error(t("settings.preferencesSaveFailed"));
+    } finally {
+      setSavingMemory(false);
     }
   };
 
@@ -240,28 +263,15 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
     return files.filter(
       (f) =>
         f.name.toLowerCase().includes(q) ||
-        (f.preview && f.preview.toLowerCase().includes(q))
+        (f.preview && f.preview.toLowerCase().includes(q)),
     );
   }, [files, searchQuery]);
 
-  const selectedProjectObj = useMemo(() => {
-    const found = projectsList.find((p) => p.id === selectedScopeId);
-    if (found) return found;
-
-    if (selectedScopeId === "global") {
-      return { id: "global", name: "Global / Default", isGlobal: true };
-    }
-
-    return {
-      id: selectedScopeId,
-      name: formatProjectName(selectedScopeId),
-      path: selectedScopeId,
-      isGlobal: false,
-    };
-  }, [projectsList, selectedScopeId]);
-
   // View / Edit file handler
-  const handleOpenFile = async (file: MemoryFileInfo, initialMode: "preview" | "edit" = "preview") => {
+  const handleOpenFile = async (
+    file: MemoryFileInfo,
+    initialMode: "preview" | "edit" = "preview",
+  ) => {
     setActiveMenuFileId(null);
     if (!window.electron?.memory?.read) return;
 
@@ -273,7 +283,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
         mode: initialMode,
       });
     } catch {
-      toast.error(`Failed to read ${file.name}`);
+      toast.error(t("settings.memoryReadFailed", { name: file.name }));
     }
   };
 
@@ -283,12 +293,19 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
 
     setIsSavingEdit(true);
     try {
-      await window.electron.memory.save(editingFile.file.path, editingFile.content);
-      toast.success(`Saved ${editingFile.file.name}`);
+      await window.electron.memory.save(
+        editingFile.file.path,
+        editingFile.content,
+      );
+      toast.success(
+        t("settings.memoryFileSaved", { name: editingFile.file.name }),
+      );
       setEditingFile(null);
       fetchMemoryFiles(selectedScopeId);
     } catch {
-      toast.error(`Failed to save ${editingFile.file.name}`);
+      toast.error(
+        t("settings.memorySaveFailed", { name: editingFile.file.name }),
+      );
     } finally {
       setIsSavingEdit(false);
     }
@@ -310,14 +327,20 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
     try {
       const ok = await window.electron.memory.delete(deletingFile.path);
       if (ok) {
-        toast.success(`Deleted ${deletingFile.name}`);
+        toast.success(
+          t("settings.memoryFileDeleted", { name: deletingFile.name }),
+        );
         setDeletingFile(null);
         fetchMemoryFiles(selectedScopeId);
       } else {
-        toast.error(`Could not delete ${deletingFile.name}`);
+        toast.error(
+          t("settings.memoryDeleteFailed", { name: deletingFile.name }),
+        );
       }
     } catch {
-      toast.error(`Failed to delete ${deletingFile.name}`);
+      toast.error(
+        t("settings.memoryDeleteFailed", { name: deletingFile.name }),
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -326,7 +349,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
   // Create new memory file handler
   const handleSaveNewFile = async () => {
     if (!newFileName.trim()) {
-      toast.error("Please enter a file name");
+      toast.error(t("settings.memoryNameRequired"));
       return;
     }
 
@@ -351,119 +374,71 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       const defaultHeader = `# ${finalName.replace(/\.md$/, "")}\n\n`;
       const fullBody = newFileContent.trim() ? newFileContent : defaultHeader;
       await window.electron.memory.save(targetPath, fullBody);
-      toast.success(`Created ${finalName}`);
+      toast.success(t("settings.memoryFileSaved", { name: finalName }));
       setIsCreatingNew(false);
       setNewFileName("");
       setNewFileContent("");
       fetchMemoryFiles(selectedScopeId);
     } catch {
-      toast.error("Failed to create memory file");
+      toast.error(t("settings.memorySaveFailed", { name: finalName }));
     } finally {
       setIsSavingNew(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl pb-8 select-none">
+    <div className="flex flex-col gap-5 w-full min-w-0 pb-6 select-none">
       {/* ------------------------------------------------------------- */}
       {/* 1. Workspace Memory Card (Image 1 top card)                   */}
       {/* ------------------------------------------------------------- */}
-      <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors">
-        <div className="flex flex-col gap-1 pr-2">
-          <span className="text-[14px] font-medium text-[#262626] dark:text-white tracking-tight">
-            {t("settings.workspaceMemory")}
-          </span>
-          <p className="text-[12px] leading-relaxed text-[#737373] dark:text-[#969696] max-w-xl">
-            {t("settings.workspaceMemoryDesc")}
-          </p>
-        </div>
-
-        {/* Toggle Switch */}
-        <div className="shrink-0 flex items-center">
+      <SettingsSection>
+        <SettingsRow
+          label={t("settings.workspaceMemory")}
+          htmlFor="settings-memory"
+        >
           <Switch
+            id="settings-memory"
             checked={memoryEnabled}
             onCheckedChange={handleToggleMemory}
-            disabled={isLoadingConfig}
+            disabled={
+              isLoadingConfig ||
+              savingMemory ||
+              !window.electron?.memory?.saveConfig
+            }
             className="data-[state=checked]:bg-[#262626] dark:data-[state=checked]:bg-white"
-            aria-label="Toggle workspace memory"
           />
-        </div>
-      </div>
+        </SettingsRow>
+      </SettingsSection>
 
       {/* ------------------------------------------------------------- */}
       {/* 2. Control Row: Scope Dropdown, Counter, Search & Refresh     */}
       {/* ------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Project Scope Selector & Counter */}
-        <div className="flex items-center gap-3">
-          {/* Dropdown Menu */}
-          <div className="relative" ref={scopeDropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsScopeDropdownOpen((prev) => !prev)}
-              className="px-3 py-1.5 rounded-lg bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer outline-none focus:outline-none"
-              title={t("settings.selectScope")}
-            >
-              {selectedProjectObj.isGlobal ? (
-                <Globe className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-              ) : (
-                <Folder className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-              )}
-              <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                {selectedProjectObj.name}
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696] shrink-0" />
-            </button>
-
-            {/* Scope Dropdown Pop-over */}
-            {isScopeDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-64 max-h-60 overflow-y-auto bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
-                <span className="text-[10px] uppercase font-semibold text-[#737373] dark:text-[#888888] px-2.5 py-1">
-                  {t("settings.memoryScope")}
-                </span>
-                {projectsList.map((p) => {
-                  const isSelected = selectedScopeId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedScopeId(p.id);
-                        setIsScopeDropdownOpen(false);
-                      }}
-                      className={cn(
-                        "w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer outline-none",
-                        isSelected
-                          ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
-                          : "hover:bg-black/5 dark:hover:bg-white/5 text-[#555555] dark:text-[#d4d4d4]"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {p.isGlobal ? (
-                          <Globe className="w-3.5 h-3.5 text-[#737373] shrink-0" />
-                        ) : (
-                          <Folder className="w-3.5 h-3.5 text-[#737373] shrink-0" />
-                        )}
-                        <span className="truncate">{p.name}</span>
-                      </div>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-black dark:text-white shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <SettingsSelect
+            label={t("settings.selectScope")}
+            value={selectedScopeId}
+            onChange={setSelectedScopeId}
+            options={projectsList.map((project) => ({
+              value: project.id,
+              label: project.isGlobal ? t("mcp.global") : project.name,
+            }))}
+          />
 
           {/* Memory Count Indicator */}
           <span className="text-xs text-[#737373] dark:text-[#969696] tabular-nums whitespace-nowrap">
-            {filteredFiles.length} {filteredFiles.length === 1 ? t("settings.memoryUnit") : t("settings.memoriesUnit")}
+            {filteredFiles.length}{" "}
+            {filteredFiles.length === 1
+              ? t("settings.memoryUnit")
+              : t("settings.memoriesUnit")}
           </span>
         </div>
 
         {/* Right: Search Input, Refresh & Add Button */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 basis-64 items-center gap-2">
           {/* Search Bar */}
-          <div className="relative flex-1 sm:w-60">
+          <div className="relative min-w-0 flex-1">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#888888] pointer-events-none" />
             <input
               type="text"
@@ -490,7 +465,9 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             className="p-2 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
             title={t("settings.refreshFiles")}
           >
-            <RotateCw className={cn("w-3.5 h-3.5", isLoadingFiles && "animate-spin")} />
+            <RotateCw
+              className={cn("w-3.5 h-3.5", isLoadingFiles && "animate-spin")}
+            />
           </button>
 
           {/* Create File Button */}
@@ -524,13 +501,15 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             <span>{t("settings.loadingMemoryFiles")}</span>
           </div>
         ) : filteredFiles.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-[#fafafa] dark:bg-[#222222] p-8 flex flex-col items-center justify-center text-center gap-2.5">
+          <div className="rounded-2xl bg-neutral-50 dark:bg-[#222222] p-8 flex flex-col items-center justify-center text-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-[#ececee] dark:bg-[#2b2b2b] flex items-center justify-center text-[#737373] dark:text-[#969696]">
               <Brain className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-medium text-[#262626] dark:text-white">
-                {searchQuery ? t("settings.noMatchingFiles") : t("settings.noMemoryFiles")}
+                {searchQuery
+                  ? t("settings.noMatchingFiles")
+                  : t("settings.noMemoryFiles")}
               </span>
               <span className="text-[11px] text-[#737373] dark:text-[#969696] max-w-sm mt-0.5">
                 {searchQuery
@@ -543,16 +522,12 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 type="button"
                 onClick={() => {
                   setNewFileName("MEMORY.md");
-                  setNewFileContent(
-                    selectedProjectObj.isGlobal
-                      ? "# Global Memory\n\nGlobal preferences, conventions, and instructions across all workspaces.\n"
-                      : "# Workspace Memory\n\nCore conventions and architectural decisions.\n"
-                  );
+                  setNewFileContent("# MEMORY\n\n");
                   setIsCreatingNew(true);
                 }}
                 className="mt-1 px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-xs font-medium text-[#262626] dark:text-white transition-colors cursor-pointer"
               >
-                Create MEMORY.md
+                {t("settings.createMemoryDocument")}
               </button>
             )}
           </div>
@@ -563,19 +538,20 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               return (
                 <div
                   key={file.path}
-                  className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] hover:bg-[#f1f1f4] dark:hover:bg-[#2b2b2b] p-3 flex items-center justify-between gap-3 transition-colors group relative"
+                  className="rounded-xl bg-neutral-50 dark:bg-[#222222] hover:bg-[#f1f1f4] dark:hover:bg-[#2b2b2b] p-3 flex items-center justify-between gap-3 transition-colors group relative"
                 >
                   {/* Left: Markdown Icon & Details */}
-                  <div
-                    className="flex items-center gap-3 min-w-0 cursor-pointer flex-1"
+                  <button
+                    type="button"
+                    className="flex items-center gap-3 min-w-0 text-left flex-1"
                     onClick={() => handleOpenFile(file, "preview")}
-                    title={`Click to preview ${file.name}`}
+                    title={t("common.preview")}
                   >
                     {/* Dark badge with official Markdown logo from @thesvg/react */}
                     <div className="w-8 h-8 rounded-lg bg-[#f0f0f2] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center shrink-0">
                       <Markdown
                         variant="mono"
-                        className="w-4 h-4 text-blue-400 dark:text-blue-400 shrink-0 fill-current"
+                        className="w-4 h-4 text-neutral-500 dark:text-[#969696] shrink-0 fill-current"
                       />
                     </div>
 
@@ -587,7 +563,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                         {file.formattedDate}
                       </span>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Right: Action Dropdown Button (Folder icon with chevron as in Image 1) */}
                   <div className="relative">
@@ -666,25 +642,32 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
       {/* 4. View / Edit Markdown Modal                                 */}
       {/* ------------------------------------------------------------- */}
       {editingFile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-text animate-in fade-in duration-150"
-          onClick={() => setEditingFile(null)}
+        <Dialog
+          open
+          onOpenChange={(value) => {
+            if (!value && !isSavingEdit) setEditingFile(null);
+          }}
         >
-          <div
-            className="w-[780px] max-w-[95vw] h-[580px] max-h-[88vh] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-[0.985] duration-150 text-[#262626] dark:text-[#d4d4d4]"
+          <DialogContent
+            hideClose
+            aria-describedby={undefined}
+            className="p-0 gap-0 w-[780px] max-w-[95vw] h-[580px] max-h-[88vh] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-[0.985] duration-150 text-[#262626] dark:text-[#d4d4d4]"
             onClick={(e) => e.stopPropagation()}
           >
+            <DialogTitle className="sr-only">
+              {editingFile.file.name}
+            </DialogTitle>
             {/* Modal Header */}
-            <div className="px-5 py-3.5 border-b border-[#dedee2] dark:border-[#383838] flex items-center justify-between gap-3 shrink-0 bg-[#f9f9fb] dark:bg-[#222222]">
+            <div className="px-5 py-3.5 border-[#dedee2] dark:border-[#383838] flex items-center justify-between gap-3 shrink-0 bg-[#f9f9fb] dark:bg-[#222222]">
               <div className="flex items-center gap-2.5 min-w-0">
                 <Markdown
                   variant="mono"
-                  className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0 fill-current"
+                  className="w-4 h-4 text-neutral-500 dark:text-[#969696] shrink-0 fill-current"
                 />
                 <span className="text-sm font-medium text-[#262626] dark:text-white truncate">
                   {editingFile.file.name}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#e8e8eb] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#e8e8eb] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696]">
                   {editingFile.file.formattedDate}
                 </span>
               </div>
@@ -694,12 +677,14 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5">
                   <button
                     type="button"
-                    onClick={() => setEditingFile({ ...editingFile, mode: "preview" })}
+                    onClick={() =>
+                      setEditingFile({ ...editingFile, mode: "preview" })
+                    }
                     className={cn(
                       "px-2.5 py-1 text-xs rounded-md transition-all cursor-pointer flex items-center gap-1.5",
                       editingFile.mode === "preview"
                         ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs font-medium"
-                        : "text-[#737373] hover:text-black dark:hover:text-white"
+                        : "text-[#737373] hover:text-black dark:hover:text-white",
                     )}
                   >
                     <Eye className="w-3 h-3" />
@@ -707,12 +692,14 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setEditingFile({ ...editingFile, mode: "edit" })}
+                    onClick={() =>
+                      setEditingFile({ ...editingFile, mode: "edit" })
+                    }
                     className={cn(
                       "px-2.5 py-1 text-xs rounded-md transition-all cursor-pointer flex items-center gap-1.5",
                       editingFile.mode === "edit"
                         ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs font-medium"
-                        : "text-[#737373] hover:text-black dark:hover:text-white"
+                        : "text-[#737373] hover:text-black dark:hover:text-white",
                     )}
                   >
                     <FileCode className="w-3 h-3" />
@@ -723,6 +710,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 <button
                   type="button"
                   onClick={() => setEditingFile(null)}
+                  aria-label={t("common.close")}
                   className="p-1 rounded-lg text-[#737373] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -735,8 +723,10 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               {editingFile.mode === "edit" ? (
                 <textarea
                   value={editingFile.content}
-                  onChange={(e) => setEditingFile({ ...editingFile, content: e.target.value })}
-                  placeholder="Type markdown content here..."
+                  onChange={(e) =>
+                    setEditingFile({ ...editingFile, content: e.target.value })
+                  }
+                  placeholder={t("settings.memoryContentPlaceholder")}
                   className="w-full h-full p-4 font-mono text-xs leading-relaxed bg-transparent text-[#262626] dark:text-[#e0e0e0] placeholder:text-[#888888] resize-none outline-none focus:outline-none"
                   spellCheck={false}
                 />
@@ -746,7 +736,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                     <MarkdownContent content={editingFile.content} />
                   ) : (
                     <div className="py-12 text-center text-xs text-[#737373]">
-                      (Empty memory document)
+                      {t("settings.emptyMemoryDocument")}
                     </div>
                   )}
                 </ScrollArea>
@@ -754,7 +744,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-5 py-3 border-t border-[#dedee2] dark:border-[#383838] flex items-center justify-between gap-3 shrink-0 bg-[#f9f9fb] dark:bg-[#222222]">
+            <div className="px-5 py-3 border-[#dedee2] dark:border-[#383838] flex items-center justify-between gap-3 shrink-0 bg-[#f9f9fb] dark:bg-[#222222]">
               <span className="text-[11px] text-[#737373] dark:text-[#969696] font-mono truncate">
                 {editingFile.file.path}
               </span>
@@ -765,7 +755,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   onClick={() => setEditingFile(null)}
                   className="px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
 
                 <button
@@ -783,22 +773,29 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* ------------------------------------------------------------- */}
       {/* 5. Delete Confirmation Modal (User Request)                   */}
       {/* ------------------------------------------------------------- */}
       {deletingFile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => setDeletingFile(null)}
+        <Dialog
+          open
+          onOpenChange={(value) => {
+            if (!value && !isDeleting) setDeletingFile(null);
+          }}
         >
-          <div
+          <DialogContent
+            hideClose
+            aria-describedby={undefined}
             className="w-[420px] max-w-[92vw] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95 duration-150 text-[#262626] dark:text-[#d4d4d4]"
             onClick={(e) => e.stopPropagation()}
           >
+            <DialogTitle className="sr-only">
+              {t("settings.deleteMemoryFile")}
+            </DialogTitle>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
                 <AlertTriangle className="w-4 h-4" />
@@ -808,7 +805,9 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                   {t("settings.deleteMemoryFile")}?
                 </span>
                 <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
-                  Are you sure you want to delete <strong className="text-black dark:text-white font-medium">{deletingFile.name}</strong>? This action cannot be undone.
+                  {t("settings.deleteMemoryConfirm", {
+                    name: deletingFile.name,
+                  })}
                 </p>
               </div>
             </div>
@@ -819,7 +818,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 onClick={() => setDeletingFile(null)}
                 className="px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -832,25 +831,32 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 ) : (
                   <Trash2 className="w-3.5 h-3.5" />
                 )}
-                <span>Delete</span>
+                <span>{t("common.delete")}</span>
               </button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* ------------------------------------------------------------- */}
       {/* 6. Create New Memory File Modal                               */}
       {/* ------------------------------------------------------------- */}
       {isCreatingNew && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => setIsCreatingNew(false)}
+        <Dialog
+          open
+          onOpenChange={(value) => {
+            if (!value && !isSavingNew) setIsCreatingNew(false);
+          }}
         >
-          <div
+          <DialogContent
+            hideClose
+            aria-describedby={undefined}
             className="w-[540px] max-w-[92vw] bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95 duration-150 text-[#262626] dark:text-[#d4d4d4]"
             onClick={(e) => e.stopPropagation()}
           >
+            <DialogTitle className="sr-only">
+              {t("settings.newMemoryFile")}
+            </DialogTitle>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-[#262626] dark:text-white">
                 {t("settings.newMemoryFile")}
@@ -858,6 +864,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
               <button
                 type="button"
                 onClick={() => setIsCreatingNew(false)}
+                aria-label={t("common.close")}
                 className="text-[#737373] hover:text-black dark:hover:text-white"
               >
                 <X className="w-4 h-4" />
@@ -866,27 +873,35 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
 
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#737373] dark:text-[#969696]">
-                  File Name
+                <label
+                  htmlFor="memory-file-name"
+                  className="text-xs font-medium text-[#737373] dark:text-[#969696]"
+                >
+                  {t("settings.memoryFileName")}
                 </label>
                 <input
                   type="text"
                   value={newFileName}
                   onChange={(e) => setNewFileName(e.target.value)}
-                  placeholder="e.g. user-coding-preferences.md"
+                  placeholder="MEMORY.md"
+                  id="memory-file-name"
                   className="w-full h-8 px-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] focus:outline-none font-mono transition-colors"
                   autoFocus
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-[#737373] dark:text-[#969696]">
-                  Initial Content (Markdown)
+                <label
+                  htmlFor="memory-file-content"
+                  className="text-xs font-medium text-[#737373] dark:text-[#969696]"
+                >
+                  {t("settings.memoryContent")}
                 </label>
                 <textarea
+                  id="memory-file-content"
                   value={newFileContent}
                   onChange={(e) => setNewFileContent(e.target.value)}
-                  placeholder="# Title&#10;&#10;Add initial memory notes, rules, or conventions..."
+                  placeholder={t("settings.memoryContentPlaceholder")}
                   className="w-full h-32 p-3 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1b1b1b] text-[#262626] dark:text-white placeholder:text-[#888888] font-mono resize-none focus:outline-none transition-colors"
                 />
               </div>
@@ -898,7 +913,7 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 onClick={() => setIsCreatingNew(false)}
                 className="px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -914,8 +929,8 @@ export function MemorySettings({ currentProject }: MemorySettingsProps) {
                 <span>{t("settings.newMemoryFile")}</span>
               </button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
