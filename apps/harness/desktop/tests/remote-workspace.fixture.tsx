@@ -14,6 +14,8 @@ import { RemotePullToRefresh } from "../src/components/remote-pull-to-refresh";
 import { scopedRemoteStorage } from "../src/lib/remote-storage";
 import { installRemotePullToRefresh } from "../src/lib/remote-pull-to-refresh";
 import { marked } from "marked";
+import { RemoteControlModal } from "../src/components/remote-control-modal";
+import type { RemoteDaemonStatus } from "../src/lib/remote-control";
 import "../src/index.css";
 import "../src/remote.css";
 
@@ -25,6 +27,7 @@ const parseInline = marked.parseInline.bind(marked);
 marked.lexer = (...args) => { markdownWork.blocks++; return lex(...args); };
 marked.parseInline = (...args) => { markdownWork.inline++; return parseInline(...args); };
 scopedRemoteStorage("fixture");
+if (new URLSearchParams(location.search).has("landing")) localStorage.removeItem("const_harness_active_conversation_id");
 let directoryResolver: ((path: string | null) => void) | undefined;
 const emit = (channel: string, ...args: any[]) => {
   for (const listener of listeners.get(channel) || []) listener({}, ...args);
@@ -77,9 +80,26 @@ const config: any = {
   workspaceMemoryEnabled: true,
 };
 let api: any;
+let remoteStatus: RemoteDaemonStatus = {
+  status: "idle", deviceId: "fixture-desktop", sessionId: null, pairingUrl: null,
+  pairingCode: null, localBridgeUrl: null, expiresAt: null, connectedDevices: [], transport: "relay",
+};
+let pairingRevision = 0;
+let remoteActionError: string | null = null;
+function updateRemoteStatus(patch: Partial<RemoteDaemonStatus>) {
+  remoteStatus = { ...remoteStatus, ...patch };
+  emit("remote:status-changed", remoteStatus);
+  return remoteStatus;
+}
 api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
+      if (["remote:start-session", "remote:refresh-session", "remote:stop-session"].includes(channel)) {
+        if (remoteActionError) throw new Error(remoteActionError);
+        if (channel === "remote:stop-session") return updateRemoteStatus({ status: "idle", sessionId: null, pairingUrl: null, pairingCode: null, expiresAt: null, connectedDevices: [] });
+        pairingRevision++;
+        return updateRemoteStatus({ status: "waiting", sessionId: `fixture-${pairingRevision}`, pairingUrl: `https://harness.const.web.id/r/fixture-${pairingRevision}#key=${"x".repeat(43)}`, pairingCode: pairingRevision % 2 ? "ABC-234" : "XYZ-789", expiresAt: Date.now() + 15 * 60_000, connectedDevices: [] });
+      }
       if (channel === "config:get") return config;
       if (channel === "dialog:open-directory") return new Promise(resolve => {
         directoryResolver?.(null);
@@ -217,7 +237,7 @@ api = createDesktopBridge(
       if (channel === "workspace:resolve-path") return "D:/Projects/Const";
       if (channel === "workspace:list-files") return [];
       if (channel === "remote:get-status")
-        return { status: "idle", connectedDevices: [] };
+        return remoteStatus;
       return true;
     },
     send() {},
@@ -236,6 +256,8 @@ api = createDesktopBridge(
 window.electron = api;
 (window as any).__remoteFixture = {
   markdownWork,
+  updateRemoteStatus,
+  setRemoteActionError(error: string | null) { remoteActionError = error; },
   installRemotePullToRefresh,
   updateConversation(id: string, patch: any) {
     const conversation = conversations.find(c => c.id === id);
@@ -306,6 +328,13 @@ function Preview() {
   );
 }
 function Crash(): React.ReactNode { throw new Error("Fixture render failure"); }
+function HostControlPreview() {
+  const [open, setOpen] = React.useState(true);
+  return <I18nProvider><ConvexClientProvider token="fixture" signOut={() => {}}>
+    <button onClick={() => setOpen(true)}>Open remote control fixture</button>
+    <RemoteControlModal isOpen={open} onClose={() => setOpen(false)} />
+  </ConvexClientProvider></I18nProvider>;
+}
 createRoot(document.getElementById("root")!).render(
-  <I18nProvider><RemoteWorkspaceBoundary><Preview /></RemoteWorkspaceBoundary></I18nProvider>,
+  <I18nProvider><RemoteWorkspaceBoundary>{new URLSearchParams(location.search).has("host-control") ? <HostControlPreview /> : <Preview />}</RemoteWorkspaceBoundary></I18nProvider>,
 );

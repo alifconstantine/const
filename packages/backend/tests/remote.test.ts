@@ -2,7 +2,7 @@ import { expect, test, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema";
 import { api, internal } from "../convex/_generated/api";
-import { digest, open, randomSecret, seal } from "../../remote/src/crypto";
+import { digest, open, openWithCode, randomSecret, seal, sealWithCode } from "../../remote/src/crypto";
 import { emptyLive, reduceLive } from "../../remote/src/live";
 
 const modules = import.meta.glob("../convex/**/*.ts");
@@ -69,6 +69,47 @@ test("requires an authenticated owner and rejects cross-account pairing and read
     }),
   ).rejects.toThrow();
 });
+
+test("a short code resolves, decrypts and pairs using the same proof as a direct link", async () => {
+  const s = await setup();
+  const code = "ABC-234";
+  const sessionId = await s.owner.mutation(api.remote.create, {
+    deviceName: "Pairing desktop", hostHash: s.hostHash, pairHash: s.pairHash,
+    pairingCode: code, encryptedSecret: await sealWithCode(code, s.secret),
+  });
+  const resolved = await s.owner.query(api.remote.resolvePairingCode, { code: " abc 234 " });
+  expect(resolved.sessionId).toBe(sessionId);
+  const secret = await openWithCode("abc234", resolved.encryptedSecret!);
+  expect(secret).toBe(s.secret);
+  await expect(s.owner.mutation(api.remote.join, {
+    sessionId, pairHash: await digest(secret), secretHash: await digest(randomSecret()), name: "Phone via code",
+  })).resolves.toBeDefined();
+  await expect(s.other.query(api.remote.resolvePairingCode, { code })).rejects.toThrow();
+  await expect(s.t.query(api.remote.resolvePairingCode, { code })).rejects.toThrow();
+  await expect(openWithCode("XYZ789", resolved.encryptedSecret!)).rejects.toThrow();
+  await s.t.run(ctx => ctx.db.patch(sessionId, { pairExpiresAt: Date.now() - 1 }));
+  await expect(s.owner.query(api.remote.resolvePairingCode, { code })).rejects.toThrow();
+});
+
+test.each(["other owner", "revoked", "expired invitation", "expired session"])(
+  "a code shared with an older %s session still resolves the owner's valid invitation",
+  async (kind) => {
+    const s = await setup();
+    const code = "ABC-234";
+    const args = {
+      deviceName: "Desktop", hostHash: s.hostHash, pairHash: s.pairHash,
+      pairingCode: code, encryptedSecret: await sealWithCode(code, s.secret),
+    };
+    const first = await (kind === "other owner" ? s.other : s.owner).mutation(api.remote.create, args);
+    if (kind !== "other owner") await s.t.run(ctx => ctx.db.patch(first,
+      kind === "revoked" ? { revoked: true } : kind === "expired invitation"
+        ? { pairExpiresAt: Date.now() - 1 } : { expiresAt: Date.now() - 1 },
+    ));
+    const current = await s.owner.mutation(api.remote.create, args);
+    const resolved = await s.owner.query(api.remote.resolvePairingCode, { code });
+    expect(resolved.sessionId).toBe(current);
+  },
+);
 test("a paired device cannot impersonate the desktop or another grant", async () => {
   const s = await setup();
   await expect(

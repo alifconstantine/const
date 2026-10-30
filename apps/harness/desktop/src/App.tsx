@@ -4258,9 +4258,28 @@ export function AuthenticatedContent({
         isSidebarOpen ? "gap-2.5" : "gap-0"
       )}
     >
+      {remote?.mobile && (
+        <button
+          type="button"
+          className="remote-sidebar-toggle"
+          data-sidebar-toggle
+          aria-label={t(isSidebarOpen ? "sidebar.collapseSidebar" : "topToolbar.toggleSidebar")}
+          aria-expanded={isSidebarOpen}
+          aria-controls="workspace-sidebar"
+          onClick={() => setIsSidebarOpen((prev) => !prev)}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <path className="remote-menu-line remote-menu-line-top" d="M3 8h18" />
+            <path className="remote-menu-line remote-menu-line-bottom" d="M3 16h18" />
+          </svg>
+        </button>
+      )}
       {remote?.mobile && isSidebarOpen && <button className="remote-sidebar-backdrop" aria-label={t("common.close")} onClick={() => setIsSidebarOpen(false)} />}
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
+        id="workspace-sidebar"
+        aria-hidden={remote?.mobile && !isSidebarOpen ? true : undefined}
+        inert={remote?.mobile && !isSidebarOpen ? true : undefined}
         className={`workspace-sidebar shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
           isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}

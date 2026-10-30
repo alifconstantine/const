@@ -712,6 +712,7 @@ export function Sidebar({
       <div className="flex flex-col shrink-0">
         {/* Logo and Collapse Button */}
         <div
+          data-sidebar-header
           className="flex items-center justify-between h-9 mb-2"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         >
@@ -734,7 +735,7 @@ export function Sidebar({
             className="flex items-center gap-0.5 text-[#666666] dark:text-[#999999]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
-            <button
+            {!remote?.mobile && <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
@@ -745,8 +746,8 @@ export function Sidebar({
               title={t("sidebar.collapseSidebar")}
               aria-label={t("sidebar.collapseSidebar")}
             >
-              {remote?.mobile ? <X className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
-            </button>
+              <PanelLeft className="w-4 h-4" />
+            </button>}
           </div>
         </div>
 

@@ -151,19 +151,21 @@ export const resolvePairingCode = query({
     const normalized = args.code.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     if (normalized.length !== 6) throw new ConvexError({ code: "INVALID_CODE" });
     const formatted = `${normalized.slice(0, 3)}-${normalized.slice(3)}`;
-    const session = await ctx.db
+    const candidates = await ctx.db
       .query("remoteSessions")
       .withIndex("by_pairing_code", (q) => q.eq("pairingCode", formatted))
-      .first();
+      .collect();
     const now = Date.now();
-    if (
-      !session ||
-      session.ownerId !== ownerId ||
-      session.revoked ||
-      session.expiresAt <= now ||
-      session.pairExpiresAt <= now ||
-      !session.encryptedSecret
-    ) {
+    // Codes can be reused. A stale session (or another owner's session) must
+    // never shadow this owner's active pairing invitation.
+    const session = candidates.find((candidate) =>
+      candidate.ownerId === ownerId &&
+      !candidate.revoked &&
+      candidate.expiresAt > now &&
+      candidate.pairExpiresAt > now &&
+      !!candidate.encryptedSecret,
+    );
+    if (!session) {
       throw new ConvexError({ code: "PAIRING_CODE_NOT_FOUND" });
     }
     return {

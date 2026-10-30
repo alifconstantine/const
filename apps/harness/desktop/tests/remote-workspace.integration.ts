@@ -82,7 +82,9 @@ async function run() {
     const work = await js(`({...window.__remoteFixture.markdownWork})`);
     console.log('Sidepanel Markdown work for 12 replies × 16 paragraphs:', JSON.stringify(work));
     assert.deepEqual(work, {blocks:0, inline:0});
-    assert.equal(await js(`getComputedStyle(document.querySelector('.workspace-chat')).transitionDuration`), "0.28s");
+    const durations = await js(`['.workspace-chat', '.workspace-right-pane'].map(selector => getComputedStyle(document.querySelector(selector)).transitionDuration.split(',')[0])`);
+    assert.equal(durations[0], durations[1]);
+    assert.ok(parseFloat(durations[0]) > 0);
     assert.equal(await js(`document.querySelector('.workspace-right-pane').inert`), true);
     await js(`window.__remoteFixture.updateConversation('preview-chat', {messages:[{id:'one',role:'user',content:'Audit the remote workspace.'}]})`);
     await waitFor('document.body.innerText.includes("Audit the remote workspace.")');
@@ -158,10 +160,39 @@ async function run() {
     await waitFor('document.body.innerText.includes("Answer before UI")');
     assert.equal(await js('Boolean(document.querySelector(".workspace-shell"))'), true);
   });
-  await check("mobile refresh affordance appears and cancels without reloading", async () => {
+  await check("mobile hamburger stays visible and opens and closes the sidebar with the sidepanel closed", async () => {
     win.setSize(390, 844);
     await waitFor('Boolean(document.querySelector(".remote-mobile"))');
     await js(`document.querySelector('.remote-sidebar-backdrop')?.click()`);
+    await delay(350);
+    const target = await js(`(() => {
+      const button = document.querySelector('[data-sidebar-toggle]');
+      const rect = button.getBoundingClientRect();
+      const x = rect.x + rect.width / 2, y = rect.y + rect.height / 2;
+      return { x, y, width: rect.width, height: rect.height, reachable: button.contains(document.elementFromPoint(x, y)) };
+    })()`);
+    assert.ok(target.width >= 44 && target.height >= 44);
+    assert.equal(target.reachable, true);
+    await capture("remote-workspace-mobile-menu");
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: target.x, y: target.y }] });
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await waitFor(`Boolean(document.querySelector('.remote-sidebar-backdrop'))`);
+    await capture("remote-workspace-mobile-sidebar");
+    assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "true");
+    assert.equal(await js(`(() => {
+      const button = document.querySelector('[data-sidebar-toggle]');
+      const top = new DOMMatrix(getComputedStyle(button.querySelector('.remote-menu-line-top')).transform);
+      const bottom = new DOMMatrix(getComputedStyle(button.querySelector('.remote-menu-line-bottom')).transform);
+      return top.b > 0.6 && bottom.b < -0.6 && button.contains(document.elementFromPoint(${target.x}, ${target.y}));
+    })()`), true);
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: target.x, y: target.y }] });
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await waitFor(`!document.querySelector('.remote-sidebar-backdrop')`);
+    await delay(350);
+    assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "false");
+    assert.equal(await js(`document.querySelectorAll('[data-sidebar-toggle] path').length`), 2);
+  });
+  await check("mobile refresh affordance appears and cancels without reloading", async () => {
     await js(`(() => {
       const target = document.querySelector('.workspace-toolbar');
       const touch = y => new Touch({identifier:1,target,clientX:30,clientY:y});
@@ -204,12 +235,140 @@ async function run() {
     })()`);
     assert.deepEqual(result, { blocked: true, armed: true, refreshed: 1, progress: 0 });
   });
+  await check("a fresh mobile landing page has a persistent two-line menu that animates to X", async () => {
+    win.setSize(360, 740);
+    await win.loadURL(process.argv[3]! + "?landing");
+    await waitFor(`Boolean(document.querySelector('.remote-mobile .workspace-landing'))`);
+    await delay(250);
+    assert.equal(await js(`(() => {
+      const button = document.querySelector('[data-sidebar-toggle]');
+      const bounds = button.getBoundingClientRect();
+      return bounds.width >= 44 && bounds.height >= 44 && button.contains(document.elementFromPoint(bounds.x + 22, bounds.y + 22));
+    })()`), true);
+    await capture("remote-landing-mobile-menu");
+    const motion = await js(`new Promise(resolve => {
+      const button = document.querySelector('[data-sidebar-toggle]');
+      const line = button.querySelector('.remote-menu-line-top');
+      const samples = [];
+      const start = performance.now();
+      const sample = now => {
+        samples.push(new DOMMatrix(getComputedStyle(line).transform).b);
+        if (now - start < 320) requestAnimationFrame(sample);
+        else resolve({ samples, persistent:button === document.querySelector('[data-sidebar-toggle]'), expanded:button.getAttribute('aria-expanded') });
+      };
+      requestAnimationFrame(sample);
+      button.click();
+    })`);
+    assert.equal(motion.persistent, true);
+    assert.equal(motion.expanded, "true");
+    assert.ok(motion.samples.some((value: number) => value > 0.01 && value < 0.70), "Expected an intermediate menu-to-X frame");
+    await capture("remote-landing-mobile-sidebar");
+    await js(`document.querySelector('[data-sidebar-toggle]').click()`);
+    await waitFor(`!document.querySelector('.remote-sidebar-backdrop')`);
+    await delay(250);
+    await motionPreference("reduce");
+    await js(`document.querySelector('[data-sidebar-toggle]').click()`);
+    await delay(80);
+    assert.equal(await js(`getComputedStyle(document.querySelector('.remote-menu-line-top')).transitionDuration`), "0s");
+    assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "true");
+    await js(`document.querySelector('.remote-sidebar-backdrop').click()`);
+    await motionPreference("no-preference");
+  });
   await check("an uncaught renderer crash shows recovery without deleting pairing credentials", async () => {
     await js(`sessionStorage.setItem('const_remote_key:fixture', 'preserved'); window.dispatchEvent(new Event('fixture:crash'))`);
     await waitFor('document.body.innerText.includes("The remote workspace could not be displayed")');
     assert.equal(await js(`sessionStorage.getItem('const_remote_key:fixture')`), "preserved");
     assert.equal(await js(`Boolean(document.querySelector('[role=alert] button'))`), true);
     await capture("remote-workspace-recovery");
+  });
+
+  win.setSize(1280, 900);
+  await win.loadURL(process.argv[3]! + "?host-control");
+  await waitFor(`document.body.innerText.includes('Remote control stopped')`);
+  await check("host pairing controls start, copy, rotate and stop without redundant actions", async () => {
+    assert.equal(await js(`Boolean(document.querySelector('img'))`), false);
+    assert.equal(await js(`Boolean(document.querySelector('[data-pairing-placeholder]'))`), true);
+    assert.equal(await js(`Boolean(document.querySelector('[data-pairing-placeholder] .lucide-qr-code'))`), true);
+    assert.equal(await js(`document.activeElement === document.querySelector('[role=dialog]')`), true);
+    assert.equal(await js(`Array.from(document.querySelectorAll('h2')).some(heading => heading.textContent === 'Connected devices')`), false);
+    assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Copy link')).disabled`), true);
+    assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('New pairing')).disabled`), true);
+    await capture("remote-control-stopped");
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Tab' });
+    win.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Tab' });
+    await delay(80);
+    assert.equal(await js(`document.activeElement === document.querySelector('[data-remote-control-close]')`), true);
+    assert.equal(await js(`(() => {
+      const style = getComputedStyle(document.querySelector('[data-remote-control-close]'));
+      const noVisibleOutline = style.outlineStyle === 'none' || style.outlineWidth === '0px' || style.outlineColor === 'rgba(0, 0, 0, 0)';
+      return noVisibleOutline && ['borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth'].every(key => style[key] === '0px');
+    })()`), true);
+    await capture("remote-control-close-keyboard-focus");
+    await js(`document.querySelector('[role=dialog]').focus()`);
+    await js(`window.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable:true, value:{ writeText:async value => window.__copied.push(value) } });
+      Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Start').click()`);
+    await waitFor(`Boolean(document.querySelector('img[alt="Remote pairing QR code"]'))`);
+    assert.equal(await js(`document.querySelectorAll('button').length`), 6);
+    await js(`document.querySelector('button[aria-label="Copy pairing code"]').click()`);
+    await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Copy link')).click()`);
+    assert.deepEqual(await js(`window.__copied`), ["ABC-234", `https://harness.const.web.id/r/fixture-1#key=${"x".repeat(43)}`]);
+    await capture("remote-control-pairing-dark");
+    await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('New pairing')).click()`);
+    await waitFor(`document.body.innerText.includes('XYZ-789')`);
+    await js(`window.__remoteFixture.updateRemoteStatus({status:'connected', connectedDevices:Array.from({length:4}, (_,i) => ({id:'device-'+i,name:['Android Phone','iPad','Windows PC','MacBook'][i],connectedAt:Date.now()-120000}))})`);
+    await waitFor(`document.body.innerText.includes('4 of 4 paired')`);
+    assert.equal(await js(`document.body.innerText.includes('MacBook')`), true);
+    await capture("remote-control-connected-dark");
+    await js(`document.documentElement.classList.remove('dark')`);
+    await capture("remote-control-connected-light");
+    win.setSize(390, 844);
+    await delay(200);
+    assert.equal(await js(`(() => { const d = document.querySelector('[role=dialog]'); return d.scrollWidth <= d.clientWidth; })()`), true);
+    await capture("remote-control-connected-mobile");
+    await js(`(() => { const viewport = document.querySelector('[role=dialog] [data-radix-scroll-area-viewport]'); viewport.scrollTop = viewport.scrollHeight; })()`);
+    assert.equal(await js(`(() => {
+      const device = Array.from(document.querySelectorAll('[role=dialog] p')).find(p => p.textContent === 'MacBook');
+      const viewport = device.closest('[data-radix-scroll-area-viewport]').getBoundingClientRect();
+      const bounds = device.getBoundingClientRect();
+      return bounds.top >= viewport.top && bounds.bottom <= viewport.bottom;
+    })()`), true);
+    await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Stop').click()`);
+    await waitFor(`document.body.innerText.includes('Remote control stopped')`);
+    assert.equal(await js(`Boolean(document.querySelector('img'))`), false);
+    assert.equal(await js(`Boolean(document.querySelector('[data-pairing-placeholder]'))`), true);
+  });
+  await check("expired and legacy invitations cannot advertise a usable pairing code", async () => {
+    win.setSize(1280, 900);
+    await js(`document.documentElement.classList.add('dark'); window.__remoteFixture.updateRemoteStatus({status:'waiting', pairingUrl:'https://harness.const.web.id/r/expired#key=${"x".repeat(43)}',pairingCode:'ABC-234',expiresAt:Date.now()-1000})`);
+    await waitFor(`document.body.innerText.includes('Pairing expired')`);
+    assert.equal(await js(`Boolean(document.querySelector('button[aria-label="Copy pairing code"]'))`), false);
+    assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Copy link')).disabled`), true);
+    await capture("remote-control-expired");
+    await js(`window.__remoteFixture.updateRemoteStatus({pairingCode:null,expiresAt:Date.now()+60000})`);
+    await waitFor(`document.body.innerText.includes('Pairing codes require an updated remote service')`);
+    assert.equal(await js(`Boolean(document.querySelector('button[aria-label="Copy pairing code"]'))`), false);
+    await capture("remote-control-legacy");
+  });
+  await check("host action errors remain recoverable", async () => {
+    await js(`window.__remoteFixture.setRemoteActionError('Network error'); Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('New pairing')).click()`);
+    await waitFor(`Boolean(document.querySelector('[role=alert]'))`);
+    assert.equal(await js(`Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('New pairing')).disabled`), false);
+    await capture("remote-control-error");
+    await js(`window.__remoteFixture.setRemoteActionError(null); Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('New pairing')).click()`);
+    await waitFor(`!document.querySelector('[role=alert]') && Boolean(document.querySelector('button[aria-label="Copy pairing code"]'))`);
+  });
+  await check("pairing stays within a narrow viewport in every supported language", async () => {
+    win.setSize(320, 740);
+    for (const language of ['en', 'id', 'ja', 'zh', 'es']) {
+      await js(`window.dispatchEvent(new CustomEvent('const-language-changed', {detail:${JSON.stringify(language)}}))`);
+      await delay(150);
+      assert.equal(await js(`(() => {
+        const dialog = document.querySelector('[role=dialog]');
+        const viewport = dialog.querySelector('[data-radix-scroll-area-viewport]');
+        return dialog.scrollWidth <= dialog.clientWidth && viewport.scrollWidth <= viewport.clientWidth && !dialog.innerText.includes('remoteControl.');
+      })()`), true, language);
+      if (language === 'id') await capture("remote-control-pairing-indonesian-mobile");
+    }
   });
   win.destroy();
 }

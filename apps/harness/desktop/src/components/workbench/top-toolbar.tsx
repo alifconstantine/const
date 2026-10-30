@@ -3,7 +3,6 @@ import React from "react";
 import {
   MessageCirclePlus,
   PanelLeft,
-  Menu,
   Folder,
   MoreHorizontal,
   Globe,
@@ -176,10 +175,11 @@ export function TopToolbar({
     >
       {/* Left section: Conversation breadcrumb / title and project badge */}
       <div
+        data-toolbar-navigation
         className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden mr-2"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {!isSidebarOpen && (
+        {!isSidebarOpen && !remote?.mobile && (
           <>
             <button
               type="button"
@@ -191,12 +191,10 @@ export function TopToolbar({
               className="shrink-0 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer flex items-center justify-center select-none"
               title={t("topToolbar.toggleSidebar")}
               aria-label={t("topToolbar.toggleSidebar")}
+              data-sidebar-toggle
+              aria-expanded={isSidebarOpen}
             >
-              {remote?.mobile ? (
-                <Menu className="w-4 h-4" />
-              ) : (
-                <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
-              )}
+              <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
             </button>
 
             <button
@@ -341,6 +339,7 @@ export function TopToolbar({
       {/* Right section: Browser & Terminal toggles in Main Chat header (ONLY when sidepanel is open, without sliding transition) */}
       {isRightSidebarOpen && (
         <div
+          data-toolbar-actions
           className="flex items-center gap-0.5 shrink-0 ml-auto pointer-events-auto"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >

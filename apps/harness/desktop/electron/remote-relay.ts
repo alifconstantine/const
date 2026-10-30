@@ -63,7 +63,7 @@ export class RemoteRelay {
     this.client = this.createClient(convexUrl);
     this.client.setAuth(async () => authToken);
     this.secret = randomSecret();
-    const pairingCode = generatePairingCode();
+    let pairingCode: string | null = generatePairingCode();
     const encryptedSecret = await sealWithCode(pairingCode, this.secret);
     const hostHash = await digest(randomSecret());
     let startupTimer: ReturnType<typeof setTimeout> | undefined;
@@ -92,7 +92,13 @@ export class RemoteRelay {
           console.error(`[RemoteRelay] Unauthorized on Convex relay (${convexUrl}):`, errMsg);
           throw new Error("REMOTE_UNAUTHORIZED");
         }
-        // Fallback in case connected Convex relay has older arguments schema
+        // Only a schema mismatch is safe to retry: a timeout may have already
+        // created the session. Legacy relays cannot resolve a pairing code.
+        if (!/ArgumentValidationError/.test(errMsg) ||
+          !/extra field [`'"]?(pairingCode|encryptedSecret)/.test(errMsg)) {
+          throw mutationError;
+        }
+        pairingCode = null;
         sessionId = (await Promise.race([
           this.client.mutation(broker.create, {
             deviceName: this.deviceId,

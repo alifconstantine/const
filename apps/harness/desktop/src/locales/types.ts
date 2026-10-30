@@ -1,6 +1,13 @@
 export interface TranslationDictionary {
   mcp: import("./mcp").McpTranslations;
   remoteControl: {
+    startHint: string;
+    pairDevice: string;
+    copyCode: string;
+    codeHint: string;
+    codeUnavailable: string;
+    expiresIn: string;
+    refreshHint: string;
     renderError: string;
     renderErrorHint: string;
     pullToRefresh: string;
