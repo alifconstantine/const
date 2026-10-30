@@ -268,7 +268,8 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
         setStatus(next);
         setNow(Date.now());
       }
-    } catch {
+    } catch (err) {
+      console.error("[RemoteModal] Failed to " + action + " session:", err);
       if (generation.current === current)
         setError(action === "start" ? "startError" : "actionError");
     } finally {

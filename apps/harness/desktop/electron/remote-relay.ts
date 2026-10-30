@@ -68,21 +68,40 @@ export class RemoteRelay {
     const hostHash = await digest(randomSecret());
     let startupTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const sessionId = (await Promise.race([
-        this.client.mutation(broker.create, {
-          deviceName: this.deviceId,
-          hostHash,
-          pairHash: await digest(this.secret),
-          pairingCode,
-          encryptedSecret,
-        }),
-        new Promise<never>((_resolve, reject) => {
-          startupTimer = setTimeout(
-            () => reject(new Error("REMOTE_TIMEOUT")),
-            20_000,
-          );
-        }),
-      ])) as string;
+      let sessionId: string;
+      try {
+        sessionId = (await Promise.race([
+          this.client.mutation(broker.create, {
+            deviceName: this.deviceId,
+            hostHash,
+            pairHash: await digest(this.secret),
+            pairingCode,
+            encryptedSecret,
+          }),
+          new Promise<never>((_resolve, reject) => {
+            startupTimer = setTimeout(
+              () => reject(new Error("REMOTE_TIMEOUT")),
+              20_000,
+            );
+          }),
+        ])) as string;
+      } catch (mutationError) {
+        // Fallback in case connected Convex relay has older arguments schema
+        if (startupTimer) clearTimeout(startupTimer);
+        sessionId = (await Promise.race([
+          this.client.mutation(broker.create, {
+            deviceName: this.deviceId,
+            hostHash,
+            pairHash: await digest(this.secret),
+          }),
+          new Promise<never>((_resolve, reject) => {
+            startupTimer = setTimeout(
+              () => reject(new Error("REMOTE_TIMEOUT")),
+              20_000,
+            );
+          }),
+        ])) as string;
+      }
       if (startupTimer) clearTimeout(startupTimer);
       this.credentials = { sessionId, hostHash };
       this.status = {
