@@ -305,7 +305,13 @@ export function compactHistoryForContext(
   }
 
   const cutoffIndex = messages.length - preserveRecentCount;
-  const latestAssistantIndex = messages.findLastIndex(message => message.role === "assistant");
+  let latestAssistantIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "assistant") {
+      latestAssistantIndex = i;
+      break;
+    }
+  }
 
   // Identify the latest user message index
   let latestUserIndex = -1;

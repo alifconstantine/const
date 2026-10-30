@@ -657,7 +657,7 @@ test("Main Chat advertises lazy approved gateways, executes deferred calls and b
 
 for (const allow of [false, true])
   test(
-    "Main Chat approval " +
+    "Main Chat catalog search and approval " +
       (allow ? "allows" : "denies") +
       " editor writes before connection",
     async () => {
@@ -673,20 +673,41 @@ for (const allow of [false, true])
           assert.ok(
             !request.tools.some((tool: any) => "requiresApproval" in tool),
           );
+          const round = ++turns;
+          assert.ok(
+            request.tools.some(
+              (tool: any) => tool.function.name === "mcp_search_tools",
+            ),
+          );
+          assert.ok(
+            !request.tools.some(
+              (tool: any) =>
+                tool.function.name === exposedToolName(record.id, "call_tool"),
+            ),
+          );
+          if (round === 2) assert.equal(f.stats().started, 0);
           const delta =
-            ++turns === 1
+            round <= 2
               ? {
                   tool_calls: [
                     {
                       index: 0,
-                      id: "call",
+                      id: "call-" + round,
                       type: "function",
                       function: {
-                        name: exposedToolName(record.id, "call_tool"),
-                        arguments: JSON.stringify({
-                          toolName: "edit",
-                          arguments: {},
-                        }),
+                        name:
+                          round === 1 ? "mcp_search_tools" : "mcp_call_tool",
+                        arguments: JSON.stringify(
+                          round === 1
+                            ? { query: "Blender call_tool" }
+                            : {
+                                toolName: exposedToolName(
+                                  record.id,
+                                  "call_tool",
+                                ),
+                                arguments: { toolName: "edit", arguments: {} },
+                              },
+                        ),
                       },
                     },
                   ],
@@ -696,7 +717,7 @@ for (const allow of [false, true])
             "data: " +
               JSON.stringify({
                 choices: [
-                  { delta, finish_reason: turns === 1 ? "tool_calls" : "stop" },
+                  { delta, finish_reason: turns <= 2 ? "tool_calls" : "stop" },
                 ],
               }) +
               "\n\ndata: [DONE]\n\n",
@@ -710,9 +731,10 @@ for (const allow of [false, true])
           apiKey: "fixture",
           model: "fixture",
           workspacePath: f.work,
-          maxTurns: 2,
+          maxTurns: 3,
           mode: "ask_before_changes",
-          externalTools: (signal) => service.tools(f.work, signal),
+          deferNativeTools: true,
+          externalTools: (signal) => service.tools(f.work, signal, 0),
           externalToolHandler: (name, args, signal) =>
             service.execute(name, args, f.work, signal, "chat"),
         });
