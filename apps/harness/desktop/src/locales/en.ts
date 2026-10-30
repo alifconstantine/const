@@ -27,6 +27,7 @@ export const en: TranslationDictionary = {
     security: "Encrypted remote connection",
     scope: "Connected devices can access chats, files, terminals, scheduled tasks, plugins, and Harness settings. Pair only devices you trust.",
     startError: "Could not start remote control. Check your sign-in and remote service configuration.",
+    authError: "Your session has expired or requires authentication. Please sign in again.",
     actionError: "The action failed. Try again.",
     expired: "QR expired. Refresh to pair a new device.",
     connectedDevicesTitle: "Connected devices",

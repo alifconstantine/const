@@ -1412,7 +1412,10 @@ app.whenReady().then(() => {
     requireRemoteHost(event);
     if (!isValidAuthToken(authToken)) throw new Error("REMOTE_LOGIN_REQUIRED");
     lastAuthToken = authToken;
-    return await remoteDaemon.startRelay({ authToken, convexUrl: process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL, webOrigin: process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN });
+    const convexUrl = process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL;
+    const webOrigin = process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN;
+    console.log(`[RemoteDaemon] Starting relay via Convex: ${convexUrl}, Web origin: ${webOrigin}`);
+    return await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin });
   });
   handleDesktopIpc("remote:stop-session", async (event) => {
     requireRemoteHost(event);

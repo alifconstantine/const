@@ -24,6 +24,7 @@ export interface TranslationDictionary {
     security: string;
     scope: string;
     startError: string;
+    authError: string;
     actionError: string;
     expired: string;
     connectedDevicesTitle: string;

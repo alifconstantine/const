@@ -27,6 +27,7 @@ export const id: TranslationDictionary = {
     security: "Koneksi remote terenkripsi",
     scope: "Perangkat terhubung dapat mengakses chat, file, terminal, jadwal, plugin, dan pengaturan Harness. Hubungkan hanya perangkat tepercaya.",
     startError: "Gagal memulai remote control. Periksa login dan konfigurasi layanan remote.",
+    authError: "Sesi masuk Anda telah kedaluwarsa atau memerlukan autentikasi. Silakan masuk kembali.",
     actionError: "Tindakan gagal. Coba lagi.",
     expired: "QR kedaluwarsa. Perbarui untuk menghubungkan perangkat baru.",
     connectedDevicesTitle: "Perangkat terhubung",

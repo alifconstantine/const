@@ -85,9 +85,14 @@ export class RemoteRelay {
             );
           }),
         ])) as string;
-      } catch (mutationError) {
-        // Fallback in case connected Convex relay has older arguments schema
+      } catch (mutationError: any) {
         if (startupTimer) clearTimeout(startupTimer);
+        const errMsg = String(mutationError?.data?.code || mutationError?.message || mutationError || "");
+        if (errMsg.includes("REMOTE_UNAUTHORIZED") || errMsg.includes("UNAUTHORIZED")) {
+          console.error(`[RemoteRelay] Unauthorized on Convex relay (${convexUrl}):`, errMsg);
+          throw new Error("REMOTE_UNAUTHORIZED");
+        }
+        // Fallback in case connected Convex relay has older arguments schema
         sessionId = (await Promise.race([
           this.client.mutation(broker.create, {
             deviceName: this.deviceId,

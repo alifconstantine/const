@@ -27,6 +27,7 @@ export const es: TranslationDictionary = {
     security: "Conexión remota cifrada",
     scope: "Los dispositivos conectados pueden acceder a chats, archivos, terminales, tareas programadas, plugins y ajustes de Harness. Vincula solo dispositivos de confianza.",
     startError: "No se pudo iniciar el control remoto. Revisa tu sesión y la configuración del servicio remoto.",
+    authError: "Su sesión ha caducado o requiere autenticación. Por favor inicie sesión de nuevo.",
     actionError: "La acción falló. Vuelve a intentarlo.",
     expired: "El QR ha caducado. Actualízalo para conectar otro dispositivo.",
     connectedDevicesTitle: "Dispositivos conectados",

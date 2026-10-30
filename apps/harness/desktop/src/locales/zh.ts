@@ -27,6 +27,7 @@ export const zh: TranslationDictionary = {
     security: "加密远程连接",
     scope: "连接的设备可以访问聊天、文件、终端、计划任务、插件和 Harness 设置。请仅连接可信设备。",
     startError: "无法启动远程控制，请检查登录状态和远程服务配置。",
+    authError: "您的登录会话已过期或需要身份验证。请重新登录。",
     actionError: "操作失败，请重试。",
     expired: "二维码已过期，请刷新后连接新设备。",
     connectedDevicesTitle: "已连接设备",

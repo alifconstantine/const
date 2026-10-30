@@ -27,6 +27,7 @@ export default defineConfig({
             alias: [
               { find: "@const/agent/token-meter", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/token-meter.ts") },
               { find: "@const/agent", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
+              { find: "@const/remote", replacement: path.resolve(__dirname, "../../../packages/remote/src") },
             ],
           },
         },
@@ -50,6 +51,7 @@ export default defineConfig({
       { find: "@", replacement: path.resolve(__dirname, "./src") },
       { find: "@const/agent/token-meter", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/token-meter.ts") },
       { find: "@const/agent", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
+      { find: "@const/remote", replacement: path.resolve(__dirname, "../../../packages/remote/src") },
     ],
   },
 });

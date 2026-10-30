@@ -160,7 +160,7 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [error, setError] = useState<"startError" | "actionError" | null>(null);
+  const [error, setError] = useState<"startError" | "actionError" | "authError" | null>(null);
   const [now, setNow] = useState(Date.now());
   const generation = useRef(0);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -268,10 +268,16 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
         setStatus(next);
         setNow(Date.now());
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[RemoteModal] Failed to " + action + " session:", err);
+      const errMsg = String(err?.message || err?.data?.code || err || "");
+      const isAuthIssue =
+        errMsg.includes("UNAUTHORIZED") ||
+        errMsg.includes("LOGIN_REQUIRED") ||
+        errMsg.includes("unauthorized") ||
+        errMsg.includes("auth");
       if (generation.current === current)
-        setError(action === "start" ? "startError" : "actionError");
+        setError(action === "start" ? (isAuthIssue ? "authError" : "startError") : "actionError");
     } finally {
       if (generation.current === current) setBusy(false);
     }
@@ -679,12 +685,23 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
               </div>
 
               {error && (
-                <p
-                  role="alert"
-                  className="text-xs text-red-500 dark:text-red-400 font-medium"
-                >
-                  {t(`remoteControl.${error}`)}
-                </p>
+                <div className="flex flex-col gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400">
+                  <div className="flex items-center justify-between gap-2">
+                    <span role="alert" className="font-medium flex-1">
+                      {t(`remoteControl.${error}`)}
+                    </span>
+                    {(error === "authError" || error === "startError") && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500 text-white font-medium text-xs hover:bg-red-600 transition-colors shrink-0 shadow-sm"
+                        onClick={() => void handleLogin()}
+                      >
+                        <LogIn className="h-3 w-3" />
+                        <span>{t("auth.signInButton")}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
 
               {/* Scope & Permissions Warning */}
