@@ -2,7 +2,6 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nProvider, useTranslation } from "../src/lib/i18n";
 import { SkillsSettings } from "../src/components/settings/skills-settings";
-import { PluginsMarketplace } from "../src/components/settings/plugins-marketplace";
 import { McpSettings } from "../src/components/settings/mcp-settings";
 import type {
   PluginCatalogEntry,
@@ -22,13 +21,16 @@ const catalog = Object.values(manifests).map((plugin) => ({
   skillSlugs: plugin.entrypoint ? [plugin.entrypoint] : [],
 }));
 let installed: InstalledPluginRecord[] = catalog
-  .filter((plugin) => plugin.defaultInstalled || plugin.mcpServers)
+  .filter(
+    (plugin) =>
+      (plugin.defaultInstalled || plugin.mcpServers) && plugin.name !== "canva",
+  )
   .map((plugin) => ({
     ...plugin,
     id: plugin.name,
     path: plugin.name,
     scope: "user",
-    isEnabled: true,
+    isEnabled: plugin.name !== "unity",
     isEffective: true,
   }));
 let connections: McpConnectionView[] = installed.flatMap((plugin) =>
@@ -66,10 +68,17 @@ let connections: McpConnectionView[] = installed.flatMap((plugin) =>
     setupUrl: server.setupUrl,
     enabled: true,
     timeoutMs: 30000,
-    status: server.auth === "none" ? "disconnected" : "needs_auth",
+    status: ["github", "google-docs"].includes(plugin.name)
+      ? "connected"
+      : server.auth === "none"
+        ? "disconnected"
+        : "needs_auth",
+    lastConnectedAt: ["github", "google-docs"].includes(plugin.name)
+      ? "2026-10-29T15:07:00.000Z"
+      : undefined,
     tools: [],
     isEffective: true,
-    hasCredentials: false,
+    hasCredentials: ["github", "google-docs"].includes(plugin.name),
   })),
 );
 const events = new Set<() => void>();
@@ -84,7 +93,13 @@ const bridge = {
   marketplace: {
     listInstalled: async () => [],
     onInstallProgress: () => () => {},
-    listPlugins: async () => ({ catalog, installed }),
+    listPlugins: async () => {
+      const scenario = new URLSearchParams(location.search).get("scenario");
+      if (scenario === "loading")
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      if (scenario === "error") throw new Error("Simulated inventory failure");
+      return { catalog, installed };
+    },
     onChanged: subscribe,
     installPlugin: async ({
       name,
@@ -119,7 +134,20 @@ const bridge = {
   },
   mcp: {
     configureEditor: async (id: string, action: string) => {
-      connections = connections.map(item => item.id === id ? { ...item, ...(action === "project" ? { detectedProject: `D:/Fixture/${item.editorApp}`, editorProjectPath: `D:/Fixture/${item.editorApp}` } : {}), ...(action === "install" ? { editorPrepared: true } : {}) } : item);
+      connections = connections.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...(action === "project"
+                ? {
+                    detectedProject: `D:/Fixture/${item.editorApp}`,
+                    editorProjectPath: `D:/Fixture/${item.editorApp}`,
+                  }
+                : {}),
+              ...(action === "install" ? { editorPrepared: true } : {}),
+            }
+          : item,
+      );
       emit();
     },
     configureArtcraft: async (id: string) => {
@@ -236,7 +264,7 @@ function Fixture() {
   const { t, setLanguage, language } = useTranslation();
   const [tab, setTab] = useState("plugins");
   return (
-    <div className="h-screen bg-[#161616] text-white flex flex-col">
+    <div className="h-full bg-[#161616] text-white flex flex-col">
       <div className="flex flex-wrap items-center gap-4 p-5 text-sm">
         <span className="text-[#969696]">
           UI fixture · simulated connections
@@ -253,6 +281,7 @@ function Fixture() {
       </div>
       <ScrollArea
         className="min-h-0 flex-1"
+        viewportClassName="min-h-0 flex-1"
         thumbClassName="bg-white/20 hover:bg-white/30"
       >
         <main className="mx-auto max-w-5xl p-6">

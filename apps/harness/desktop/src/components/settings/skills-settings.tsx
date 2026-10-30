@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+} from "react";
 import { Button, Input, ScrollArea, Switch, toast, cn } from "@const/ui";
 import {
   PanelLeft,
@@ -13,14 +19,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
-  Blocks,
-  Video,
-  Monitor,
-  Cable,
   FileCode,
   ChevronRight,
-  Check,
-  Plus,
+  RotateCw,
   Search,
 } from "lucide-react";
 import { marked } from "marked";
@@ -42,6 +43,12 @@ import {
 } from "../../lib/skills/skills-service";
 import { FileIcon } from "../workbench/file-icon";
 import { McpSettings } from "./mcp-settings";
+import { PluginActions } from "./plugin-actions";
+import {
+  pluginCatalogEntries,
+  selectPluginInstallation,
+} from "../../lib/plugins/catalog";
+import { useMcpConnections } from "../../lib/mcp/use-mcp";
 import { PluginIcon } from "./plugin-icon";
 import { pluginDescriptionKeys } from "./plugin-connection-info";
 import { PluginsMarketplace } from "./plugins-marketplace";
@@ -53,6 +60,25 @@ import { usePluginInventory } from "../../lib/plugins/plugins-service";
 import { MarkdownContent } from "../workbench/markdown-content";
 
 import { highlightCodeLines } from "../../lib/code-highlighter";
+
+function handleTabKeys(event: React.KeyboardEvent<HTMLDivElement>) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  const tabs = Array.from(
+    event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+  );
+  const index = tabs.indexOf(event.target as HTMLButtonElement);
+  if (index < 0) return;
+  event.preventDefault();
+  const next =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? tabs.length - 1
+        : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+          tabs.length;
+  tabs[next]?.focus();
+  tabs[next]?.click();
+}
 
 function SkillCodeViewer({
   code,
@@ -74,7 +100,6 @@ function SkillCodeViewer({
     </div>
   );
 }
-
 
 export interface SkillsSettingsProps {
   onClose?: () => void;
@@ -100,7 +125,13 @@ export function SkillsSettings({
   const skills = useResolvedSkills(workspacePath).filter(
     (skill) => !skill.pluginId,
   );
-  const { catalog: pluginCatalog, installed: installedPlugins } = usePluginInventory(workspacePath);
+  const pluginInventory = usePluginInventory(workspacePath);
+  const { catalog: pluginCatalog, installed: installedPlugins } =
+    pluginInventory;
+  const { connections: pluginConnections, refresh: refreshConnections } =
+    useMcpConnections(workspacePath);
+  const pluginPageRef = useRef<HTMLDivElement>(null);
+  const catalogScroll = useRef(0);
 
   // Marketplace tab: Skills vs Plugins
   const [marketplaceTab, setMarketplaceTab] = useState<"skills" | "plugins">(
@@ -114,6 +145,31 @@ export function SkillsSettings({
   const [selectedPlugin, setSelectedPlugin] = useState<
     PluginCatalogEntry | InstalledPluginRecord | null
   >(null);
+  const previousView = useRef(viewMode);
+  useLayoutEffect(() => {
+    const page = pluginPageRef.current;
+    const viewport = page?.closest<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (viewMode === "plugin-detail") {
+      if (viewport) viewport.scrollTop = 0;
+      page
+        ?.querySelector<HTMLButtonElement>("[data-plugin-back]")
+        ?.focus({ preventScroll: true });
+    } else if (
+      viewMode === "list" &&
+      previousView.current === "plugin-detail"
+    ) {
+      if (viewport) viewport.scrollTop = catalogScroll.current;
+      if (selectedPlugin)
+        page
+          ?.querySelector<HTMLButtonElement>(
+            '[data-plugin-name="' + CSS.escape(selectedPlugin.name) + '"]',
+          )
+          ?.focus({ preventScroll: true });
+    }
+    previousView.current = viewMode;
+  }, [viewMode]);
   const [originPlugin, setOriginPlugin] = useState<
     PluginCatalogEntry | InstalledPluginRecord | null
   >(null);
@@ -231,7 +287,7 @@ export function SkillsSettings({
   useEffect(() => {
     if (selectedPlugin) {
       const updated =
-        installedPlugins.find((p) => p.name === selectedPlugin.name) ||
+        selectPluginInstallation(installedPlugins, selectedPlugin.name) ||
         pluginCatalog.find((p) => p.name === selectedPlugin.name);
       if (updated) setSelectedPlugin(updated);
     }
@@ -738,6 +794,7 @@ export function SkillsSettings({
             <Button
               variant="ghost"
               size="sm"
+              aria-label={t("common.close")}
               onClick={onClose}
               className="h-8 w-8 p-0 rounded-lg text-[#969696] hover:text-white"
             >
@@ -1067,7 +1124,8 @@ export function SkillsSettings({
       pluginId: "id" in selectedPlugin ? selectedPlugin.id : undefined,
       pluginName: selectedPlugin.interface.displayName,
       scope: "scope" in selectedPlugin ? selectedPlugin.scope : "user",
-      isEnabled: "isEnabled" in selectedPlugin ? selectedPlugin.isEnabled : true,
+      isEnabled:
+        "isEnabled" in selectedPlugin ? selectedPlugin.isEnabled : true,
       isBuiltIn: false,
       category: "custom",
       createdAt: Date.now(),
@@ -1080,13 +1138,10 @@ export function SkillsSettings({
   // RENDER: VIEW 1.5 — PLUGIN DETAIL VIEW
   // ---------------------------------------------------------------------------
   if (viewMode === "plugin-detail" && selectedPlugin) {
-    const isInstalled =
-      ("id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id) ||
-      installedPlugins.some((p) => p.name === selectedPlugin.name);
-    const installedRecord =
-      "id" in selectedPlugin && !!(selectedPlugin as InstalledPluginRecord).id
-        ? (selectedPlugin as InstalledPluginRecord)
-        : installedPlugins.find((p) => p.name === selectedPlugin.name);
+    const installedRecord = selectPluginInstallation(
+      installedPlugins,
+      selectedPlugin.name,
+    );
 
     const pluginSkillsList =
       selectedPlugin.skills && selectedPlugin.skills.length > 0
@@ -1094,8 +1149,7 @@ export function SkillsSettings({
         : selectedPlugin.skillSlugs.map((slug) => {
             const matched = skills.find(
               (s) =>
-                s.slug === slug ||
-                s.slug === `${selectedPlugin.name}:${slug}`,
+                s.slug === slug || s.slug === `${selectedPlugin.name}:${slug}`,
             );
             return {
               slug,
@@ -1110,7 +1164,10 @@ export function SkillsSettings({
 
     const pluginOverviewText = selectedPlugin.placeholder
       ? t("mcp.guideEmpty")
-      : selectedPlugin.overview || (pluginDescriptionKeys[selectedPlugin.name] ? t(pluginDescriptionKeys[selectedPlugin.name]!) : selectedPlugin.description);
+      : selectedPlugin.overview ||
+        (pluginDescriptionKeys[selectedPlugin.name]
+          ? t(pluginDescriptionKeys[selectedPlugin.name]!)
+          : selectedPlugin.description);
 
     const mcpServers = selectedPlugin.mcpServers || {};
     const mcpCount = Object.keys(mcpServers).length;
@@ -1125,8 +1182,9 @@ export function SkillsSettings({
 
     return (
       <div
+        ref={pluginPageRef}
         className={cn(
-          "w-full flex flex-col font-sans select-none outline-none ring-0",
+          "mx-auto w-full max-w-5xl flex flex-col font-sans select-none outline-none ring-0",
           isModal ? "space-y-4 pb-8" : "space-y-5",
         )}
       >
@@ -1135,6 +1193,7 @@ export function SkillsSettings({
           <Button
             variant="ghost"
             size="sm"
+            data-plugin-back
             onClick={() => setViewMode("list")}
             className="gap-1.5 text-xs text-[#969696] hover:text-white cursor-pointer -ml-2 h-8"
           >
@@ -1154,165 +1213,87 @@ export function SkillsSettings({
           )}
         </div>
 
-        {/* Plugin Header Strip */}
-        <div className="flex items-center justify-between gap-4 p-5 rounded-2xl bg-[#222222] border border-[#383838]">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
-              <PluginIcon name={selectedPlugin.name} />
+        <div className="flex flex-wrap items-center justify-between gap-5 py-3">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[#222222] text-white">
+              <PluginIcon
+                name={selectedPlugin.name}
+                size={30}
+                className="size-[30px]"
+              />
             </div>
-            <div className="flex flex-col min-w-0">
-              <h2 className="text-xl sm:text-2xl font-normal tracking-tight text-white truncate">
+            <div className="min-w-0">
+              <h2 className="truncate text-2xl font-medium tracking-tight text-white">
                 {selectedPlugin.interface.displayName}
               </h2>
-              <div className="flex items-center gap-2 text-xs text-[#969696] mt-0.5 flex-wrap">
-                <span>{selectedPlugin.author.name}</span>
-                <span>·</span>
-                <span>v{selectedPlugin.version}</span>
-                {selectedPlugin.skillSlugs.length > 0 && (
-                  <>
-                    <span>·</span>
-                    <span>{t("marketplace.pluginSkillsCount").replace("{count}", String(selectedPlugin.skillSlugs.length))}</span>
-                  </>
+              <p className="mt-1 text-xs text-[#969696]">
+                {selectedPlugin.author.name} · {selectedPlugin.version}
+                {installedRecord && (
+                  <span>
+                    {" "}
+                    ·{" "}
+                    {t(
+                      installedRecord.scope === "workspace"
+                        ? "marketplace.workspaceScope"
+                        : "marketplace.globalScope",
+                    )}
+                  </span>
                 )}
-              </div>
+              </p>
             </div>
           </div>
-
-          {/* Action button */}
-          <div className="shrink-0 flex items-center gap-2.5">
-            {installedRecord ? (
-              <div className="flex items-center gap-2.5">
-                <Button
-                  size="sm"
-                  variant={installedRecord.isEnabled ? "secondary" : "default"}
-                  onClick={async () => {
-                    const newEnabled = !installedRecord.isEnabled;
-                    try {
-                      await window.electron?.marketplace?.setEnabled({
-                        id: installedRecord.id,
-                        enabled: newEnabled,
-                        workspacePath,
-                      });
-                      toast.success(
-                        newEnabled
-                          ? t("marketplace.enabled")
-                          : t("marketplace.disabled"),
-                      );
-                    } catch {
-                      toast.error(t("marketplace.pluginMutationError"));
-                    }
-                  }}
-                  className="rounded-xl text-xs font-semibold gap-1.5 shadow-none h-8 px-3"
-                >
-                  {installedRecord.isEnabled ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{t("marketplace.enabled")}</span>
-                    </>
-                  ) : (
-                    <span>{t("marketplace.disabled")}</span>
-                  )}
-                </Button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await window.electron?.marketplace?.uninstallPlugin({
-                        id: installedRecord.id,
-                        workspacePath,
-                      });
-                      toast.success(
-                        t("marketplace.pluginUninstalledSuccess").replace(
-                          "{name}",
-                          selectedPlugin.interface.displayName,
-                        ),
-                      );
-                      setViewMode("list");
-                    } catch {
-                      toast.error(t("marketplace.pluginMutationError"));
-                    }
-                  }}
-                  title={t("marketplace.uninstall")}
-                  className="p-2 rounded-lg text-[#969696] hover:text-white hover:bg-[#383838] cursor-pointer transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                onClick={async () => {
-                  try {
-                    await window.electron?.marketplace?.installPlugin({
-                      name: selectedPlugin.name,
-                      scope: "user",
-                      workspacePath,
-                    });
-                    toast.success(
-                      t("marketplace.pluginInstalledSuccess").replace(
-                        "{name}",
-                        selectedPlugin.interface.displayName,
-                      ),
-                    );
-                  } catch {
-                    toast.error(t("marketplace.pluginMutationError"));
-                  }
-                }}
-                className="rounded-xl bg-white text-black hover:bg-[#d4d4d4] text-xs font-semibold gap-1.5 h-8 px-3.5 shadow-none"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{t("marketplace.install")}</span>
-              </Button>
-            )}
-          </div>
+          <PluginActions
+            plugin={selectedPlugin}
+            installation={installedRecord}
+            connections={pluginConnections}
+            workspacePath={workspacePath}
+            onManage={() => setPluginActiveTab(hasMcp ? "mcp" : "overview")}
+            onRemoved={() => setViewMode("list")}
+          />
         </div>
 
-        {/* Tabs Row: only show tabs when hasMcp or hasSkills */}
         {(hasMcp || hasSkills) && (
-          <div className="border-b border-[#383838] flex items-center gap-6 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setPluginActiveTab("overview")}
-              className={cn(
-                "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
-                activeTab === "overview"
-                  ? "border-white text-white font-semibold"
-                  : "border-transparent text-[#969696] hover:text-white",
-              )}
-            >
-              {t("marketplace.tabOverview")}
-            </button>
-            {hasMcp && (
+          <div
+            className="flex flex-wrap items-center gap-1"
+            role="tablist"
+            onKeyDown={handleTabKeys}
+            aria-label={selectedPlugin.interface.displayName}
+          >
+            {(
+              [
+                "overview",
+                ...(hasMcp ? ["mcp"] : []),
+                ...(hasSkills ? ["skills"] : []),
+              ] as ("overview" | "mcp" | "skills")[]
+            ).map((tab) => (
               <button
+                key={tab}
                 type="button"
-                onClick={() => setPluginActiveTab("mcp")}
+                role="tab"
+                aria-selected={activeTab === tab}
+                tabIndex={activeTab === tab ? 0 : -1}
+                onClick={() => setPluginActiveTab(tab)}
                 className={cn(
-                  "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px] flex items-center gap-1.5",
-                  activeTab === "mcp"
-                    ? "border-white text-white font-semibold"
-                    : "border-transparent text-[#969696] hover:text-white",
+                  "h-8 rounded-lg px-3 text-sm outline-none transition-colors focus-visible:bg-[#383838]",
+                  activeTab === tab
+                    ? "bg-[#2b2b2b] text-white"
+                    : "text-[#969696] hover:bg-[#222222] hover:text-white",
                 )}
               >
-                <span>{t("marketplace.tabMcp")}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#383838] text-white">
-                  {mcpCount}
-                </span>
-              </button>
-            )}
-            {hasSkills && (
-              <button
-                type="button"
-                onClick={() => setPluginActiveTab("skills")}
-                className={cn(
-                  "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
-                  activeTab === "skills"
-                    ? "border-white text-white font-semibold"
-                    : "border-transparent text-[#969696] hover:text-white",
+                {t(
+                  tab === "overview"
+                    ? "marketplace.tabOverview"
+                    : tab === "mcp"
+                      ? "mcp.pluginConnection"
+                      : "marketplace.tabSkills",
                 )}
-              >
-                {t("marketplace.tabSkills")} · {pluginSkillsList.length}
+                {tab === "skills" && (
+                  <span className="ml-2 text-xs text-[#969696]">
+                    {pluginSkillsList.length}
+                  </span>
+                )}
               </button>
-            )}
+            ))}
           </div>
         )}
 
@@ -1369,7 +1350,17 @@ export function SkillsSettings({
 
         {activeTab === "mcp" && hasMcp && (
           <div className="max-w-3xl pt-2">
-            {installedRecord ? <McpSettings workspacePath={workspacePath} pluginId={installedRecord.id} compact /> : <p className="text-sm text-[#969696]">{t("mcp.installToConnect")}</p>}
+            {installedRecord ? (
+              <McpSettings
+                workspacePath={workspacePath}
+                pluginId={installedRecord.id}
+                compact
+              />
+            ) : (
+              <p className="text-sm text-[#969696]">
+                {t("mcp.installToConnect")}
+              </p>
+            )}
           </div>
         )}
 
@@ -1412,7 +1403,7 @@ export function SkillsSettings({
     );
   }
 
-    // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // RENDER: VIEW 2 — UPLOAD SKILL VIEW
   // ---------------------------------------------------------------------------
   if (viewMode === "upload") {
@@ -1573,8 +1564,10 @@ export function SkillsSettings({
   // ---------------------------------------------------------------------------
   return (
     <div
+      ref={pluginPageRef}
       className={cn(
         "w-full flex flex-col font-sans outline-none ring-0",
+        marketplaceTab === "plugins" && "mx-auto max-w-5xl",
         isModal ? "space-y-5" : "space-y-6",
       )}
     >
@@ -1592,14 +1585,56 @@ export function SkillsSettings({
           )}
           <div>
             <h1 className="text-2xl font-medium tracking-tight text-white">
-              {t("marketplace.title")}
+              {t(
+                marketplaceTab === "plugins"
+                  ? "marketplace.tabPlugins"
+                  : "marketplace.title",
+              )}
             </h1>
-            <p className="text-sm text-[#969696] mt-1">
-              {t(marketplaceTab === "skills" ? "marketplace.skillsIntro" : "marketplace.pluginUsageHint")}
-            </p>
+            {marketplaceTab === "skills" && (
+              <p className="mt-1 text-sm text-[#969696]">
+                {t("marketplace.skillsIntro")}
+              </p>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {marketplaceTab === "plugins" && (
+            <>
+              <div className="relative w-60 max-w-full">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#969696]" />
+                <Input
+                  aria-label={t("mcp.pluginSearch")}
+                  placeholder={t("mcp.pluginSearch")}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="h-9 rounded-full border-0 bg-[#222222] pl-9 pr-9 text-xs text-white placeholder:text-[#969696] shadow-none focus-visible:ring-0 focus-visible:bg-[#2b2b2b]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    aria-label={t("mcp.pluginClearSearch")}
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-[#969696] outline-none hover:bg-[#383838] hover:text-white focus-visible:bg-[#383838]"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label={t("mcp.pluginRefresh")}
+                disabled={pluginInventory.loading}
+                onClick={() => {
+                  pluginInventory.refresh();
+                  refreshConnections();
+                }}
+                className="flex size-9 items-center justify-center rounded-lg text-[#969696] outline-none hover:bg-[#222222] hover:text-white focus-visible:bg-[#383838] disabled:opacity-50"
+              >
+                <RotateCw className="size-4" />
+              </button>
+            </>
+          )}
           {marketplaceTab === "skills" && (
             <>
               <Button
@@ -1634,15 +1669,23 @@ export function SkillsSettings({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-5 text-sm" role="tablist" aria-label={t("marketplace.title")}>
+      <div
+        className="flex items-center gap-1 text-sm"
+        onKeyDown={handleTabKeys}
+        role="tablist"
+        aria-label={t("marketplace.title")}
+      >
         <button
           type="button"
           role="tab"
           aria-selected={marketplaceTab === "skills"}
+          tabIndex={marketplaceTab === "skills" ? 0 : -1}
           onClick={() => handleMarketplaceTabChange("skills")}
           className={cn(
-            "py-2",
-            marketplaceTab === "skills" ? "text-white" : "text-[#969696]",
+            "h-8 rounded-lg px-3 outline-none transition-colors focus-visible:bg-[#383838]",
+            marketplaceTab === "skills"
+              ? "bg-[#2b2b2b] text-white"
+              : "text-[#969696] hover:bg-[#222222] hover:text-white",
           )}
         >
           {t("marketplace.tabSkills")}
@@ -1651,14 +1694,19 @@ export function SkillsSettings({
           type="button"
           role="tab"
           aria-selected={marketplaceTab === "plugins"}
+          tabIndex={marketplaceTab === "plugins" ? 0 : -1}
           onClick={() => handleMarketplaceTabChange("plugins")}
           className={cn(
-            "py-2",
-            marketplaceTab === "plugins" ? "text-white" : "text-[#969696]",
+            "h-8 rounded-lg px-3 outline-none transition-colors focus-visible:bg-[#383838]",
+            marketplaceTab === "plugins"
+              ? "bg-[#2b2b2b] text-white"
+              : "text-[#969696] hover:bg-[#222222] hover:text-white",
           )}
         >
           {t("marketplace.tabPlugins")}{" "}
-          <span className="text-[#969696]">{pluginCatalog.length}</span>
+          <span className="text-[#969696]">
+            {pluginCatalogEntries(pluginInventory).length}
+          </span>
         </button>
       </div>
       {progressPanel}
@@ -1691,23 +1739,23 @@ export function SkillsSettings({
         />
       ) : (
         <>
-          <div className="relative w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#969696] pointer-events-none" />
-            <Input
-              aria-label={t("marketplace.searchPlaceholder")}
-              placeholder={t("marketplace.searchPlaceholder")}
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className="h-9 w-full pl-9 pr-3 rounded-xl bg-[#2b2b2b] border-0 text-xs text-white placeholder:text-[#969696] shadow-none focus-visible:ring-1 focus-visible:ring-white/20"
-            />
-          </div>
           <PluginsMarketplace
             workspacePath={workspacePath}
-            scope="all"
+            inventory={pluginInventory}
+            connections={pluginConnections}
             search={searchQuery}
-            onSelectPlugin={(plugin) => {
+            onSelectPlugin={(plugin, tab) => {
+              catalogScroll.current =
+                pluginPageRef.current?.closest<HTMLElement>(
+                  "[data-radix-scroll-area-viewport]",
+                )?.scrollTop ?? 0;
               setSelectedPlugin(plugin);
-              setPluginActiveTab(plugin.mcpServers && plugin.skillSlugs.length === 0 ? "mcp" : "overview");
+              setPluginActiveTab(
+                tab ??
+                  (plugin.mcpServers && plugin.skillSlugs.length === 0
+                    ? "mcp"
+                    : "overview"),
+              );
               setViewMode("plugin-detail");
             }}
           />

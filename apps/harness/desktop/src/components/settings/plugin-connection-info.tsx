@@ -1,8 +1,7 @@
-import type { PluginCatalogEntry } from "../../lib/plugins/types";
 import type { McpConnectionView } from "../../lib/mcp/types";
 import { useTranslation } from "../../lib/i18n";
-import { isEditorApp, EDITOR_IDS } from "../../lib/mcp/editors";
-import { ARTCRAFT_IDS, isArtCraftApp } from "../../lib/mcp/artcraft";
+import { EDITOR_IDS } from "../../lib/mcp/editors";
+import { ARTCRAFT_IDS } from "../../lib/mcp/artcraft";
 
 export const pluginDescriptionKeys: Record<string, string> = {
   ...Object.fromEntries(
@@ -31,6 +30,7 @@ export const pluginDescriptionKeys: Record<string, string> = {
   "google-calendar": "mcp.googleCalendarDescription",
   "google-classroom": "mcp.googleClassroomDescription",
   hyperframes: "marketplace.hyperframesDescription",
+  "intelligence-ui": "mcp.intelligenceUiDescription",
 };
 
 export function connectionAccountLabel(connection: McpConnectionView) {
@@ -68,58 +68,5 @@ export function ConnectionTime({ at }: { at?: string }) {
         }).format(new Date(at)),
       })}
     </time>
-  );
-}
-
-/** Status only: account controls live in the plugin's detail page. */
-export function PluginConnectionInfo({
-  plugin,
-  connections,
-}: {
-  plugin: PluginCatalogEntry;
-  connections: McpConnectionView[];
-}) {
-  const { t } = useTranslation();
-  const servers = Object.values(plugin.mcpServers ?? {});
-  if (!servers.length) return null;
-  const account = servers.some((s) => s.auth === "oauth");
-  const key = servers.some((s) => s.auth === "api-key");
-  const mostRecent = connections
-    .map((c) => c.lastConnectedAt)
-    .filter((at): at is string => !!at)
-    .sort()
-    .at(-1);
-  return (
-    <div className="flex flex-col gap-1 text-[11px] leading-relaxed text-[#969696]">
-      <span>
-        {t(
-          isEditorApp(plugin.name)
-            ? "mcp.editorRuntime"
-            : isArtCraftApp(plugin.name)
-              ? "mcp.artcraftRuntime"
-              : plugin.name === "obsidian"
-                ? "mcp.localVault"
-                : plugin.name === "figma"
-                  ? connections[0]?.auth === "oauth"
-                    ? "mcp.requiresAccount"
-                    : "mcp.figmaDesktop"
-                  : account
-                    ? "mcp.requiresAccount"
-                    : key
-                      ? "mcp.requiresKey"
-                      : "mcp.noAccount",
-        )}
-      </span>
-      {connections.map((connection) => (
-        <span key={connection.id}>
-          {t(
-            connection.isEffective
-              ? `mcp.${connection.status}`
-              : "mcp.overridden",
-          )}
-        </span>
-      ))}
-      <ConnectionTime at={mostRecent} />
-    </div>
   );
 }
