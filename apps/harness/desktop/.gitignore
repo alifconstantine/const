@@ -1,1 +1,6 @@
 public/excalidraw-assets/
+dist/
+dist-electron/
+release/
+.turbo/
+

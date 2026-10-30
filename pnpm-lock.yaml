@@ -96,9 +96,6 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.0
         version: 0.18.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@7.2.0)
-      '@iconify/react':
-        specifier: ^6.0.2
-        version: 6.0.2(react@19.2.8)
       '@modelcontextprotocol/ext-apps':
         specifier: 2.0.4
         version: 2.0.4(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.3.6)
@@ -108,9 +105,6 @@ importers:
       '@openuidev/lang-core':
         specifier: 1.0.1
         version: 1.0.1(@modelcontextprotocol/sdk@1.32.2(supports-color@7.2.0)(zod@4.3.6))(zod@4.3.6)
-      '@openuidev/react-headless':
-        specifier: 0.18.1
-        version: 0.18.1(react@19.2.8)(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.18)(react@19.2.8))
       '@openuidev/react-lang':
         specifier: 1.0.1
         version: 1.0.1(@modelcontextprotocol/sdk@1.32.2(supports-color@7.2.0)(zod@4.3.6))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.3.6)
@@ -120,9 +114,6 @@ importers:
       '@thesvg/react':
         specifier: ^3.3.13
         version: 3.3.13(react@19.2.8)
-      '@types/marked':
-        specifier: ^6.0.0
-        version: 6.0.0
       '@xterm/addon-fit':
         specifier: ^0.11.0
         version: 0.11.0
@@ -178,9 +169,6 @@ importers:
       '@const/typescript-config':
         specifier: workspace:*
         version: link:../../../packages/typescript-config
-      '@iconify-json/vscode-icons':
-        specifier: ^1.2.76
-        version: 1.2.76
       '@types/jszip':
         specifier: ^3.4.1
         version: 3.4.1
@@ -232,9 +220,6 @@ importers:
       vite-plugin-electron:
         specifier: ^1.1.2
         version: 1.1.2(vite-plugin-electron-renderer@1.0.0)(vite@6.4.3(@types/node@22.20.1)(jiti@1.21.7)(lightningcss@1.32.0)(sass@1.51.0)(tsx@4.20.6)(yaml@2.9.0))
-      vite-plugin-electron-renderer:
-        specifier: ^1.0.0
-        version: 1.0.0
 
   apps/harness/mobile:
     dependencies:
@@ -2387,14 +2372,6 @@ packages:
         optional: true
       zod:
         optional: true
-
-  '@iconify-json/vscode-icons@1.2.76':
-    resolution: {integrity: sha512-gSu20bZiegbMFLSPHHtmliUJoOPhovTT77RNkMfr6u9ns5uC2bVZ4K5T7wUlywRAzQk4qgG7t4AULaucSsta4w==}
-
-  '@iconify/react@6.0.2':
-    resolution: {integrity: sha512-SMmC2sactfpJD427WJEDN6PMyznTFMhByK9yLW0gOTtnjzzbsi/Ke/XqsumsavFPwNiXs8jSiYeZTmLCLwO+Fg==}
-    peerDependencies:
-      react: '>=16'
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -10528,15 +10505,6 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       ajv: 8.20.0
       zod: 4.5.4
-
-  '@iconify-json/vscode-icons@1.2.76':
-    dependencies:
-      '@iconify/types': 2.0.0
-
-  '@iconify/react@6.0.2(react@19.2.8)':
-    dependencies:
-      '@iconify/types': 2.0.0
-      react: 19.2.8
 
   '@iconify/types@2.0.0': {}
 

@@ -4,8 +4,9 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
+    "clean": "node -e \"const fs=require('fs'); ['dist','dist-electron'].forEach(d => fs.rmSync(d, {recursive:true, force:true}));\"",
     "dev": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && vite",
-    "build": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
+    "build": "pnpm clean && node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
@@ -40,15 +41,12 @@
     "@const/remote": "workspace:*",
     "@const/ui": "workspace:*",
     "@excalidraw/excalidraw": "0.18.0",
-    "@iconify/react": "^6.0.2",
     "@modelcontextprotocol/ext-apps": "2.0.4",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@openuidev/lang-core": "1.0.1",
-    "@openuidev/react-headless": "0.18.1",
     "@openuidev/react-lang": "1.0.1",
     "@openuidev/react-ui": "0.18.1",
     "@thesvg/react": "^3.3.13",
-    "@types/marked": "^6.0.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "convex": "^1.45.0",
@@ -69,7 +67,6 @@
   },
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
-    "@iconify-json/vscode-icons": "^1.2.76",
     "@types/jszip": "^3.4.1",
     "@types/node": "^22.13.9",
     "@types/qrcode": "^1.5.6",
@@ -86,8 +83,7 @@
     "tsx": "4.20.6",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
-    "vite-plugin-electron": "^1.1.2",
-    "vite-plugin-electron-renderer": "^1.0.0"
+    "vite-plugin-electron": "^1.1.2"
   },
   "build": {
     "appId": "id.web.const.harness.desktop",

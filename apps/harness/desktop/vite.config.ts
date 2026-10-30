@@ -6,7 +6,7 @@ import path from "node:path";
 export default defineConfig({
   base: "./",
   // Electron ships these assets locally; gzip reporting adds costly work for large diagram chunks.
-  build: { reportCompressedSize: false },
+  build: { reportCompressedSize: false, emptyOutDir: true },
   plugins: [
     react(),
     electron([
@@ -18,6 +18,7 @@ export default defineConfig({
         vite: {
           build: {
             outDir: "dist-electron",
+            emptyOutDir: true,
             reportCompressedSize: false,
             // Keep ws's optional native addons inside its guarded Node require().
             // Bundling them creates eager Vite error stubs and crashes Electron.
@@ -40,6 +41,7 @@ export default defineConfig({
         vite: {
           build: {
             outDir: "dist-electron",
+            emptyOutDir: false,
             reportCompressedSize: false,
           },
         },
