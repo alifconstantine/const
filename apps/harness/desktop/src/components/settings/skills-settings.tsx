@@ -1184,7 +1184,7 @@ export function SkillsSettings({
       <div
         ref={pluginPageRef}
         className={cn(
-          "mx-auto w-full max-w-5xl flex flex-col font-sans select-none outline-none ring-0",
+          "w-full flex flex-col font-sans select-none outline-none ring-0",
           isModal ? "space-y-4 pb-8" : "space-y-5",
         )}
       >
@@ -1567,7 +1567,6 @@ export function SkillsSettings({
       ref={pluginPageRef}
       className={cn(
         "w-full flex flex-col font-sans outline-none ring-0",
-        marketplaceTab === "plugins" && "mx-auto max-w-5xl",
         isModal ? "space-y-5" : "space-y-6",
       )}
     >
