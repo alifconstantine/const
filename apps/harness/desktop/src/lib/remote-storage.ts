@@ -59,7 +59,15 @@ export function createRemoteUiStorage(sessionId: string, backing: Storage): Stor
 /** Keep desktop UI caches separate from pairing credentials and other hosts. */
 export function scopedRemoteStorage(sessionId: string) {
   const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+  const preferences = window.localStorage;
   const storage = createRemoteUiStorage(sessionId, window.sessionStorage);
+  // The mobile shell and its bundled workspace share appearance preferences.
+  if (window.parent !== window && sessionStorage.getItem("const_mobile_persist_pairing") === "true") {
+    for (const key of ["theme", "const_app_language"]) {
+      const value = preferences.getItem(key);
+      if (value !== null) storage.setItem(key, value);
+    }
+  }
   Object.defineProperty(window, "localStorage", { configurable: true, value: storage });
   return () => {
     if (original) Object.defineProperty(window, "localStorage", original);

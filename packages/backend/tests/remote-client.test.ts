@@ -22,7 +22,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-function setup() {
+function setup(credentialStorage?: Storage) {
   const transport = {
     setAuth() {},
     mutation: vi.fn(async (_reference: any, _args: any): Promise<any> => "device"),
@@ -30,13 +30,33 @@ function setup() {
     close: vi.fn(async () => {}),
   };
   const failure = vi.fn();
-  const client = new RemoteClient("session", "x".repeat(43), "https://fixture.convex.cloud", "test-token", () => {}, () => {}, failure, () => transport as any);
+  const client = new RemoteClient("session", "x".repeat(43), "https://fixture.convex.cloud", "test-token", () => {}, () => {}, failure, () => transport as any, credentialStorage);
   clients.push(client);
   return { client, transport, failure };
 }
 function feed(transport: ReturnType<typeof setup>["transport"]) {
   transport.onUpdate.mock.calls[0]![2]({ heartbeatAt: Date.now(), deviceName: "Desktop", events: [], responses: [], revision: 0 });
 }
+
+test("an opted-in mobile credential store survives a fresh webview without joining again", async () => {
+  storage.clear();
+  const saved = new Map([["const_remote_grant:session", JSON.stringify(grant)]]);
+  const persistent = {
+    getItem: (key: string) => saved.get(key) ?? null,
+    setItem: (key: string, value: string) => saved.set(key, value),
+    removeItem: (key: string) => saved.delete(key),
+  } as Storage;
+  for (let index = 0; index < 2; index++) {
+    const { client, transport } = setup(persistent);
+    const connected = client.connect();
+    await Promise.resolve();
+    feed(transport);
+    await connected;
+    expect(transport.mutation.mock.calls.some(call => getFunctionName(call[0]) === "remote:join")).toBe(false);
+    await client.close(index === 1);
+  }
+  expect(saved.has("const_remote_grant:session")).toBe(false);
+});
 
 test("connection is ready only after its authenticated feed arrives", async () => {
   const { client, transport } = setup();

@@ -159,6 +159,15 @@ describe("request-specific capability guidance", () => {
 });
 
 describe("recovery preserves the actual user request", () => {
+  it("never executes a tool call from a length-truncated generation even when the JSON parses", async () => {
+    const { requests, run } = fixture(turn => turn === 1
+      ? { delta: { tool_calls: [{ index: 0, id: "truncated", type: "function", function: { name: "write", arguments: '{"path":"never.txt","content":"partial"}' } }] }, finish_reason: "length" }
+      : { delta: { content: "Recovered without executing the incomplete call." } });
+    await run();
+    expect(requests).toHaveLength(2);
+    expect(await readdir(workspace)).toEqual([]);
+    expect(requests[1]!.messages.at(-1)!.content).toContain("output limit");
+  });
   it("turn budgets change only the request reminder, not the system prefix or saved human request", async () => {
     await writeFile(path.join(workspace, "file.txt"), "Fixture");
     const { requests, run } = fixture(turn => turn === 1
@@ -188,16 +197,16 @@ describe("recovery preserves the actual user request", () => {
     expect(await readdir(workspace)).toEqual([]);
   });
 
-  it("repeated reasoning-only responses do not force concrete file modifications", async () => {
+  it("repeated reasoning-only responses stop after one recovery without modifying files", async () => {
     const { requests, run } = fixture(turn => turn < 3
       ? { delta: { reasoning_content: "Inspecting the request" } }
       : { delta: { content: "Audit selesai." } });
     await run();
-    expect(requests).toHaveLength(3);
-    expect(requests[2]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
-    expect(requests[2]!.messages.at(-1)!.content).toContain("Keep read-only tasks read-only");
+    expect(requests).toHaveLength(2);
+    expect(requests[1]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
+    expect(requests[1]!.messages.at(-1)!.content).toContain("Keep read-only tasks read-only");
     expect(JSON.stringify(requests)).not.toContain("concrete file modifications");
-    expect(requests[2]!.messages.filter(message => message.role === "user")).toHaveLength(1);
+    expect(requests[1]!.messages.filter(message => message.role === "user")).toHaveLength(1);
     expect(await readdir(workspace)).toEqual([]);
   });
 

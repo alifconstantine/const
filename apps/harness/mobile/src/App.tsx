@@ -17,22 +17,21 @@ import {
   User,
   X,
 } from "lucide-react";
-import { ConstLogoIcon, ScrollArea } from "@const/ui";
+import { ConstLogoIcon, ScrollArea, useTheme, type Theme } from "@const/ui";
+import { api } from "@const/backend/_generated/api";
 import { DEFAULT_CONVEX_URL } from "@const/remote/config";
 import { broker } from "@const/remote/protocol";
 import { normalizePairingCode, openWithCode } from "@const/remote/crypto";
-import { useTranslation } from "./i18n";
+import { languages, useTranslation } from "./i18n";
+import { readPairings, savePairing, leaveWorkspace, clearPairings, type Connection } from "./pairing-store";
 
 interface DesktopSession {
   sessionId: string;
   deviceName: string;
   pairingCode?: string;
   isOnline: boolean;
-}
-interface Connection {
-  sessionId: string;
-  key: string;
-  deviceName?: string;
+  heartbeatAt?: number;
+  hasPairingCode?: boolean;
 }
 type Tab = "pairing" | "session" | "accounts";
 const accountsUrl =
@@ -40,7 +39,9 @@ const accountsUrl =
 const convexUrl = import.meta.env.VITE_CONVEX_URL || DEFAULT_CONVEX_URL;
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, language, setLanguage } = useTranslation();
+  const [theme, setTheme] = useTheme();
+  const [profile, setProfile] = useState<{ name?: string; email?: string } | null>(null);
   const [token, setToken] = useState(
     () =>
       localStorage.getItem("const_harness_token") ||
@@ -56,10 +57,20 @@ export default function App() {
   const [sessions, setSessions] = useState<DesktopSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [sessionError, setSessionError] = useState(false);
-  const [connection, setConnection] = useState<Connection | null>(null);
+  const [connection, setConnection] = useState<Connection | null>(() => {
+    const saved = readPairings(token);
+    const active = saved?.connections.find(item => item.sessionId === saved.active) ?? null;
+    if (active && token) {
+      sessionStorage.setItem("const_remote_token", token);
+      sessionStorage.setItem("const_mobile_persist_pairing", "true");
+      sessionStorage.setItem(`const_remote_key:${active.sessionId}`, active.key);
+    }
+    return active;
+  });
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [now, setNow] = useState(Date.now);
   const iframe = useRef<HTMLIFrameElement>(null);
   const mounted = useRef(true);
   const authVersion = useRef(0);
@@ -78,6 +89,9 @@ export default function App() {
       const next = url.searchParams.get("token");
       if (!next || !expected || url.searchParams.get("state") !== expected)
         return;
+      if (!readPairings(next)) clearPairings();
+      setConnection(null);
+      setProfile(null);
       localStorage.setItem("const_harness_token", next);
       sessionStorage.setItem("const_remote_token", next);
       sessionStorage.removeItem("const_mobile_auth_state");
@@ -145,9 +159,13 @@ export default function App() {
         }
       },
     );
+    const unsubscribeProfile = client.onUpdate(api.auth.queries.currentUser, {}, (user) => {
+      if (!disposed) setProfile(user ? { name: user.name, email: user.email } : null);
+    }, () => { if (!disposed) setProfile(null); });
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribeProfile();
       void client.close();
     };
   }, [token, refresh]);
@@ -181,6 +199,8 @@ export default function App() {
     localStorage.removeItem("const_harness_token");
     localStorage.removeItem("const_sso_token");
     sessionStorage.removeItem("const_mobile_workspace");
+    clearPairings();
+    setProfile(null);
     for (const key of Object.keys(sessionStorage)) {
       if (key.startsWith("const_remote_") || key === "const_mobile_auth_state")
         sessionStorage.removeItem(key);
@@ -198,7 +218,14 @@ export default function App() {
     // Neither the login token nor the encryption key is placed in a URL.
     if (token) sessionStorage.setItem("const_remote_token", token);
     sessionStorage.setItem(`const_remote_key:${next.sessionId}`, next.key);
+    sessionStorage.setItem("const_mobile_persist_pairing", "true");
+    if (token) savePairing(token, next);
     setConnection(next);
+  };
+
+  const closeWorkspace = (remove = false) => {
+    leaveWorkspace(token, remove ? connection?.sessionId : undefined);
+    setConnection(null);
   };
 
   useEffect(() => {
@@ -209,12 +236,12 @@ export default function App() {
       )
         return;
       if (event.data?.type === "harness:workspace-error") {
-        setConnection(null);
+        closeWorkspace();
         setError(t("connectError"));
         return;
       }
       if (event.data?.type === "harness:disconnect") {
-        setConnection(null);
+        closeWorkspace(true);
         return;
       }
       if (event.data?.type !== "harness:exit") return;
@@ -223,6 +250,12 @@ export default function App() {
     };
     addEventListener("message", exit);
     return () => removeEventListener("message", exit);
+  }, [token, language, connection?.sessionId]);
+
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
   }, []);
 
   const connect = async (value = code) => {
@@ -293,6 +326,7 @@ export default function App() {
     client.setAuth(async () => token);
     try {
       await client.mutation(broker.removeMySession, { sessionId });
+      leaveWorkspace(token, sessionId);
       if (mounted.current) {
         setSessions((items) =>
           items.filter((item) => item.sessionId !== sessionId),
@@ -332,7 +366,7 @@ export default function App() {
         <header className="workspace-header safe-top-padding">
           <button
             className="icon-button"
-            onClick={() => setConnection(null)}
+            onClick={() => closeWorkspace()}
             aria-label={t("disconnect")}
           >
             <ArrowLeft size={20} />
@@ -352,7 +386,7 @@ export default function App() {
           <button
             className="icon-button"
             aria-label={t("disconnect")}
-            onClick={() => setConnection(null)}
+            onClick={() => closeWorkspace()}
           >
             <X size={20} />
           </button>
@@ -378,7 +412,7 @@ export default function App() {
         <main className="mx-auto w-full max-w-lg px-6 pb-8 pt-6">
           {!token ? (
             <section className="welcome">
-              <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#222222]">
+              <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--mobile-surface)]">
                 <Monitor size={28} />
               </div>
               <h1>{t("welcome")}</h1>
@@ -519,7 +553,7 @@ export default function App() {
               )}
               {tab === "session" && (
                 <>
-                  <div className="mb-4 flex items-center justify-between text-sm text-[#969696]">
+                  <div className="mb-4 flex items-center justify-between text-sm text-[var(--mobile-muted)]">
                     <span>
                       {sessions.length} {t("session")}
                     </span>
@@ -549,12 +583,14 @@ export default function App() {
                     </div>
                   )}
                   <div className="space-y-3">
-                    {sessions.map((item) => (
+                    {sessions.map((session) => {
+                      const item = { ...session, isOnline: session.heartbeatAt !== undefined ? now - session.heartbeatAt < 45_000 : session.isOnline };
+                      return (
                       <article className="session-row" key={item.sessionId}>
                         <div className="flex min-w-0 items-start gap-3">
                           <Monitor
                             size={22}
-                            className="mt-1 shrink-0 text-[#969696]"
+                            className="mt-1 shrink-0 text-[var(--mobile-muted)]"
                           />
                           <div className="min-w-0 flex-1">
                             <h2 className="break-words text-sm font-medium">
@@ -607,11 +643,15 @@ export default function App() {
                             </div>
                           </div>
                         ) : (
-                          item.pairingCode && (
+                          (readPairings(token)?.connections.some(saved => saved.sessionId === item.sessionId) || (item.hasPairingCode && item.pairingCode)) && (
                             <button
                               className="secondary mt-3"
                               disabled={busy || !item.isOnline}
-                              onClick={() => void connect(item.pairingCode)}
+                              onClick={() => {
+                                const saved = readPairings(token)?.connections.find(saved => saved.sessionId === item.sessionId);
+                                if (saved) openSession(saved);
+                                else if (item.pairingCode) void connect(item.pairingCode);
+                              }}
                             >
                               {t(busy ? "connecting" : "connect")}
                               <ArrowRight size={16} />
@@ -619,16 +659,31 @@ export default function App() {
                           )
                         )}
                       </article>
-                    ))}
+                    ); })}
                   </div>
                 </>
               )}
               {tab === "accounts" && (
                 <section className="space-y-4">
-                  <div className="flex items-center gap-3 rounded-2xl bg-[#222222] p-4">
+                  <div className="account-card flex items-center gap-3 rounded-2xl p-4">
                     <User size={22} />
-                    <span className="text-sm">{t("signedIn")}</span>
+                    <div className="min-w-0 text-sm">
+                      <p className="break-words">{profile?.name || t("signedIn")}</p>
+                      {profile?.email && <p className="supporting break-all text-xs">{profile.email}</p>}
+                    </div>
                   </div>
+                  <label className="preference-row" htmlFor="mobile-theme">
+                    <span>{t("theme")}</span>
+                    <select id="mobile-theme" value={theme} onChange={event => setTheme(event.target.value as Theme)}>
+                      {(["system", "light", "dark"] as const).map(value => <option key={value} value={value}>{t(value)}</option>)}
+                    </select>
+                  </label>
+                  <label className="preference-row" htmlFor="mobile-language">
+                    <span>{t("language")}</span>
+                    <select id="mobile-language" value={language} onChange={event => setLanguage(event.target.value as typeof language)}>
+                      {languages.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </label>
                   <button
                     className="secondary"
                     onClick={() => void signIn()}

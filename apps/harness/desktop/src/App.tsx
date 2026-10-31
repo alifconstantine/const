@@ -2489,7 +2489,21 @@ export function AuthenticatedContent({
     let disposed = false;
     const observedSessions = new Map<string, boolean>();
     if (window.electron?.getRunningSessions) {
-      window.electron.getRunningSessions().then((ids) => {
+      window.electron.getRunningSessions().then(async (ids) => {
+        if (disposed) return;
+        await Promise.all(ids.map(async (id) => {
+          if (isSideChatConversation(id) || observedSessions.has(id)) return;
+          const snapshot = await window.electron?.getSessionSnapshot?.(id, { hydrate: true });
+          if (disposed || observedSessions.has(id) || !snapshot) return;
+          executionStartTimeMapRef.current.set(id, snapshot.startedAt);
+          activeRunIdsRef.current.set(id, snapshot.runId);
+          const live = (snapshot as any).__remoteLive;
+          if (Array.isArray(live?.messages) && live.messages.length) {
+            const next = normalizeUiMessages(live.messages);
+            activeSessionMessagesRef.current.set(id, next);
+            if (conversationIdRef.current === id) { messagesRef.current = next; setMessages(next); }
+          }
+        }));
         if (disposed) return;
         const running = new Set(ids.filter(id => !isSideChatConversation(id) && observedSessions.get(id) !== false));
         for (const [id, active] of observedSessions) if (active) running.add(id);
@@ -2504,7 +2518,13 @@ export function AuthenticatedContent({
         observedSessions.set(data.conversationId, true);
         if (data.runId) activeRunIdsRef.current.set(data.conversationId, data.runId);
         runningConvoIdsRef.current.add(data.conversationId);
-        if (!executionStartTimeMapRef.current.has(data.conversationId)) executionStartTimeMapRef.current.set(data.conversationId, Date.now());
+        if (data.startedAt && Number.isFinite(data.startedAt)) executionStartTimeMapRef.current.set(data.conversationId, data.startedAt);
+        else if (!executionStartTimeMapRef.current.has(data.conversationId)) {
+          void window.electron?.getSessionSnapshot?.(data.conversationId).then(snapshot => {
+            if (!disposed && snapshot && activeRunIdsRef.current.get(data.conversationId) === snapshot.runId)
+              executionStartTimeMapRef.current.set(data.conversationId, snapshot.startedAt);
+          }).catch(() => {});
+        }
         const history = data.conversationId === conversationIdRef.current
           ? messagesRef.current
           : activeSessionMessagesRef.current.get(data.conversationId) || [];

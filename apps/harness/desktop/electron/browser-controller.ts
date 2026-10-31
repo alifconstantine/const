@@ -2106,7 +2106,18 @@ export class BrowserController {
     } catch {}
   }
 
-  public async screenshot(params?: {
+  private screenshotQueue: Promise<void> = Promise.resolve();
+
+  public async screenshot(params?: Parameters<BrowserController["captureScreenshot"]>[0]) {
+    const previous = this.screenshotQueue;
+    let release!: () => void;
+    this.screenshotQueue = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try { return await this.captureScreenshot(params); }
+    finally { release(); }
+  }
+
+  private async captureScreenshot(params?: {
     ephemeral?: boolean;
     annotate?: boolean;
     quality?: number;

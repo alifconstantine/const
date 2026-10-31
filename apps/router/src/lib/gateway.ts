@@ -131,6 +131,7 @@ export type ChatBody = {
   max_completion_tokens?: number;
   tools?: unknown[];
   tool_choice?: unknown;
+  parallel_tool_calls?: boolean;
   reasoning_effort?: string;
   response_format?: unknown;
   web_search?: string | boolean;
@@ -179,6 +180,8 @@ export function validateChat(body: ChatBody) {
       );
   if (body.stream !== undefined && typeof body.stream !== "boolean")
     throw new GatewayError("stream must be a boolean.");
+  if (body.parallel_tool_calls !== undefined && typeof body.parallel_tool_calls !== "boolean")
+    throw new GatewayError("parallel_tool_calls must be a boolean.");
   if (new TextEncoder().encode(JSON.stringify(body)).length > 4_000_000)
     throw new GatewayError("Request too large", 413);
 }
@@ -290,7 +293,11 @@ export async function executeSingle(
     .filter((m) => m.role === "user")
     .map((m) => (typeof m.content === "string" ? m.content : ""))
     .join("\n");
-  const signal = AbortSignal.any([req.signal, AbortSignal.timeout(180000)]);
+  const configuredTimeout = Number(process.env.ROUTER_UPSTREAM_TIMEOUT_MS);
+  const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout >= 30_000
+    ? Math.min(configuredTimeout, 900_000) : 600_000;
+  const upstreamController = new AbortController();
+  const signal = AbortSignal.any([req.signal, upstreamController.signal, AbortSignal.timeout(timeoutMs)]);
   const stream = body.stream ?? auth.settings.enableStreaming;
   const payload = {
     model: normalizeConstModelName(modelId),
@@ -301,6 +308,7 @@ export async function executeSingle(
     ...(stream ? { stream_options: { include_usage: true } } : {}),
     ...(body.tools ? { tools: body.tools } : {}),
     ...(body.tool_choice ? { tool_choice: body.tool_choice } : {}),
+    ...(body.parallel_tool_calls !== undefined ? { parallel_tool_calls: body.parallel_tool_calls } : {}),
     ...(body.response_format ? { response_format: body.response_format } : {}),
     ...(body.reasoning_effort
       ? { reasoning_effort: body.reasoning_effort }
@@ -458,7 +466,11 @@ export async function executeSingle(
       try {
         const { done, value } = await reader.read();
         if (done) {
-          await finish(200);
+          parser.finish();
+          if (!parser.hasTerminal && !parser.hasError) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: { message: "Upstream stream ended before completion. Retry or select another model.", code: "incomplete_stream" } })}\n\n`));
+            await finish(502, "Upstream stream ended before completion");
+          } else await finish(parser.hasError ? 502 : 200);
           controller.close();
           return;
         }
@@ -466,16 +478,10 @@ export async function executeSingle(
         controller.enqueue(value);
       } catch (error) {
         try {
-          const isClientAbort =
-            req.signal.aborted ||
-            (error as any)?.name === "AbortError" ||
-            (error as any)?.code === "ERR_INVALID_STATE" ||
-            String(error).includes("closed") ||
-            String(error).includes("stopped") ||
-            String(error).includes("cancel");
+          const isClientAbort = req.signal.aborted || upstreamController.signal.aborted;
           await finish(
-            isClientAbort ? 499 : 502,
-            isClientAbort ? "Stream stopped by client" : "Stream interrupted",
+            isClientAbort ? 499 : signal.aborted ? 504 : 502,
+            isClientAbort ? "Stream stopped by client" : signal.aborted ? "Upstream stream timed out" : "Stream interrupted",
           );
         } finally {
           controller.error(error);
@@ -484,6 +490,7 @@ export async function executeSingle(
       }
     },
     async cancel(reason) {
+      upstreamController.abort();
       await reader.cancel(reason).catch(() => {});
       await finish(499, "Stream stopped by client");
     },

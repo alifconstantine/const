@@ -69,14 +69,14 @@
 }
 .remote-sidebar-toggle {
   position: absolute;
-  top: 6px;
-  left: 10px;
+  top: 2px;
+  left: 6px;
   z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -93,7 +93,10 @@
   box-shadow: none !important;
   outline: none !important;
 }
-.remote-sidebar-toggle:hover,
+.remote-sidebar-toggle:hover {
+  background: transparent !important;
+  color: #161616;
+}
 .dark .remote-sidebar-toggle:hover {
   background: transparent !important;
   color: #ffffff;

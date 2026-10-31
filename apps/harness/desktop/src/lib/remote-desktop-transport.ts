@@ -256,7 +256,7 @@ export function remoteDesktopTransport(
           event({
             type: "desktop:event",
             channel: "agent:session-started",
-            args: [{ conversationId: snapshotId, runId: live.runId }],
+            args: [{ conversationId: snapshotId, runId: live.runId, startedAt: value?.startedAt ?? live.startedAt }],
           });
           if (live.approval)
             event({

@@ -1,3 +1,4 @@
+import { consumeChatStream, abortableDelay } from "./chat-stream.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -647,11 +648,14 @@ async function fetchWithRetry(
       throw new DOMException("The operation was aborted.", "AbortError");
     }
 
+    const headerController = new AbortController();
+    const headerTimer = setTimeout(() => headerController.abort(new DOMException("Model response headers timed out", "TimeoutError")), 90_000);
     try {
       const response = await fetch(url, {
         ...init,
-        signal,
+        signal: signal ? AbortSignal.any([signal, headerController.signal]) : headerController.signal,
       });
+      clearTimeout(headerTimer);
 
       // Transient HTTP errors: 429 (Rate limit) or 5xx server errors
       const isTransientHttp =
@@ -677,12 +681,14 @@ async function fetchWithRetry(
         const reason = `Server returned HTTP ${response.status} (${response.statusText || "Transient error"})`;
         options.onRetry?.(attempt, maxRetries, reason);
 
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await response.body?.cancel().catch(() => {});
+        await abortableDelay(delayMs, signal);
         continue;
       }
 
       return response;
     } catch (err: any) {
+      clearTimeout(headerTimer);
       if (signal?.aborted || err.name === "AbortError") {
         throw err;
       }
@@ -700,7 +706,7 @@ async function fetchWithRetry(
           Math.floor(Math.random() * 300);
         options.onRetry?.(attempt, maxRetries, reason);
 
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await abortableDelay(delayMs, signal);
         continue;
       }
 
@@ -854,13 +860,11 @@ export class ConstAgent {
         usedTokens: breakdown.totalHeuristicTokens,
         totalTokens: this.config.contextWindow ?? DEFAULT_MODELS.find(m => m.id === this.config.model)?.contextWindow ?? 1_000_000 });
     };
-    let consecutiveStreamRetries = 0;
     let consecutivePlanningTurns = 0;
     let consecutiveDraftCutoffs = 0;
     let recoveryInstruction = "";
     let consecutiveEmptyRetries = 0;
-    const MAX_EMPTY_RETRIES = this.config.sessionKind === "companion" ? 1 : 5;
-    const STREAM_STALL_TIMEOUT_MS = 35_000;
+    const MAX_EMPTY_RETRIES = this.config.sessionKind === "companion" ? 1 : 2;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
@@ -1160,159 +1164,75 @@ export class ConstAgent {
           throw new Error("No response body from Const");
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
         let turnContent = "";
         let turnThinking = "";
         let turnFinishReason: string | null = null;
-        let hasReceivedAnyData = false;
-        let hasCleanDone = false;
         const streamFilter = new ThinkingStreamFilter();
         const toolCallsMap: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
-        const readWithTimeout = <T>(
-          streamReader: ReadableStreamDefaultReader<T>,
-          timeoutMs: number,
-          abortSignal?: AbortSignal
-        ): Promise<ReadableStreamReadResult<T>> => {
-          return new Promise((resolve, reject) => {
-            let timer: ReturnType<typeof setTimeout> | null = null;
-            let finished = false;
-
-            const onAbort = () => {
-              if (finished) return;
-              finished = true;
-              if (timer) clearTimeout(timer);
-              reject(new DOMException("The operation was aborted.", "AbortError"));
-            };
-
-            if (abortSignal?.aborted) {
-              return onAbort();
-            }
-
-            timer = setTimeout(() => {
-              if (finished) return;
-              finished = true;
-              abortSignal?.removeEventListener("abort", onAbort);
-              reject(new Error(`Stream stalled: no data received for ${Math.round(timeoutMs / 1000)}s`));
-            }, timeoutMs);
-
-            abortSignal?.addEventListener("abort", onAbort, { once: true });
-
-            streamReader.read().then(
-              (res) => {
-                if (finished) return;
-                finished = true;
-                if (timer) clearTimeout(timer);
-                abortSignal?.removeEventListener("abort", onAbort);
-                resolve(res);
-              },
-              (err) => {
-                if (finished) return;
-                finished = true;
-                if (timer) clearTimeout(timer);
-                abortSignal?.removeEventListener("abort", onAbort);
-                reject(err);
-              }
-            );
-          });
-        };
-
         try {
-          while (true) {
-            const { done, value } = await readWithTimeout(reader, STREAM_STALL_TIMEOUT_MS, signal);
-            if (done) break;
+          await consumeChatStream(response.body, (json) => {
+          if (json?.usage) request.observeUsage(json.usage);
+          const choice = json.choices?.[0];
+          if (choice?.finish_reason) {
+            turnFinishReason = choice.finish_reason;
+          }
 
-            hasReceivedAnyData = true;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
+          const delta = choice?.delta || choice?.message;
+          if (!delta) return;
+          request.observeDelta(delta);
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const dataStr = trimmed.slice(5).trim();
-              if (dataStr === "[DONE]") {
-                hasCleanDone = true;
-                continue;
-              }
+          const reasoningDelta =
+            delta.reasoning_content ||
+            delta.reasoning ||
+            delta.thought ||
+            (typeof delta.thinking === "string" ? delta.thinking : "");
+          if (reasoningDelta) {
+            turnThinking += reasoningDelta;
+            onEvent({ type: "thinking", thinking: reasoningDelta });
+          }
 
-              let json: any;
-              try {
-                json = JSON.parse(dataStr);
-              } catch {
-                continue;
-              }
+          if (delta.content) {
+            const filtered = streamFilter.push(delta.content);
+            if (filtered.thinking) {
+              turnThinking += filtered.thinking;
+              onEvent({ type: "thinking", thinking: filtered.thinking });
+            }
+            if (filtered.content) {
+              turnContent += filtered.content;
+              onEvent({ type: "token", token: filtered.content });
+            }
+          }
 
-              if (json?.error) {
-                const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
-                try {
-                  reader.cancel().catch(() => {});
-                } catch {}
-                throw new Error(`Const stream error: ${errorMsg}`);
-              }
-
-              try {
-                if (json?.usage) request.observeUsage(json.usage);
-                const choice = json.choices?.[0];
-                if (choice?.finish_reason) {
-                  turnFinishReason = choice.finish_reason;
-                  hasCleanDone = true;
-                }
-
-                const delta = choice?.delta || choice?.message;
-                if (!delta) continue;
-                request.observeDelta(delta);
-
-                const reasoningDelta =
-                  delta.reasoning_content ||
-                  delta.reasoning ||
-                  delta.thought ||
-                  (typeof delta.thinking === "string" ? delta.thinking : "");
-                if (reasoningDelta) {
-                  turnThinking += reasoningDelta;
-                  onEvent({ type: "thinking", thinking: reasoningDelta });
-                }
-
-                if (delta.content) {
-                  const filtered = streamFilter.push(delta.content);
-                  if (filtered.thinking) {
-                    turnThinking += filtered.thinking;
-                    onEvent({ type: "thinking", thinking: filtered.thinking });
-                  }
-                  if (filtered.content) {
-                    turnContent += filtered.content;
-                    onEvent({ type: "token", token: filtered.content });
-                  }
-                }
-
-                if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
-                  for (const tc of delta.tool_calls) {
-                    const idx = tc.index ?? 0;
-                    if (!toolCallsMap.has(idx)) {
-                      toolCallsMap.set(idx, {
-                        id: tc.id || `call_${Date.now()}_${idx}`,
-                        name: tc.function?.name || "",
-                        arguments: tc.function?.arguments || "",
-                      });
-                    } else {
-                      const c = toolCallsMap.get(idx)!;
-                      if (tc.id) c.id = tc.id;
-                      if (tc.function?.name) c.name += tc.function.name;
-                      if (tc.function?.arguments) c.arguments += tc.function.arguments;
-                    }
-                  }
-                }
-              } catch {
-                // ignore
+          if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index ?? 0;
+              if (!toolCallsMap.has(idx)) {
+                toolCallsMap.set(idx, {
+                  id: tc.id || `call_${Date.now()}_${idx}`,
+                  name: tc.function?.name || "",
+                  arguments: tc.function?.arguments || "",
+                });
+              } else {
+                const c = toolCallsMap.get(idx)!;
+                if (tc.id) c.id = tc.id;
+                if (tc.function?.name) c.name += tc.function.name;
+                if (tc.function?.arguments) c.arguments += tc.function.arguments;
               }
             }
           }
+          }, signal);
         } catch (streamErr: any) {
+          if (turnContent) onEvent({ type: "token_reset" });
           request.finish(signal.aborted || this._isCancelled ? "cancelled" : "failed");
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
+          }
+          if (turnThinking && !turnContent) {
+            if (consecutivePlanningTurns >= 1) throw streamErr;
+            consecutivePlanningTurns++;
+            conversationHistory.push({ role: "assistant", content: "", thinking: turnThinking.slice(-16000), timestamp: Date.now() });
+            recoveryInstruction = RESPONSE_RECOVERY_GUIDANCE;
           }
 
           const errMsg = streamErr?.message || "";
@@ -1365,79 +1285,10 @@ export class ConstAgent {
               status: "thinking",
               message: `Koneksi stream terputus (${streamErr.message || "stream drop"}). Mengulang otomatis (percobaan ${consecutiveEmptyRetries}/${MAX_EMPTY_RETRIES} dalam ${(backoffMs / 1000).toFixed(1)}s)...`,
             });
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            await abortableDelay(backoffMs, signal);
             continue;
           }
           throw streamErr;
-        }
-
-        // Process any trailing data remaining in buffer
-        if (buffer.trim().startsWith("data:")) {
-          const trimmed = buffer.trim();
-          const dataStr = trimmed.slice(5).trim();
-          if (dataStr && dataStr !== "[DONE]") {
-            let json: any;
-            try {
-              json = JSON.parse(dataStr);
-            } catch {
-              json = null;
-            }
-
-            if (json?.error) {
-              const errorMsg = json.error.message || json.error.msg || (typeof json.error === "string" ? json.error : JSON.stringify(json.error));
-              throw new Error(`Const stream error: ${errorMsg}`);
-            }
-
-            try {
-              if (json?.usage) request.observeUsage(json.usage);
-              const choice = json.choices?.[0];
-              if (choice?.finish_reason) {
-                turnFinishReason = choice.finish_reason;
-                hasCleanDone = true;
-              }
-              const delta = choice?.delta || choice?.message;
-              if (delta) {
-                request.observeDelta(delta);
-                const reasoningDelta =
-                  delta.reasoning_content ||
-                  delta.reasoning ||
-                  delta.thought ||
-                  (typeof delta.thinking === "string" ? delta.thinking : "");
-                if (reasoningDelta) {
-                  turnThinking += reasoningDelta;
-                  onEvent({ type: "thinking", thinking: reasoningDelta });
-                }
-                if (delta.content) {
-                  const filtered = streamFilter.push(delta.content);
-                  if (filtered.thinking) {
-                    turnThinking += filtered.thinking;
-                    onEvent({ type: "thinking", thinking: filtered.thinking });
-                  }
-                  if (filtered.content) {
-                    turnContent += filtered.content;
-                    onEvent({ type: "token", token: filtered.content });
-                  }
-                }
-                if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
-                  for (const tc of delta.tool_calls) {
-                    const idx = tc.index ?? 0;
-                    if (!toolCallsMap.has(idx)) {
-                      toolCallsMap.set(idx, {
-                        id: tc.id || `call_${Date.now()}_${idx}`,
-                        name: tc.function?.name || "",
-                        arguments: tc.function?.arguments || "",
-                      });
-                    } else {
-                      const c = toolCallsMap.get(idx)!;
-                      if (tc.id) c.id = tc.id;
-                      if (tc.function?.name) c.name += tc.function.name;
-                      if (tc.function?.arguments) c.arguments += tc.function.arguments;
-                    }
-                  }
-                }
-              }
-            } catch {}
-          }
         }
 
         // Flush any remaining buffered tokens from streamFilter
@@ -1452,6 +1303,15 @@ export class ConstAgent {
         }
 
         request.finish("completed");
+
+        if (turnFinishReason === "length" && toolCallsMap.size) {
+          toolCallsMap.clear();
+          turnContent = "";
+          onEvent({ type: "token_reset" });
+          recoveryInstruction = TRUNCATED_RESPONSE_GUIDANCE;
+          if (++consecutiveDraftCutoffs > 2) throw new Error("Model repeatedly truncated tool arguments. Choose a model with a larger output limit.");
+          continue;
+        }
 
         const rawToolCalls: ToolCall[] = Array.from(toolCallsMap.values())
           .filter((tc) => tc.name && tc.name.trim().length > 0)
@@ -1537,11 +1397,10 @@ export class ConstAgent {
 
         if (hasActionableOutput) {
           consecutiveEmptyRetries = 0;
-          consecutiveStreamRetries = 0;
           recoveryInstruction = "";
         } else {
           // Model produced no actionable text and no tool calls!
-          if (!isCompanion && hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
+          if (!isCompanion && hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 1) {
             consecutivePlanningTurns++;
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
@@ -1563,7 +1422,7 @@ export class ConstAgent {
             continue;
           }
 
-          if (consecutiveEmptyRetries < MAX_EMPTY_RETRIES) {
+          if (!hasThinking && consecutiveEmptyRetries < MAX_EMPTY_RETRIES) {
             consecutiveEmptyRetries++;
             currentTurn--; // Don't consume a conversational turn on empty response
             const backoffMs =
@@ -1576,13 +1435,15 @@ export class ConstAgent {
               message: `Model tidak memberikan respon. Mengulang otomatis (percobaan ${consecutiveEmptyRetries}/${MAX_EMPTY_RETRIES} dalam ${(backoffMs / 1000).toFixed(1)}s)...`,
             });
 
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            await abortableDelay(backoffMs, signal);
             continue;
           }
 
           // Capped after MAX_EMPTY_RETRIES
           const exhaustedErrMsg =
-            isCompanion ? "The side chat model returned an empty response. Please try again." : `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
+            isCompanion ? "The side chat model returned an empty response. Please try again." : hasThinking
+              ? "Model berulang kali menyelesaikan analisis tanpa jawaban atau tool call. Pilih model lain atau coba prompt yang lebih ringkas."
+              : `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
           onEvent({ type: "error", error: exhaustedErrMsg });
           onEvent({ type: "status", status: "error", message: exhaustedErrMsg });
           conversationHistory.push({

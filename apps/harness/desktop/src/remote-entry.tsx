@@ -18,7 +18,6 @@ import "./index.css";
 import "./remote.css";
 import { RemoteDirectoryPicker } from "./components/remote-directory-picker";
 import { RemoteWorkspaceBoundary } from "./components/remote-workspace-boundary";
-import { RemotePullToRefresh } from "./components/remote-pull-to-refresh";
 import { scopedRemoteStorage } from "./lib/remote-storage";
 
 type Options = {
@@ -100,6 +99,9 @@ function Workspace({ sessionId, convexUrl, accountsUrl, onExit, onDisconnect }: 
           }
         },
         fail,
+        undefined,
+        window.parent !== window && sessionStorage.getItem("const_mobile_persist_pairing") === "true"
+          ? window.parent.localStorage : sessionStorage,
       );
       bridge = remoteDesktopTransport(
         client,
@@ -225,12 +227,10 @@ function Workspace({ sessionId, convexUrl, accountsUrl, onExit, onDisconnect }: 
         <div
           className={`remote-client ${mobile ? "remote-mobile" : "remote-desktop"}`}
         >
-          <RemotePullToRefresh enabled={mobile}>
             <AuthenticatedContent
               onSignOut={() => void exit()}
               onSwitchAccount={() => void exit(true)}
             />
-          </RemotePullToRefresh>
           {directoryPicker && (
             <RemoteDirectoryPicker
               initialPath={directoryRoot}

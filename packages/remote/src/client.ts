@@ -56,6 +56,7 @@ export class RemoteClient {
     private failure: (error?: unknown) => void,
     createClient: (url: string) => ConvexClient = (url) =>
       new ConvexClient(url, { unsavedChangesWarning: false }),
+    private credentialStorage: Storage = sessionStorage,
   ) {
     this.client = createClient(url);
     this.client.setAuth(async () => token);
@@ -85,7 +86,7 @@ export class RemoteClient {
   }
   private async initialize() {
     const storageKey = `const_remote_grant:${this.sessionId}`;
-    const stored = sessionStorage.getItem(storageKey);
+    const stored = this.credentialStorage.getItem(storageKey);
     if (stored) {
       try {
         const grant = JSON.parse(stored) as Grant;
@@ -98,14 +99,14 @@ export class RemoteClient {
       } catch {
         /* A corrupt tab cache may safely pair again using its stable proof. */
       }
-      if (!this.grant) sessionStorage.removeItem(storageKey);
+      if (!this.grant) this.credentialStorage.removeItem(storageKey);
     }
     if (!this.grant) {
       const secretKey = `const_remote_device_secret:${this.sessionId}`;
       const secretHash =
-        sessionStorage.getItem(secretKey) || (await digest(randomSecret()));
+        this.credentialStorage.getItem(secretKey) || (await digest(randomSecret()));
       if (this.closed) throw new Error("REMOTE_DISCONNECTED");
-      sessionStorage.setItem(secretKey, secretHash);
+      this.credentialStorage.setItem(secretKey, secretHash);
       const pairHash = await digest(this.key);
       if (this.closed) throw new Error("REMOTE_DISCONNECTED");
       const deviceId = await this.client.mutation(broker.join, {
@@ -116,7 +117,7 @@ export class RemoteClient {
       });
       if (this.closed) throw new Error("REMOTE_DISCONNECTED");
       this.grant = { sessionId: this.sessionId, deviceId, secretHash };
-      sessionStorage.setItem(storageKey, JSON.stringify(this.grant));
+      this.credentialStorage.setItem(storageKey, JSON.stringify(this.grant));
     }
     if (this.closed) throw new Error("REMOTE_DISCONNECTED");
     await new Promise<void>((resolve, reject) => {
@@ -250,9 +251,9 @@ export class RemoteClient {
   }
   close(revoke = false): Promise<void> {
     if (revoke) {
-      sessionStorage.removeItem(`const_remote_grant:${this.sessionId}`);
+      this.credentialStorage.removeItem(`const_remote_grant:${this.sessionId}`);
       sessionStorage.removeItem(`const_remote_key:${this.sessionId}`);
-      sessionStorage.removeItem(`const_remote_device_secret:${this.sessionId}`);
+      this.credentialStorage.removeItem(`const_remote_device_secret:${this.sessionId}`);
     }
     if (this.closePromise) return this.closePromise;
     this.closed = true;

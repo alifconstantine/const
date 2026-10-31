@@ -6,6 +6,19 @@ import type { RemoteClient } from "@const/remote/client";
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 const stream = (revision: number, token: string) => ({ type: "desktop:event", channel: "agent:stream-event", args: [{ type: "token", token, conversationId: "chat", runId: "run", remoteSequence: revision }] });
 
+test("snapshot replay retains the host start time after a renderer reload", async () => {
+  const bridge = remoteDesktopTransport({ request: async () => ({ ok: true, value: {
+    startedAt: 1234, runId: "run", __remoteLive: { runId: "run", messages: [] },
+  } }) } as unknown as RemoteClient, () => assert.fail("unexpected resync"));
+  try {
+    const starts: any[] = [];
+    bridge.transport.on("agent:session-started", (_event, value) => starts.push(value));
+    await bridge.transport.invoke("agent:get-session-snapshot", "chat", { hydrate: true });
+    await tick();
+    assert.equal(starts[0].startedAt, 1234);
+  } finally { bridge.dispose(); }
+});
+
 test("a snapshot replaces stale output and releases only newer buffered events once", async () => {
   let resolveSnapshot!: (value: any) => void;
   const bridge = remoteDesktopTransport({ request: () => new Promise(resolve => { resolveSnapshot = resolve; }) } as unknown as RemoteClient, () => assert.fail("unexpected resync"));

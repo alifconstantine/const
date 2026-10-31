@@ -22,6 +22,8 @@ export function RemoteBrowserViewport({
   const [frame, setFrame] = useState("");
   const [failed, setFailed] = useState(false);
   const image = useRef<HTMLImageElement>(null);
+  const touch = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
   const refresh = useRef<() => Promise<void>>(async () => {});
   const shim = useMemo(() => {
     const events = new Map<string, Set<(event: any) => void>>();
@@ -114,6 +116,7 @@ export function RemoteBrowserViewport({
           format: "jpeg",
           quality: 55,
           ephemeral: true,
+          annotate: false,
         });
         if (!disposed) {
           setFrame(shot.dataUrl);
@@ -139,9 +142,32 @@ export function RemoteBrowserViewport({
   }, [tabId, shim]);
   return (
     <div
-      className="relative h-full min-h-0 flex-1 overflow-hidden bg-[#161616] outline-none"
+      className="relative h-full min-h-0 flex-1 touch-none overflow-hidden bg-[#161616] outline-none"
+      data-remote-browser
       tabIndex={0}
       aria-label={t("rightPane.browser")}
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse") return;
+        suppressClick.current = false;
+        touch.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+      }}
+      onPointerMove={(event) => {
+        const start = touch.current;
+        if (!start || start.id !== event.pointerId) return;
+        if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) {
+          start.moved = true;
+        }
+      }}
+      onPointerUp={(event) => {
+        const start = touch.current;
+        touch.current = null;
+        if (!start || start.id !== event.pointerId || !start.moved) return;
+        suppressClick.current = true;
+        void shim.act("scroll", { deltaY: Math.max(-1000, Math.min(1000, event.clientY - start.y)) })
+          .catch(() => setFailed(true));
+      }}
+      onPointerCancel={() => { touch.current = null; suppressClick.current = true; }}
+      onLostPointerCapture={() => { touch.current = null; }}
       onKeyDown={(event) => {
         if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
           event.preventDefault();
@@ -180,6 +206,7 @@ export function RemoteBrowserViewport({
           draggable={false}
           className="w-full object-contain object-top"
           onClick={(event) => {
+            if (suppressClick.current) { suppressClick.current = false; return; }
             const box = event.currentTarget.getBoundingClientRect();
             event.currentTarget.parentElement?.focus();
             void shim

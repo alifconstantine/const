@@ -79,7 +79,7 @@ export function getSafeRedirectUrl(
   if (!target || typeof target !== "string") return null;
 
   const trimmed = target.trim();
-  if (!trimmed) return null;
+  if (!trimmed || /[\u0000-\u0020\u007f\\]/.test(trimmed)) return null;
 
   try {
     // 1. Check for Const desktop & mobile native app deep-link schemes
@@ -95,7 +95,6 @@ export function getSafeRedirectUrl(
       if (/^const(-auth|-learn|-harness)?:\/\/[a-zA-Z0-9_\-\.\/]+(\?.*)?$/i.test(trimmed)) {
         return trimmed;
       }
-      console.warn(`[Security] Malformed native deep-link blocked: ${trimmed}`);
       return null;
     }
 
@@ -113,6 +112,7 @@ export function getSafeRedirectUrl(
 
     // 3. Absolute URL parsing
     const parsed = new URL(trimmed);
+    if (parsed.username || parsed.password) return null;
 
     // Only allow http: and https: protocols
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -145,21 +145,19 @@ export function getSafeRedirectUrl(
       /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
       hostname.endsWith(".local");
 
-    if (isLoopbackOrLocalhost || isPrivateLanIp) {
+    if (process.env.NODE_ENV !== "production" && (isLoopbackOrLocalhost || isPrivateLanIp)) {
       return trimmed;
     }
 
-    // 6. Allow official production domains (*.const.web.id and *.vercel.app deployments)
+    // Tokens must only be delivered to the official HTTPS ecosystem.
     if (
-      hostname === "const.web.id" ||
-      hostname.endsWith(".const.web.id") ||
-      hostname.endsWith(".vercel.app")
+      parsed.protocol === "https:" &&
+      (hostname === "const.web.id" || hostname.endsWith(".const.web.id"))
     ) {
       return trimmed;
     }
 
     // Untrusted external domain
-    console.warn(`[Security] Untrusted redirect target blocked: ${trimmed}`);
     return null;
   } catch {
     return null;

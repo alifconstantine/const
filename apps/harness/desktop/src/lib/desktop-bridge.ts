@@ -145,7 +145,7 @@ export function createDesktopBridge(
     }) => ipcRenderer.invoke("agent:respond-approval", payload),
     getRunningSessions: () => ipcRenderer.invoke("agent:get-running-sessions"),
     onSessionStarted: (
-      callback: (data: { conversationId: string; runId?: string }) => void,
+      callback: (data: { conversationId: string; runId?: string; startedAt?: number }) => void,
     ) => {
       const handler = (_event: any, data: any) => callback(data);
       ipcRenderer.on("agent:session-started", handler);

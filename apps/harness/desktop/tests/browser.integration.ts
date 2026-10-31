@@ -225,6 +225,15 @@ async function run() {
     assert.equal(await js(`document.querySelector('[id^="const-mask-"]')`), null);
     await unlink(shot.filePath);
   });
+  await check("concurrent AI and remote screenshots cannot leak annotations into the remote frame", async () => {
+    const [annotated, remote] = await Promise.all([
+      driver.screenshot({ annotate: true, ephemeral: true, format: "png" }),
+      driver.screenshot({ annotate: false, ephemeral: true, format: "png" }),
+    ]);
+    assert.notEqual(annotated.base64, remote.base64, "the plain remote frame must differ from the annotated AI capture");
+    assert.equal(await js(`document.querySelector('[data-const-screenshot-annotations]')`), null);
+    assert.equal(await js(`document.querySelector('[id^="const-mask-"]')`), null);
+  });
   await check("guest popups cannot create unmanaged windows", async () => {
     const before = webContents.getAllWebContents().length;
     await js(`window.open(${JSON.stringify(origin)})`);

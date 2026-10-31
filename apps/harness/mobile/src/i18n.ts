@@ -1,4 +1,11 @@
+import { useSyncExternalStore } from "react";
+
 const copy = {
+  theme: ["Theme", "Tema", "テーマ", "主题", "Tema"],
+  language: ["Language", "Bahasa", "言語", "语言", "Idioma"],
+  light: ["Light", "Terang", "ライト", "浅色", "Claro"],
+  dark: ["Dark", "Gelap", "ダーク", "深色", "Oscuro"],
+  system: ["System", "Sistem", "システム", "跟随系统", "Sistema"],
   pairing: ["Pairing", "Pairing", "ペアリング", "配对", "Emparejar"],
   session: ["Session", "Sesi", "セッション", "会话", "Sesión"],
   accounts: ["Accounts", "Akun", "アカウント", "账户", "Cuentas"],
@@ -228,10 +235,27 @@ const copy = {
   ],
 } as const;
 
+export const languages = [
+  { id: "en", name: "English" }, { id: "id", name: "Bahasa Indonesia" },
+  { id: "ja", name: "日本語" }, { id: "zh", name: "中文" }, { id: "es", name: "Español" },
+] as const;
+type Language = typeof languages[number]["id"];
+const getLanguage = (): Language => {
+  const saved = localStorage.getItem("const_app_language") || navigator.language.slice(0, 2);
+  return languages.some(item => item.id === saved) ? saved as Language : "en";
+};
+const subscribe = (update: () => void) => {
+  addEventListener("storage", update);
+  addEventListener("const-language-changed", update);
+  return () => { removeEventListener("storage", update); removeEventListener("const-language-changed", update); };
+};
 export function useTranslation() {
-  const saved =
-    localStorage.getItem("const_app_language") ||
-    navigator.language.slice(0, 2);
-  const index = Math.max(0, ["en", "id", "ja", "zh", "es"].indexOf(saved));
-  return { t: (key: keyof typeof copy): string => copy[key][index]! };
+  const language = useSyncExternalStore(subscribe, getLanguage, () => "en" as Language);
+  const index = languages.findIndex(item => item.id === language);
+  return { language, t: (key: keyof typeof copy): string => copy[key][index]!,
+    setLanguage: (next: Language) => {
+      localStorage.setItem("const_app_language", next);
+      document.documentElement.lang = next;
+      dispatchEvent(new CustomEvent("const-language-changed"));
+    } };
 }

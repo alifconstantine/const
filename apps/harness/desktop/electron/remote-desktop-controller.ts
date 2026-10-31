@@ -15,7 +15,7 @@ export interface RemoteDesktopContext {
     "getConversation" | "saveConversation" | "listRemoteSummaries"
   >;
   activeSessions: {
-    get(id: string): { runId: string } | undefined;
+    get(id: string): { runId: string; startedAt?: number } | undefined;
     has(id: string): boolean;
     keys(): IterableIterator<string>;
   };
@@ -146,6 +146,7 @@ export async function dispatchRemoteDesktop(
       value: Array.from(activeSessions.keys()).map((conversationId) => ({
         conversationId,
         runId: activeSessions.get(conversationId)?.runId,
+        startedAt: activeSessions.get(conversationId)?.startedAt,
       })),
     };
   }
@@ -160,7 +161,7 @@ export async function dispatchRemoteDesktop(
         ? {
             ...value,
             messages: live?.messages && runId ? live.messages : value.messages,
-            __remoteLive: live && runId ? { ...live, messages: undefined, text: undefined, thinking: undefined, completeMessages: true, runId } : undefined,
+            __remoteLive: live && runId ? { ...live, messages: undefined, text: undefined, thinking: undefined, completeMessages: true, runId, startedAt: activeSessions.get(args[0])?.startedAt } : undefined,
             __remoteRevision:
               live && runId
                 ? { runId, revision: live.revision }

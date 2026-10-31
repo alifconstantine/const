@@ -1,4 +1,5 @@
 import http from "node:http";
+import { matchesAuthState } from "./auth-state";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -109,23 +110,11 @@ export async function startLoopbackAuthServer(
             let returnedState = reqUrl.searchParams.get("state") || undefined;
             if (returnedState) returnedState = decodeURIComponent(returnedState).trim().replace(/\/+$/, "");
 
-            // Strict CSRF Defense: Validate state parameter if activeState was established
-            if (activeState && returnedState) {
-              const cleanActive = activeState.trim().replace(/\/+$/, "");
-              if (returnedState !== cleanActive) {
-                console.warn("[AuthServer] State mismatch in callback:", {
-                  returnedState,
-                  activeState: cleanActive,
-                });
-                res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
-                res.end("Forbidden: Invalid authentication state nonce");
-                return;
-              }
+            if (!matchesAuthState(activeState, returnedState)) {
+              res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+              res.end("Forbidden: Invalid authentication state nonce");
+              return;
             }
-
-
-            // Invalidate state immediately after validation to prevent replay attacks
-            activeState = null;
 
             // Token sanitization and format verification
             if (!token || !isValidAuthToken(token)) {
@@ -139,6 +128,7 @@ export async function startLoopbackAuthServer(
               res.end("Bad Request: Malformed refreshToken parameter");
               return;
             }
+            activeState = null;
               // Render studio monochrome success page matching DESIGN.md
               const html = `<!DOCTYPE html>
 <html lang="en">

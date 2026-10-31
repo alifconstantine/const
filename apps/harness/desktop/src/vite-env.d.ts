@@ -376,7 +376,7 @@ declare global {
         feedback?: string;
       }) => Promise<{ success: boolean; error?: string }>;
       getRunningSessions?: () => Promise<string[]>;
-      onSessionStarted?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
+      onSessionStarted?: (callback: (data: { conversationId: string; runId?: string; startedAt?: number }) => void) => () => void;
       onSessionEnded?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
       rollbackFile: (record: FileMutationRecord) => Promise<{
         success: boolean;

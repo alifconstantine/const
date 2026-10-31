@@ -72,6 +72,7 @@ import { handleDesktopIpc, invokeRemoteDesktop, sendDesktopEvent } from "./deskt
 import { dispatchRemoteDesktop } from "./remote-desktop-controller";
 import { createRemoteSessionState, updateRemoteSessionState, type RemoteSessionState } from "./remote-session-state";
 import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
+import { matchesAuthState } from "./auth-state";
 
 registerGlobalBrowserToolHandler(async (toolName, args) => {
   const config = loadUserConfig();
@@ -96,7 +97,7 @@ registerGlobalComputerToolHandler(async (toolName, args, context) => {
 });
 
 app.on("before-quit", () => computerController.shutdown());
-app.on("before-quit", () => { void remoteDaemon.stop(); });
+app.on("before-quit", () => { void remoteDaemon.stop(false); });
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -105,6 +106,18 @@ const constProjectsDir = path.join(harnessHomeDir, "projects");
 const constBrainDir = path.join(harnessHomeDir, "brain");
 const constConversationsDir = path.join(harnessHomeDir, "conversations");
 const constConfigFile = path.join(harnessHomeDir, "config.json");
+const remoteStateFile = path.join(harnessHomeDir, "remote-session.bin");
+function clearRemoteState() {
+  try { fs.unlinkSync(remoteStateFile); } catch {}
+}
+function saveRemoteState(authToken: string) {
+  const state = remoteDaemon.exportRelaySession();
+  if (!state || !safeStorage.isEncryptionAvailable() ||
+      (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) return;
+  const temporary = remoteStateFile + ".tmp";
+  fs.writeFileSync(temporary, safeStorage.encryptString(JSON.stringify({ authToken, state })), { mode: 0o600 });
+  fs.renameSync(temporary, remoteStateFile);
+}
 const mcpService = new McpService(new McpStore(harnessHomeDir, {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) throw new Error("storage");
@@ -426,6 +439,26 @@ let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
 let activeLoginSessionState: string | null = null;
 let lastAuthToken: string | null = null;
+
+function restoreSavedRemoteSession() {
+  // Closing the app releases all processes. Reopening resumes the same paired
+  // session using an OS-encrypted host grant, while the backend grant is valid.
+  try {
+    if (fs.existsSync(remoteStateFile) && safeStorage.isEncryptionAvailable()) {
+      const saved = JSON.parse(safeStorage.decryptString(fs.readFileSync(remoteStateFile)));
+      if (isValidAuthToken(saved.authToken) && saved.state?.expiresAt > Date.now()) {
+        const convexUrl = process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL;
+        const webOrigin = process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN;
+        lastAuthToken = saved.authToken;
+        void remoteDaemon.startRelay({ authToken: saved.authToken, convexUrl, webOrigin }, saved.state)
+          .catch((error) => {
+            if (/REMOTE_SESSION_EXPIRED/.test(String(error))) clearRemoteState();
+          });
+      } else clearRemoteState();
+    }
+  } catch { clearRemoteState(); }
+}
+
 const activeTerminals = new Map<string, { process: ChildProcess; cwd: string }>();
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
@@ -472,14 +505,11 @@ function sendDeepLinkToRenderer(url: string) {
 
   console.log("[Electron Main] Processing auth callback. Active session:", activeLoginSessionState ? "ACTIVE" : "NONE", "Token present:", Boolean(token));
 
-  // If a valid token is found, deliver it immediately without false cancellations
+  // A token alone is not proof that this callback belongs to our login attempt.
   if (token) {
-    if (activeLoginSessionState && returnedState) {
-      const cleanReturned = returnedState.replace(/\/+$/, "").trim();
-      const cleanActive = activeLoginSessionState.replace(/\/+$/, "").trim();
-      if (cleanReturned !== cleanActive) {
-        console.warn("[Electron Main] Notice: state mismatch on token delivery (accepted):", { cleanReturned, cleanActive });
-      }
+    if (!matchesAuthState(activeLoginSessionState, returnedState)) {
+      console.warn("[Electron Main] Rejected authentication callback: invalid state.");
+      return;
     }
     // Consume session state upon valid token delivery
     activeLoginSessionState = null;
@@ -568,7 +598,7 @@ function createWindow() {
 
   browserController.setParentWindow(win);
   win.on("closed", () => {
-    void remoteDaemon.stop();
+    void remoteDaemon.stop(false);
     browserController.setParentWindow(null);
     win = null;
   });
@@ -645,7 +675,6 @@ function createWindow() {
   });
 
   win.webContents.on("render-process-gone", (_event, details) => {
-    void remoteDaemon.stop();
     console.error("[Electron Main] Render process gone:", details);
     if (details.reason !== "clean-exit") {
       win?.reload();
@@ -1287,6 +1316,9 @@ app.whenReady().then(() => {
   // Mobile Remote Control Daemon & Bridges
   // ---------------------------------------------------------------------------
   remoteDaemon.onStatusChange((status) => {
+    if (status.status !== "idle" && lastAuthToken) {
+      try { saveRemoteState(lastAuthToken); } catch { /* A read-only disk must not stop the live session. */ }
+    }
     if (win && !win.isDestroyed()) {
       sendDesktopEvent(win.webContents, "remote:status-changed", status);
     }
@@ -1415,16 +1447,36 @@ app.whenReady().then(() => {
     const convexUrl = process.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || DEFAULT_CONVEX_URL;
     const webOrigin = process.env.HARNESS_REMOTE_WEB_ORIGIN || DEFAULT_REMOTE_ORIGIN;
     console.log(`[RemoteDaemon] Starting relay via Convex: ${convexUrl}, Web origin: ${webOrigin}`);
-    return await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin });
+    let resume: import("./remote-relay").SavedRelaySession | undefined;
+    try {
+      if (safeStorage.isEncryptionAvailable() && fs.existsSync(remoteStateFile)) {
+        const saved = JSON.parse(safeStorage.decryptString(fs.readFileSync(remoteStateFile)));
+        if (saved.state?.expiresAt > Date.now()) resume = saved.state;
+      }
+    } catch { clearRemoteState(); }
+    let status;
+    try { status = await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin }, resume); }
+    catch (error) {
+      if (!resume || !/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED)/.test(String(error))) throw error;
+      clearRemoteState();
+      status = await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin });
+    }
+    saveRemoteState(authToken);
+    return status;
   });
   handleDesktopIpc("remote:stop-session", async (event) => {
     requireRemoteHost(event);
+    clearRemoteState();
     await remoteDaemon.stop();
+    clearRemoteState();
+    lastAuthToken = null;
     return remoteDaemon.getStatus();
   });
   handleDesktopIpc("remote:refresh-session", async (event) => {
     requireRemoteHost(event);
-    return await remoteDaemon.refresh();
+    const status = await remoteDaemon.refresh();
+    if (lastAuthToken) saveRemoteState(lastAuthToken);
+    return status;
   });
   handleDesktopIpc("remote:get-status", (event) => {
     requireRemoteHost(event);
@@ -1655,7 +1707,7 @@ app.whenReady().then(() => {
       remoteLive.set(convoId, createRemoteSessionState(savedHistory || payload.messages, runId));
 
       if (win && !win.isDestroyed()) {
-        sendDesktopEvent(win.webContents, "agent:session-started", { conversationId: convoId, runId });
+        sendDesktopEvent(win.webContents, "agent:session-started", { conversationId: convoId, runId, startedAt: agentSession.startedAt });
       }
 
       const streamBatcher = createStreamBatcher((agentEvent) => {
@@ -3015,9 +3067,12 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  restoreSavedRemoteSession();
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      restoreSavedRemoteSession();
     }
   });
 });

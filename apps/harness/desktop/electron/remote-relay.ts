@@ -16,6 +16,15 @@ import {
 import { packTransfer, unpackTransfer } from "@const/remote/transfer";
 import type { RemoteDaemonStatus } from "../src/lib/remote-control";
 
+export interface SavedRelaySession {
+  sessionId: string;
+  hostHash: string;
+  secret: string;
+  pairingCode: string | null;
+  pairExpiresAt: number;
+  expiresAt: number;
+}
+
 export class RemoteRelay {
   private client: ConvexClient | null = null;
   private credentials: { sessionId: string; hostHash: string } | null = null;
@@ -28,6 +37,9 @@ export class RemoteRelay {
   private events: RemotePacket[] = [];
   private publishing = false;
   private stopped = false;
+  private saved: SavedRelaySession | null = null;
+
+  exportSession(): SavedRelaySession | null { return this.saved; }
 
   constructor(
     private deviceId: string,
@@ -53,7 +65,7 @@ export class RemoteRelay {
   getStatus() {
     return this.status;
   }
-  async start(authToken: string, convexUrl: string, webOrigin: string) {
+  async start(authToken: string, convexUrl: string, webOrigin: string, resume?: SavedRelaySession) {
     const origin = new URL(webOrigin);
     if (
       origin.protocol !== "https:" &&
@@ -62,66 +74,80 @@ export class RemoteRelay {
       throw new Error("REMOTE_HTTPS_REQUIRED");
     this.client = this.createClient(convexUrl);
     this.client.setAuth(async () => authToken);
-    this.secret = randomSecret();
-    let pairingCode: string | null = generatePairingCode();
-    const encryptedSecret = await sealWithCode(pairingCode, this.secret);
-    const hostHash = await digest(randomSecret());
+    this.secret = resume?.secret ?? randomSecret();
+    let pairingCode: string | null = resume ? resume.pairingCode : generatePairingCode();
+    const encryptedSecret = pairingCode ? await sealWithCode(pairingCode, this.secret) : undefined;
+    const hostHash = resume?.hostHash ?? await digest(randomSecret());
     let startupTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       let sessionId: string;
-      try {
-        sessionId = (await Promise.race([
-          this.client.mutation(broker.create, {
-            deviceName: this.deviceId,
-            hostHash,
-            pairHash: await digest(this.secret),
-            pairingCode,
-            encryptedSecret,
-          }),
+      if (resume) {
+        if (resume.expiresAt <= Date.now()) throw new Error("REMOTE_SESSION_EXPIRED");
+        // The backend verifies both the account and the host proof on resume.
+        await Promise.race([
+          this.client.mutation(broker.heartbeat, { sessionId: resume.sessionId, hostHash }),
           new Promise<never>((_resolve, reject) => {
-            startupTimer = setTimeout(
-              () => reject(new Error("REMOTE_TIMEOUT")),
-              20_000,
-            );
+            startupTimer = setTimeout(() => reject(new Error("REMOTE_TIMEOUT")), 20_000);
           }),
-        ])) as string;
-      } catch (mutationError: any) {
-        if (startupTimer) clearTimeout(startupTimer);
-        const errMsg = String(mutationError?.data?.code || mutationError?.message || mutationError || "");
-        if (errMsg.includes("REMOTE_UNAUTHORIZED") || errMsg.includes("UNAUTHORIZED")) {
-          console.error(`[RemoteRelay] Unauthorized on Convex relay (${convexUrl}):`, errMsg);
-          throw new Error("REMOTE_UNAUTHORIZED");
+        ]);
+        sessionId = resume.sessionId;
+      } else {
+        try {
+          sessionId = (await Promise.race([
+            this.client.mutation(broker.create, {
+              deviceName: this.deviceId,
+              hostHash,
+              pairHash: await digest(this.secret),
+              pairingCode,
+              encryptedSecret,
+            }),
+            new Promise<never>((_resolve, reject) => {
+              startupTimer = setTimeout(
+                () => reject(new Error("REMOTE_TIMEOUT")),
+                20_000,
+              );
+            }),
+          ])) as string;
+        } catch (mutationError: any) {
+          if (startupTimer) clearTimeout(startupTimer);
+          const errMsg = String(mutationError?.data?.code || mutationError?.message || mutationError || "");
+          if (errMsg.includes("REMOTE_UNAUTHORIZED") || errMsg.includes("UNAUTHORIZED")) {
+            console.error(`[RemoteRelay] Unauthorized on Convex relay (${convexUrl}):`, errMsg);
+            throw new Error("REMOTE_UNAUTHORIZED");
+          }
+          // Only a schema mismatch is safe to retry: a timeout may have already
+          // created the session. Legacy relays cannot resolve a pairing code.
+          if (!/ArgumentValidationError/.test(errMsg) ||
+            !/extra field [`'"]?(pairingCode|encryptedSecret)/.test(errMsg)) {
+            throw mutationError;
+          }
+          pairingCode = null;
+          sessionId = (await Promise.race([
+            this.client.mutation(broker.create, {
+              deviceName: this.deviceId,
+              hostHash,
+              pairHash: await digest(this.secret),
+            }),
+            new Promise<never>((_resolve, reject) => {
+              startupTimer = setTimeout(
+                () => reject(new Error("REMOTE_TIMEOUT")),
+                20_000,
+              );
+            }),
+          ])) as string;
         }
-        // Only a schema mismatch is safe to retry: a timeout may have already
-        // created the session. Legacy relays cannot resolve a pairing code.
-        if (!/ArgumentValidationError/.test(errMsg) ||
-          !/extra field [`'"]?(pairingCode|encryptedSecret)/.test(errMsg)) {
-          throw mutationError;
-        }
-        pairingCode = null;
-        sessionId = (await Promise.race([
-          this.client.mutation(broker.create, {
-            deviceName: this.deviceId,
-            hostHash,
-            pairHash: await digest(this.secret),
-          }),
-          new Promise<never>((_resolve, reject) => {
-            startupTimer = setTimeout(
-              () => reject(new Error("REMOTE_TIMEOUT")),
-              20_000,
-            );
-          }),
-        ])) as string;
       }
       if (startupTimer) clearTimeout(startupTimer);
       this.credentials = { sessionId, hostHash };
+      this.saved = resume ?? { sessionId, hostHash, secret: this.secret, pairingCode,
+        pairExpiresAt: Date.now() + 15 * 60_000, expiresAt: Date.now() + 30 * 24 * 60 * 60_000 };
       this.status = {
         ...this.status,
         status: "waiting",
         sessionId,
         pairingUrl: `${origin.origin}/r/${sessionId}#key=${this.secret}`,
         pairingCode,
-        expiresAt: Date.now() + 15 * 60_000,
+        expiresAt: this.saved.pairExpiresAt,
       };
       this.unsubscribe = this.client.onUpdate(
         broker.hostInbox,
@@ -136,20 +162,29 @@ export class RemoteRelay {
           this.notify(this.status);
           for (const command of inbox.commands) void this.handle(command);
         },
-        () => {
-          if (!this.stopped) void this.stop();
+        (error) => {
+          if (!this.stopped && /REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
         },
       );
       this.timer = setInterval(() => {
         void this.client
           ?.mutation(broker.heartbeat, this.credentials!)
-          .catch(() => this.stop());
+          .then((result) => {
+            if (this.saved && typeof result?.expiresAt === "number") {
+              this.saved.expiresAt = result.expiresAt;
+              this.notify(this.status);
+            }
+          })
+          .catch((error) => {
+            // Convex reconnects after temporary network loss. Keep the grant.
+            if (/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
+          });
       }, 15_000);
       this.notify(this.status);
       return this.status;
     } catch (error) {
       if (startupTimer) clearTimeout(startupTimer);
-      await this.stop();
+      await this.stop(!resume);
       throw error;
     }
   }
@@ -246,8 +281,9 @@ export class RemoteRelay {
     }
     this.events.push(event);
     if (this.events.length > 1000) {
-      void this.stop();
-      return;
+      // A slow/offline viewer can recover from the host snapshot. Do not revoke
+      // a paired session simply because it fell behind a fast token stream.
+      this.events = [{ type: "resync" }];
     }
     if (!this.flushTimer)
       this.flushTimer = setTimeout(() => {
@@ -280,19 +316,28 @@ export class RemoteRelay {
           packet,
         });
       }
-    } catch {
-      if (!this.stopped) void this.stop();
+    } catch (error) {
+      if (!this.stopped) {
+        if (/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
+        else {
+          this.events = [{ type: "resync" }];
+          if (!this.flushTimer) this.flushTimer = setTimeout(() => {
+            this.flushTimer = null;
+            void this.flush();
+          }, 1500);
+        }
+      }
     } finally {
       this.publishing = false;
     }
   }
-  async stop() {
+  async stop(revoke = true) {
     if (this.stopped) return;
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.unsubscribe?.();
-    if (this.client && this.credentials) {
+    if (revoke && this.client && this.credentials) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
         this.client.mutation(broker.revoke, this.credentials).catch(() => {}),
@@ -305,6 +350,7 @@ export class RemoteRelay {
     await this.client?.close();
     this.client = null;
     this.secret = "";
+    this.saved = null;
     this.events = [];
     this.status = {
       ...this.status,

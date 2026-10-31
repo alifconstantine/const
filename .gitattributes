@@ -1,0 +1,2 @@
+# Catalog manifests hash the exact JSON bytes; preserve LF on Windows checkouts.
+packages/ai/src/providers/data/*.json text eol=lf

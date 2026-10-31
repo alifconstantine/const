@@ -18,6 +18,9 @@ export function promptFileExcerpt(content: string, limit: number, filePath: stri
 export function buildToolGuidance(tools: readonly NativeToolDefinition[], platform = process.platform): string {
   const names = new Set(tools.map((tool) => tool.function.name));
   const sections: string[] = [];
+  if (names.has("todo_write")) {
+    sections.push("TASK PROGRESS: For a substantial task with several steps, use 'todo_write' to keep a short checklist and update it as work completes. Planning must lead to the next authorized action; do not spend successive turns only thinking or rewriting the plan. Simple requests do not need a checklist.");
+  }
   if (names.has("write") || names.has("edit")) {
     sections.push(`WORKSPACE FILE CHANGES:
 - Read existing files before changing them. Use 'edit' for partial changes to preserve unrelated content. Reserve 'write' for new files or an intentional full rewrite after inspecting the existing content; supply the complete file without omitted sections.

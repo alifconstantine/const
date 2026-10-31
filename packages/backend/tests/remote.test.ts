@@ -70,6 +70,16 @@ test("requires an authenticated owner and rejects cross-account pairing and read
   ).rejects.toThrow();
 });
 
+test("starting a second desktop retains an offline desktop's paired session", async () => {
+  const s = await setup();
+  await s.t.run(ctx => ctx.db.patch(s.sessionId, { heartbeatAt: Date.now() - 120_000 }));
+  await s.owner.mutation(api.remote.create, { deviceName: "Other desktop", hostHash: s.hostHash, pairHash: s.pairHash });
+  const session = await s.t.run(ctx => ctx.db.get(s.sessionId));
+  expect(session?.revoked).toBe(false);
+  const renewed = await s.owner.mutation(api.remote.heartbeat, { sessionId: s.sessionId, hostHash: s.hostHash });
+  expect(renewed.expiresAt).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60_000);
+});
+
 test("only the account owner can remove a session without the desktop host secret", async () => {
   const s = await setup();
   await expect(s.other.mutation(api.remote.removeMySession, { sessionId: s.sessionId })).rejects.toThrow();
@@ -454,10 +464,10 @@ test("a claimed long run can finish after command ciphertext expires", async () 
   ).resolves.toBeNull();
 });
 
-test("offline crashed hosts do not lock the account out for eight hours", async () => {
+test("expired hosts do not occupy active session slots", async () => {
   const s = await setup();
   await s.t.run((ctx) =>
-    ctx.db.patch(s.sessionId, { heartbeatAt: Date.now() - 91_000 }),
+    ctx.db.patch(s.sessionId, { heartbeatAt: Date.now() - 91_000, expiresAt: Date.now() - 1 }),
   );
   const replacement = await s.owner.mutation(api.remote.create, {
     deviceName: "Replacement",

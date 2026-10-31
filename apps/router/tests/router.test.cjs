@@ -359,6 +359,32 @@ const body = (model = free) => ({
 });
 const logs = () =>
   [...db.rows.values()].filter((r) => r.__table === "routerLogs");
+
+test("tool serialization flags reach the engine and reject invalid values", async () => {
+  const response = await chat.POST(request({ ...body(), parallel_tool_calls: false }));
+  assert.equal(response.status, 200);
+  assert.equal(lastPayload.parallel_tool_calls, false);
+  assert.equal((await chat.POST(request({ ...body(), parallel_tool_calls: "false" }))).status, 400);
+});
+
+test("an incomplete upstream stream is reported as failure and releases reservations", async () => {
+  global.fetch = async () => new Response('data: {"choices":[{"delta":{"reasoning_content":"still thinking"}}]}\n\n');
+  const response = await chat.POST(request({ ...body(), stream: true }));
+  const text = await response.text();
+  assert.match(text, /incomplete_stream/);
+  assert.equal(logs()[0].status, 502);
+  assert.equal((await db.query("userQuotas").first()).reservedTokens, 0);
+});
+
+test("the usage parser distinguishes a completion event from a dropped socket", () => {
+  for (const tail of ['data: [DONE]\n\n', 'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}']) {
+    const parser = new SseUsageParser();
+    parser.push(new TextEncoder().encode('data: {"choices":[{"delta":{"reasoning":"thought"}}]}\n\n' + tail));
+    parser.finish();
+    assert.equal(parser.hasTerminal, true);
+    assert.equal(parser.outputText, "thought");
+  }
+});
 const ticketArgs = (model = free) => ({
   secret,
   rawApiKey: "sk-const-live-test",

@@ -14,6 +14,7 @@ const sessionId = v.id("remoteSessions");
 const deviceId = v.id("remoteDevices");
 const hostArgs = { sessionId, hostHash: v.string() };
 const deviceArgs = { sessionId, deviceId, secretHash: v.string() };
+const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60_000;
 type Ctx = MutationCtx | QueryCtx;
 async function session(ctx: Ctx, id: Id<"remoteSessions">) {
   const owner = await getAuthUserId(ctx);
@@ -79,7 +80,7 @@ export const create = mutation({
       .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
       .collect();
     for (const stale of previous.filter(
-      (row) => !row.revoked && Date.now() - row.heartbeatAt > 90_000,
+      (row) => !row.revoked && row.expiresAt <= Date.now(),
     )) {
       await ctx.db.patch(stale._id, { revoked: true });
       await ctx.scheduler.runAfter(
@@ -91,6 +92,7 @@ export const create = mutation({
       );
     }
     if (
+      previous.filter((row) => !row.revoked && row.expiresAt > Date.now()).length >= 20 ||
       previous.filter(
         (row) =>
           !row.revoked &&
@@ -103,13 +105,13 @@ export const create = mutation({
       ...args,
       ownerId,
       pairExpiresAt: Date.now() + 15 * 60_000,
-      expiresAt: Date.now() + 8 * 60 * 60_000,
+      expiresAt: Date.now() + SESSION_LIFETIME_MS,
       heartbeatAt: Date.now(),
       revoked: false,
       revision: 0,
     });
     await ctx.scheduler.runAfter(
-      8 * 60 * 60_000,
+      7 * 24 * 60 * 60_000,
       makeFunctionReference<"mutation", { sessionId: Id<"remoteSessions"> }>(
         "remote:cleanup",
       ),
@@ -136,6 +138,7 @@ export const listMySessions = query({
         deviceName: s.deviceName,
         pairingCode: s.pairingCode,
         isOnline: now - s.heartbeatAt < 45_000,
+        heartbeatAt: s.heartbeatAt,
         expiresAt: s.expiresAt,
         pairExpiresAt: s.pairExpiresAt,
         hasPairingCode: !!s.pairingCode && s.pairExpiresAt > now,
@@ -416,7 +419,9 @@ export const heartbeat = mutation({
   args: hostArgs,
   handler: async (ctx, args) => {
     await host(ctx, args);
-    await ctx.db.patch(args.sessionId, { heartbeatAt: Date.now() });
+    const expiresAt = Date.now() + SESSION_LIFETIME_MS;
+    await ctx.db.patch(args.sessionId, { heartbeatAt: Date.now(), expiresAt });
+    return { expiresAt };
   },
 });
 export const revoke = mutation({
@@ -468,7 +473,12 @@ export const cleanup = internalMutation({
   args: { sessionId },
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.sessionId);
-    if (!row || (!row.revoked && row.expiresAt > Date.now())) return;
+    if (!row) return;
+    if (!row.revoked && row.expiresAt > Date.now()) {
+      await ctx.scheduler.runAfter(Math.min(row.expiresAt - Date.now(), 7 * 24 * 60 * 60_000),
+        makeFunctionReference<"mutation", { sessionId: Id<"remoteSessions"> }>("remote:cleanup"), args);
+      return;
+    }
     let more = false;
     for (const table of [
       "remoteCommands",

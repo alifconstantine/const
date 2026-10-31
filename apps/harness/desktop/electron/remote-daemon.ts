@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { remoteCommandSchema, type RemoteCommand, type RemoteConnectedDevice, type RemoteDaemonStatus } from "../src/lib/remote-control";
 import { createPairingPage } from "./remote-pairing-page";
-import { RemoteRelay } from "./remote-relay";
+import { RemoteRelay, type SavedRelaySession } from "./remote-relay";
 
 type CommandHandler = (command: RemoteCommand, reply: (response: unknown) => void) => void | Promise<void>;
 type Client = { ws: WebSocket; device: RemoteConnectedDevice; alive: boolean; pending: number };
@@ -65,20 +65,22 @@ export class RemoteDaemon {
 
   onCommand(handler: CommandHandler): void { this.handler = handler; }
 
-  startRelay(options: { authToken: string; convexUrl: string; webOrigin: string }): Promise<RemoteDaemonStatus> {
+  exportRelaySession() { return this.relay?.exportSession() ?? null; }
+
+  startRelay(options: { authToken: string; convexUrl: string; webOrigin: string }, resume?: SavedRelaySession): Promise<RemoteDaemonStatus> {
     return this.serialize(async () => {
       if (this.relay?.getStatus().status !== "idle" && this.relay) return this.relay.getStatus();
       if (this.server) throw new Error("REMOTE_ALREADY_RUNNING");
       this.relayOptions = options;
-      return this.connectRelay(options);
+      return this.connectRelay(options, resume);
     });
   }
-  private async connectRelay(options: { authToken: string; convexUrl: string; webOrigin: string }) {
+  private async connectRelay(options: { authToken: string; convexUrl: string; webOrigin: string }, resume?: SavedRelaySession) {
     this.relay = new RemoteRelay(this.deviceId, () => this.notify(), async (command, reply) => {
       if (!this.handler) throw new Error("NOT_READY");
       await this.handler(command, reply);
     });
-    return this.relay.start(options.authToken, options.convexUrl, options.webOrigin);
+    return this.relay.start(options.authToken, options.convexUrl, options.webOrigin, resume);
   }
 
   private notify(): void {
@@ -225,9 +227,9 @@ export class RemoteDaemon {
     });
   }
 
-  stop(): Promise<void> {
+  stop(revoke = true): Promise<void> {
     return this.serialize(async () => {
-      await this.relay?.stop();
+      await this.relay?.stop(revoke);
       this.relay = null;
       this.relayOptions = null;
       this.disconnect();

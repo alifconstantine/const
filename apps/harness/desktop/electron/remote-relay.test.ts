@@ -56,3 +56,31 @@ for (const reason of ["REMOTE_TIMEOUT", "REMOTE_SESSION_LIMIT", "Network error",
     assert.equal(s.closed, true);
   });
 }
+
+test("closing and reopening resumes the same host grant without creating a new session", async () => {
+  const first = fixture(async () => "session");
+  const initial = await first.relay.start("token", "https://fixture.convex.cloud", "https://harness.example");
+  const saved = first.relay.exportSession()!;
+  await first.relay.stop(false);
+  const next = fixture(async () => { throw new Error("must not create another session"); });
+  try {
+    const resumed = await next.relay.start("token", "https://fixture.convex.cloud", "https://harness.example", saved);
+    assert.equal(resumed.sessionId, initial.sessionId);
+    assert.equal(resumed.pairingUrl, initial.pairingUrl);
+    assert.equal(resumed.pairingCode, initial.pairingCode);
+    assert.equal(resumed.expiresAt, initial.expiresAt);
+    assert.equal(next.attempts.length, 0);
+  } finally { await next.relay.stop(); }
+});
+
+test("resuming a legacy link-only session does not invent an unusable pairing code", async () => {
+  const s = fixture(async () => { throw new Error("must resume"); });
+  try {
+    const status = await s.relay.start("token", "https://fixture.convex.cloud", "https://harness.example", {
+      sessionId: "legacy", hostHash: "h".repeat(43), secret: "x".repeat(43), pairingCode: null,
+      pairExpiresAt: Date.now() + 1000, expiresAt: Date.now() + 10_000,
+    });
+    assert.equal(status.pairingCode, null);
+    assert.ok(status.pairingUrl);
+  } finally { await s.relay.stop(); }
+});

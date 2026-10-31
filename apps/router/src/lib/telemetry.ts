@@ -8,6 +8,7 @@ export class SseUsageParser {
   outputText = "";
   hasUsage = false;
   hasError = false;
+  hasTerminal = false;
   firstTokenAt?: number;
   push(chunk: Uint8Array) {
     this.buffer += this.decoder.decode(chunk, { stream: true });
@@ -33,7 +34,8 @@ export class SseUsageParser {
       .filter((line) => line.startsWith("data:"))
       .map((line) => line.slice(5).trimStart())
       .join("\n");
-    if (!data || data === "[DONE]") return;
+    if (!data) return;
+    if (data === "[DONE]") { this.hasTerminal = true; return; }
     try {
       const json = JSON.parse(data);
       if (json.error) this.hasError = true;
@@ -52,12 +54,13 @@ export class SseUsageParser {
           0;
       }
       for (const choice of json.choices ?? []) {
+        if (choice.finish_reason != null) this.hasTerminal = true;
         const delta = choice.delta ?? {};
         const text =
           (typeof delta.content === "string" ? delta.content : "") +
           (typeof delta.reasoning_content === "string"
             ? delta.reasoning_content
-            : "");
+            : typeof delta.reasoning === "string" ? delta.reasoning : "");
         if (text || delta.tool_calls?.length)
           this.firstTokenAt ??= performance.now();
         this.outputText +=

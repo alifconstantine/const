@@ -383,6 +383,18 @@ async function run() {
       if (language === 'id') await capture("remote-control-pairing-indonesian-mobile");
     }
   });
+  await check("remote browser uses plain frames and touch swipes scroll without triggering a click", async () => {
+    win.setSize(390, 844);
+    await win.loadURL(process.argv[3]! + "?remote-browser");
+    await waitFor('Boolean(document.querySelector("[data-remote-browser] img"))');
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 160, y: 420 }] });
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 160, y: 220 }] });
+    await win.webContents.debugger.sendCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await waitFor('window.__remoteFixture.browserInputs.some(input => input.action === "scroll")');
+    assert.equal(await js('window.__remoteFixture.browserInputs.some(input => input.action === "click")'), false);
+    assert.equal(await js('window.__remoteFixture.browserInputs.find(input => input.action === "scroll").deltaY'), -200);
+    assert.equal(await js('window.__remoteFixture.browserShots.every(shot => shot.annotate === false && shot.ephemeral === true)'), true);
+  });
   win.destroy();
 }
 run().then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });
