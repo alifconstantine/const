@@ -138,6 +138,7 @@ const { calculateQuotaState, WEEK_MS } = load(
 const { dayStart, hashKey } = load("packages/backend/convex/router/access.ts");
 const { SseUsageParser } = load("apps/router/src/lib/telemetry.ts");
 const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
+const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
@@ -447,6 +448,49 @@ test("paid request uses actual cached price, settles once, and releases reservat
   assert.equal(logs().length, 1);
   assert.equal((await db.query("creditTransactions").collect()).length, 1);
 });
+for (const [model, upstream] of [
+  ["claude-sonnet-5.5", "atmo/kiro/claude-sonnet-5.5"],
+  ["claude-opus-5.5", "atmo/kiro/claude-opus-5.5"],
+]) {
+  for (const mode of ["API JSON", "API streaming", "playground SSO"]) {
+    test(`${model} routes and bills correctly through ${mode}`, async () => {
+      const engineFetch = global.fetch;
+      let dispatchedModel;
+      global.fetch = async (url, init) => {
+        dispatchedModel = JSON.parse(init.body).model;
+        // The engine's Kiro catalog uses dotted version numbers.
+        if (dispatchedModel !== upstream)
+          return Response.json({ error: { message: "Model not found" } }, { status: 404 });
+        return engineFetch(url, init);
+      };
+      const streaming = mode !== "API JSON";
+      const response = mode === "playground SSO"
+        ? await generation.POST(request(
+            { ...body(model), thinkingLevel: "medium" },
+            { "x-const-sso-token": "valid.jwt.token" },
+          ))
+        : await chat.POST(request({ ...body(model), stream: streaming }));
+      assert.equal(dispatchedModel, upstream);
+      assert.equal(response.status, 200);
+      if (streaming) {
+        assert.match(response.headers.get("content-type"), /event-stream/);
+        assert.match(await response.text(), /OK/);
+      } else {
+        const data = await response.json();
+        assert.equal(data.model, model);
+        assert.equal(data.choices[0].message.content, "OK");
+      }
+      const expected = catalog.tokenCostNano(model, 20, 5, 4);
+      const wallet = await db.get("wallet");
+      assert.equal(wallet.balanceNanoUsd, 1e9 - expected);
+      assert.equal(wallet.reservedNanoUsd, 0);
+      assert.equal(logs()[0].billingTier, "paid");
+      assert.equal(logs()[0].model, model);
+      assert.equal((await db.query("creditTransactions").collect()).length, 1);
+    });
+  }
+}
+
 test("zero-balance paid requests never reach the engine", async () => {
   await db.patch("wallet", { balanceUsd: 0 });
   assert.equal((await chat.POST(request(body("gpt-6.1-sol")))).status, 402);
