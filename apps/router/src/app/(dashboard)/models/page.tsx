@@ -24,8 +24,8 @@ const MODEL_SAVINGS: Record<
   "qwen-3.8-max": { savePercent: "97.5%", officialInput: "$2.000", officialOutput: "$6.000" },
   "gpt-6.1-sol": { savePercent: "88.0%", officialInput: "$2.000", officialOutput: "$10.000" },
   "gpt-6-astra": { savePercent: "95.5%", officialInput: "$10.000", officialOutput: "$50.000" },
-  "claude-sonnet-5.5": { savePercent: "99.8%", officialInput: "$2.000", officialOutput: "$10.000" },
-  "claude-opus-5.5": { savePercent: "99.9%", officialInput: "$15.000", officialOutput: "$75.000" },
+  "claude-sonnet-5.5": { savePercent: "97.5%", officialInput: "$2.000", officialOutput: "$10.000" },
+  "claude-opus-5.5": { savePercent: "97.5%", officialInput: "$4.000", officialOutput: "$20.000" },
   "grok-4.7": { savePercent: "93.0%", officialInput: "$2.000", officialOutput: "$6.000" },
 };
 
