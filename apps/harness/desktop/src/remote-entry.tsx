@@ -21,8 +21,14 @@ import { RemoteWorkspaceBoundary } from "./components/remote-workspace-boundary"
 import { RemotePullToRefresh } from "./components/remote-pull-to-refresh";
 import { scopedRemoteStorage } from "./lib/remote-storage";
 
-type Options = { sessionId: string; convexUrl: string; accountsUrl: string };
-function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
+type Options = {
+  sessionId: string;
+  convexUrl: string;
+  accountsUrl: string;
+  onExit?: (switchAccount: boolean) => void;
+  onDisconnect?: () => void;
+};
+function Workspace({ sessionId, convexUrl, accountsUrl, onExit, onDisconnect }: Options) {
   const { language } = useTranslation();
   const t = remoteCopy(language);
   const [gate, setGate] = useState<
@@ -148,6 +154,11 @@ function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
     };
   }, [sessionId, convexUrl, attempt]);
   const exit = async (switchAccount = false) => {
+    if (onExit) {
+      await peer?.close(true);
+      onExit(switchAccount);
+      return;
+    }
     const key = switchAccount
       ? sessionStorage.getItem(`const_remote_key:${sessionId}`)
       : null;
@@ -180,7 +191,7 @@ function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
           )}
         </p>
         {gate === "login" ? (
-          <button onClick={() => remoteLogin(false, accountsUrl)}>
+          <button onClick={() => onExit ? onExit(true) : remoteLogin(false, accountsUrl)}>
             {t("login")}
           </button>
         ) : gate === "error" ? (
@@ -198,6 +209,10 @@ function Workspace({ sessionId, convexUrl, accountsUrl }: Options) {
         mobile,
         disconnect: async () => {
           await peer?.close(true);
+          if (onDisconnect) {
+            onDisconnect();
+            return;
+          }
           setGate("missingKey");
         },
       }}

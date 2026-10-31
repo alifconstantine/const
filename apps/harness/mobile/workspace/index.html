@@ -1,0 +1,67 @@
+<!doctype html>
+<html class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <link rel="stylesheet" href="./workspace.css" />
+    <style>
+      html,
+      body,
+      #workspace {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #161616;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="workspace"></div>
+    <script type="module">
+      try {
+        await import("./workspace.js");
+        const params = new URLSearchParams(location.search);
+        // remoteAuth removes query parameters. Preserve non-secret mount options for reload.
+        const options = params.get("sessionId")
+          ? {
+              sessionId: params.get("sessionId"),
+              convexUrl: params.get("convexUrl"),
+              accountsUrl: params.get("accountsUrl"),
+            }
+          : JSON.parse(
+              sessionStorage.getItem("const_mobile_workspace") || "null",
+            );
+        if (!options?.sessionId) throw new Error("MISSING_SESSION");
+        sessionStorage.setItem(
+          "const_mobile_workspace",
+          JSON.stringify(options),
+        );
+        const unmount = window.ConstRemoteWorkspace.mount(
+          document.getElementById("workspace"),
+          {
+            ...options,
+            onDisconnect: () =>
+              parent.postMessage(
+                { type: "harness:disconnect" },
+                location.origin,
+              ),
+            onExit: (switchAccount) =>
+              parent.postMessage(
+                { type: "harness:exit", switchAccount },
+                location.origin,
+              ),
+          },
+        );
+        addEventListener("pagehide", unmount, { once: true });
+      } catch {
+        parent.postMessage(
+          { type: "harness:workspace-error" },
+          location.origin,
+        );
+      }
+    </script>
+  </body>
+</html>

@@ -3,12 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/build-workspace.mjs --dev && vite",
+    "build": "tsc && vite build && node scripts/build-workspace.mjs",
     "check-types": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
-    "sync:android": "tsc && vite build && cap sync android"
+    "sync:android": "pnpm build && cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

@@ -111,6 +111,7 @@ export const broker = Object.fromEntries(
     "heartbeat",
     "pingDevice",
     "revoke",
+    "removeMySession",
     "leave",
     "listMySessions",
     "resolvePairingCode",

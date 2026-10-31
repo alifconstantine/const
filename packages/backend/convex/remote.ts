@@ -433,6 +433,23 @@ export const revoke = mutation({
     );
   },
 });
+// Account owners can end a session from mobile without possessing the host secret.
+export const removeMySession = mutation({
+  args: { sessionId },
+  handler: async (ctx, args) => {
+    const owner = await getAuthUserId(ctx);
+    const row = await ctx.db.get(args.sessionId);
+    if (!owner || !row || row.ownerId !== owner)
+      throw new ConvexError({ code: "REMOTE_UNAUTHORIZED" });
+    await ctx.db.patch(row._id, { revoked: true });
+    await ctx.scheduler.runAfter(
+      60_000,
+      makeFunctionReference<"mutation", { sessionId: Id<"remoteSessions"> }>("remote:cleanup"),
+      { sessionId: row._id },
+    );
+  },
+});
+
 export const leave = mutation({
   args: deviceArgs,
   handler: async (ctx, args) => {

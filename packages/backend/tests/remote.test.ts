@@ -70,6 +70,20 @@ test("requires an authenticated owner and rejects cross-account pairing and read
   ).rejects.toThrow();
 });
 
+test("only the account owner can remove a session without the desktop host secret", async () => {
+  const s = await setup();
+  await expect(s.other.mutation(api.remote.removeMySession, { sessionId: s.sessionId })).rejects.toThrow();
+  await expect(s.t.mutation(api.remote.removeMySession, { sessionId: s.sessionId })).rejects.toThrow();
+  expect(await s.owner.query(api.remote.listMySessions, {})).toHaveLength(1);
+  await s.owner.mutation(api.remote.removeMySession, { sessionId: s.sessionId });
+  expect(await s.owner.query(api.remote.listMySessions, {})).toHaveLength(0);
+  await expect(s.owner.query(api.remote.deviceFeed, {
+    sessionId: s.sessionId, deviceId: s.deviceId, secretHash: s.secretHash,
+  })).rejects.toThrow();
+  // Repeated removal remains safe, including expired sessions visible in a stale UI.
+  await s.owner.mutation(api.remote.removeMySession, { sessionId: s.sessionId });
+});
+
 test("a short code resolves, decrypts and pairs using the same proof as a direct link", async () => {
   const s = await setup();
   const code = "ABC-234";
