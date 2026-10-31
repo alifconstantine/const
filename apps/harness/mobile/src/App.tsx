@@ -6,9 +6,7 @@ import { ConvexClient } from "convex/browser";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   Clipboard,
-  ExternalLink,
   Laptop,
   LogIn,
   LogOut,
@@ -20,8 +18,6 @@ import {
   ShieldCheck,
   Smartphone,
   TvMinimal,
-  Wifi,
-  WifiOff,
   X,
 } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
@@ -60,7 +56,6 @@ export default function App() {
   const [connectedSession, setConnectedSession] = useState<ConnectedSession | null>(null);
   const [showDirectInput, setShowDirectInput] = useState(false);
   const [directUrl, setDirectUrl] = useState("");
-  const [copiedCode, setCopiedCode] = useState(false);
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(true);
 
   const convexUrl = (import.meta.env.VITE_CONVEX_URL as string) || DEFAULT_CONVEX_URL;
@@ -310,18 +305,18 @@ export default function App() {
   const getDeviceIcon = (deviceName: string) => {
     const lower = deviceName.toLowerCase();
     if (lower.includes("phone") || lower.includes("android") || lower.includes("iphone")) {
-      return <Smartphone className="h-5 w-5 text-blue-400" />;
+      return <Smartphone className="h-5 w-5 text-zinc-400" />;
     }
     if (lower.includes("mac") || lower.includes("laptop") || lower.includes("thinkpad")) {
-      return <Laptop className="h-5 w-5 text-emerald-400" />;
+      return <Laptop className="h-5 w-5 text-zinc-400" />;
     }
-    return <Monitor className="h-5 w-5 text-purple-400" />;
+    return <Monitor className="h-5 w-5 text-zinc-400" />;
   };
 
   if (initializing) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-[#0b0d10] text-slate-400">
-        <RefreshCw className="h-8 w-8 animate-spin text-cyan-400" />
+      <div className="flex flex-1 items-center justify-center bg-[#0a0a0a] text-zinc-500">
+        <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
       </div>
     );
   }
@@ -331,53 +326,53 @@ export default function App() {
     const remoteTargetUrl = `${webBaseUrl.replace(/\/+$/, "")}/r/${connectedSession.sessionId}#key=${encodeURIComponent(connectedSession.key)}`;
 
     return (
-      <div className="relative flex h-full w-full flex-col bg-[#0b0d10] text-white">
+      <div className="relative flex h-full w-full flex-col bg-[#0a0a0a] text-white">
         {/* Mobile Control Header */}
         {isToolbarExpanded ? (
-          <header className="safe-top-padding relative z-50 flex items-center justify-between border-b border-white/10 bg-[#12161c]/90 px-4 py-2.5 backdrop-blur-md">
+          <header className="safe-top-padding relative z-50 flex items-center justify-between border-b border-zinc-800/80 bg-[#141416]/95 px-3.5 py-2 backdrop-blur-md">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 onClick={() => setConnectedSession(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-slate-300 hover:bg-white/10 active:scale-95 transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 active:opacity-70 transition-colors"
                 aria-label="Disconnect"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle" />
-                  <span className="truncate text-xs font-semibold text-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-subtle" />
+                  <span className="truncate text-xs font-semibold text-zinc-100">
                     {connectedSession.deviceName || "Desktop Workspace"}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono truncate">
+                <div className="text-[10px] text-zinc-500 font-mono truncate">
                   ID: {connectedSession.sessionId.slice(0, 12)}...
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => {
                   if (iframeRef.current) {
                     iframeRef.current.src = remoteTargetUrl;
                   }
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 active:scale-95 transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 active:opacity-70 transition-colors"
                 title="Reload Session"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setIsToolbarExpanded(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 hover:bg-white/10 active:scale-95 transition-all"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 active:opacity-70 transition-colors"
                 title="Collapse Bar"
               >
                 <Minimize2 className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setConnectedSession(null)}
-                className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-medium hover:bg-rose-500/25 active:scale-95 transition-all"
+                className="flex h-8 px-2.5 items-center gap-1 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 text-xs font-medium transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
                 <span>Disconnect</span>
@@ -387,15 +382,15 @@ export default function App() {
         ) : (
           <button
             onClick={() => setIsToolbarExpanded(true)}
-            className="safe-top-padding absolute top-2 right-2 z-50 flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-[#12161c]/80 px-3 py-1 text-xs text-slate-300 backdrop-blur-md shadow-lg active:scale-95 transition-all"
+            className="safe-top-padding absolute top-2 right-2 z-50 flex h-8 items-center gap-1.5 rounded-full border border-zinc-800 bg-[#141416]/90 px-2.5 py-1 text-xs text-zinc-300 backdrop-blur-md shadow-md active:scale-95 transition-all"
           >
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-subtle" />
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse-subtle" />
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
         )}
 
         {/* Embedded Remote Workspace Frame */}
-        <div className="relative flex-1 w-full h-full bg-[#0d1117] overflow-hidden">
+        <div className="relative flex-1 w-full h-full bg-[#0a0a0a] overflow-hidden">
           <iframe
             ref={iframeRef}
             src={remoteTargetUrl}
@@ -411,57 +406,56 @@ export default function App() {
   // SCREEN 1: Sign in Screen
   if (!token) {
     return (
-      <div className="safe-top-padding safe-bottom-padding flex flex-1 flex-col justify-between px-6 py-8">
+      <div className="safe-top-padding safe-bottom-padding flex flex-1 flex-col justify-between px-6 py-8 bg-[#0a0a0a]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <ConstLogoIcon className="h-8 w-8 text-cyan-400" />
-            <span className="text-sm font-semibold tracking-wide text-slate-200">
+            <ConstLogoIcon className="h-7 w-7 text-white" />
+            <span className="text-sm font-semibold tracking-wide text-zinc-100">
               CONST HARNESS
             </span>
           </div>
-          <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[11px] font-medium text-cyan-300">
-            MOBILE REMOTE
+          <span className="rounded-full border border-zinc-800 bg-zinc-900/90 px-2.5 py-0.5 text-[11px] font-medium text-zinc-400">
+            REMOTE
           </span>
         </div>
 
         <div className="my-auto flex flex-col items-center text-center">
-          <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-b from-white/10 to-transparent shadow-2xl backdrop-blur-xl">
-            <Radio className="h-10 w-10 text-cyan-400 animate-pulse-subtle" />
-            <div className="absolute -inset-1 rounded-3xl bg-cyan-500/20 blur-xl -z-10" />
+          <div className="relative mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-sm">
+            <Radio className="h-8 w-8 text-blue-500 animate-pulse" />
           </div>
 
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Connect to Desktop
+            Remote Workspace
           </h1>
-          <p className="mt-2.5 max-w-xs text-sm leading-relaxed text-slate-400">
-            Secure, end-to-end encrypted remote control for your Const Harness workspaces.
+          <p className="mt-2.5 max-w-xs text-sm leading-relaxed text-zinc-400">
+            Connect to and control your desktop Const Harness workspace remotely with end-to-end encryption.
           </p>
 
           <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
             <button
               onClick={handleSignIn}
               disabled={isWaitingAuth}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-medium text-zinc-950 shadow-sm hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
             >
               {isWaitingAuth ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
                 <LogIn className="h-4 w-4" />
               )}
-              <span>{isWaitingAuth ? "Signing In..." : "Sign in with Const Accounts"}</span>
+              <span>{isWaitingAuth ? "Signing in..." : "Sign in with Const Accounts"}</span>
             </button>
 
             <button
               onClick={() => setShowDirectInput(!showDirectInput)}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors py-2"
+              className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 transition-colors py-2 cursor-pointer"
             >
-              Have a direct session link?
+              {showDirectInput ? "Hide manual pairing" : "Have a direct pairing link?"}
             </button>
           </div>
 
           {showDirectInput && (
-            <div className="glass-panel mt-4 w-full max-w-xs rounded-2xl p-4 text-left">
-              <label className="text-xs font-medium text-slate-300">
+            <div className="ch-card mt-4 w-full max-w-xs rounded-2xl p-4 text-left">
+              <label className="text-xs font-medium text-zinc-300">
                 Direct Pairing URL
               </label>
               <input
@@ -469,11 +463,11 @@ export default function App() {
                 placeholder="https://.../r/[id]#key=..."
                 value={directUrl}
                 onChange={(e) => setDirectUrl(e.target.value)}
-                className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900/90 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
               />
               <button
                 onClick={handleConnectDirectUrl}
-                className="mt-3 w-full rounded-lg bg-white/10 py-2 text-xs font-semibold text-white hover:bg-white/15 active:scale-95 transition-all"
+                className="mt-3 w-full rounded-xl bg-zinc-800 py-2 text-xs font-medium text-white hover:bg-zinc-700 active:scale-95 transition-all cursor-pointer"
               >
                 Connect Direct
               </button>
@@ -481,8 +475,8 @@ export default function App() {
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
-          <ShieldCheck className="h-4 w-4 text-emerald-400/80" />
+        <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
+          <ShieldCheck className="h-4 w-4 text-emerald-500" />
           <span>Zero-Knowledge Relay • AES-256-GCM</span>
         </div>
       </div>
@@ -491,15 +485,15 @@ export default function App() {
 
   // SCREEN 2: Authenticated - Pairing & Active Sessions Screen
   return (
-    <div className="safe-top-padding safe-bottom-padding flex flex-1 flex-col justify-between px-5 py-6 overflow-y-auto">
+    <div className="safe-top-padding safe-bottom-padding flex flex-1 flex-col justify-between px-5 py-6 overflow-y-auto bg-[#0a0a0a]">
       {/* Top Header */}
       <header className="flex items-center justify-between pb-4">
         <div className="flex items-center gap-2.5">
-          <ConstLogoIcon className="h-7 w-7 text-cyan-400" />
+          <ConstLogoIcon className="h-7 w-7 text-white" />
           <div>
-            <h2 className="text-sm font-bold text-white">Const Harness</h2>
+            <h2 className="text-sm font-semibold text-white">Const Harness</h2>
             <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-subtle" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse-subtle" />
               Connected to Cloud
             </div>
           </div>
@@ -507,7 +501,7 @@ export default function App() {
 
         <button
           onClick={handleSignOut}
-          className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           title="Sign Out"
         >
           <LogOut className="h-4 w-4" />
@@ -517,26 +511,24 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 space-y-6 pt-2">
         {/* Pairing Code Card */}
-        <section className="glass-panel relative overflow-hidden rounded-3xl p-6">
-          <div className="absolute top-0 right-0 h-32 w-32 bg-cyan-500/10 rounded-full blur-2xl -z-10" />
-
+        <section className="ch-card relative overflow-hidden rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-base font-bold text-white">Enter Pairing Code</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h3 className="text-sm font-semibold text-white">Enter Pairing Code</h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
                 From Const Harness Desktop (Remote Modal)
               </p>
             </div>
             <button
               onClick={handlePasteCode}
-              className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 active:scale-95 transition-all"
+              className="flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
             >
               <Clipboard className="h-3 w-3" />
               <span>Paste</span>
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3.5">
             <div className="relative">
               <input
                 type="text"
@@ -549,7 +541,7 @@ export default function App() {
                     void handleConnectWithCode();
                   }
                 }}
-                className="w-full rounded-2xl border border-white/15 bg-black/50 py-3.5 text-center font-mono text-2xl font-bold tracking-widest text-cyan-300 uppercase placeholder-slate-600 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900/90 py-3 text-center font-mono text-2xl font-bold tracking-widest text-zinc-100 uppercase placeholder-zinc-700 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
               />
             </div>
 
@@ -562,7 +554,7 @@ export default function App() {
             <button
               onClick={() => void handleConnectWithCode()}
               disabled={connecting || pairingCode.replace("-", "").length !== 6}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-semibold text-zinc-950 shadow-sm hover:bg-zinc-200 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               {connecting ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -577,21 +569,21 @@ export default function App() {
         {/* Active Desktop Sessions List */}
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Active Desktop Sessions ({sessions.length})
             </h3>
             {loadingSessions && (
-              <RefreshCw className="h-3 w-3 animate-spin text-slate-500" />
+              <RefreshCw className="h-3 w-3 animate-spin text-zinc-500" />
             )}
           </div>
 
           {sessions.length === 0 ? (
-            <div className="glass-panel flex flex-col items-center justify-center rounded-2xl p-6 text-center text-slate-400">
-              <TvMinimal className="h-8 w-8 text-slate-600 mb-2" />
-              <p className="text-xs font-medium text-slate-300">
+            <div className="ch-card flex flex-col items-center justify-center rounded-2xl p-6 text-center text-zinc-400">
+              <TvMinimal className="h-7 w-7 text-zinc-600 mb-2" />
+              <p className="text-xs font-medium text-zinc-300">
                 No active desktop sessions
               </p>
-              <p className="text-[11px] text-slate-500 mt-1 max-w-[220px]">
+              <p className="text-[11px] text-zinc-500 mt-1 max-w-[220px]">
                 Open Const Harness on your desktop and click the Remote icon in the titlebar.
               </p>
             </div>
@@ -600,30 +592,30 @@ export default function App() {
               {sessions.map((item) => (
                 <div
                   key={item.sessionId}
-                  className="glass-panel-interactive flex items-center justify-between rounded-2xl p-3.5"
+                  className="ch-card-interactive flex items-center justify-between rounded-xl p-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800">
                       {getDeviceIcon(item.deviceName)}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`h-2 w-2 rounded-full ${
-                            item.isOnline ? "bg-emerald-400 animate-pulse-subtle" : "bg-amber-400"
+                            item.isOnline ? "bg-emerald-500 animate-pulse-subtle" : "bg-amber-400"
                           }`}
                         />
-                        <span className="truncate text-xs font-semibold text-slate-200">
+                        <span className="truncate text-xs font-medium text-zinc-200">
                           {item.deviceName}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
                         {item.pairingCode ? (
-                          <span className="text-cyan-300 font-bold">
+                          <span className="text-zinc-300 font-semibold">
                             Code: {item.pairingCode}
                           </span>
                         ) : (
-                          <span>Direct Relay Session</span>
+                          <span className="text-zinc-500">Direct Relay Session</span>
                         )}
                       </div>
                     </div>
@@ -633,13 +625,13 @@ export default function App() {
                     <button
                       onClick={() => void handleConnectWithCode(item.pairingCode)}
                       disabled={connecting}
-                      className="shrink-0 flex items-center gap-1 rounded-xl bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/30 active:scale-95 transition-all"
+                      className="shrink-0 flex items-center gap-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/60 px-3 py-1.5 text-xs font-medium text-zinc-200 active:scale-95 transition-all cursor-pointer"
                     >
                       <span>Connect</span>
                       <ArrowRight className="h-3 w-3" />
                     </button>
                   ) : (
-                    <span className="text-[10px] text-slate-500">Online</span>
+                    <span className="text-[10px] text-zinc-500">Online</span>
                   )}
                 </div>
               ))}
@@ -648,17 +640,17 @@ export default function App() {
         </section>
 
         {/* Fallback Direct Pairing Link */}
-        <section className="pt-2">
+        <section className="pt-1">
           <button
             onClick={() => setShowDirectInput(!showDirectInput)}
-            className="flex w-full items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors py-2"
+            className="flex w-full items-center justify-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors py-2 cursor-pointer"
           >
             <span>{showDirectInput ? "Hide Direct Link Input" : "Paste Direct Pairing URL"}</span>
           </button>
 
           {showDirectInput && (
-            <div className="glass-panel mt-2 rounded-2xl p-4">
-              <label className="text-xs font-medium text-slate-300">
+            <div className="ch-card mt-2 rounded-xl p-3.5">
+              <label className="text-xs font-medium text-zinc-300">
                 Direct Pairing URL
               </label>
               <input
@@ -666,11 +658,11 @@ export default function App() {
                 placeholder="https://.../r/[sessionId]#key=[secret]"
                 value={directUrl}
                 onChange={(e) => setDirectUrl(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-900/90 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-zinc-500 focus:outline-none"
               />
               <button
                 onClick={handleConnectDirectUrl}
-                className="mt-3 w-full rounded-xl bg-white/10 py-2.5 text-xs font-semibold text-white hover:bg-white/15 active:scale-95 transition-all"
+                className="mt-3 w-full rounded-lg bg-zinc-800 py-2 text-xs font-medium text-white hover:bg-zinc-700 active:scale-95 transition-all cursor-pointer"
               >
                 Connect to URL
               </button>
@@ -680,12 +672,12 @@ export default function App() {
       </div>
 
       {/* Footer Info */}
-      <footer className="pt-4 flex items-center justify-between text-[11px] text-slate-500 border-t border-white/5">
+      <footer className="pt-4 flex items-center justify-between text-[11px] text-zinc-500 border-t border-zinc-800/60">
         <div className="flex items-center gap-1">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400/70" />
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
           <span>Zero-Knowledge Relay</span>
         </div>
-        <span>v0.1.0</span>
+        <span>v0.0.1</span>
       </footer>
     </div>
   );

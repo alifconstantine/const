@@ -15,9 +15,11 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Cache-Control", value: "private, no-store" },
-          { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Content-Security-Policy", value: "base-uri 'none'; object-src 'none'; frame-ancestors 'none'" },
+          {
+            key: "Content-Security-Policy",
+            value: "base-uri 'none'; object-src 'none'; frame-ancestors 'self' capacitor: http://localhost https://localhost https://*.const.web.id https://const.web.id",
+          },
         ],
       },
     ];

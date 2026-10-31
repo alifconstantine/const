@@ -69,29 +69,45 @@
 }
 .remote-sidebar-toggle {
   position: absolute;
-  top: 2px;
+  top: 6px;
   left: 10px;
   z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
   color: #262626;
+  -webkit-tap-highlight-color: transparent !important;
+  transition: opacity 150ms ease, color 150ms ease;
+  cursor: pointer;
 }
 .dark .remote-sidebar-toggle {
   color: #d4d4d4;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
-.remote-sidebar-toggle:hover {
-  background: #0000000d;
-}
+.remote-sidebar-toggle:hover,
 .dark .remote-sidebar-toggle:hover {
-  background: #383838;
+  background: transparent !important;
+  color: #ffffff;
 }
+.remote-sidebar-toggle:active,
+.dark .remote-sidebar-toggle:active {
+  background: transparent !important;
+  opacity: 0.6;
+}
+.remote-sidebar-toggle:focus,
 .remote-sidebar-toggle:focus-visible {
-  outline: 1px solid currentColor;
-  outline-offset: -3px;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 .remote-sidebar-toggle svg {
   width: 20px;
