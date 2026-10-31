@@ -1577,6 +1577,7 @@ export class ConstAgent {
           return conversationHistory;
         }
 
+        onEvent({ type: "commentary", content: turnContent });
         const assistantMsg: AgentMessage = {
           role: "assistant",
           content: turnContent,

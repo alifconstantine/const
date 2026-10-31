@@ -260,13 +260,17 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   // Assistant message
   const activeFeedback = feedback !== undefined ? feedback : internalFeedback;
   const isCopied = copiedId === message.id || internalCopied;
+  const traceSteps = isExecuting && message.content
+    ? [...(message.traceSteps || []), { id: `${message.id}_draft`, type: "commentary" as const,
+        content: message.content, isStreaming: true }]
+    : message.traceSteps;
 
   return (
-    <div className="w-full flex flex-col gap-2.5 group select-text cursor-text">
+    <div data-assistant-message={message.id} className="w-full flex flex-col gap-2.5 group select-text cursor-text">
       <ExecutionTrace
         thinking={message.thinking}
         toolCalls={message.toolCalls}
-        traceSteps={message.traceSteps}
+        traceSteps={traceSteps}
         mutations={message.mutations}
         isExecuting={isExecuting}
         pendingApprovalToolCallId={isExecuting ? activeApproval?.toolCallId : undefined}
@@ -283,8 +287,8 @@ export const ChatMessageItem = memo(function ChatMessageItem({
 
       {/* Formatted Markdown Content */}
       {messageApps(message).map(app => <McpAppCard key={app.id} app={app} onOpenFile={onOpenFilePreview} />)}
-      {message.content ? (
-        <div className="px-0.5 select-text cursor-text">
+      {!isExecuting && message.content ? (
+        <div data-final-answer className="px-0.5 select-text cursor-text">
           <AssistantResponse
             content={message.content}
             isStreaming={isExecuting}

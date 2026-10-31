@@ -202,6 +202,7 @@ export interface AgentEventMap {
   };
   token: { token: string };
   token_reset: {};
+  commentary: { content: string };
   thinking: { thinking: string };
   tool_call: { toolCallId: string; toolName: string; args: any };
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean; durationMs?: number; waitingMs?: number };

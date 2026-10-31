@@ -1,4 +1,4 @@
-import { shiftIntelligenceUiState } from "../components/intelligence-ui/protocol";
+import { archiveAssistantCommentary } from "./assistant-transcript";
 import type { ChatTelemetry } from "./chat-telemetry";
 import { translate } from "./i18n";
 import { mergeTelemetry } from "./chat-telemetry";
@@ -89,7 +89,7 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
     return { ...message, sideInstruction: content, content: translate("rightPane.sideDirection") };
   });
 
-  const hasToolRole = rawMessages.some((m) => m && m.role === "tool");
+  const hasToolRole = rawMessages.some((m) => m && (m.role === "tool" || m.tool_calls?.length));
   if (!hasToolRole) {
     return rawMessages;
   }
@@ -110,40 +110,28 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
     } else if (msg.role === "assistant") {
       if (!currentAssistant) {
         currentAssistant = {
-          id: msg.id || `msg_${msg.timestamp || Date.now()}_assistant`,
-          role: "assistant",
-          content: msg.content || "",
-          thinking: msg.thinking || "",
-          traceSteps: Array.isArray(msg.traceSteps) ? [...msg.traceSteps] : [],
-          toolCalls: Array.isArray(msg.toolCalls) ? [...msg.toolCalls] : [],
-          mutations: Array.isArray(msg.mutations) ? [...msg.mutations] : [],
-          durationMs: msg.durationMs,
-          intelligenceUiState: msg.intelligenceUiState,
+          id: msg.id || `msg_${msg.timestamp || Date.now()}_assistant`, role: "assistant",
+          content: "", thinking: "", traceSteps: [], toolCalls: [], mutations: [],
           timestamp: msg.timestamp || msg.createdAt || Date.now(),
         };
-      } else {
-        if (msg.content) {
-          if (msg.intelligenceUiState) {
-            const offset = currentAssistant.content ? currentAssistant.content.length + 2 : 0;
-            currentAssistant.intelligenceUiState = {
-              ...currentAssistant.intelligenceUiState,
-              ...shiftIntelligenceUiState(msg.intelligenceUiState, offset),
-            };
-          }
-          currentAssistant.content = currentAssistant.content
-            ? `${currentAssistant.content}\n\n${msg.content}`
-            : msg.content;
-        }
-        if (msg.thinking) {
-          currentAssistant.thinking = (currentAssistant.thinking || "") + msg.thinking;
-        }
-        if (Array.isArray(msg.traceSteps)) {
-          currentAssistant.traceSteps.push(...msg.traceSteps);
-        }
-        if (msg.durationMs) {
-          currentAssistant.durationMs = (currentAssistant.durationMs || 0) + msg.durationMs;
+      } else if (currentAssistant.content) {
+        currentAssistant = archiveAssistantCommentary(currentAssistant);
+      }
+      const providedSteps = Array.isArray(msg.traceSteps) ? msg.traceSteps : [];
+      currentAssistant.traceSteps.push(...providedSteps.map((step: any) => ({ ...step })));
+      if (msg.thinking) {
+        currentAssistant.thinking += msg.thinking;
+        if (!providedSteps.some((step: any) => step.type === "thought")) {
+          currentAssistant.traceSteps.push({ id: `thought_${i}`, type: "thought", content: msg.thinking,
+            startTime: msg.timestamp, durationMs: msg.durationMs });
         }
       }
+      currentAssistant.content = typeof msg.content === "string" ? msg.content : "";
+      currentAssistant.intelligenceUiState = msg.intelligenceUiState;
+      if (msg.tool_calls?.length) currentAssistant = archiveAssistantCommentary(currentAssistant);
+      if (Array.isArray(msg.toolCalls)) currentAssistant.toolCalls.push(...msg.toolCalls.map((call: any) => ({ ...call })));
+      if (Array.isArray(msg.mutations)) currentAssistant.mutations.push(...msg.mutations);
+      if (msg.durationMs !== undefined) currentAssistant.durationMs = (currentAssistant.durationMs || 0) + msg.durationMs;
 
       // Handle raw assistant tool_calls from LLM API format
       if (Array.isArray(msg.tool_calls)) {

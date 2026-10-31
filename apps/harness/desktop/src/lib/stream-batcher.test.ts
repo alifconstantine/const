@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createStreamBatcher } from "./stream-batcher";
 
+test("commentary seals a model turn before subsequent tool and answer deltas", () => {
+  const events: any[] = [];
+  const batcher = createStreamBatcher(event => events.push(event));
+  batcher.forward({ type: "token", token: "I'll inspect " });
+  batcher.forward({ type: "token", token: "the sources." });
+  batcher.forward({ type: "commentary", content: "I'll inspect the sources." });
+  batcher.forward({ type: "tool_call", toolCallId: "read" });
+  batcher.forward({ type: "token", token: "Final findings." });
+  batcher.flush();
+  assert.deepEqual(events.map(event => event.type), ["token", "commentary", "tool_call", "token"]);
+  assert.equal(events[0].token, "I'll inspect the sources.");
+  assert.equal(events[3].token, "Final findings.");
+});
+
 test("delta batches preserve text, ordering and structural barriers", t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const events: any[] = [];

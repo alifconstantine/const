@@ -268,6 +268,12 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 ### 3. Synthesis Guarantee for Multi-Turn Tasks
 - **Never Output Empty Assistant Cards**: If an agent completes multiple tool turns and the model outputs an empty text turn without tools, the system must prompt the model to synthesize a complete final answer rather than terminating with an empty chat card.
 
+### 4. Progress Text and Final Answers
+- Assistant text followed by tool calls is public progress. Store each model turn as a separate `commentary` trace step, in order with its tool activity; preserve its Markdown and paragraph breaks.
+- While generating, show provisional text inside the Working section. Do not concatenate successive progress updates into the final-answer field.
+- The final response stays outside Working and remains visible when the process is collapsed. Collapsed process content must also be excluded from keyboard and screen-reader navigation.
+- Persist the distinction in host snapshots and saved history. Reconstruct commentary, tool calls/results, and the final answer in their original order for continuation prompts.
+
 ---
 
 ## Iconography & Empty States

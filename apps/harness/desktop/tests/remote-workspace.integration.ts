@@ -146,8 +146,28 @@ async function run() {
     })()`);
     await delay(100);
     await js(`document.querySelector('button[aria-label="Send message"]').click()`);
+    await waitFor('document.querySelectorAll("[data-process-commentary]").length >= 2');
+    assert.deepEqual(await js(`(() => {
+      const answer = [...document.querySelectorAll('[data-assistant-message]')].at(-1);
+      return { final: Boolean(answer.querySelector('[data-final-answer]')),
+        progress: [...answer.querySelectorAll('[data-process-commentary]')].map(node => node.innerText.trim()) };
+    })()`), { final: false, progress: ["I'll inspect the workspace first.", "The sources are readable.\n\nI'll compare the figures next."] });
+    await capture("working-progress-expanded");
+    await js('window.__remoteFixture.completeProgress()');
     await waitFor('document.body.innerText.includes("The shared desktop chat is working in the remote browser.")');
     assert.equal(await js('Boolean(document.querySelector(".workspace-shell"))'), true);
+  });
+  await check("closing Working hides only the ordered progress and keeps the final answer separate", async () => {
+    await waitFor(`(() => { const group = [...document.querySelectorAll('[data-assistant-message]')].at(-1); return group?.querySelector('[data-working-toggle]')?.getAttribute('aria-expanded') === 'false'; })()`);
+    assert.deepEqual(await js(`(() => {
+      const group = [...document.querySelectorAll('[data-assistant-message]')].at(-1);
+      return { final: group.querySelector('[data-final-answer]').innerText.trim(),
+        hidden: group.querySelector('[data-working-process]').getAttribute('aria-hidden') };
+    })()`), { final: "The shared desktop chat is working in the remote browser.", hidden: "true" });
+    await capture("working-progress-collapsed");
+    await js(`[...document.querySelectorAll('[data-assistant-message]')].at(-1).querySelector('[data-working-toggle]').click()`);
+    await waitFor(`(() => { const group = [...document.querySelectorAll('[data-assistant-message]')].at(-1); return group.querySelector('[data-working-toggle]').getAttribute('aria-expanded') === 'true'; })()`);
+    assert.equal(await js(`document.querySelectorAll('[data-process-commentary]').length`), 2);
   });
   await check("completed OpenUI output and invalid generated components preserve the chat", async () => {
     const prefix = "Answer before UI";

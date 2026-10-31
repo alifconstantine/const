@@ -51,6 +51,7 @@ import { ApprovalResponseGate, approvalResponseKey, removeMatchingApproval } fro
 import { QuestionCard } from "./components/workbench/question-card";
 import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
 import { ChatMessageItem } from "./components/workbench/chat-message-item";
+import { archiveAssistantCommentary, serializeAssistantTranscript } from "./lib/assistant-transcript";
 import { assistantResponseToText, updateIntelligenceUiState } from "./components/intelligence-ui/protocol";
 import type { IntelligenceUiState } from "./components/intelligence-ui/schema";
 import { ReviewDialog } from "./components/workbench/review-dialog";
@@ -180,39 +181,8 @@ function formatChatMessageForLlm(
   thinking?: string;
 }> {
   if (m.role !== "user") {
-    if (m.toolCalls && m.toolCalls.length > 0) {
-      const toolMessages: any[] = [];
-      const formattedToolCalls = m.toolCalls.map((tc, idx) => ({
-        id: tc.id || `call_${m.timestamp || Date.now()}_${idx}`,
-        type: "function" as const,
-        function: {
-          name: tc.name,
-          arguments: typeof tc.args === "string" ? tc.args : JSON.stringify(tc.args ?? {}),
-        },
-      }));
-
-      toolMessages.push({
-        role: "assistant",
-        content: m.content || null,
-        thinking: m.thinking || undefined,
-        tool_calls: formattedToolCalls,
-      });
-
-      for (const tc of m.toolCalls) {
-        const resultStr =
-          typeof tc.result === "string"
-            ? tc.result
-            : tc.result !== undefined && tc.result !== null
-            ? JSON.stringify(tc.result)
-            : "";
-        toolMessages.push({
-          role: "tool",
-          tool_call_id: tc.id || `call_${m.timestamp || Date.now()}`,
-          name: tc.name,
-          content: resultStr,
-        });
-      }
-      return toolMessages;
+    if (m.toolCalls?.length || m.traceSteps?.some(step => step.type === "commentary")) {
+      return serializeAssistantTranscript(m);
     }
 
     return [
@@ -2654,7 +2624,19 @@ export function AuthenticatedContent({
         }
       }
 
-      if (event.type === "token") {
+      if (event.type === "commentary" || event.type === "tool_call" || event.type === "ask_question" || event.type === "error") {
+        const index = targetMsgs.length - 1;
+        const last = targetMsgs[index];
+        if (last?.role === "assistant") {
+          targetMsgs = [...targetMsgs];
+          targetMsgs[index] = archiveAssistantCommentary(last, event.type === "commentary" ? event.content : last.content);
+        }
+      }
+
+      if (event.type === "commentary") {
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) { messagesRef.current = targetMsgs; setMessages(targetMsgs); }
+      } else if (event.type === "token") {
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];

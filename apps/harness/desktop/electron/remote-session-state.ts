@@ -1,3 +1,5 @@
+import { archiveAssistantCommentary } from "../src/lib/assistant-transcript";
+
 /** Host-owned renderable history for joining a run between renderer checkpoints. */
 export interface RemoteSessionState {
   revision: number;
@@ -35,6 +37,9 @@ export function updateRemoteSessionState(live: RemoteSessionState, event: any): 
     live.messages.push(last);
   }
   if (last?.role !== "assistant") return;
+  if (event.type === "commentary" || event.type === "tool_call" || event.type === "ask_question") {
+    Object.assign(last, archiveAssistantCommentary(last, event.type === "commentary" ? event.content : last.content, now));
+  }
   const steps = last.traceSteps;
   const finishThought = () => {
     const step = steps[steps.length - 1];
@@ -85,6 +90,12 @@ export function updateRemoteSessionState(live: RemoteSessionState, event: any): 
   if (event.type === "ask_question") live.questions = event;
   if (event.type === "question_resolved") delete live.questions;
   if (event.type === "context_update") live.context = event;
+  if (event.type === "error") {
+    finishThought();
+    Object.assign(last, archiveAssistantCommentary(last, last.content, now));
+    last.content = event.error || "";
+    live.status = "error";
+  }
   if (event.type === "done") {
     finishThought();
     last.content = event.fullContent || last.content;

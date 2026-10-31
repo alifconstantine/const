@@ -30,7 +30,8 @@ export interface FileMutationRecord {
 
 export interface TraceStep {
   id: string;
-  type: "thought" | "tool";
+  type: "thought" | "tool" | "commentary";
+  isStreaming?: boolean;
   content?: string;
   startTime?: number;
   durationMs?: number;
@@ -143,6 +144,7 @@ export interface AgentStreamEvent {
   type:
     | "token"
     | "token_reset"
+    | "commentary"
     | "thinking"
     | "tool_call"
     | "tool_result"
@@ -164,6 +166,7 @@ export interface AgentStreamEvent {
     | "subagent_finished"
     | "subagent_killed";
   token?: string;
+  content?: string;
   thinking?: string;
   toolCallId?: string;
   toolName?: string;

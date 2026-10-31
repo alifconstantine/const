@@ -2,6 +2,32 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createRemoteSessionState, updateRemoteSessionState } from "./remote-session-state";
 
+test("host snapshots preserve separate progress updates and final text through JSON reload", () => {
+  const live = createRemoteSessionState([{ role: "user", content: "Research" }], "run");
+  for (const [index, content] of ["I'll inspect the workspace.", "The sources are readable.\n\nI'll compare the figures."].entries()) {
+    updateRemoteSessionState(live, { type: "token", token: content });
+    updateRemoteSessionState(live, { type: "commentary", content });
+    updateRemoteSessionState(live, { type: "tool_call", toolCallId: `tool-${index}`, toolName: "read" });
+    updateRemoteSessionState(live, { type: "tool_result", toolCallId: `tool-${index}`, result: "verified" });
+  }
+  const snapshot = JSON.parse(JSON.stringify(live));
+  updateRemoteSessionState(snapshot, { type: "token", token: "## Final findings\n\nVerified answer." });
+  updateRemoteSessionState(snapshot, { type: "done", fullContent: "## Final findings\n\nVerified answer." });
+  const answer = snapshot.messages.at(-1);
+  assert.equal(answer.content, "## Final findings\n\nVerified answer.");
+  assert.deepEqual(answer.traceSteps.map((step: any) => step.type), ["commentary", "tool", "commentary", "tool"]);
+  assert.equal(answer.traceSteps.filter((step: any) => step.type === "commentary").length, 2);
+});
+
+test("a failed run keeps its unfinished prose inside Working and exposes its error separately", () => {
+  const live = createRemoteSessionState([{ role: "user", content: "Research" }], "run");
+  updateRemoteSessionState(live, { type: "token", token: "I'll inspect the remaining sources." });
+  updateRemoteSessionState(live, { type: "error", error: "Connection interrupted." });
+  assert.equal(live.messages.at(-1).content, "Connection interrupted.");
+  assert.equal(live.messages.at(-1).traceSteps.at(-1).content, "I'll inspect the remaining sources.");
+  assert.equal(live.status, "error");
+});
+
 test("joining a running session preserves resets, long output, thinking and every tool result", () => {
   const history = [{ id: "user", role: "user", content: "Audit" }, { id: "placeholder", role: "assistant", content: "" }];
   const live = createRemoteSessionState(history, "run");

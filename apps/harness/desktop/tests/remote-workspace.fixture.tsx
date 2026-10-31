@@ -74,6 +74,7 @@ if (longMenus) {
 const tasks: any[] = [];
 const browserInputs: any[] = [];
 const browserShots: any[] = [];
+let completeProgress: (() => void) | undefined;
 const config: any = {
   activeModel: "test-model",
   activeProvider: "const",
@@ -194,6 +195,17 @@ api = createDesktopBridge(
         const runId = "preview-run";
         emit("agent:session-started", { conversationId: id, runId });
         await new Promise((resolve) => setTimeout(resolve, 200));
+        const send = (event: any) => emit("agent:stream-event", { ...event, conversationId: id, runId });
+        for (const [index, content] of ["I'll inspect the workspace first.", "The sources are readable.\n\nI'll compare the figures next."].entries()) {
+          send({ type: "token", token: content });
+          send({ type: "commentary", content });
+          send({ type: "tool_call", toolCallId: `preview-read-${index}`, toolName: "read", args: { path: `source-${index}.md` } });
+          send({ type: "tool_result", toolCallId: `preview-read-${index}`, toolName: "read", result: "Verified source" });
+        }
+        await new Promise<void>(resolve => {
+          const timer = setTimeout(resolve, 5000);
+          completeProgress = () => { clearTimeout(timer); resolve(); completeProgress = undefined; };
+        });
         emit("agent:stream-event", {
           type: "token",
           token: "The shared desktop chat is working in the remote browser.",
@@ -264,6 +276,7 @@ api = createDesktopBridge(
 );
 window.electron = api;
 (window as any).__remoteFixture = {
+  completeProgress() { completeProgress?.(); },
   browserInputs, browserShots,
   markdownWork,
   updateRemoteStatus,

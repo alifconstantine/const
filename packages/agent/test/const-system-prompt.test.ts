@@ -6,7 +6,7 @@ import { buildConstSystemPrompt, buildLearnSystemPrompt, createConstAgent, compa
 import { CONST_DEFAULT_TOOLS } from "../src/const/tools.js";
 import { buildToolGuidance, promptFileExcerpt } from "../src/const/prompt-guidance.js";
 import { pluginInvocationInstructions, resolveSkillRegistry } from "../src/const/skill-registry.js";
-import type { AgentConfig } from "../src/const/types.js";
+import type { AgentConfig, AgentEvent } from "../src/const/types.js";
 import { normalizeUiMessages } from "../../../apps/harness/desktop/src/lib/conversation-store";
 
 vi.mock("../src/const/skill-registry.js", () => ({
@@ -28,13 +28,14 @@ afterEach(async () => {
 type Request = { messages: Array<{ role: string; content: any; reasoning_content?: string }>; tools?: Array<{ function: { name: string } }> };
 function fixture(respond: (turn: number) => { delta: object; finish_reason?: string }, config: Partial<AgentConfig> = {}) {
   const requests: Request[] = [];
+  const events: AgentEvent[] = [];
   vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
     requests.push(JSON.parse(String(init.body)));
     const choice = respond(requests.length);
     return new Response(`data: ${JSON.stringify({ choices: [{ finish_reason: "stop", ...choice }] })}\n\ndata: [DONE]\n\n`, { status: 200 });
   }));
   const agent = createConstAgent({ model: "fixture", baseUrl: "http://fixture.invalid/v1", apiKey: "", workspacePath: workspace, maxTurns: 4, mode: "full_access", ...config });
-  return { requests, run: (text = "Audit kode saja; jangan ubah file.") => agent.run([{ role: "user", content: text }], () => {}) };
+  return { requests, events, run: (text = "Audit kode saja; jangan ubah file.") => agent.run([{ role: "user", content: text }], event => events.push(event)) };
 }
 
 describe("context excerpts", () => {
@@ -159,6 +160,16 @@ describe("request-specific capability guidance", () => {
 });
 
 describe("recovery preserves the actual user request", () => {
+  it("marks text before tool execution as commentary and keeps the final answer distinct", async () => {
+    await writeFile(path.join(workspace, "source.md"), "Verified source");
+    const { events, run } = fixture(turn => turn === 1
+      ? { delta: { content: "I'll inspect the source.", tool_calls: [{ index: 0, id: "read", type: "function", function: { name: "read", arguments: '{"path":"source.md"}' } }] }, finish_reason: "tool_calls" }
+      : { delta: { content: "Final findings." } });
+    await run();
+    expect(events.filter(event => event.type === "commentary")).toEqual([{ type: "commentary", content: "I'll inspect the source." }]);
+    expect(events.findIndex(event => event.type === "commentary")).toBeLessThan(events.findIndex(event => event.type === "tool_call"));
+    expect(events.find(event => event.type === "done")).toMatchObject({ fullContent: "Final findings." });
+  });
   it("never executes a tool call from a length-truncated generation even when the JSON parses", async () => {
     const { requests, run } = fixture(turn => turn === 1
       ? { delta: { tool_calls: [{ index: 0, id: "truncated", type: "function", function: { name: "write", arguments: '{"path":"never.txt","content":"partial"}' } }] }, finish_reason: "length" }

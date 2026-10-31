@@ -114,7 +114,8 @@ export function ExecutionTrace({
 
   // Normalize chronological steps (supports live traceSteps and fallback history)
   const steps: TraceStep[] = useMemo(() => {
-    if (traceSteps && traceSteps.length > 0) {
+    const onlyDraft = traceSteps.length > 0 && traceSteps.every(step => step.type === "commentary" && step.isStreaming);
+    if (traceSteps && traceSteps.length > 0 && !onlyDraft) {
       return traceSteps.filter((st) => {
         if (st.type === "thought") {
           return Boolean(st.content && st.content.trim().length > 0);
@@ -152,7 +153,7 @@ export function ExecutionTrace({
         isError: tc.isError,
       });
     }
-    return result;
+    return onlyDraft ? [...result, ...traceSteps] : result;
   }, [traceSteps, thinking, toolCalls, durationMs]);
 
   const hasContent = steps.length > 0 || mutations.length > 0 || isExecuting;
@@ -183,6 +184,8 @@ export function ExecutionTrace({
       {/* Root Summary Header: e.g. Worked for 22s > */}
       <button
         type="button"
+        aria-expanded={isMainOpen}
+        data-working-toggle
         onClick={() => setIsMainOpen((prev) => !prev)}
         className="inline-flex items-center gap-1.5 text-[13px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none"
       >
@@ -197,8 +200,14 @@ export function ExecutionTrace({
 
       {/* Trace Body with Smooth Collapse */}
       <SmoothCollapse isOpen={isMainOpen}>
-        <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
+        <div data-working-process aria-hidden={!isMainOpen} inert={!isMainOpen} className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
           {steps.map((step, idx) => {
+            if (step.type === "commentary") {
+              return <div key={step.id} data-process-commentary className="py-2 select-text">
+                <MarkdownContent content={step.content || ""} isStreaming={step.isStreaming}
+                  onOpenFilePreview={onOpenFilePreview} onOpenBrowser={onOpenBrowser} />
+              </div>;
+            }
             if (step.type === "thought") {
               return (
                 <ThoughtItem
