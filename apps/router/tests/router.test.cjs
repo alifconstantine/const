@@ -389,7 +389,7 @@ test("only three explicitly listed IDs can use :free", () => {
   assert.equal(catalog.getManagedModel("deepseek-v4.1-flash").tier, "paid");
   assert.equal(
     catalog.normalizeConstModelName(free),
-    "atmo/ali/deepseek-v4.1-flash-1017",
+    "atmo/alicn/deepseek-v4.1-flash-1017",
   );
 });
 test("unauthenticated, revoked, and expired credentials never call the engine", async () => {
@@ -682,18 +682,24 @@ test("missing server metering secret fails closed", async () => {
   }
 });
 test("failed upstream calls release held credit without charging the wallet", async () => {
-  global.fetch = async () => new Response("Unavailable", { status: 503 });
-  const response = await chat.POST(request(body("gpt-6.1-sol")));
-  assert.equal(response.status, 503);
-  assert.equal((await db.get("wallet")).reservedNanoUsd, 0);
-  assert.equal((await db.get("wallet")).balanceUsd, 1);
-  assert.equal((await db.query("creditTransactions").collect()).length, 0);
+  const origFetch = global.fetch;
+  try {
+    global.fetch = async () => new Response("Unavailable", { status: 503 });
+    const response = await chat.POST(request(body("gpt-6.1-sol")));
+    assert.equal(response.status, 503);
+    assert.equal((await db.get("wallet")).reservedNanoUsd, 0);
+    assert.equal((await db.get("wallet")).balanceUsd, 1);
+    assert.equal((await db.query("creditTransactions").collect()).length, 0);
+  } finally {
+    global.fetch = origFetch;
+  }
 });
 test("cancelled streaming requests persist partial usage and release free reservations", async () => {
   const response = await chat.POST(request({ ...body(), stream: true }));
   const reader = response.body.getReader();
   await reader.read();
   await reader.cancel("user stopped");
+  await new Promise((r) => setTimeout(r, 10));
   assert.equal(logs()[0].status, 499);
   assert(logs()[0].totalTokens > 0);
   assert.equal((await db.query("userQuotas").first()).reservedTokens, 0);

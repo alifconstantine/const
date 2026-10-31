@@ -466,7 +466,17 @@ export async function executeSingle(
         controller.enqueue(value);
       } catch (error) {
         try {
-          await finish(req.signal.aborted ? 499 : 502, "Stream interrupted");
+          const isClientAbort =
+            req.signal.aborted ||
+            (error as any)?.name === "AbortError" ||
+            (error as any)?.code === "ERR_INVALID_STATE" ||
+            String(error).includes("closed") ||
+            String(error).includes("stopped") ||
+            String(error).includes("cancel");
+          await finish(
+            isClientAbort ? 499 : 502,
+            isClientAbort ? "Stream stopped by client" : "Stream interrupted",
+          );
         } finally {
           controller.error(error);
           await reader.cancel().catch(() => {});
