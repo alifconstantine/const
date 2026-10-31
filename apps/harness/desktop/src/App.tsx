@@ -994,8 +994,14 @@ export function AuthenticatedContent({
   }, []);
 
   const handleToggleRightSidebar = useCallback(() => {
-    setIsRightSidebarOpen((prev) => !prev);
-  }, []);
+    setIsRightSidebarOpen((prev) => {
+      const next = !prev;
+      if (next && remote?.mobile) {
+        setIsSidebarOpen(false);
+      }
+      return next;
+    });
+  }, [remote?.mobile]);
 
   const handleSelectRightPaneTab = useCallback((tabId: string) => {
     setActiveRightPaneTabId(tabId);
@@ -4257,8 +4263,9 @@ export function AuthenticatedContent({
         "workspace-shell h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#101011] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none p-2.5",
         isSidebarOpen ? "gap-2.5" : "gap-0"
       )}
+      data-right-open={isRightSidebarOpen ? "true" : "false"}
     >
-      {remote?.mobile && (
+      {remote?.mobile && !isRightSidebarOpen && (
         <button
           type="button"
           className="remote-sidebar-toggle"
@@ -4895,8 +4902,8 @@ export function AuthenticatedContent({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <div className="flex items-center gap-0.5 pointer-events-auto">
-                {/* When Sidepanel is CLOSED, show stationary Browser & Terminal icons in window header */}
-                {!isRightSidebarOpen && (
+                {/* When Sidepanel is CLOSED, show stationary Browser & Terminal icons in window header (desktop only) */}
+                {!isRightSidebarOpen && !remote?.mobile && (
                   <>
                     <button
                       type="button"
@@ -4938,8 +4945,8 @@ export function AuthenticatedContent({
                   </>
                 )}
 
-                {/* Expand / Restore SidePanel (Visible when sidebar is open) */}
-                {isRightSidebarOpen && (
+                {/* Expand / Restore SidePanel (Visible on desktop when sidebar is open) */}
+                {isRightSidebarOpen && !remote?.mobile && (
                   <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}

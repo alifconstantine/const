@@ -2543,7 +2543,7 @@ export function ChatCard({
                           )}
                         />
                       </svg>
-                      <span className="tabular-nums font-medium">
+                      <span className="tabular-nums font-medium" data-telemetry-label>
                         {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`}
                       </span>
                     </button>

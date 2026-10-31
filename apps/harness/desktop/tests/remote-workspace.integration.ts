@@ -179,6 +179,7 @@ async function run() {
     await waitFor(`Boolean(document.querySelector('.remote-sidebar-backdrop'))`);
     await capture("remote-workspace-mobile-sidebar");
     assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "true");
+    await delay(300);
     assert.equal(await js(`(() => {
       const button = document.querySelector('[data-sidebar-toggle]');
       const top = new DOMMatrix(getComputedStyle(button.querySelector('.remote-menu-line-top')).transform);
@@ -191,6 +192,17 @@ async function run() {
     await delay(350);
     assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "false");
     assert.equal(await js(`document.querySelectorAll('[data-sidebar-toggle] path').length`), 2);
+  });
+  await check("mobile heading hides browser icon and hides hamburger menu when sidepanel is open", async () => {
+    assert.equal(await js(`Boolean(document.querySelector('button[aria-label="Browser"]'))`), false);
+    await js(`document.querySelector('button[aria-label="Toggle right sidebar"]').click()`);
+    await waitFor('Boolean(document.querySelector(".workspace-right-pane"))');
+    await delay(350);
+    assert.equal(await js(`Boolean(document.querySelector('[data-sidebar-toggle]'))`), false);
+    assert.equal(await js(`Boolean(document.querySelector('.workspace-right-pane button[aria-label="Hide panel"]'))`), true);
+    await js(`document.querySelector('.workspace-right-pane button[aria-label="Hide panel"]').click()`);
+    await delay(350);
+    assert.equal(await js(`Boolean(document.querySelector('[data-sidebar-toggle]'))`), true);
   });
   await check("mobile refresh affordance appears and cancels without reloading", async () => {
     await js(`(() => {
@@ -271,6 +283,7 @@ async function run() {
     await delay(80);
     assert.equal(await js(`getComputedStyle(document.querySelector('.remote-menu-line-top')).transitionDuration`), "0s");
     assert.equal(await js(`document.querySelector('[data-sidebar-toggle]').getAttribute('aria-expanded')`), "true");
+    await delay(300);
     await js(`document.querySelector('.remote-sidebar-backdrop').click()`);
     await motionPreference("no-preference");
   });

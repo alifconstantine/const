@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
+  ArrowLeft,
   ChevronsDown,
   Plus,
   X,
@@ -15,7 +16,7 @@ import {
   Bot,
   FolderTree,
   Waypoints,
-  PanelRight,
+
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import { cn } from "@const/ui";
@@ -223,7 +224,7 @@ export function TabHeader({
           aria-label={t("rightPane.hidePanel")}
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          <PanelRight className="w-3.5 h-3.5" />
+          <ArrowLeft className="w-4 h-4" />
         </button>
       )}
 

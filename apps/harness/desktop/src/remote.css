@@ -108,6 +108,11 @@
 .remote-sidebar-toggle[aria-expanded="true"] .remote-menu-line-bottom {
   transform: translateY(-4px) rotate(-45deg);
 }
+.remote-mobile .workspace-shell[data-right-open="true"] .remote-sidebar-toggle,
+.remote-mobile:has(.workspace-right-pane:not([aria-hidden="true"])) .remote-sidebar-toggle {
+  display: none !important;
+  pointer-events: none !important;
+}
 .remote-mobile [data-sidebar-header] {
   padding-left: 44px;
 }
@@ -153,7 +158,8 @@
   gap: 4px;
   white-space: nowrap;
 }
-.remote-mobile [data-remote-telemetry] [data-telemetry-label] {
+.remote-mobile [data-remote-telemetry] [data-telemetry-label],
+.remote-mobile [data-remote-telemetry] [data-telemetry-control="context"] span {
   display: none;
 }
 .remote-mobile [data-telemetry-control="statistics"] { order: 0; }

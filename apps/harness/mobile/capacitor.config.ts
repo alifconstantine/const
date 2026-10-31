@@ -6,6 +6,12 @@ const config: CapacitorConfig = {
   webDir: "dist",
   server: {
     androidScheme: "https",
+    allowNavigation: [
+      "*.const.web.id",
+      "const.web.id",
+      "harness.const.web.id",
+      "accounts.const.web.id",
+    ],
   },
   plugins: {
     CapacitorHttp: {
