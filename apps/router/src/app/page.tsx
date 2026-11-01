@@ -122,28 +122,6 @@ const CATALOG_MODELS: CatalogItem[] = [
     savePercent: "95.5%",
   },
   {
-    id: "claude-sonnet-5.5",
-    name: "Claude Sonnet 5.5",
-    contextWindow: "1M",
-    input: "$0.050",
-    officialInput: "$2.000",
-    cache: "$0.050",
-    output: "$0.250",
-    officialOutput: "$10.000",
-    savePercent: "97.5%",
-  },
-  {
-    id: "claude-opus-5.5",
-    name: "Claude Opus 5.5",
-    contextWindow: "1M",
-    input: "$0.100",
-    officialInput: "$4.000",
-    cache: "$0.100",
-    output: "$0.500",
-    officialOutput: "$20.000",
-    savePercent: "97.5%",
-  },
-  {
     id: "grok-4.7",
     name: "Grok 4.7",
     contextWindow: "500K",
@@ -251,24 +229,11 @@ const client = new OpenAI({
 });
 
 const completion = await client.chat.completions.create({
-  model: "claude-sonnet-5.5",
+  model: "gpt-6.1-sol",
   messages: [{ role: "user", content: "Review this pull request diff." }],
 });
 
 console.log(completion.choices[0].message.content);`,
-    },
-    {
-      id: "claude",
-      label: "Claude Code (Anthropic Spec)",
-      filename: "claude-code.sh",
-      note: "Launch Anthropic Claude Code backed directly by Const Router:",
-      lang: "bash",
-      code: `# Point Claude Code CLI to Const Router's Anthropic Messages endpoint:
-export ANTHROPIC_BASE_URL="https://router.const.web.id"
-export ANTHROPIC_API_KEY="const_live_xxxxxxxxxxxx"
-
-# Run Claude Code with full tool calling:
-claude`,
     },
     {
       id: "streaming",
@@ -337,7 +302,7 @@ for chunk in stream:
           </h1>
 
           <p className="home-hero-description">
-            14 frontier models behind a single OpenAI-compatible API. Multi-model failover, native SSE streaming, and transparent per-token metering with zero commitments.
+            10 chat models behind a single OpenAI-compatible API. Multi-model failover, native SSE streaming, and transparent per-token metering with zero commitments.
           </p>
 
           <div className="home-helper">
@@ -383,7 +348,7 @@ for chunk in stream:
           </div>
 
           <p className="home-hero-footnote">
-            OpenAI-compatible &bull; Anthropic Messages spec &bull; Pay per token &bull;{" "}
+            OpenAI-compatible &bull; Pay per token &bull;{" "}
             <Link href="/docs" className="hover:underline">Explore the docs &rarr;</Link>
           </p>
         </div>
@@ -429,7 +394,7 @@ for chunk in stream:
                 <div className="router-flow-step">
                   <div className="flex items-center gap-2">
                     <span className="step-label">3. Fallback Tier</span>
-                    <span className="step-val">Claude Sonnet 5.5</span>
+                    <span className="step-val">GPT 6.1 Sol</span>
                   </div>
                   <span className="text-[11px] text-[#737373]">High-Tier Backup</span>
                 </div>
@@ -441,7 +406,7 @@ for chunk in stream:
               <span className="feature-tag">Unified Access</span>
               <h3>One Key, All Models</h3>
               <p>
-                Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">sk-const-live-</code> key.
+                Drop-in replacement for OpenAI-compatible SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">sk-const-live-</code> key.
               </p>
 
               <div className="key-clients-visual">
@@ -452,10 +417,6 @@ for chunk in stream:
                 <div className="key-client-item">
                   <span>TypeScript / Node</span>
                   <code>baseURL: "https://router.const.web.id/v1"</code>
-                </div>
-                <div className="key-client-item">
-                  <span>Claude Code CLI</span>
-                  <code>ANTHROPIC_BASE_URL="https://router.const.web.id"</code>
                 </div>
                 <div className="key-client-item">
                   <span>Cursor / Cline</span>
@@ -583,11 +544,6 @@ for chunk in stream:
             <p>Universal OpenAI-compatible host for chat completions and transcription.</p>
           </div>
           <div>
-            <span className="ref-label">Anthropic Base URL</span>
-            <code>https://router.const.web.id</code>
-            <p>Direct Anthropic Messages spec passthrough for Claude Code and Anthropic clients.</p>
-          </div>
-          <div>
             <span className="ref-label">Telemetry Header</span>
             <code>X-Const-Cost</code>
             <p>Exact micro-cost deducted in USD and latency returned in every response header.</p>
@@ -603,7 +559,7 @@ for chunk in stream:
               Model Catalog &amp; Live Rates
             </h2>
             <p className="text-sm text-[#969696] pt-1">
-              14 frontier models with transparent per-token pricing and instant routing.
+              10 chat models with transparent per-token pricing and instant routing.
             </p>
           </div>
           <Link href="/dashboard" className="home-text-link">
@@ -681,7 +637,7 @@ for chunk in stream:
             <ul className="pricing-features-list">
               <li>
                 <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>One key for all 14 supported frontier models</span>
+                <span>One key for all 10 supported chat models</span>
               </li>
               <li>
                 <Check className="h-4 w-4 text-emerald-400 shrink-0" />
@@ -784,7 +740,7 @@ for chunk in stream:
           <article>
             <span className="font-mono text-xs text-[#737373]">04</span>
             <h3>Start Calling</h3>
-            <p>Point any OpenAI or Anthropic tool to router.const.web.id/v1.</p>
+            <p>Point any OpenAI-compatible tool to router.const.web.id/v1.</p>
           </article>
         </div>
       </section>
@@ -800,11 +756,11 @@ for chunk in stream:
           <ul>
             <li>
               <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              One key for the OpenAI and Anthropic compatible endpoints
+              One key for the OpenAI-compatible endpoints
             </li>
             <li>
               <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              14 frontier models across all major families
+              10 chat models across all major families
             </li>
             <li>
               <Check className="h-4 w-4 text-emerald-400 shrink-0" />

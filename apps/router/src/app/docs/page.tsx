@@ -236,7 +236,7 @@ export default function DocsPage() {
               Const Router API Documentation
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Const Router is a high-performance universal AI gateway providing drop-in OpenAI-compatible access to frontier models (Claude, DeepSeek, GPT, Gemini, Qwen, GLM, MiniMax, Grok), speech-to-text, live web search grounding, and smart virtual combos with automated failover.
+              Const Router is a high-performance universal AI gateway providing drop-in OpenAI-compatible access to frontier models (DeepSeek, GPT, Gemini, Qwen, GLM, MiniMax, Grok), speech-to-text, live web search grounding, and smart virtual combos with automated failover.
             </p>
             <div className="pt-2 flex flex-wrap gap-2 text-xs font-mono text-muted-foreground">
               <span className="px-2.5 py-1 bg-secondary/50 rounded-md border border-border/40 text-foreground font-medium">
@@ -467,7 +467,7 @@ client := openai.NewClientWithConfig(config)`,
 4. Paste your API Key:
    sk-const-live-YOUR_API_KEY
 5. In the model dropdown, type your model ID:
-   deepseek-v4.1-flash:free (or claude-sonnet-5.5 / combo/coding)`,
+   deepseek-v4.1-flash:free (or gpt-6.1-sol / combo/coding)`,
                 },
                 {
                   label: "Cline / Roo Code",
@@ -479,7 +479,7 @@ client := openai.NewClientWithConfig(config)`,
 4. API Key:
    sk-const-live-YOUR_API_KEY
 5. Model ID:
-   deepseek-v4.1-flash:free or claude-sonnet-5.5`,
+   deepseek-v4.1-flash:free or gpt-6.1-sol`,
                 },
                 {
                   label: "Continue.dev",
@@ -495,9 +495,9 @@ client := openai.NewClientWithConfig(config)`,
       "apiKey": "sk-const-live-YOUR_API_KEY"
     },
     {
-      "title": "Const Claude Sonnet 5.5",
+      "title": "Const GPT 6.1 Sol",
       "provider": "openai",
-      "model": "claude-sonnet-5.5",
+      "model": "gpt-6.1-sol",
       "apiBase": "https://router.const.web.id/v1",
       "apiKey": "sk-const-live-YOUR_API_KEY"
     }
@@ -750,7 +750,7 @@ print(response.choices[0].message.content)`,
           <section id="vision" className="space-y-4 scroll-mt-24">
             <h2 className="text-xl font-medium tracking-tight">Vision & Multimodal Inputs</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Pass image URLs or Base64 data URIs using the standard OpenAI content block structure. Supported models include <code className="text-foreground font-mono">deepseek-v4.1-flash:free</code>, <code className="text-foreground font-mono">qwen-3.8-omni-flash:free</code>, <code className="text-foreground font-mono">gemini-3.8-flash</code>, and <code className="text-foreground font-mono">claude-sonnet-5.5</code>.
+              Pass image URLs or Base64 data URIs using the standard OpenAI content block structure. Supported models include <code className="text-foreground font-mono">deepseek-v4.1-flash:free</code>, <code className="text-foreground font-mono">qwen-3.8-omni-flash:free</code>, <code className="text-foreground font-mono">gemini-3.8-flash</code>, and <code className="text-foreground font-mono">gpt-6.1-sol</code>.
             </p>
 
             <CodeSnippetTabs

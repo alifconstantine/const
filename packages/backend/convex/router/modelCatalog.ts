@@ -249,52 +249,6 @@ const CATALOG_MODELS: ModelSpec[] = [
     outputTypes: ["text"],
   },
   {
-    id: "claude-sonnet-5.5",
-    name: "Claude Sonnet 5.5",
-    modelId: "claude-sonnet-5.5",
-    provider: "const",
-    providerName: "Const",
-    tier: "paid",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.050",
-      cache: "$0.050",
-      output: "$0.250",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image"],
-    outputTypes: ["text"],
-  },
-  {
-    id: "claude-opus-5.5",
-    name: "Claude Opus 5.5",
-    modelId: "claude-opus-5.5",
-    provider: "const",
-    providerName: "Const",
-    tier: "paid",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.100",
-      cache: "$0.100",
-      output: "$0.500",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image"],
-    outputTypes: ["text"],
-  },
-  {
     id: "grok-4.7",
     name: "Grok 4.7",
     modelId: "grok-4.7",
@@ -387,8 +341,6 @@ const UPSTREAM_MODELS: Record<string, string> = {
   "qwen-3.8-max": "atmo/alicn/qwen3.8-max-0902",
   "gpt-6.1-sol": "atmo/cx/gpt-6.1-sol",
   "gpt-6-astra": "atmo/cx/gpt-6-astra",
-  "claude-sonnet-5.5": "atmo/kiro/claude-sonnet-5.5",
-  "claude-opus-5.5": "atmo/kiro/claude-opus-5.5",
   "grok-4.7": "atmo/grok/grok-4.7",
   "whisper-large-v3-turbo": "Whisper Large v3 Turbo",
   "const-search": "Const Search",
@@ -498,7 +450,7 @@ export function hasFixedThinking(modelId: string, name?: string): boolean {
  * In 2026: All frontier generative models support thinking natively.
  * - Non-generative models (embeddings, tts, flux): false
  * - Fixed-tier models (gemini-3.8-flash-high, etc.): false (thinking is already included in provider config)
- * - Base generative models (gemini-3.8-flash, deepseek-v4.1-flash, claude-opus-5, etc.): true (dynamic thinking UI shown)
+ * - Base generative models (gemini-3.8-flash, deepseek-v4.1-flash, etc.): true (dynamic thinking UI shown)
  */
 export function checkSupportsThinking(
   modelId: string,

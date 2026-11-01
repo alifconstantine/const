@@ -448,9 +448,9 @@ test("paid request uses actual cached price, settles once, and releases reservat
   assert.equal(logs().length, 1);
   assert.equal((await db.query("creditTransactions").collect()).length, 1);
 });
-for (const [model, upstream] of [
-  ["claude-sonnet-5.5", "atmo/kiro/claude-sonnet-5.5"],
-  ["claude-opus-5.5", "atmo/kiro/claude-opus-5.5"],
+for (const [model, upstream, expectedCostNano] of [
+  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 10040],
+  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 18560],
 ]) {
   for (const mode of ["API JSON", "API streaming", "playground SSO"]) {
     test(`${model} routes and bills correctly through ${mode}`, async () => {
@@ -458,7 +458,7 @@ for (const [model, upstream] of [
       let dispatchedModel;
       global.fetch = async (url, init) => {
         dispatchedModel = JSON.parse(init.body).model;
-        // The engine's Kiro catalog uses dotted version numbers.
+        // Reject IDs outside the engine catalog before returning a completion.
         if (dispatchedModel !== upstream)
           return Response.json({ error: { message: "Model not found" } }, { status: 404 });
         return engineFetch(url, init);
@@ -480,9 +480,8 @@ for (const [model, upstream] of [
         assert.equal(data.model, model);
         assert.equal(data.choices[0].message.content, "OK");
       }
-      const expected = catalog.tokenCostNano(model, 20, 5, 4);
       const wallet = await db.get("wallet");
-      assert.equal(wallet.balanceNanoUsd, 1e9 - expected);
+      assert.equal(wallet.balanceNanoUsd, 1e9 - expectedCostNano);
       assert.equal(wallet.reservedNanoUsd, 0);
       assert.equal(logs()[0].billingTier, "paid");
       assert.equal(logs()[0].model, model);
@@ -494,6 +493,18 @@ for (const [model, upstream] of [
 test("zero-balance paid requests never reach the engine", async () => {
   await db.patch("wallet", { balanceUsd: 0 });
   assert.equal((await chat.POST(request(body("gpt-6.1-sol")))).status, 402);
+  assert.equal(fetches, 0);
+});
+
+test("retired Claude models are absent from discovery and cannot execute", async () => {
+  const response = await models.GET(new NextRequest("http://localhost/v1/models"));
+  const discovered = (await response.json()).data;
+  assert(!discovered.some((model) => /claude/i.test(model.id)));
+  for (const model of ["claude-sonnet-5.5", "claude-opus-5.5"]) {
+    assert.equal(catalog.getManagedModel(model), undefined);
+    assert.equal((await chat.POST(request(body(model)))).status, 400);
+    await assert.rejects(gateway.begin.handler(ctx, ticketArgs(model)));
+  }
   assert.equal(fetches, 0);
 });
 test("settlement rejects negative values and untrusted callers", async () => {
