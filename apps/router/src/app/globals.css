@@ -1,95 +1,66 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap');
 @import "@const/ui/globals.css";
-
-/* Const Router Design System: Studio Obsidian Monochrome (Aligned with DESIGN.md & landing.css) */
 :root {
-  /* Level 0: Soft Warm Studio Paper Canvas */
-  --background: 240 5% 97.5%;
-  /* Primary Ink: Deep Charcoal (#141416) */
-  --foreground: 240 6% 9%;
-
-  /* Level 1: Floating Crisp White Card Surface (#ffffff) */
-  --card: 0 0% 100%;
-  --card-foreground: 240 6% 9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 6% 9%;
-
-  /* Primary Solid Action Button (#141416 with #ffffff text) */
-  --primary: 240 6% 9%;
-  --primary-foreground: 0 0% 100%;
-
-  /* Level 2: Secondary Tactile Fills & Controls (#f0f0f3) */
-  --secondary: 240 4% 93.5%;
-  --secondary-foreground: 240 6% 9%;
-
-  /* Level 3: Muted Tracks & Hover (#e8e8ed) */
-  --muted: 240 4% 90.5%;
-  --muted-foreground: 240 4% 45%;
-
-  --accent: 240 4% 91%;
-  --accent-foreground: 240 6% 9%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-
-  /* Hairlines & Flat Borders (#dfdfe4) */
-  --border: 240 3% 86.5%;
-  --input: 240 4% 93%;
-  --ring: 240 6% 9%;
-
-  /* Sidebar Tokens (Light) */
-  --sidebar-background: 240 4% 95.5%;
-  --sidebar-foreground: 240 5% 25%;
-  --sidebar-primary: 240 6% 9%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 4% 91%;
-  --sidebar-accent-foreground: 240 6% 9%;
-  --sidebar-border: 240 3% 87%;
-  --sidebar-ring: 240 6% 9%;
+  --font-sans: var(--font-router, Manrope), sans-serif;
+  color-scheme: light;
+  --background: 45 15% 97%; --foreground: 240 6% 10%;
+  --card: 0 0% 100%; --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%; --popover-foreground: 240 6% 10%;
+  --primary: 240 6% 10%; --primary-foreground: 45 15% 97%;
+  --secondary: 40 8% 93%; --secondary-foreground: 240 6% 15%;
+  --muted: 40 6% 91%; --muted-foreground: 240 4% 41%;
+  --accent: 40 8% 91%; --accent-foreground: 240 6% 10%;
+  --destructive: 0 68% 45%; --destructive-foreground: 0 0% 100%;
+  --border: 40 5% 84%; --input: 40 5% 84%; --ring: 35 24% 42%;
+  --radius: .75rem;
+  --sidebar-background: 40 10% 94%; --sidebar-foreground: 240 4% 38%;
+  --sidebar-primary: 240 6% 10%; --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 40 6% 88%; --sidebar-accent-foreground: 240 6% 10%;
+  --sidebar-border: 40 5% 84%; --sidebar-ring: 35 24% 42%;
+  --router-highlight: #78613e; --router-chart-free: #817255; --router-chart-paid: #637c96;
 }
-
 .dark {
-  /* Level 0: Deep Obsidian Canvas (#0a0a0a - Matches Landing & Const Platform) */
-  --background: 0 0% 4.2%;
-  /* Primary Crisp Reading Ink (#f2f2f2) */
-  --foreground: 0 0% 95%;
-
-  /* Level 1: Elevated Studio Card Panel (#141414) */
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 95%;
-  --popover: 0 0% 8.5%;
-  --popover-foreground: 0 0% 95%;
-
-  /* Primary Button: Solid Pure White with Jet Dark Ink */
-  --primary: 0 0% 98%;
-  --primary-foreground: 0 0% 5%;
-
-  /* Level 2: Tactile Elevated Controls, Pills, & Inputs (#1c1c1c) */
-  --secondary: 0 0% 11.5%;
-  --secondary-foreground: 0 0% 95%;
-
-  /* Level 3: Muted / Track / Hover (#242424) */
-  --muted: 0 0% 14.5%;
-  --muted-foreground: 0 0% 60%;
-
-  --accent: 0 0% 14%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 62.8% 45%;
-  --destructive-foreground: 0 0% 98%;
-
-  /* Hairline Crisp 1px Borders (#262626 - perfectly defined against #0a0a0a & #141414) */
-  --border: 0 0% 15.5%;
-  --input: 0 0% 11.5%;
-  --ring: 0 0% 98%;
-
-  /* Sidebar Tokens (Dark - #0f0f0f grounded sidebar) */
-  --sidebar-background: 0 0% 6%;
-  --sidebar-foreground: 0 0% 80%;
-  --sidebar-primary: 0 0% 98%;
-  --sidebar-primary-foreground: 0 0% 5%;
-  --sidebar-accent: 0 0% 11.5%;
-  --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 0 0% 13.5%;
-  --sidebar-ring: 0 0% 98%;
+  color-scheme: dark;
+  --background: 240 10% 3.5%; --foreground: 40 23% 94%;
+  --card: 240 5% 7%; --card-foreground: 40 23% 94%;
+  --popover: 240 5% 8%; --popover-foreground: 40 23% 94%;
+  --primary: 40 23% 94%; --primary-foreground: 240 10% 4%;
+  --secondary: 240 5% 11%; --secondary-foreground: 40 12% 89%;
+  --muted: 240 5% 14%; --muted-foreground: 240 5% 66%;
+  --accent: 35 10% 15%; --accent-foreground: 40 23% 94%;
+  --destructive: 0 63% 52%; --destructive-foreground: 0 0% 100%;
+  --border: 240 5% 17%; --input: 240 5% 21%; --ring: 38 35% 70%;
+  --sidebar-background: 240 7% 5.5%; --sidebar-foreground: 240 5% 66%;
+  --sidebar-primary: 40 23% 94%; --sidebar-primary-foreground: 240 10% 4%;
+  --sidebar-accent: 35 8% 12%; --sidebar-accent-foreground: 40 23% 94%;
+  --sidebar-border: 240 5% 14%; --sidebar-ring: 38 35% 70%;
+  --router-highlight: #cfbd9c; --router-chart-free: #cfbd9c; --router-chart-paid: #94adbd;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
+body { font-feature-settings: "ss01"; }
+::selection { background: #cfbd9c; color: #17130e; }
+button, input, select, textarea { font: inherit; }
+input, textarea { caret-color: var(--router-highlight); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+a { text-underline-offset: .22em; }
+:focus-visible { outline: 2px solid var(--router-highlight); outline-offset: 3px; }
+[role="dialog"]:focus-visible { outline: none; }
+input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+pre, code { font-variant-ligatures: none; }
+.router-shell { font-family: var(--font-sans), sans-serif; }
+.router-shell h1 { text-wrap: balance; }
+.router-shell h1, .router-shell h2, .router-shell h3 { font-family: var(--font-sans), sans-serif; }
+.router-shell table { font-variant-numeric: tabular-nums; }
+.router-shell [data-radix-scroll-area-viewport] { overscroll-behavior-y: contain; }
+.router-page-content { width: 100%; padding: 2rem clamp(1rem, 3.5vw, 3.5rem) 3.5rem; }
+.router-skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; padding: .75rem 1rem; border-radius: .5rem; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.router-skip-link:focus { top: 1rem; }
+@media (max-width: 767px) {
+  .router-page-content { padding: 1.5rem 1rem 2.5rem; }
+  .router-shell button:not([role="switch"]), .router-shell a[role="button"], .router-shell select { min-height: 2.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

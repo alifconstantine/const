@@ -93,7 +93,7 @@ export function ChatMessageItem({
   if (isUser) {
     return (
       <div className="w-full flex flex-col items-end my-4 space-y-1.5 select-text">
-        <div className="max-w-[88%] sm:max-w-[78%] bg-secondary text-foreground px-5 py-3.5 rounded-3xl text-sm sm:text-base font-sans leading-relaxed border border-border/60 shadow-sm whitespace-pre-wrap break-words space-y-3">
+        <div className="max-w-[88%] sm:max-w-[78%] bg-secondary text-foreground px-5 py-3.5 rounded-xl text-sm sm:text-base font-sans leading-relaxed border border-border/60  whitespace-pre-wrap break-words space-y-3">
           {/* Attachments (Images, Media, Documents) */}
           {hasAttachments && (
             <div className="flex flex-wrap gap-2 pt-1">
@@ -113,13 +113,13 @@ export function ChatMessageItem({
                   return (
                     <div
                       key={idx}
-                      className="overflow-hidden rounded-2xl border border-border/60 shadow-sm max-w-xs"
+                      className="overflow-hidden rounded-xl border border-border/60  max-w-xs"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={att.dataUrl}
                         alt={att.name}
-                        className="max-h-56 w-auto object-cover rounded-2xl"
+                        className="max-h-56 w-auto object-cover rounded-xl"
                       />
                     </div>
                   );
@@ -128,7 +128,7 @@ export function ChatMessageItem({
                 return (
                   <div
                     key={idx}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-background/70 border border-border/60 text-xs font-sans select-none"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-background/70 border border-border/60 text-xs font-sans select-none"
                   >
                     {isVideo ? (
                       <Film className="h-4 w-4 text-foreground shrink-0" />
@@ -160,7 +160,7 @@ export function ChatMessageItem({
             variant="ghost"
             size="icon"
             onClick={handleCopy}
-            className="h-7 w-7 rounded-full hover:text-foreground hover:bg-secondary cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:text-foreground hover:bg-secondary cursor-pointer"
             title="Copy prompt"
           >
             {copied ? (
@@ -175,7 +175,7 @@ export function ChatMessageItem({
               variant="ghost"
               size="icon"
               onClick={() => onEditPrompt(message.content)}
-              className="h-7 w-7 rounded-full hover:text-foreground hover:bg-secondary cursor-pointer"
+              className="h-7 w-7 rounded-lg hover:text-foreground hover:bg-secondary cursor-pointer"
               title="Edit prompt"
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -191,7 +191,7 @@ export function ChatMessageItem({
     <div className="w-full my-4 space-y-2.5 select-text">
       {/* Real-time Tool Call / Web Searching Indicator */}
       {isSearching && (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-blue-500/30 text-xs font-sans text-muted-foreground animate-pulse select-none my-1">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/80 border border-blue-500/30 text-xs font-sans text-muted-foreground animate-pulse select-none my-1">
           <Globe className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
           <span>
             {message.searchMode === "deep-research"
@@ -219,7 +219,7 @@ export function ChatMessageItem({
           <button
             type="button"
             onClick={() => setIsSourcesOpen(!isSourcesOpen)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/70 text-xs font-sans text-muted-foreground hover:text-foreground transition-all cursor-pointer group"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/70 text-xs font-sans text-muted-foreground hover:text-foreground transition-all cursor-pointer group"
           >
             <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
             <span className="font-medium text-foreground/90">
@@ -319,7 +319,7 @@ export function ChatMessageItem({
       {/* Thinking Process (Non-card, inline minimal layout) */}
       {isStreaming && isLast && !message.content && hasThinking && (
         <div className="flex items-center gap-2 text-xs sm:text-sm font-sans text-muted-foreground py-1 animate-pulse select-none">
-          <span className="inline-block w-2 h-2 rounded-full bg-foreground animate-ping" />
+          <span className="inline-block w-2 h-2 rounded-lg bg-foreground animate-ping" />
           <span>Thinking...</span>
         </div>
       )}
@@ -386,7 +386,7 @@ export function ChatMessageItem({
             variant="ghost"
             size="icon"
             onClick={handleCopy}
-            className="h-7 w-7 rounded-full hover:text-foreground hover:bg-secondary cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:text-foreground hover:bg-secondary cursor-pointer"
             title="Copy response"
           >
             {copied ? (

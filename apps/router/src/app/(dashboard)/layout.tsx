@@ -14,67 +14,28 @@ import {
   Sheet,
   SheetContent,
   SheetTitle,
+  ScrollArea,
   cn,
   toast,
 } from "@const/ui";
-import { Loader2, Menu, Bell, CreditCard } from "lucide-react";
+import { Loader2, Menu, ChevronRight, CreditCard, Plus, BookOpen } from "lucide-react";
 
-// Safe Error Boundary to prevent any credit query failure from crashing the dashboard
-class SafeCreditBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(error: any) {
-    // Gracefully handle server query errors
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Link href="/credits">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 rounded-lg text-xs font-mono font-medium px-2 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
-          >
-            <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="hidden sm:inline">Balance unavailable</span>
-            <span className="sm:hidden">—</span>
-          </Button>
-        </Link>
-      );
-    }
-    return this.props.children;
-  }
+class SafeCreditBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() { return this.state.hasError ? <CreditBalanceLink value="Unavailable" /> : this.props.children; }
 }
-
+function CreditBalanceLink({ value }: { value: string }) {
+  return <Link href="/credits" aria-label={"Credit balance: " + value} className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium tabular-nums transition-colors hover:bg-secondary">
+    <CreditCard className="size-3.5 text-muted-foreground" /><span>{value}</span>
+  </Link>;
+}
 function HeaderCreditBalance() {
   const { isAuthenticated } = useRouterAuth();
-  const credits = useQuery(
-    api.router.credits.getUserCredits,
-    isAuthenticated ? {} : "skip",
-  );
-  const balance =
-    typeof credits?.balanceUsd === "number" ? credits.balanceUsd : 0;
-
-  return (
-    <Link href="/credits">
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 rounded-lg text-xs font-mono font-medium px-2 sm:px-3 bg-secondary/50 border-border/60 hover:bg-secondary cursor-pointer gap-1.5 transition-colors"
-      >
-        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{credits ? `$${balance.toFixed(4)}` : "..."}</span>
-      </Button>
-    </Link>
-  );
+  const credits = useQuery(api.router.credits.getUserCredits, isAuthenticated ? {} : "skip");
+  const balance = typeof credits?.balanceUsd === "number" ? credits.balanceUsd : 0;
+  const value = !credits ? "…" : balance > 0 && balance < .0001 ? "<$0.0001" : "$" + balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: balance < 1 ? 4 : 2 });
+  return <CreditBalanceLink value={value} />;
 }
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -103,8 +64,6 @@ export default function DashboardLayout({
     api.auth.queries.currentUser,
     isAuthenticated ? {} : "skip",
   );
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasAttemptedRefresh, setHasAttemptedRefresh] = useState(false);
 
   const currentTitle = useMemo(() => {
@@ -188,7 +147,7 @@ export default function DashboardLayout({
             size="md"
             className="w-8 h-8 text-foreground animate-pulse"
           />
-          <p className="text-xs font-mono text-muted-foreground">
+          <p className="text-xs tabular-nums text-muted-foreground">
             {isSigningOut
               ? "Signing out of Const Platform..."
               : "Connecting to Const Accounts..."}
@@ -199,125 +158,45 @@ export default function DashboardLayout({
     );
   }
 
-  return (
-    <>
-      <title>{`${currentTitle} - Const Router`}</title>
-      <div
-        className={cn(
-          "flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground",
-        )}
-      >
-        {/* Full-height Desktop Left Sidebar */}
-        <div
-          className={cn(
-            "hidden md:block shrink-0 transition-all duration-300 bg-sidebar border-r border-border/70 h-full",
-            isCollapsed ? "w-16" : "w-64",
-          )}
-        >
-          <Sidebar
-            isCollapsed={isCollapsed}
-            onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-          />
+  return <DashboardShell currentTitle={currentTitle} isGeneration={isGeneration}>{children}</DashboardShell>;
+}
+
+export function DashboardShell({ children, currentTitle = "Overview", isGeneration = false }: {
+  children: React.ReactNode; currentTitle?: string; isGeneration?: boolean;
+}) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  useEffect(() => setMobileOpen(false), [pathname]);
+  return <div className="router-shell flex h-dvh w-full min-w-0 overflow-hidden bg-background text-foreground">
+    <title>{currentTitle + " - Const Router"}</title>
+    <a href="#router-main" className="router-skip-link">Skip to content</a>
+    <div className={cn("hidden h-full shrink-0 border-r border-sidebar-border bg-sidebar md:block transition-[width] duration-200 motion-reduce:transition-none", isCollapsed ? "w-[72px]" : "w-[236px]")}>
+      <Sidebar isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(value => !value)} />
+    </div>
+    <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+      <SheetContent side="left" className="w-[min(300px,calc(100vw-32px))] border-0 bg-sidebar p-0" showCloseButton={false}>
+        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        <Sidebar onNavigate={() => setMobileOpen(false)} onToggleCollapse={() => setMobileOpen(false)} />
+      </SheetContent>
+    </Sheet>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 sm:px-7">
+        <div className="flex min-w-0 items-center gap-2.5 text-sm">
+          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} className="size-10 shrink-0 md:hidden" aria-label="Open navigation"><Menu className="size-4" /></Button>
+          <span className="hidden text-muted-foreground lg:inline">Workspace</span><ChevronRight className="hidden size-3 text-muted-foreground lg:inline" />
+          <span className="truncate font-medium">{currentTitle}</span>
         </div>
-
-        {/* Mobile Slide-out Drawer */}
-        <div className="md:hidden">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetContent
-              side="left"
-              className="p-0 w-64 border-none bg-sidebar"
-              showCloseButton={false}
-            >
-              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-              <Sidebar
-                onNavigate={() => setMobileOpen(false)}
-                onToggleCollapse={() => setMobileOpen(false)}
-              />
-            </SheetContent>
-          </Sheet>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <Link href="/docs" className="hidden items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground lg:flex"><BookOpen className="size-3.5" />Docs</Link>
+          <div className="hidden sm:block"><ThemeToggle /></div>
+          <SafeCreditBoundary><HeaderCreditBalance /></SafeCreditBoundary>
+          <Button asChild size="sm" className="h-9 gap-1.5 rounded-lg px-2.5 text-xs sm:px-3"><Link href="/keys"><Plus className="size-3.5" /><span className="hidden sm:inline">Create key</span><span className="sm:hidden">Key</span></Link></Button>
         </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
-          {/* Top Page Heading Bar: Mobile Menu + Brand (Left) + ThemeToggle, Notif, Credit, Create Key (Right) */}
-          <header className="h-14 w-full border-b border-border/70 bg-card/60 backdrop-blur sticky top-0 z-30 px-3 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
-            {/* Left: Mobile Menu Toggle + Mobile Brand Logo */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileOpen(true)}
-                className="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
-                aria-label="Open navigation"
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-
-              <Link
-                href="/dashboard"
-                className="md:hidden flex items-center gap-2 group min-w-0"
-              >
-                <ConstLogoIcon
-                  size="sm"
-                  className="w-5 h-5 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-serif text-base font-normal tracking-tight text-foreground">
-                    Const
-                  </span>
-                  <span className="text-[9px] font-mono tracking-wider uppercase px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
-                    Router
-                  </span>
-                </div>
-              </Link>
-            </div>
-
-            {/* Right: Controls & Actions */}
-            <div className="flex items-center gap-1.5 sm:gap-3">
-              <ThemeToggle />
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-                aria-label="View quota and notification settings"
-                onClick={() => {
-                  window.location.href = "/settings";
-                }}
-              >
-                <Bell className="h-4 w-4 stroke-[1.75]" />
-              </Button>
-
-              {/* Credit Balance Pill linking to /credits (Protected by SafeCreditBoundary) */}
-              <SafeCreditBoundary>
-                <HeaderCreditBalance />
-              </SafeCreditBoundary>
-
-              <Link href="/keys">
-                <Button
-                  size="sm"
-                  className="h-8 rounded-lg text-xs font-medium px-2.5 sm:px-3.5 bg-foreground text-background hover:bg-foreground/90 cursor-pointer shadow-xs transition-colors shrink-0"
-                >
-                  <span className="hidden sm:inline">Create API key</span>
-                  <span className="sm:hidden">+ Key</span>
-                </Button>
-              </Link>
-            </div>
-          </header>
-
-          {/* Page Content Viewport */}
-          <main
-            className={cn(
-              "flex-1 min-w-0 w-full overflow-y-auto",
-              isGeneration
-                ? "p-0 overflow-hidden flex flex-col h-full"
-                : "p-4 sm:p-6 md:p-8",
-            )}
-          >
-            {children}
-          </main>
-        </div>
-      </div>
-    </>
-  );
+      </header>
+      <main id="router-main" tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col outline-none">
+        {isGeneration ? children : <ScrollArea className="min-h-0 flex-1"><div className="router-page-content">{children}</div></ScrollArea>}
+      </main>
+    </div>
+  </div>;
 }

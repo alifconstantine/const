@@ -6,54 +6,387 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { QueryBoundary } from "@/components/query-boundary";
-import { Button, Skeleton, Badge, ScrollArea, toast, cn } from "@const/ui";
-import { BUILTIN_MODELS } from "@/lib/model-specs";
-import { formatTokenAmount, calculateQuotaMetrics } from "@/lib/quota";
-import { Check, Copy, Terminal, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { Button, ScrollArea, Skeleton, cn } from "@const/ui";
+import { calculateQuotaMetrics, type QuotaLike } from "@/lib/quota";
+import { formatUsd, type TimelinePoint } from "@/lib/router-analytics";
+import { ActivityChart } from "@/components/dashboard/activity-chart";
+import { QuickSetup } from "@/components/dashboard/quick-setup";
+import { ArrowUpRight, ArrowRight } from "lucide-react";
 
-const dollars = (n: number) => "$" + n.toFixed(6);
-
-const QUICK_SETUP_CODE = {
-  curl: `curl https://router.const.web.id/v1/chat/completions \\
-  -H "Authorization: Bearer sk-const-live-YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "deepseek-v4.1-flash:free",
-    "messages": [{"role": "user", "content": "Hello world"}]
-  }'`,
-  python: `from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://router.const.web.id/v1",
-    api_key="sk-const-live-YOUR_API_KEY",
-)
-
-response = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
-    messages=[{"role": "user", "content": "Hello world"}],
-)
-print(response.choices[0].message.content)`,
-  javascript: `import OpenAI from "openai";
-
-const client = new OpenAI({
-  baseURL: "https://router.const.web.id/v1",
-  apiKey: process.env.CONST_API_KEY,
-});
-
-const response = await client.chat.completions.create({
-  model: "deepseek-v4.1-flash:free",
-  messages: [{ role: "user", content: "Hello world" }],
-});
-console.log(response.choices[0].message.content);`,
+type Analytics = {
+  kpi: {
+    totalRequests: number;
+    totalTokens: number;
+    freeTokens: number;
+    paidTokens: number;
+    costUsd: number;
+    successRate: number;
+    avgDurationMs: number;
+    legacyTokens?: number;
+  };
+  timeline: TimelinePoint[];
+  modelBreakdown: {
+    model: string;
+    tier: string;
+    requests: number;
+    tokens: number;
+    costUsd: number;
+  }[];
+  historicalCostsAvailable?: boolean;
 };
+type RecentLog = {
+  _id: string;
+  model: string;
+  totalTokens: number;
+  status: number;
+  createdAt: number;
+  billingTier?: string;
+};
+
+export function OverviewView({
+  analytics,
+  quota,
+  logs,
+  range = "7d",
+  onRangeChange,
+}: {
+  analytics?: Analytics;
+  quota?: QuotaLike;
+  logs?: RecentLog[];
+  range?: string;
+  onRangeChange?: (range: string) => void;
+}) {
+  const metrics = calculateQuotaMetrics(quota);
+  const kpi = analytics?.kpi;
+  const freeRequests = analytics?.modelBreakdown
+    .filter((model) => model.tier === "free")
+    .reduce((sum, model) => sum + model.requests, 0);
+  const paidRequests = analytics?.modelBreakdown
+    .filter((model) => model.tier === "paid")
+    .reduce((sum, model) => sum + model.requests, 0);
+  return (
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
+      <header className="flex flex-wrap items-start justify-between gap-5">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Overview</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your traffic, token usage, and spend at a glance.
+          </p>
+        </div>
+        <Button asChild variant="outline" className="gap-2">
+          <Link href="/generation">
+            Open playground <ArrowUpRight className="size-4" />
+          </Link>
+        </Button>
+      </header>
+      <section
+        aria-label="Usage summary"
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-3">
+          <h2 className="text-sm font-medium">Usage summary</h2>
+          <div
+            className="flex flex-wrap gap-1"
+            role="group"
+            aria-label="Usage period"
+          >
+            {[
+              ["24 hours", "today"],
+              ["7 days", "7d"],
+              ["30 days", "30d"],
+              ["All time", "all"],
+            ].map(([label, value]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={range === value}
+                onClick={() => onRangeChange?.(value!)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                  range === value
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-border lg:grid-cols-4">
+          {[
+            {
+              label: "Requests",
+              value: kpi?.totalRequests.toLocaleString(),
+              detail: kpi
+                ? `${freeRequests?.toLocaleString()} free · ${paidRequests?.toLocaleString()} paid`
+                : "Free and paid traffic",
+            },
+            {
+              label: "Free tokens",
+              value: kpi?.freeTokens.toLocaleString(),
+              detail: "Charged to weekly allowance",
+            },
+            {
+              label: "Paid tokens",
+              value: kpi?.paidTokens.toLocaleString(),
+              detail: "Charged to credit balance",
+            },
+            {
+              label: "Paid usage · USD",
+              value: kpi ? formatUsd(kpi.costUsd) : undefined,
+              detail: "Metered cost in this period",
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="min-w-0 px-5 py-5 max-lg:border-b max-lg:border-border"
+            >
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              {item.value === undefined ? (
+                <Skeleton className="my-3 h-8 w-24" />
+              ) : (
+                <p className="my-3 break-words text-2xl font-medium tracking-tight tabular-nums">
+                  {item.value}
+                </p>
+              )}
+              <p className="text-[11px] leading-5 text-muted-foreground">
+                {item.detail}
+              </p>
+            </div>
+          ))}
+        </div>
+        {!!kpi?.legacyTokens && (
+          <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+            Total tokens also include {kpi.legacyTokens.toLocaleString()} from
+            legacy usage.
+          </p>
+        )}
+      </section>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <section
+          className="min-w-0 rounded-xl border border-border bg-card p-5 sm:p-6"
+          aria-label="Usage activity"
+        >
+          {analytics ? (
+            <ActivityChart timeline={analytics.timeline} range={range} />
+          ) : (
+            <>
+              <Skeleton className="mb-6 h-6 w-40" />
+              <Skeleton className="h-64 w-full" />
+            </>
+          )}
+          <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4 text-xs text-muted-foreground">
+            <span>
+              Success rate{" "}
+              <strong className="ml-2 font-medium text-foreground tabular-nums">
+                {kpi?.totalRequests ? `${kpi.successRate.toFixed(1)}%` : "—"}
+              </strong>
+            </span>
+            <span>
+              Average latency{" "}
+              <strong className="ml-2 font-medium text-foreground tabular-nums">
+                {kpi?.totalRequests
+                  ? `${(kpi.avgDurationMs / 1000).toFixed(2)} s`
+                  : "—"}
+              </strong>
+            </span>
+          </div>
+        </section>
+        <section
+          className="flex flex-col rounded-xl border border-border bg-card p-5 sm:p-6"
+          aria-label="Weekly free allowance"
+        >
+          <h2 className="text-sm font-medium">Weekly free allowance</h2>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Shared by models with the <code>:free</code> suffix.
+          </p>
+          <div className="my-7">
+            {quota ? (
+              <p className="text-3xl font-medium tracking-tight tabular-nums">
+                {metrics.formattedRemaining}
+              </p>
+            ) : (
+              <Skeleton className="h-9 w-32" />
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              tokens remaining
+            </p>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Free tokens remaining"
+            aria-valuemin={0}
+            aria-valuemax={metrics.limitTokens}
+            aria-valuenow={quota ? metrics.remainingTokens : undefined}
+            className="h-1.5 overflow-hidden rounded-full bg-secondary"
+          >
+            <div
+              className={
+                metrics.isLow
+                  ? "h-full bg-amber-400"
+                  : "h-full bg-[var(--router-highlight)]"
+              }
+              style={{ width: quota ? `${metrics.percentRemaining}%` : "0%" }}
+            />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {quota
+              ? `${metrics.formattedUsed} of ${metrics.formattedLimit} used · resets in ${metrics.resetsInText}`
+              : "Loading your allowance…"}
+          </p>
+          <Link
+            href="/models"
+            className="mt-6 inline-flex items-center justify-between gap-3 border-t border-border pt-4 text-xs font-medium hover:text-[var(--router-highlight)]"
+          >
+            Explore free models <ArrowRight className="size-4" />
+          </Link>
+        </section>
+      </div>
+      <section aria-label="Usage by model" className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-medium">Usage by model</h2>
+          <span className="text-xs text-muted-foreground">Selected period</span>
+        </div>
+        <ScrollArea
+          orientation="horizontal"
+          className="rounded-xl border border-border bg-card"
+          viewportRef={(node) => {
+            if (node) {
+              node.tabIndex = 0;
+              node.setAttribute("aria-label", "Usage by model data");
+              node.setAttribute("role", "region");
+            }
+          }}
+        >
+          <table className="w-full min-w-[560px] text-left text-xs">
+            <thead className="border-b border-border text-muted-foreground">
+              <tr>
+                {["Model / tier", "Requests", "Tokens", "Cost · USD"].map(
+                  (label, index) => (
+                    <th
+                      key={label}
+                      className={cn(
+                        "px-5 py-3 font-medium",
+                        index > 0 && "text-right",
+                      )}
+                    >
+                      {label}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {analytics?.modelBreakdown.map((model) => (
+                <tr
+                  key={`${model.model}-${model.tier}`}
+                  className="hover:bg-secondary/40"
+                >
+                  <td className="px-5 py-4">
+                    <p className="font-medium">{model.model}</p>
+                    <p className="mt-1 text-muted-foreground capitalize">
+                      {model.tier}
+                    </p>
+                  </td>
+                  <td className="px-5 py-4 text-right tabular-nums">
+                    {model.requests.toLocaleString()}
+                  </td>
+                  <td className="px-5 py-4 text-right tabular-nums">
+                    {model.tokens.toLocaleString()}
+                  </td>
+                  <td className="px-5 py-4 text-right tabular-nums">
+                    {formatUsd(model.costUsd)}
+                  </td>
+                </tr>
+              ))}
+              {!analytics ? (
+                <tr>
+                  <td colSpan={4} className="p-5">
+                    <Skeleton className="h-16 w-full" />
+                  </td>
+                </tr>
+              ) : (
+                !analytics.modelBreakdown.length && (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-5 py-10 text-center text-muted-foreground"
+                    >
+                      No usage in this period. Try a different date range or
+                      send your first request.
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </ScrollArea>
+        {analytics?.historicalCostsAvailable === false && (
+          <p className="text-xs text-muted-foreground">
+            Costs reflect metered requests. Historical costs before metering are
+            unavailable.
+          </p>
+        )}
+      </section>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="min-w-0 space-y-4" aria-label="Recent requests">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium">Recent requests</h2>
+            <Link
+              href="/logs"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              All logs <ArrowUpRight className="size-3.5" />
+            </Link>
+          </div>
+          <div className="divide-y divide-border rounded-xl border border-border bg-card">
+            {logs?.map((log) => (
+              <div
+                key={log._id}
+                className="flex items-center justify-between gap-4 px-5 py-4 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{log.model}</p>
+                  <p className="mt-1.5 text-muted-foreground tabular-nums">
+                    {log.totalTokens.toLocaleString()} tokens ·{" "}
+                    {new Date(log.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-md px-2 py-1 tabular-nums",
+                    log.status >= 400
+                      ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                      : "bg-secondary text-foreground",
+                  )}
+                >
+                  {log.status}
+                </span>
+              </div>
+            ))}
+            {logs === undefined ? (
+              <div className="p-5">
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : (
+              !logs.length && (
+                <p className="px-5 py-10 text-center text-xs leading-5 text-muted-foreground">
+                  Your latest requests will appear here after you make a call.
+                </p>
+              )
+            )}
+          </div>
+        </section>
+        <QuickSetup />
+      </div>
+    </div>
+  );
+}
 
 function Overview() {
   const { isAuthenticated } = useRouterAuth();
   const [range, setRange] = useState("7d");
-  const [setupTab, setSetupTab] = useState<"curl" | "python" | "javascript">("curl");
-  const [copiedSetup, setCopiedSetup] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
-
   const analytics = useQuery(
     api.router.logs.getDashboardAnalytics,
     isAuthenticated ? { timeRange: range } : "skip",
@@ -66,378 +399,16 @@ function Overview() {
     api.router.logs.listLogs,
     isAuthenticated ? { limit: 8 } : "skip",
   );
-
-  const metrics = calculateQuotaMetrics(quota);
-  const kpi = analytics?.kpi;
-  const max = Math.max(1, ...(analytics?.timeline.map((t) => t.tokens) ?? []));
-
-  async function copyBaseUrl() {
-    try {
-      await navigator.clipboard.writeText("https://router.const.web.id/v1");
-      setCopiedUrl(true);
-      toast.success("Base URL copied");
-      setTimeout(() => setCopiedUrl(false), 2000);
-    } catch {
-      toast.error("Could not copy Base URL");
-    }
-  }
-
-  async function copySnippet() {
-    try {
-      await navigator.clipboard.writeText(QUICK_SETUP_CODE[setupTab]);
-      setCopiedSetup(true);
-      toast.success("Snippet copied");
-      setTimeout(() => setCopiedSetup(false), 2000);
-    } catch {
-      toast.error("Could not copy snippet");
-    }
-  }
-
   return (
-    <div className="max-w-6xl mx-auto space-y-7 pb-12">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 items-start">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">Overview</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Requests, free allowance, and paid usage in one place.
-          </p>
-        </div>
-
-        {/* Minimal Time Range Segmented Selector */}
-        <div className="flex gap-1 bg-secondary/50 p-1 rounded-xl border border-border/50 overflow-x-auto no-scrollbar max-w-full">
-          {[
-            ["24h", "today"],
-            ["7 days", "7d"],
-            ["30 days", "30d"],
-            ["All time", "all"],
-          ].map(([label, value]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setRange(value!)}
-              className={cn(
-                "px-2.5 sm:px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer shrink-0",
-                range === value
-                  ? "bg-card text-foreground shadow-xs border border-border/60"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* KPI Cards (Responsive 2-col on mobile, 4-col on desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[
-          ["Paid usage", kpi ? dollars(kpi.costUsd) : undefined],
-          ["Requests", kpi?.totalRequests.toLocaleString()],
-          [
-            "Free tokens used",
-            kpi ? formatTokenAmount(kpi.freeTokens) : undefined,
-          ],
-          [
-            "Paid tokens used",
-            kpi ? formatTokenAmount(kpi.paidTokens) : undefined,
-          ],
-        ].map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-xl bg-card border border-border/60 p-3.5 sm:p-5 space-y-1.5 sm:space-y-2 shadow-xs"
-          >
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate">{label}</p>
-            {value === undefined ? (
-              <Skeleton className="h-7 sm:h-8 w-20 sm:w-24" />
-            ) : (
-              <p className="text-xl sm:text-2xl font-medium tracking-tight tabular-nums truncate">{value}</p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Activity Chart & Free Allowance */}
-      <div className="grid lg:grid-cols-[1.5fr_1fr] gap-5">
-        <section className="bg-card border border-border/60 rounded-xl p-5 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="font-medium text-sm">Token activity</h2>
-            <span className="text-xs text-muted-foreground font-mono">
-              Hourly totals
-            </span>
-          </div>
-
-          {!analytics ? (
-            <Skeleton className="h-36 w-full" />
-          ) : !analytics.timeline.length ? (
-            <div className="h-36 flex items-center justify-center text-xs text-muted-foreground">
-              Send your first request to see activity.
-            </div>
-          ) : (
-            <div
-              className="h-36 flex gap-1 items-end overflow-hidden"
-              aria-label="Tokens used by hour"
-            >
-              {analytics.timeline.slice(-120).map((t) => (
-                <div
-                  key={t.timestamp}
-                  className="bg-foreground/80 min-w-[2px] flex-1 rounded-t-sm hover:bg-foreground transition-colors"
-                  style={{ height: Math.max(2, (t.tokens / max) * 100) + "%" }}
-                  title={
-                    new Date(t.timestamp).toLocaleString() +
-                    ": " +
-                    t.tokens.toLocaleString() +
-                    " tokens"
-                  }
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-5 text-xs text-muted-foreground pt-1 border-t border-border/30">
-            <span>
-              Success rate:{" "}
-              <strong className="text-foreground font-mono">
-                {kpi ? kpi.successRate.toFixed(1) + "%" : "—"}
-              </strong>
-            </span>
-            <span>
-              Average latency:{" "}
-              <strong className="text-foreground font-mono">
-                {kpi ? (kpi.avgDurationMs / 1000).toFixed(2) + "s" : "—"}
-              </strong>
-            </span>
-          </div>
-        </section>
-
-        {/* Free Allowance Card */}
-        <section className="bg-card border border-border/60 rounded-xl p-5 flex flex-col justify-between gap-4">
-          <div>
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium text-sm">Weekly Free Allowance</h2>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-secondary text-muted-foreground">
-                7M / Cycle
-              </span>
-            </div>
-            <p className="text-2xl font-medium tracking-tight tabular-nums mt-4">
-              {quota ? metrics.formattedRemaining : "—"}{" "}
-              <span className="text-xs text-muted-foreground font-normal">
-                tokens left
-              </span>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="h-2 bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-foreground rounded-full transition-all duration-300"
-                style={{ width: metrics.percentRemaining + "%" }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Resets in <span className="text-foreground font-medium">{metrics.resetsInText}</span>. Applies to all models marked <code className="text-foreground font-mono">:free</code>.
-            </p>
-          </div>
-
-          <Link
-            href="/models"
-            className="text-xs font-medium text-foreground hover:underline inline-flex items-center gap-1 pt-2 border-t border-border/30"
-          >
-            <span>Browse {BUILTIN_MODELS.filter((m) => m.tier === "free").length} free tier models</span>
-            <ArrowUpRight className="h-3 w-3" />
-          </Link>
-        </section>
-      </div>
-
-      {/* Quick Setup Card */}
-      <section className="bg-card border border-border/60 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-medium text-sm">Quick Setup</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Drop-in replacement for OpenAI SDK clients. Replace the base URL and use your key.
-            </p>
-          </div>
-
-          {/* Language selector & Copy */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg border border-border/50">
-              {(["curl", "python", "javascript"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setSetupTab(t)}
-                  className={cn(
-                    "px-2.5 py-1 text-xs font-mono font-medium rounded transition-colors cursor-pointer capitalize",
-                    setupTab === t
-                      ? "bg-card text-foreground shadow-xs border border-border/60"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t === "curl" ? "cURL" : t === "python" ? "Python" : "Node.js"}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs gap-1.5 rounded-lg"
-              onClick={copySnippet}
-            >
-              {copiedSetup ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  <span>Copy</span>
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Base URL Pill */}
-        <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30 border border-border/40 text-xs gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-muted-foreground font-mono shrink-0">Base URL:</span>
-            <code className="font-mono text-foreground font-medium truncate">https://router.const.web.id/v1</code>
-          </div>
-          <button
-            type="button"
-            onClick={copyBaseUrl}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 font-mono cursor-pointer shrink-0"
-          >
-            {copiedUrl ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            <span>{copiedUrl ? "Copied" : "Copy URL"}</span>
-          </button>
-        </div>
-
-        {/* Code Snippet */}
-        <div className="rounded-lg bg-secondary/20 border border-border/40 overflow-hidden">
-          <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto text-foreground/90">
-            {QUICK_SETUP_CODE[setupTab]}
-          </pre>
-        </div>
-      </section>
-
-      {/* Recent Requests (Moved UP!) */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="font-medium text-sm">Recent requests</h2>
-          <Link
-            href="/logs"
-            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-          >
-            <span>View usage logs</span>
-            <ArrowUpRight className="h-3 w-3" />
-          </Link>
-        </div>
-
-        <div className="bg-card border border-border/60 rounded-xl divide-y divide-border/40 overflow-hidden">
-          {logs?.map((log) => (
-            <div
-              key={log._id}
-              className="p-3.5 sm:p-4 flex items-center justify-between gap-2.5 text-xs hover:bg-secondary/20 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="font-mono font-medium text-foreground truncate">{log.model}</p>
-                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
-                  {log.totalTokens.toLocaleString()} tokens ·{" "}
-                  {new Date(log.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <Badge
-                variant={log.status >= 400 ? "destructive" : "secondary"}
-                className="font-mono text-[10px] shrink-0"
-              >
-                {log.status}
-              </Badge>
-            </div>
-          ))}
-
-          {logs?.length === 0 && (
-            <p className="p-8 text-xs text-muted-foreground text-center">
-              Your recent requests will appear here once you send calls.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Usage By Model (Moved to the VERY BOTTOM!) */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="font-medium text-sm">Usage by model</h2>
-          <span className="text-xs text-muted-foreground font-mono">
-            Metered telemetry
-          </span>
-        </div>
-
-        <div className="bg-card border border-border/60 rounded-xl overflow-hidden">
-          <ScrollArea orientation="horizontal">
-            <table className="min-w-[550px] w-full text-sm text-left">
-              <thead className="bg-secondary/40 text-xs text-muted-foreground border-b border-border/40">
-                <tr>
-                  {["Model", "Requests", "Tokens", "Cost"].map((t) => (
-                    <th key={t} className="px-5 py-3.5 font-normal">
-                      {t}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {analytics?.modelBreakdown.map((m) => (
-                  <tr key={m.model} className="hover:bg-secondary/20 transition-colors">
-                    <td className="p-4 font-mono text-xs">
-                      {m.model}{" "}
-                      <Badge variant="secondary" className="ml-1 text-[10px] font-mono">
-                        {m.tier}
-                      </Badge>
-                    </td>
-                    <td className="p-4 tabular-nums text-xs">{m.requests}</td>
-                    <td className="p-4 tabular-nums text-xs font-mono">
-                      {m.tokens.toLocaleString()}
-                    </td>
-                    <td className="p-4 tabular-nums text-xs font-mono font-medium">
-                      {dollars(m.costUsd)}
-                    </td>
-                  </tr>
-                ))}
-                {analytics && !analytics.modelBreakdown.length && (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="p-8 text-center text-xs text-muted-foreground"
-                    >
-                      No usage recorded in this period.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
-        </div>
-      </section>
-
-      {/* Bottom Actions */}
-      <div className="flex flex-wrap gap-2.5 pt-2">
-        <Button asChild size="sm" className="rounded-lg flex-1 sm:flex-none">
-          <Link href="/generation">Open Playground</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-lg flex-1 sm:flex-none">
-          <Link href="/keys">Manage API keys</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm" className="rounded-lg w-full sm:w-auto">
-          <Link href="/docs">Read documentation</Link>
-        </Button>
-      </div>
-    </div>
+    <OverviewView
+      analytics={analytics}
+      quota={quota}
+      logs={logs}
+      range={range}
+      onRangeChange={setRange}
+    />
   );
 }
-
 export default function DashboardPage() {
   return (
     <QueryBoundary name="Overview">

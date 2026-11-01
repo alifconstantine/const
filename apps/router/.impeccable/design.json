@@ -1,0 +1,731 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T10:36:12.867Z",
+  "title": "Design System: Const Router",
+  "extensions": {
+    "colorMeta": {
+      "public-background": {
+        "role": "neutral",
+        "displayName": "Public Background",
+        "canonical": "#09090b",
+        "tonalRamp": [
+          "oklch(15% 0.0020 285.8)",
+          "oklch(26% 0.0032 285.8)",
+          "oklch(38% 0.0041 285.8)",
+          "oklch(50% 0.0044 285.8)",
+          "oklch(62% 0.0041 285.8)",
+          "oklch(74% 0.0032 285.8)",
+          "oklch(86% 0.0019 285.8)",
+          "oklch(95% 0.0007 285.8)"
+        ]
+      },
+      "public-panel": {
+        "role": "neutral",
+        "displayName": "Public Panel",
+        "canonical": "#121214",
+        "tonalRamp": [
+          "oklch(15% 0.0018 286.0)",
+          "oklch(26% 0.0029 286.0)",
+          "oklch(38% 0.0038 286.0)",
+          "oklch(50% 0.0040 286.0)",
+          "oklch(62% 0.0038 286.0)",
+          "oklch(74% 0.0029 286.0)",
+          "oklch(86% 0.0017 286.0)",
+          "oklch(95% 0.0006 286.0)"
+        ]
+      },
+      "public-line": {
+        "role": "neutral",
+        "displayName": "Public Line",
+        "canonical": "#29292e",
+        "tonalRamp": [
+          "oklch(15% 0.0041 285.8)",
+          "oklch(26% 0.0066 285.8)",
+          "oklch(38% 0.0084 285.8)",
+          "oklch(50% 0.0091 285.8)",
+          "oklch(62% 0.0084 285.8)",
+          "oklch(74% 0.0066 285.8)",
+          "oklch(86% 0.0039 285.8)",
+          "oklch(95% 0.0014 285.8)"
+        ]
+      },
+      "public-text": {
+        "role": "neutral",
+        "displayName": "Public Text",
+        "canonical": "#f4f1eb",
+        "tonalRamp": [
+          "oklch(15% 0.0039 84.6)",
+          "oklch(26% 0.0063 84.6)",
+          "oklch(38% 0.0080 84.6)",
+          "oklch(50% 0.0086 84.6)",
+          "oklch(62% 0.0080 84.6)",
+          "oklch(74% 0.0063 84.6)",
+          "oklch(86% 0.0037 84.6)",
+          "oklch(95% 0.0013 84.6)"
+        ]
+      },
+      "public-muted": {
+        "role": "neutral",
+        "displayName": "Public Muted",
+        "canonical": "#a3a3ab",
+        "tonalRamp": [
+          "oklch(15% 0.0052 286.1)",
+          "oklch(26% 0.0084 286.1)",
+          "oklch(38% 0.0107 286.1)",
+          "oklch(50% 0.0115 286.1)",
+          "oklch(62% 0.0107 286.1)",
+          "oklch(74% 0.0084 286.1)",
+          "oklch(86% 0.0049 286.1)",
+          "oklch(95% 0.0018 286.1)"
+        ]
+      },
+      "champagne": {
+        "role": "primary",
+        "displayName": "Champagne",
+        "canonical": "#cfbd9c",
+        "tonalRamp": [
+          "oklch(15% 0.0223 82.6)",
+          "oklch(26% 0.0357 82.6)",
+          "oklch(38% 0.0456 82.6)",
+          "oklch(50% 0.0490 82.6)",
+          "oklch(62% 0.0456 82.6)",
+          "oklch(74% 0.0357 82.6)",
+          "oklch(86% 0.0209 82.6)",
+          "oklch(95% 0.0077 82.6)"
+        ]
+      },
+      "console-background": {
+        "role": "neutral",
+        "displayName": "Console Background",
+        "canonical": "hsl(240 10% 3.5%)",
+        "tonalRamp": [
+          "oklch(15% 0.0019 285.8)",
+          "oklch(26% 0.0030 285.8)",
+          "oklch(38% 0.0039 285.8)",
+          "oklch(50% 0.0042 285.8)",
+          "oklch(62% 0.0039 285.8)",
+          "oklch(74% 0.0030 285.8)",
+          "oklch(86% 0.0018 285.8)",
+          "oklch(95% 0.0007 285.8)"
+        ]
+      },
+      "console-text": {
+        "role": "neutral",
+        "displayName": "Console Text",
+        "canonical": "hsl(40 23% 94%)",
+        "tonalRamp": [
+          "oklch(15% 0.0031 84.6)",
+          "oklch(26% 0.0049 84.6)",
+          "oklch(38% 0.0063 84.6)",
+          "oklch(50% 0.0067 84.6)",
+          "oklch(62% 0.0063 84.6)",
+          "oklch(74% 0.0049 84.6)",
+          "oklch(86% 0.0029 84.6)",
+          "oklch(95% 0.0011 84.6)"
+        ]
+      },
+      "console-card": {
+        "role": "neutral",
+        "displayName": "Console Card",
+        "canonical": "hsl(240 5% 7%)",
+        "tonalRamp": [
+          "oklch(15% 0.0016 286.0)",
+          "oklch(26% 0.0026 286.0)",
+          "oklch(38% 0.0034 286.0)",
+          "oklch(50% 0.0036 286.0)",
+          "oklch(62% 0.0034 286.0)",
+          "oklch(74% 0.0026 286.0)",
+          "oklch(86% 0.0015 286.0)",
+          "oklch(95% 0.0006 286.0)"
+        ]
+      },
+      "console-secondary": {
+        "role": "neutral",
+        "displayName": "Console Secondary",
+        "canonical": "hsl(240 5% 11%)",
+        "tonalRamp": [
+          "oklch(15% 0.0025 286.0)",
+          "oklch(26% 0.0039 286.0)",
+          "oklch(38% 0.0050 286.0)",
+          "oklch(50% 0.0054 286.0)",
+          "oklch(62% 0.0050 286.0)",
+          "oklch(74% 0.0039 286.0)",
+          "oklch(86% 0.0023 286.0)",
+          "oklch(95% 0.0008 286.0)"
+        ]
+      },
+      "console-secondary-text": {
+        "role": "neutral",
+        "displayName": "Console Secondary Text",
+        "canonical": "hsl(40 12% 89%)",
+        "tonalRamp": [
+          "oklch(15% 0.0030 84.6)",
+          "oklch(26% 0.0047 84.6)",
+          "oklch(38% 0.0061 84.6)",
+          "oklch(50% 0.0065 84.6)",
+          "oklch(62% 0.0061 84.6)",
+          "oklch(74% 0.0047 84.6)",
+          "oklch(86% 0.0028 84.6)",
+          "oklch(95% 0.0010 84.6)"
+        ]
+      },
+      "console-muted": {
+        "role": "neutral",
+        "displayName": "Console Muted",
+        "canonical": "hsl(240 5% 14%)",
+        "tonalRamp": [
+          "oklch(15% 0.0030 285.9)",
+          "oklch(26% 0.0049 285.9)",
+          "oklch(38% 0.0062 285.9)",
+          "oklch(50% 0.0067 285.9)",
+          "oklch(62% 0.0062 285.9)",
+          "oklch(74% 0.0049 285.9)",
+          "oklch(86% 0.0028 285.9)",
+          "oklch(95% 0.0010 285.9)"
+        ]
+      },
+      "console-muted-text": {
+        "role": "neutral",
+        "displayName": "Console Muted Text",
+        "canonical": "hsl(240 5% 66%)",
+        "tonalRamp": [
+          "oklch(15% 0.0056 286.1)",
+          "oklch(26% 0.0091 286.1)",
+          "oklch(38% 0.0115 286.1)",
+          "oklch(50% 0.0124 286.1)",
+          "oklch(62% 0.0115 286.1)",
+          "oklch(74% 0.0091 286.1)",
+          "oklch(86% 0.0053 286.1)",
+          "oklch(95% 0.0019 286.1)"
+        ]
+      },
+      "console-border": {
+        "role": "neutral",
+        "displayName": "Console Border",
+        "canonical": "hsl(240 5% 17%)",
+        "tonalRamp": [
+          "oklch(15% 0.0036 285.9)",
+          "oklch(26% 0.0057 285.9)",
+          "oklch(38% 0.0073 285.9)",
+          "oklch(50% 0.0079 285.9)",
+          "oklch(62% 0.0073 285.9)",
+          "oklch(74% 0.0057 285.9)",
+          "oklch(86% 0.0033 285.9)",
+          "oklch(95% 0.0012 285.9)"
+        ]
+      },
+      "console-input": {
+        "role": "neutral",
+        "displayName": "Console Input",
+        "canonical": "hsl(240 5% 21%)",
+        "tonalRamp": [
+          "oklch(15% 0.0043 285.9)",
+          "oklch(26% 0.0069 285.9)",
+          "oklch(38% 0.0087 285.9)",
+          "oklch(50% 0.0094 285.9)",
+          "oklch(62% 0.0087 285.9)",
+          "oklch(74% 0.0069 285.9)",
+          "oklch(86% 0.0040 285.9)",
+          "oklch(95% 0.0015 285.9)"
+        ]
+      },
+      "console-ring": {
+        "role": "neutral",
+        "displayName": "Console Ring",
+        "canonical": "hsl(38 35% 70%)",
+        "tonalRamp": [
+          "oklch(15% 0.0232 81.3)",
+          "oklch(26% 0.0372 81.3)",
+          "oklch(38% 0.0474 81.3)",
+          "oklch(50% 0.0510 81.3)",
+          "oklch(62% 0.0474 81.3)",
+          "oklch(74% 0.0372 81.3)",
+          "oklch(86% 0.0217 81.3)",
+          "oklch(95% 0.0080 81.3)"
+        ]
+      },
+      "console-primary-ink": {
+        "role": "neutral",
+        "displayName": "Console Primary Ink",
+        "canonical": "hsl(240 10% 4%)",
+        "tonalRamp": [
+          "oklch(15% 0.0020 285.8)",
+          "oklch(26% 0.0032 285.8)",
+          "oklch(38% 0.0041 285.8)",
+          "oklch(50% 0.0044 285.8)",
+          "oklch(62% 0.0041 285.8)",
+          "oklch(74% 0.0032 285.8)",
+          "oklch(86% 0.0019 285.8)",
+          "oklch(95% 0.0007 285.8)"
+        ]
+      },
+      "console-destructive": {
+        "role": "neutral",
+        "displayName": "Console Destructive",
+        "canonical": "hsl(0 63% 52%)",
+        "tonalRamp": [
+          "oklch(15% 0.0869 25.6)",
+          "oklch(26% 0.1395 25.6)",
+          "oklch(38% 0.1779 25.6)",
+          "oklch(50% 0.1913 25.6)",
+          "oklch(62% 0.1779 25.6)",
+          "oklch(74% 0.1395 25.6)",
+          "oklch(86% 0.0815 25.6)",
+          "oklch(95% 0.0299 25.6)"
+        ]
+      },
+      "sidebar-background": {
+        "role": "neutral",
+        "displayName": "Sidebar Background",
+        "canonical": "hsl(240 7% 5.5%)",
+        "tonalRamp": [
+          "oklch(15% 0.0019 285.9)",
+          "oklch(26% 0.0030 285.9)",
+          "oklch(38% 0.0038 285.9)",
+          "oklch(50% 0.0041 285.9)",
+          "oklch(62% 0.0038 285.9)",
+          "oklch(74% 0.0030 285.9)",
+          "oklch(86% 0.0017 285.9)",
+          "oklch(95% 0.0006 285.9)"
+        ]
+      },
+      "sidebar-active": {
+        "role": "neutral",
+        "displayName": "Sidebar Active",
+        "canonical": "hsl(35 8% 12%)",
+        "tonalRamp": [
+          "oklch(15% 0.0028 76.5)",
+          "oklch(26% 0.0045 76.5)",
+          "oklch(38% 0.0057 76.5)",
+          "oklch(50% 0.0062 76.5)",
+          "oklch(62% 0.0057 76.5)",
+          "oklch(74% 0.0045 76.5)",
+          "oklch(86% 0.0026 76.5)",
+          "oklch(95% 0.0010 76.5)"
+        ]
+      },
+      "chart-paid": {
+        "role": "neutral",
+        "displayName": "Chart Paid",
+        "canonical": "#94adbd",
+        "tonalRamp": [
+          "oklch(15% 0.0164 236.1)",
+          "oklch(26% 0.0263 236.1)",
+          "oklch(38% 0.0336 236.1)",
+          "oklch(50% 0.0361 236.1)",
+          "oklch(62% 0.0336 236.1)",
+          "oklch(74% 0.0263 236.1)",
+          "oklch(86% 0.0154 236.1)",
+          "oklch(95% 0.0057 236.1)"
+        ]
+      },
+      "light-background": {
+        "role": "neutral",
+        "displayName": "Light Background",
+        "canonical": "hsl(45 15% 97%)",
+        "tonalRamp": [
+          "oklch(15% 0.0011 91.4)",
+          "oklch(26% 0.0017 91.4)",
+          "oklch(38% 0.0022 91.4)",
+          "oklch(50% 0.0024 91.4)",
+          "oklch(62% 0.0022 91.4)",
+          "oklch(74% 0.0017 91.4)",
+          "oklch(86% 0.0010 91.4)",
+          "oklch(95% 0.0004 91.4)"
+        ]
+      },
+      "light-text": {
+        "role": "neutral",
+        "displayName": "Light Text",
+        "canonical": "hsl(240 6% 10%)",
+        "tonalRamp": [
+          "oklch(15% 0.0027 285.9)",
+          "oklch(26% 0.0044 285.9)",
+          "oklch(38% 0.0056 285.9)",
+          "oklch(50% 0.0060 285.9)",
+          "oklch(62% 0.0056 285.9)",
+          "oklch(74% 0.0044 285.9)",
+          "oklch(86% 0.0025 285.9)",
+          "oklch(95% 0.0009 285.9)"
+        ]
+      },
+      "light-card": {
+        "role": "neutral",
+        "displayName": "Light Card",
+        "canonical": "hsl(0 0% 100%)",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.9)",
+          "oklch(26% 0.0000 89.9)",
+          "oklch(38% 0.0000 89.9)",
+          "oklch(50% 0.0000 89.9)",
+          "oklch(62% 0.0000 89.9)",
+          "oklch(74% 0.0000 89.9)",
+          "oklch(86% 0.0000 89.9)",
+          "oklch(95% 0.0000 89.9)"
+        ]
+      },
+      "light-secondary": {
+        "role": "neutral",
+        "displayName": "Light Secondary",
+        "canonical": "hsl(40 8% 93%)",
+        "tonalRamp": [
+          "oklch(15% 0.0012 84.6)",
+          "oklch(26% 0.0020 84.6)",
+          "oklch(38% 0.0026 84.6)",
+          "oklch(50% 0.0027 84.6)",
+          "oklch(62% 0.0026 84.6)",
+          "oklch(74% 0.0020 84.6)",
+          "oklch(86% 0.0012 84.6)",
+          "oklch(95% 0.0004 84.6)"
+        ]
+      },
+      "light-secondary-text": {
+        "role": "neutral",
+        "displayName": "Light Secondary Text",
+        "canonical": "hsl(240 6% 15%)",
+        "tonalRamp": [
+          "oklch(15% 0.0039 285.8)",
+          "oklch(26% 0.0062 285.8)",
+          "oklch(38% 0.0079 285.8)",
+          "oklch(50% 0.0085 285.8)",
+          "oklch(62% 0.0079 285.8)",
+          "oklch(74% 0.0062 285.8)",
+          "oklch(86% 0.0036 285.8)",
+          "oklch(95% 0.0013 285.8)"
+        ]
+      },
+      "light-muted": {
+        "role": "neutral",
+        "displayName": "Light Muted",
+        "canonical": "hsl(40 6% 91%)",
+        "tonalRamp": [
+          "oklch(15% 0.0012 84.6)",
+          "oklch(26% 0.0019 84.6)",
+          "oklch(38% 0.0025 84.6)",
+          "oklch(50% 0.0027 84.6)",
+          "oklch(62% 0.0025 84.6)",
+          "oklch(74% 0.0019 84.6)",
+          "oklch(86% 0.0011 84.6)",
+          "oklch(95% 0.0004 84.6)"
+        ]
+      },
+      "light-muted-text": {
+        "role": "neutral",
+        "displayName": "Light Muted Text",
+        "canonical": "hsl(240 4% 41%)",
+        "tonalRamp": [
+          "oklch(15% 0.0059 285.9)",
+          "oklch(26% 0.0096 285.9)",
+          "oklch(38% 0.0122 285.9)",
+          "oklch(50% 0.0131 285.9)",
+          "oklch(62% 0.0122 285.9)",
+          "oklch(74% 0.0096 285.9)",
+          "oklch(86% 0.0056 285.9)",
+          "oklch(95% 0.0021 285.9)"
+        ]
+      },
+      "light-border": {
+        "role": "neutral",
+        "displayName": "Light Border",
+        "canonical": "hsl(40 5% 84%)",
+        "tonalRamp": [
+          "oklch(15% 0.0018 84.6)",
+          "oklch(26% 0.0029 84.6)",
+          "oklch(38% 0.0037 84.6)",
+          "oklch(50% 0.0040 84.6)",
+          "oklch(62% 0.0037 84.6)",
+          "oklch(74% 0.0029 84.6)",
+          "oklch(86% 0.0017 84.6)",
+          "oklch(95% 0.0006 84.6)"
+        ]
+      },
+      "light-ring": {
+        "role": "neutral",
+        "displayName": "Light Ring",
+        "canonical": "hsl(35 24% 42%)",
+        "tonalRamp": [
+          "oklch(15% 0.0232 75.7)",
+          "oklch(26% 0.0372 75.7)",
+          "oklch(38% 0.0475 75.7)",
+          "oklch(50% 0.0511 75.7)",
+          "oklch(62% 0.0475 75.7)",
+          "oklch(74% 0.0372 75.7)",
+          "oklch(86% 0.0217 75.7)",
+          "oklch(95% 0.0080 75.7)"
+        ]
+      },
+      "light-highlight": {
+        "role": "primary",
+        "displayName": "Light Highlight",
+        "canonical": "#78613e",
+        "tonalRamp": [
+          "oklch(15% 0.0265 77.3)",
+          "oklch(26% 0.0426 77.3)",
+          "oklch(38% 0.0543 77.3)",
+          "oklch(50% 0.0585 77.3)",
+          "oklch(62% 0.0543 77.3)",
+          "oklch(74% 0.0426 77.3)",
+          "oklch(86% 0.0249 77.3)",
+          "oklch(95% 0.0091 77.3)"
+        ]
+      },
+      "light-sidebar": {
+        "role": "neutral",
+        "displayName": "Light Sidebar",
+        "canonical": "hsl(40 10% 94%)",
+        "tonalRamp": [
+          "oklch(15% 0.0013 84.6)",
+          "oklch(26% 0.0021 84.6)",
+          "oklch(38% 0.0027 84.6)",
+          "oklch(50% 0.0029 84.6)",
+          "oklch(62% 0.0027 84.6)",
+          "oklch(74% 0.0021 84.6)",
+          "oklch(86% 0.0012 84.6)",
+          "oklch(95% 0.0005 84.6)"
+        ]
+      },
+      "light-sidebar-text": {
+        "role": "neutral",
+        "displayName": "Light Sidebar Text",
+        "canonical": "hsl(240 4% 38%)",
+        "tonalRamp": [
+          "oklch(15% 0.0056 285.9)",
+          "oklch(26% 0.0090 285.9)",
+          "oklch(38% 0.0114 285.9)",
+          "oklch(50% 0.0123 285.9)",
+          "oklch(62% 0.0114 285.9)",
+          "oklch(74% 0.0090 285.9)",
+          "oklch(86% 0.0052 285.9)",
+          "oklch(95% 0.0019 285.9)"
+        ]
+      },
+      "light-sidebar-active": {
+        "role": "neutral",
+        "displayName": "Light Sidebar Active",
+        "canonical": "hsl(40 6% 88%)",
+        "tonalRamp": [
+          "oklch(15% 0.0016 84.6)",
+          "oklch(26% 0.0026 84.6)",
+          "oklch(38% 0.0033 84.6)",
+          "oklch(50% 0.0036 84.6)",
+          "oklch(62% 0.0033 84.6)",
+          "oklch(74% 0.0026 84.6)",
+          "oklch(86% 0.0015 84.6)",
+          "oklch(95% 0.0006 84.6)"
+        ]
+      },
+      "light-chart-free": {
+        "role": "neutral",
+        "displayName": "Light Chart Free",
+        "canonical": "#817255",
+        "tonalRamp": [
+          "oklch(15% 0.0209 83.6)",
+          "oklch(26% 0.0336 83.6)",
+          "oklch(38% 0.0429 83.6)",
+          "oklch(50% 0.0461 83.6)",
+          "oklch(62% 0.0429 83.6)",
+          "oklch(74% 0.0336 83.6)",
+          "oklch(86% 0.0196 83.6)",
+          "oklch(95% 0.0072 83.6)"
+        ]
+      },
+      "light-chart-paid": {
+        "role": "neutral",
+        "displayName": "Light Chart Paid",
+        "canonical": "#637c96",
+        "tonalRamp": [
+          "oklch(15% 0.0226 249.7)",
+          "oklch(26% 0.0362 249.7)",
+          "oklch(38% 0.0462 249.7)",
+          "oklch(50% 0.0497 249.7)",
+          "oklch(62% 0.0462 249.7)",
+          "oklch(74% 0.0362 249.7)",
+          "oklch(86% 0.0212 249.7)",
+          "oklch(95% 0.0078 249.7)"
+        ]
+      },
+      "light-destructive": {
+        "role": "neutral",
+        "displayName": "Light Destructive",
+        "canonical": "hsl(0 68% 45%)",
+        "tonalRamp": [
+          "oklch(15% 0.0869 26.9)",
+          "oklch(26% 0.1395 26.9)",
+          "oklch(38% 0.1780 26.9)",
+          "oklch(50% 0.1914 26.9)",
+          "oklch(62% 0.1780 26.9)",
+          "oklch(74% 0.1395 26.9)",
+          "oklch(86% 0.0815 26.9)",
+          "oklch(95% 0.0299 26.9)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "display",
+        "purpose": "Landing headline."
+      },
+      "headline": {
+        "displayName": "headline",
+        "purpose": "Public section headings."
+      },
+      "console-title": {
+        "displayName": "console-title",
+        "purpose": "Working-screen page title."
+      },
+      "docs-title": {
+        "displayName": "docs-title",
+        "purpose": "Documentation heading."
+      },
+      "body": {
+        "displayName": "body",
+        "purpose": "Console body copy."
+      },
+      "label": {
+        "displayName": "label",
+        "purpose": "Compact controls and metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "work-area-rest",
+        "value": "none",
+        "purpose": "Main public panels and console work areas use tonal layering and borders."
+      }
+    ],
+    "motion": [
+      {
+        "name": "public-action",
+        "value": "background 0.18s, color 0.18s",
+        "purpose": "Public primary action state changes."
+      },
+      {
+        "name": "console-control",
+        "value": "all 200ms",
+        "purpose": "Shared button state changes."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "Global duration override; public transitions and hero backdrop are disabled."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "console-sm",
+        "value": "640px"
+      },
+      {
+        "name": "console-md",
+        "value": "768px"
+      },
+      {
+        "name": "public-mobile-max",
+        "value": "767px"
+      },
+      {
+        "name": "public-tablet-max",
+        "value": "1050px"
+      },
+      {
+        "name": "console-lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Public primary action",
+      "kind": "button",
+      "refersTo": "public-button-primary",
+      "description": "Public integration and entry action.",
+      "html": "<button class=\"ds-public-primary\">Open console</button>",
+      "css": ".ds-public-primary{font-family:var(--font-sans, Manrope),sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:48px;background:var(--rp-text,#f4f1eb);color:var(--rp-bg,#09090b);border:0;border-radius:6px;padding:12px 21px;font-size:14px;font-weight:600;cursor:pointer;transition:background .18s,color .18s}.ds-public-primary:hover{background:var(--rp-accent,#cfbd9c)}.ds-public-primary:focus-visible{outline:2px solid var(--rp-accent,#cfbd9c);outline-offset:5px}"
+    },
+    {
+      "name": "Console primary action",
+      "kind": "button",
+      "refersTo": "console-button-primary",
+      "description": "Compact semantic primary action used in working screens.",
+      "html": "<button class=\"ds-button ds-primary\">Save changes</button>",
+      "css": ".ds-button{font-family:var(--font-sans, Manrope),sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius,.75rem);height:2.5rem;padding:.5rem 1.25rem;font-size:.75rem;line-height:1rem;font-weight:500;cursor:pointer;transition:all 200ms;}.ds-primary{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border:1px solid transparent}.ds-primary:hover{background:hsl(var(--primary)/.9)}.ds-button:focus-visible{outline:none;box-shadow:0 0 0 1px hsl(var(--background)),0 0 0 3px hsl(var(--ring))}.ds-button:active{transform:scale(.98)}.ds-button:disabled{pointer-events:none;opacity:.5}"
+    },
+    {
+      "name": "Console outline action",
+      "kind": "button",
+      "refersTo": "console-button-outline",
+      "description": "Secondary account or workspace action.",
+      "html": "<button class=\"ds-button ds-outline\">Reset defaults</button>",
+      "css": ".ds-button{font-family:var(--font-sans, Manrope),sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:var(--radius,.75rem);height:2.5rem;padding:.5rem 1.25rem;font-size:.75rem;line-height:1rem;font-weight:500;cursor:pointer;transition:all 200ms;}.ds-outline{border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))}.ds-outline:hover{background:hsl(var(--secondary));color:hsl(var(--foreground))}.ds-button:focus-visible{outline:none;box-shadow:0 0 0 1px hsl(var(--background)),0 0 0 3px hsl(var(--ring))}.ds-button:active{transform:scale(.98)}.ds-button:disabled{pointer-events:none;opacity:.5}"
+    },
+    {
+      "name": "Catalog search",
+      "kind": "input",
+      "refersTo": "catalog-search",
+      "description": "The catalog search field with its icon inset.",
+      "html": "<div class=\"ds-search\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input aria-label=\"Search models\" placeholder=\"Search model name or ID…\" /></div>",
+      "css": ".ds-search{position:relative}.ds-search svg{position:absolute;left:12px;top:12px;width:16px;height:16px;color:hsl(var(--muted-foreground));pointer-events:none}.ds-search input{font-family:var(--font-sans, Manrope),sans-serif;width:100%;height:40px;border:1px solid hsl(var(--border)/.7);border-radius:1rem;background:hsl(var(--card));padding:8px 16px 8px 36px;color:hsl(var(--foreground));font-size:14px;transition:color 150ms,background-color 150ms,border-color 150ms}.ds-search input::placeholder{color:hsl(var(--muted-foreground))}.ds-search input:hover{border-color:hsl(var(--foreground)/.3)}.ds-search input:focus-visible{outline:none;border-color:hsl(var(--foreground)/.4);box-shadow:inset 0 0 0 1px hsl(var(--foreground)/.15)}.ds-search input:disabled{cursor:not-allowed;opacity:.5}"
+    },
+    {
+      "name": "Console panel",
+      "kind": "card",
+      "refersTo": "console-panel",
+      "description": "Bordered resting work area used by Overview and data groups.",
+      "html": "<section class=\"ds-panel\"><h2>Usage</h2><p>Request and token activity</p></section>",
+      "css": ".ds-panel{font-family:var(--font-sans, Manrope),sans-serif;background:hsl(var(--card));color:hsl(var(--card-foreground));border:1px solid hsl(var(--border));border-radius:var(--radius,.75rem);padding:20px}.ds-panel h2{font-size:14px;font-weight:500;margin:0}.ds-panel p{font-size:12px;line-height:20px;color:hsl(var(--muted-foreground));margin:8px 0 0}@media(min-width:640px){.ds-panel{padding:24px}}"
+    },
+    {
+      "name": "Catalog category",
+      "kind": "chip",
+      "refersTo": "category-selected",
+      "description": "Pressed category filter with a quiet secondary surface.",
+      "html": "<button class=\"ds-category\" aria-pressed=\"true\">All</button><button class=\"ds-category\" aria-pressed=\"false\">Chat</button>",
+      "css": ".ds-category{font-family:var(--font-sans, Manrope),sans-serif;border:0;border-radius:calc(var(--radius,.75rem) - 2px);padding:8px 12px;font-size:12px;line-height:16px;background:transparent;color:hsl(var(--muted-foreground));cursor:pointer;transition:color 150ms,background-color 150ms}.ds-category[aria-pressed=\"true\"]{background:hsl(var(--secondary));color:hsl(var(--foreground))}.ds-category:hover{color:hsl(var(--foreground))}.ds-category:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:3px}"
+    },
+    {
+      "name": "Sidebar navigation item",
+      "kind": "nav",
+      "description": "Active route treatment from the shared Router shell.",
+      "html": "<a class=\"ds-route\" href=\"#overview\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.65\" aria-hidden=\"true\"><rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"14\" rx=\"1\"/></svg>Overview</a>",
+      "css": ".ds-route{font-family:var(--font-sans, Manrope),sans-serif;display:flex;min-height:40px;align-items:center;gap:12px;border-radius:var(--radius,.75rem);padding:0 12px;font-size:13px;text-decoration:none;color:hsl(var(--sidebar-foreground));transition:color 150ms,background-color 150ms}.ds-route svg{width:16px;height:16px;flex-shrink:0}.ds-route:hover{background:hsl(var(--sidebar-accent)/.6);color:hsl(var(--foreground))}.ds-route[aria-current=\"page\"]{background:hsl(var(--sidebar-accent));color:hsl(var(--sidebar-accent-foreground));font-weight:500}.ds-route[aria-current=\"page\"] svg{color:var(--router-highlight)}.ds-route:focus-visible{outline:2px solid var(--router-highlight);outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Working Gateway",
+    "overview": "Router uses a black and graphite foundation, warm white text, and restrained champagne emphasis. Manrope carries the public site and working console through the app’s self-hosted next/font setup. The existing Const mark and desktop particle backdrop remain the identity assets.\n\nThe finished interface uses open sections, fine dividers, and quiet bordered work areas. Density follows the task: broad public sections, compact console controls, and a narrower documentation reading column. Console preferences retain a light theme; the public site and documentation keep their scoped dark palette.",
+    "keyCharacteristics": [
+      "Warm type on black and graphite surfaces.",
+      "Champagne for selection, focus, highlighted technical values, and the free-usage series.",
+      "Manrope throughout the shared shell and public headings.",
+      "Dividers and tonal layering rather than decorative surface shadows."
+    ],
+    "rules": [
+      {
+        "name": "The Scope Rule",
+        "body": "Keep the public hex palette scoped to public and documentation surfaces; console components follow the active semantic theme.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shared Voice Rule",
+        "body": "Use the Router Manrope alias for interface text and headings. Keep tabular numerals on prices, balances, and usage.",
+        "section": "typography"
+      },
+      {
+        "name": "The Quiet Surface Rule",
+        "body": "Use tonal steps and fine borders for resting work areas; the observed primary panels do not need a decorative shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the Const mark, black public foundation, and existing desktop particle backdrop.",
+      "Do retain visible keyboard focus and the reduced-motion behavior.",
+      "Do pair mobile rates with their labels and units inside the available width.",
+      "Do use semantic theme variables for console text, borders, fields, and controls."
+    ],
+    "donts": [
+      "Don't add the desktop hero backdrop to mobile.",
+      "Don't replace the Router font alias with the shared package’s Inter default.",
+      "Don't force console light-theme controls into the public dark palette."
+    ]
+  }
+}

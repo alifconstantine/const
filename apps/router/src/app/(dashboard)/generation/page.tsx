@@ -9,14 +9,11 @@ import {
   useMemo,
 } from "react";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
-import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
-import { type Id } from "@const/backend/_generated/dataModel";
 import {
   Button,
   Input,
-  Textarea,
-  Slider,
   Badge,
   Select,
   SelectTrigger,
@@ -42,9 +39,6 @@ import {
   Eye,
   EyeOff,
   ChevronRight,
-  History,
-  Pencil,
-  Check,
   X,
   FileText,
   Film,
@@ -59,10 +53,6 @@ import {
   checkSupportsThinking,
 } from "@/lib/model-specs";
 import { ModelSelectorPanel } from "@/components/generation/model-selector-panel";
-import {
-  HistoryPanel,
-  type ChatSessionMeta,
-} from "@/components/generation/history-panel";
 import { SystemInstructionPanel } from "@/components/generation/system-instruction-panel";
 import { ViewCodeDialog } from "@/components/generation/view-code-dialog";
 import {
@@ -73,33 +63,14 @@ import {
 } from "@/components/generation/chat-message-item";
 
 export default function GenerationPage() {
-  const { isAuthenticated, token } = useRouterAuth();
+  const { token } = useRouterAuth();
 
-  // Convex Queries & Mutations
-  const chatPages = usePaginatedQuery(
-    api.router.chats.listChats,
-    isAuthenticated ? {} : "skip",
-    { initialNumItems: 30 },
-  );
-  const userChats = chatPages.results;
-  const userKeys = useQuery(
-    api.router.keys.listKeys,
-    isAuthenticated ? {} : "skip",
-  );
   const availableCombos = useQuery(api.router.combos.listCombos, {});
 
   const generateUploadUrl = useMutation(api.router.chats.generateUploadUrl);
   const registerFile = useMutation(api.router.chats.registerFile);
-  const revisionRef = useRef(0);
   const activeRun = useRef<symbol | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "failed">(
-    "saved",
-  );
-  const pendingSave = useRef<(() => Promise<void>) | null>(null);
-  const createChatMutation = useMutation(api.router.chats.createChat);
-  const updateChatMutation = useMutation(api.router.chats.updateChat);
-  const deleteChatMutation = useMutation(api.router.chats.deleteChat);
 
   // Map Virtual Combos into ModelSpec list (strictly user-created custom combos only)
   const comboModels = useMemo<ModelSpec[]>(() => {
@@ -124,12 +95,7 @@ export default function GenerationPage() {
   // Unified Const Gateway: no external BYOK models
   const customModels: ModelSpec[] = useMemo(() => [], []);
 
-  // Active Session & Chat State
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [chatTitle, setChatTitle] = useState<string>("Untitled Chat");
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState("Untitled Chat");
-
+  // Conversations stay in memory for the current page session.
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputPrompt, setInputPrompt] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -138,7 +104,6 @@ export default function GenerationPage() {
   );
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isMultiLine, setIsMultiLine] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -160,13 +125,13 @@ export default function GenerationPage() {
     if (!inputPrompt) {
       setScrollAreaHeight(MIN_TEXTAREA_HEIGHT);
       textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
-      setIsMultiLine(false);
+
       return;
     }
 
     if (isExpanded) {
       textarea.style.height = `${Math.max(scrollHeight, 400)}px`;
-      setIsMultiLine(true);
+
       return;
     }
 
@@ -176,7 +141,6 @@ export default function GenerationPage() {
     );
     setScrollAreaHeight(nextHeight);
     textarea.style.height = `${scrollHeight}px`;
-    setIsMultiLine(nextHeight > 38 || inputPrompt.includes("\n"));
   }, [inputPrompt, isExpanded]);
 
   useLayoutEffect(() => {
@@ -196,7 +160,7 @@ export default function GenerationPage() {
 
   const processUploadedFiles = async (files: FileList | File[]) => {
     if (stagedAttachments.length + files.length > 8) {
-      toast.error("Attach up to 8 images per message.");
+      toast.error("Attach up to 8 files per message.");
       return;
     }
     setUploading(true);
@@ -279,8 +243,7 @@ export default function GenerationPage() {
     "off" | "auto" | "research" | "deep-research"
   >("off");
 
-  // API Key Selection & Custom Paste (defaults to logged in session)
-  const [selectedKeyId, setSelectedKeyId] = useState<string>("account-session");
+  // Pasted keys are held in memory; an empty value uses account authentication.
   const [customApiKey, setCustomApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -288,50 +251,8 @@ export default function GenerationPage() {
   const [isRunSettingsCollapsed, setIsRunSettingsCollapsed] = useState(false);
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSystemInstructionOpen, setIsSystemInstructionOpen] = useState(false);
   const [isViewCodeOpen, setIsViewCodeOpen] = useState(false);
-
-  // Sync active chat session from Convex when activeChatId changes
-  const activeChatQuery = useQuery(
-    api.router.chats.getChat,
-    activeChatId ? { chatId: activeChatId as Id<"routerChats"> } : "skip",
-  );
-
-  useEffect(() => {
-    if (activeChatQuery && !isStreaming) {
-      revisionRef.current = activeChatQuery.revision;
-      setChatTitle(activeChatQuery.title || "Untitled Chat");
-      setTitleDraft(activeChatQuery.title || "Untitled Chat");
-      setMessages(activeChatQuery.messages);
-      setSystemInstruction(activeChatQuery.systemInstruction || "");
-      setTemperature(activeChatQuery.temperature);
-      if (activeChatQuery.thinkingLevel) {
-        const val = activeChatQuery.thinkingLevel.toLowerCase();
-        if (val === "low" || val === "high") {
-          setThinkingLevel(val);
-        } else {
-          setThinkingLevel("medium");
-        }
-      }
-      if ((activeChatQuery as any).webSearch) {
-        setWebSearch(
-          (activeChatQuery as any).webSearch === "auto" ? "auto" : "off",
-        );
-      }
-      const matched =
-        comboModels.find(
-          (m) =>
-            m.modelId === activeChatQuery.modelId ||
-            m.id === activeChatQuery.modelId,
-        ) ||
-        customModels.find((m) => m.modelId === activeChatQuery.modelId) ||
-        BUILTIN_MODELS.find((m) => m.modelId === activeChatQuery.modelId);
-      if (matched) {
-        setSelectedModel(matched);
-      }
-    }
-  }, [activeChatQuery, customModels, comboModels]);
 
   // Check if current model supports dynamic thinking UI
   const supportsThinking = useMemo(() => {
@@ -344,6 +265,7 @@ export default function GenerationPage() {
 
   useEffect(
     () => () => {
+      activeRun.current = null;
       abortControllerRef.current?.abort();
     },
     [],
@@ -354,57 +276,17 @@ export default function GenerationPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  const handleCustomKeyChange = (val: string) => {
-    setCustomApiKey(val);
-    setSelectedKeyId(val.trim() ? "custom" : "account-session");
-  };
-
   // Start a fresh new chat session
   const handleNewChat = () => {
     activeRun.current = null;
-    revisionRef.current = 0;
     if (isStreaming) {
       abortControllerRef.current?.abort();
       setIsStreaming(false);
     }
-    setActiveChatId(null);
-    setChatTitle("Untitled Chat");
-    setTitleDraft("Untitled Chat");
     setMessages([]);
     setInputPrompt("");
     setStagedAttachments([]);
     setIsExpanded(false);
-    setIsMultiLine(false);
-    setSystemInstruction("");
-  };
-
-  // Save edited title
-  const handleSaveTitle = async () => {
-    const trimmed = titleDraft.trim() || "Untitled Chat";
-    setChatTitle(trimmed);
-    setIsEditingTitle(false);
-    if (activeChatId && isAuthenticated) {
-      try {
-        await updateChatMutation({
-          chatId: activeChatId as Id<"routerChats">,
-          title: trimmed,
-        });
-      } catch {}
-    }
-  };
-
-  // Delete a chat session
-  const handleDeleteChat = async (chatId: string) => {
-    try {
-      await deleteChatMutation({ chatId: chatId as Id<"routerChats"> });
-      if (activeChatId === chatId) {
-        handleNewChat();
-      }
-      toast.success("Chat deleted");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete chat";
-      toast.error(msg);
-    }
   };
 
   // Stop active streaming
@@ -423,16 +305,8 @@ export default function GenerationPage() {
       return;
     const run = Symbol("generation");
     activeRun.current = run;
-    let sessionId = activeChatId;
-    let revision = revisionRef.current;
 
-    // Determine effective API key
-    let effectiveKey = "";
-    if (selectedKeyId === "custom") {
-      effectiveKey = customApiKey.trim();
-    } else if (selectedKeyId !== "account-session") {
-      effectiveKey = customApiKey.trim();
-    }
+    const effectiveKey = customApiKey.trim();
 
     const currentAttachments = [...stagedAttachments];
     setStagedAttachments([]);
@@ -468,23 +342,8 @@ export default function GenerationPage() {
     setInputPrompt("");
     setScrollAreaHeight(MIN_TEXTAREA_HEIGHT);
     setIsExpanded(false);
-    setIsMultiLine(false);
-    setIsStreaming(true);
 
-    // Auto-generate clean title on first prompt if still untitled
-    let effectiveTitle = chatTitle;
-    if (chatTitle === "Untitled Chat" && messages.length === 0) {
-      const autoTitle = trimmedPrompt
-        ? trimmedPrompt.length > 36
-          ? `${trimmedPrompt.slice(0, 36).trim()}...`
-          : trimmedPrompt
-        : currentAttachments[0]?.name
-          ? `File: ${currentAttachments[0].name}`
-          : "Untitled Chat";
-      setChatTitle(autoTitle);
-      setTitleDraft(autoTitle);
-      effectiveTitle = autoTitle;
-    }
+    setIsStreaming(true);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -497,67 +356,7 @@ export default function GenerationPage() {
       : undefined;
     let activeSearchResults: SearchResultItem[] | undefined = undefined;
 
-    const persistMessages = async (list: ChatMessage[]) => {
-      if (!isAuthenticated) return;
-      const clean = list.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-        ...(m.thinkingContent ? { thinkingContent: m.thinkingContent } : {}),
-        ...(m.searchQuery ? { searchQuery: m.searchQuery } : {}),
-        ...(m.searchResults?.length
-          ? {
-              searchResults: m.searchResults.map((r) => ({
-                title: r.title,
-                url: r.url,
-                ...(r.snippet ? { snippet: r.snippet } : {}),
-              })),
-            }
-          : {}),
-        ...(m.attachments?.length
-          ? {
-              attachments: m.attachments.map((a) => ({
-                name: a.name,
-                type: a.type,
-                size: a.size,
-                ...(a.fileId ? { fileId: a.fileId } : {}),
-                ...(a.dataUrl ? { dataUrl: a.dataUrl } : {}),
-              })),
-            }
-          : {}),
-      }));
-      setSaveStatus("saving");
-      const payload = {
-        title: effectiveTitle,
-        modelId: selectedModel.modelId,
-        providerId: selectedModel.provider,
-        systemInstruction,
-        temperature,
-        thinkingLevel: supportsThinking ? thinkingLevel : undefined,
-        messages: clean as any,
-      };
-      if (!sessionId) {
-        const saved = await createChatMutation(payload);
-        sessionId = saved.chatId;
-        revision = saved.revision;
-        if (activeRun.current === run) setActiveChatId(saved.chatId);
-      } else {
-        const saved = await updateChatMutation({
-          ...payload,
-          chatId: sessionId as Id<"routerChats">,
-          expectedRevision: revision,
-        });
-        revision = saved.revision;
-      }
-      if (activeRun.current === run) {
-        revisionRef.current = revision;
-        pendingSave.current = null;
-        setSaveStatus("saved");
-      }
-    };
     try {
-      await persistMessages([...messages, userMessage]);
       const response = await fetch("/api/generation/chat", {
         method: "POST",
         headers: {
@@ -606,6 +405,7 @@ export default function GenerationPage() {
 
       while (true) {
         const { done, value } = await reader.read();
+        if (activeRun.current !== run) return;
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -720,29 +520,8 @@ export default function GenerationPage() {
           }
         }
       }
-
-      // Final message snapshot
-      const finalAssistantMessage: ChatMessage = {
-        id: assistantPlaceholderId,
-        role: "assistant",
-        content: accumulatedContent,
-        thinkingContent: accumulatedThinking || undefined,
-        isSearching: false,
-        searchQuery: activeSearchQuery,
-        searchResults:
-          activeSearchResults && activeSearchResults.length > 0
-            ? activeSearchResults
-            : undefined,
-        createdAt: Date.now(),
-      };
-
-      const finalMessagesList = [
-        ...messages,
-        userMessage,
-        finalAssistantMessage,
-      ];
-      setMessages(finalMessagesList);
     } catch (err: unknown) {
+      if (activeRun.current !== run) return;
       if ((err as Error)?.name === "AbortError") {
         return;
       }
@@ -758,7 +537,7 @@ export default function GenerationPage() {
           msg.id === assistantPlaceholderId
             ? {
                 ...msg,
-                content: `⚠️ Error: ${errorMessage}`,
+                content: `Error: ${errorMessage}`,
               }
             : msg,
         ),
@@ -776,19 +555,6 @@ export default function GenerationPage() {
         searchResults: activeSearchResults,
       };
       const finalList = [...messages, userMessage, partial];
-      const retry = () => persistMessages(finalList);
-      try {
-        await retry();
-      } catch (error) {
-        pendingSave.current = retry;
-        setSaveStatus("failed");
-        toast.error("Chat could not be saved", {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Retry saving before leaving the page.",
-        });
-      }
       if (activeRun.current === run) {
         setMessages(finalList);
         setIsStreaming(false);
@@ -822,11 +588,8 @@ export default function GenerationPage() {
     }
   };
 
-  const renderRunSettingsContent = (
-    onClose: () => void,
-    isMobileView: boolean = false,
-  ) => (
-    <div className="flex flex-col h-full overflow-hidden bg-card/40">
+  const renderRunSettingsContent = (onClose: () => void) => (
+    <div className="flex flex-col h-full overflow-hidden bg-card">
       {/* Header Bar */}
       <div className="p-4 flex items-center justify-between shrink-0 border-b border-border/40">
         <h2 className="font-sans text-base font-semibold text-foreground">
@@ -837,7 +600,7 @@ export default function GenerationPage() {
             variant="ghost"
             size="sm"
             onClick={() => setIsViewCodeOpen(true)}
-            className="h-7 px-2.5 rounded-full text-xs font-normal gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+            className="h-9 px-2.5 rounded-lg text-xs font-normal gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
           >
             <Code2 className="h-3.5 w-3.5" />
             <span>Get code</span>
@@ -846,7 +609,8 @@ export default function GenerationPage() {
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+            aria-label="Close run settings"
+            className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
             title="Collapse settings"
           >
             <PanelRightClose className="h-3.5 w-3.5" />
@@ -855,36 +619,15 @@ export default function GenerationPage() {
       </div>
 
       <div className="p-4 space-y-6 flex-1 overflow-y-auto">
-        {/* New Chat & History Row in Right Sidebar */}
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => {
-              handleNewChat();
-              if (isMobileView) setMobileSettingsOpen(false);
-            }}
-            size="sm"
-            className="flex-1 rounded-full text-xs sm:text-sm font-medium h-9 gap-1.5 cursor-pointer shadow-sm bg-foreground text-background hover:bg-foreground/90"
-          >
-            <Plus className="h-4 w-4" />
-            <span>New chat</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsHistoryOpen(true)}
-            className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground border-border/70 cursor-pointer shrink-0 hover:bg-secondary"
-            title="Chat history"
-          >
-            <History className="h-4 w-4" />
-          </Button>
-        </div>
-
         {/* 1. Model Selector Row (Clean, No Icon) */}
         <div className="space-y-1.5">
-          <div
+          <span className="block text-xs font-medium text-muted-foreground">
+            Model
+          </span>
+          <button
+            type="button"
             onClick={() => setIsModelSelectorOpen(true)}
-            className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 hover:border-border transition-all cursor-pointer group"
+            className="w-full text-left p-3.5 rounded-xl border border-border bg-background hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer group"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -899,14 +642,15 @@ export default function GenerationPage() {
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
             </div>
-          </div>
+          </button>
         </div>
 
         {/* 2. System Instructions Row (No Icon, Clean Typography) */}
         <div className="space-y-1.5">
-          <div
+          <button
+            type="button"
             onClick={() => setIsSystemInstructionOpen(true)}
-            className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 transition-all cursor-pointer space-y-1.5 group"
+            className="w-full text-left p-3.5 rounded-xl border border-border bg-background hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer space-y-1.5 group"
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">
@@ -918,7 +662,7 @@ export default function GenerationPage() {
               {systemInstruction.trim() ||
                 "Optional tone and style instructions for the model"}
             </p>
-          </div>
+          </button>
         </div>
 
         {/* 3. Paste API Key */}
@@ -946,9 +690,11 @@ export default function GenerationPage() {
           <Input
             type={showApiKey ? "text" : "password"}
             value={customApiKey}
-            onChange={(e) => handleCustomKeyChange(e.target.value)}
+            onChange={(e) => setCustomApiKey(e.target.value)}
             placeholder="Optional Const API key"
-            className="h-9 rounded-full text-xs font-mono"
+            aria-label="Optional Const API key"
+            autoComplete="off"
+            className="h-10 rounded-lg text-xs font-mono"
           />
           <p className="text-xs text-muted-foreground">
             Leave empty to use your account session. Pasted keys are held only
@@ -966,13 +712,15 @@ export default function GenerationPage() {
               {temperature.toFixed(1)}
             </span>
           </div>
-          <Slider
-            value={[temperature]}
-            onValueChange={(vals) => setTemperature(vals[0] ?? 1.0)}
+          <input
+            type="range"
+            value={temperature}
+            onChange={(event) => setTemperature(Number(event.target.value))}
             min={0.0}
             max={2.0}
             step={0.1}
-            className="w-full cursor-pointer"
+            aria-label="Temperature"
+            className="h-6 w-full cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <div className="flex justify-between text-xs text-muted-foreground font-sans">
             <span>0.0 (Precise)</span>
@@ -1001,10 +749,13 @@ export default function GenerationPage() {
                 setThinkingLevel(val)
               }
             >
-              <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
+              <SelectTrigger
+                aria-label="Thinking level"
+                className="w-full h-9 rounded-lg text-xs font-sans border-border bg-secondary/50 text-foreground"
+              >
                 <SelectValue placeholder="Thinking Level" />
               </SelectTrigger>
-              <SelectContent className="bg-card border-border/70 text-xs font-sans">
+              <SelectContent className="bg-card border-border text-xs font-sans">
                 <SelectItem
                   value="low"
                   className="cursor-pointer text-foreground"
@@ -1064,10 +815,13 @@ export default function GenerationPage() {
               val: "off" | "auto" | "research" | "deep-research",
             ) => setWebSearch(val)}
           >
-            <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
+            <SelectTrigger
+              aria-label="Web search"
+              className="w-full h-9 rounded-lg text-xs font-sans border-border bg-secondary/50 text-foreground"
+            >
               <SelectValue placeholder="Web Search" />
             </SelectTrigger>
-            <SelectContent className="bg-card border-border/70 text-xs font-sans">
+            <SelectContent className="bg-card border-border text-xs font-sans">
               <SelectItem
                 value="off"
                 className="cursor-pointer text-foreground"
@@ -1101,103 +855,98 @@ export default function GenerationPage() {
     <div className="flex-1 flex h-full w-full bg-background text-foreground overflow-hidden">
       {/* Main Center Canvas: Full Width */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
-        <div
-          role="status"
-          aria-live="polite"
-          className="px-4 py-1.5 text-xs text-muted-foreground bg-secondary/20"
-        >
-          {uploading ? (
-            "Uploading images…"
-          ) : saveStatus === "saving" ? (
-            "Saving chat…"
-          ) : saveStatus === "failed" ? (
-            <button
-              className="underline text-destructive"
-              onClick={() =>
-                pendingSave.current?.().catch(() => setSaveStatus("failed"))
-              }
-            >
-              Chat not saved. Retry saving
-            </button>
-          ) : (
-            "Chat history saved"
-          )}
-        </div>
-        {/* Top Chat Title Bar (Editable, Default "Untitled Chat") */}
-        <div className="h-14 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur border-b border-border/40">
-          <div className="flex items-center gap-2 min-w-0 max-w-lg">
-            {isEditingTitle ? (
-              <input
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onBlur={handleSaveTitle}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveTitle();
-                  if (e.key === "Escape") {
-                    setTitleDraft(chatTitle);
-                    setIsEditingTitle(false);
-                  }
-                }}
-                className="h-8 px-2.5 text-base sm:text-lg font-sans font-medium rounded-lg bg-secondary/50 text-foreground outline-none ring-1 ring-foreground/30 w-56 sm:w-72 transition-all"
-                autoFocus
-                onFocus={(e) => e.target.select()}
-              />
-            ) : (
-              <div
-                onClick={() => {
-                  setTitleDraft(chatTitle);
-                  setIsEditingTitle(true);
-                }}
-                className="group flex items-center gap-2 cursor-pointer select-none py-1 px-2 -ml-2 rounded-lg hover:bg-secondary/50 transition-colors min-w-0"
-                title="Click to rename chat"
-              >
-                <span className="font-sans text-base sm:text-lg font-medium text-foreground truncate max-w-[200px] sm:max-w-md">
-                  {chatTitle}
-                </span>
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-              </div>
-            )}
+        <header className="flex min-h-20 items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-8">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">Playground</h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Test a model. Shape a response.
+            </p>
           </div>
-
-          {/* Right Mobile Actions: New Chat, History, Run Settings */}
-          <div className="flex items-center gap-0.5 md:hidden">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
+              size="sm"
               onClick={handleNewChat}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-              title="New chat"
-              aria-label="New chat"
+              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs"
+              aria-label="Clear chat and start a new session"
             >
               <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New session</span>
             </Button>
             <Button
               variant="ghost"
-              size="icon"
-              onClick={() => setIsHistoryOpen(true)}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-              title="Chat history"
-              aria-label="Chat history"
+              size="sm"
+              onClick={() => setIsViewCodeOpen(true)}
+              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs"
+              aria-label="View request code"
             >
-              <History className="h-4 w-4" />
+              <Code2 className="h-4 w-4" />
+              <span className="hidden sm:inline">View code</span>
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setMobileSettingsOpen(true)}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
-              title="Open Run settings"
-              aria-label="Open Run settings"
+              className="h-9 w-9 rounded-lg md:hidden"
+              aria-label="Open run settings"
             >
               <PanelRight className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-
+        </header>
+        {uploading && (
+          <div
+            role="status"
+            className="px-4 py-2 text-xs text-muted-foreground"
+          >
+            Uploading attachments…
+          </div>
+        )}
         {/* Chat Thread Messages Viewport with ScrollArea */}
         <ScrollArea className="flex-1 min-h-0 h-full">
           <div className="px-3 sm:px-12 py-4 sm:py-6 space-y-4 sm:space-y-6">
-            {messages.length === 0 ? null : (
+            {messages.length === 0 ? (
+              <div className="mx-auto flex w-full max-w-3xl flex-col justify-center py-10 sm:py-20">
+                <div className="mb-9 max-w-lg">
+                  <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                    A place to work things out.
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    Choose a model, add your instructions, and try a prompt.
+                    Follow up to refine the result.
+                  </p>
+                </div>
+                <div className="divide-y divide-border border-y border-border">
+                  {[
+                    [
+                      "Build something",
+                      "Write a TypeScript function that groups an array of objects by a given key. Explain your approach.",
+                    ],
+                    [
+                      "Make it clearer",
+                      "Help me rewrite this message to be clear, concise, and friendly:\n\n",
+                    ],
+                    [
+                      "Explore an idea",
+                      "Explain the tradeoffs between a monolith and microservices for a small engineering team.",
+                    ],
+                  ].map(([label, prompt]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        setInputPrompt(prompt!);
+                        textareaRef.current?.focus();
+                      }}
+                      className="group flex w-full items-center justify-between gap-4 py-4 text-left text-sm transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span>{label}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
               /* Active Messages Thread matching Image 1 layout */
               <div className="max-w-3xl mx-auto space-y-4 w-full">
                 {messages.map((m, index) => (
@@ -1216,7 +965,7 @@ export default function GenerationPage() {
         </ScrollArea>
 
         {/* Bottom AI Input Bar */}
-        <div className="p-2.5 sm:p-6 pt-1 sm:pt-2 pb-2 sm:pb-6 shrink-0 bg-gradient-to-t from-background via-background/90 to-transparent">
+        <div className="p-3 sm:px-8 sm:pb-6 pt-2 shrink-0 bg-background">
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -1231,7 +980,7 @@ export default function GenerationPage() {
               }
             }}
             className={cn(
-              "max-w-3xl mx-auto relative rounded-2xl sm:rounded-3xl bg-secondary/40 backdrop-blur-md shadow-sm transition-all focus-within:shadow-md overflow-hidden",
+              "max-w-3xl mx-auto relative rounded-xl border border-border bg-card transition-colors focus-within:border-primary/60 overflow-hidden",
               isDraggingOver && "bg-secondary/60 ring-2 ring-foreground/20",
             )}
           >
@@ -1255,7 +1004,7 @@ export default function GenerationPage() {
                   >
                     {att.type.startsWith("image/") &&
                     (att.url || att.dataUrl) ? (
-                      <div className="h-7 w-7 rounded-lg overflow-hidden shrink-0 bg-background/50">
+                      <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0 bg-background/50">
                         <img
                           src={att.url || att.dataUrl}
                           alt={att.name}
@@ -1282,7 +1031,7 @@ export default function GenerationPage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveAttachment(idx)}
-                      className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors"
+                      className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/80 transition-colors"
                       title="Remove attachment"
                     >
                       <X className="h-3 w-3" />
@@ -1296,7 +1045,7 @@ export default function GenerationPage() {
             <div
               className={cn(
                 "w-full flex flex-col p-3 sm:p-3.5",
-                isExpanded && "h-[72vh] min-h-[460px] max-h-[85vh]",
+                isExpanded && "h-[min(50dvh,460px)]",
               )}
             >
               {/* Scrollable Textarea Area using @const/ui ScrollArea */}
@@ -1317,10 +1066,11 @@ export default function GenerationPage() {
                   placeholder={
                     stagedAttachments.length > 0
                       ? "Add a message or press enter to send..."
-                      : "Start typing a prompt to see what our models can do..."
+                      : "Ask a question or describe a task…"
                   }
+                  aria-label="Message prompt"
                   rows={1}
-                  className="w-full bg-transparent border-none p-0 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground/70 resize-none leading-relaxed overflow-hidden"
+                  className="w-full bg-transparent border-none p-0 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground resize-none leading-relaxed overflow-hidden"
                 />
               </ScrollArea>
 
@@ -1333,8 +1083,9 @@ export default function GenerationPage() {
                     size="icon"
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                    title="Attach files or media"
+                    className="h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+                    aria-label="Attach files"
+                    title="Attach files"
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
@@ -1350,7 +1101,10 @@ export default function GenerationPage() {
                       setIsExpanded(!isExpanded);
                       setTimeout(() => textareaRef.current?.focus(), 50);
                     }}
-                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+                    className="h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+                    aria-label={
+                      isExpanded ? "Collapse prompt" : "Expand prompt"
+                    }
                     title={
                       isExpanded ? "Collapse prompt (Esc)" : "Expand prompt"
                     }
@@ -1367,7 +1121,8 @@ export default function GenerationPage() {
                       onClick={handleStopStreaming}
                       size="icon"
                       variant="destructive"
-                      className="rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer shrink-0"
+                      className="rounded-lg h-10 w-10 cursor-pointer shrink-0"
+                      aria-label="Stop generating"
                       title="Stop generating"
                     >
                       <Square className="h-4 w-4 fill-current" />
@@ -1380,7 +1135,8 @@ export default function GenerationPage() {
                         (!inputPrompt.trim() && stagedAttachments.length === 0)
                       }
                       size="icon"
-                      className="rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-opacity"
+                      className="rounded-lg h-10 w-10 cursor-pointer shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-opacity"
+                      aria-label="Send message"
                       title={
                         isExpanded
                           ? "Send (Cmd+Enter / Ctrl+Enter)"
@@ -1394,29 +1150,30 @@ export default function GenerationPage() {
               </div>
             </div>
           </div>
+          <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] leading-5 text-muted-foreground">
+            Conversations stay on this page. Usage logging follows your account
+            settings.
+          </p>
         </div>
       </div>
 
       {/* Desktop Right Inspector Panel (Collapsible) */}
       <div className="hidden md:flex shrink-0 h-full">
         {isRunSettingsCollapsed ? (
-          <div className="shrink-0 flex flex-col items-center py-3 px-2 border-l border-border/70 bg-card/40">
+          <div className="shrink-0 flex flex-col items-center py-3 px-2 border-l border-border bg-card">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsRunSettingsCollapsed(false)}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
               title="Expand Run Settings"
             >
               <PanelRight className="h-4 w-4" />
             </Button>
           </div>
         ) : (
-          <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-hidden transition-all">
-            {renderRunSettingsContent(
-              () => setIsRunSettingsCollapsed(true),
-              false,
-            )}
+          <div className="w-80 shrink-0 border-l border-border bg-card flex flex-col h-full overflow-hidden transition-all">
+            {renderRunSettingsContent(() => setIsRunSettingsCollapsed(true))}
           </div>
         )}
       </div>
@@ -1430,7 +1187,7 @@ export default function GenerationPage() {
             className="p-0 w-[85vw] max-w-sm border-l border-border bg-card flex flex-col h-full z-50"
           >
             <SheetTitle className="sr-only">Run settings</SheetTitle>
-            {renderRunSettingsContent(() => setMobileSettingsOpen(false), true)}
+            {renderRunSettingsContent(() => setMobileSettingsOpen(false))}
           </SheetContent>
         </Sheet>
       </div>
@@ -1448,26 +1205,6 @@ export default function GenerationPage() {
         }}
         customModels={customModels}
         comboModels={comboModels}
-      />
-
-      {/* History Slide-Over Panel */}
-      <HistoryPanel
-        open={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        sessions={(userChats as unknown as ChatSessionMeta[]) || []}
-        activeChatId={activeChatId}
-        onSelectChat={(id) => {
-          activeRun.current = null;
-          abortControllerRef.current?.abort();
-          setIsStreaming(false);
-          setActiveChatId(id);
-        }}
-        onDeleteChat={handleDeleteChat}
-        onLoadMore={
-          chatPages.status === "CanLoadMore"
-            ? () => chatPages.loadMore(30)
-            : undefined
-        }
       />
 
       {/* System Instruction Slide-Over Panel */}

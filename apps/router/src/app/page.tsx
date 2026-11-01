@@ -1,892 +1,371 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { LandingNavbar } from "@/components/landing/LandingNavbar";
 import { LandingFooter } from "@/components/landing/LandingFooter";
-import { Copy, Check, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { ParticleBackdrop } from "@/components/landing/ParticleBackdrop";
+import { CodeBlock, QUICKSTART_TABS } from "@/components/landing/CodeBlock";
+import { BUILTIN_MODELS, FREE_MODEL_IDS } from "@/lib/model-specs";
+import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
 import "./landing.css";
 
-interface CatalogItem {
-  id: string;
-  name: string;
-  contextWindow: string;
-  input: string;
-  officialInput: string;
-  cache?: string;
-  output: string;
-  officialOutput: string;
-  savePercent: string;
-}
-
-const CATALOG_MODELS: CatalogItem[] = [
-  {
-    id: "deepseek-v4.1-flash",
-    name: "DeepSeek v4.1 Flash",
-    contextWindow: "1M",
-    input: "$0.0125",
-    officialInput: "$0.150",
-    cache: "$0.0125",
-    output: "$0.060",
-    officialOutput: "$0.600",
-    savePercent: "91.7%",
-  },
-  {
-    id: "qwen-3.8-omni-flash",
-    name: "Qwen 3.8 Omni Flash",
-    contextWindow: "1M",
-    input: "$0.0125",
-    officialInput: "$0.150",
-    cache: "$0.0125",
-    output: "$0.055",
-    officialOutput: "$0.470",
-    savePercent: "91.7%",
-  },
-  {
-    id: "glm-5.3-flash",
-    name: "GLM 5.3 Flash",
-    contextWindow: "1M",
-    input: "$0.0125",
-    officialInput: "$0.150",
-    cache: "$0.0125",
-    output: "$0.055",
-    officialOutput: "$0.500",
-    savePercent: "91.7%",
-  },
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    contextWindow: "1M",
-    input: "$0.020",
-    officialInput: "$0.750",
-    cache: "$0.020",
-    output: "$0.080",
-    officialOutput: "$3.750",
-    savePercent: "97.3%",
-  },
-  {
-    id: "glm-5.3",
-    name: "GLM 5.3",
-    contextWindow: "1M",
-    input: "$0.035",
-    officialInput: "$1.400",
-    cache: "$0.035",
-    output: "$0.110",
-    officialOutput: "$4.400",
-    savePercent: "97.5%",
-  },
-  {
-    id: "minimax-m3.1-flash",
-    name: "MiniMax M3.1 Flash",
-    contextWindow: "1M",
-    input: "$0.035",
-    officialInput: "$0.150",
-    cache: "$0.035",
-    output: "$0.135",
-    officialOutput: "$0.600",
-    savePercent: "76.7%",
-  },
-  {
-    id: "qwen-3.8-max",
-    name: "Qwen 3.8 Max",
-    contextWindow: "1M",
-    input: "$0.050",
-    officialInput: "$2.000",
-    cache: "$0.050",
-    output: "$0.150",
-    officialOutput: "$6.000",
-    savePercent: "97.5%",
-  },
-  {
-    id: "gpt-6.1-sol",
-    name: "GPT 6.1 Sol",
-    contextWindow: "500K",
-    input: "$0.240",
-    officialInput: "$2.000",
-    cache: "$0.050",
-    output: "$1.200",
-    officialOutput: "$10.000",
-    savePercent: "88.0%",
-  },
-  {
-    id: "gpt-6-astra",
-    name: "GPT 6 Astra",
-    contextWindow: "272K",
-    input: "$0.450",
-    officialInput: "$10.000",
-    cache: "$0.090",
-    output: "$2.200",
-    officialOutput: "$50.000",
-    savePercent: "95.5%",
-  },
-  {
-    id: "claude-sonnet-5.5",
-    name: "Claude Sonnet 5.5",
-    contextWindow: "1M",
-    input: "$0.050",
-    officialInput: "$2.000",
-    cache: "$0.050",
-    output: "$0.250",
-    officialOutput: "$10.000",
-    savePercent: "97.5%",
-  },
-  {
-    id: "claude-opus-5.5",
-    name: "Claude Opus 5.5",
-    contextWindow: "1M",
-    input: "$0.100",
-    officialInput: "$4.000",
-    cache: "$0.100",
-    output: "$0.500",
-    officialOutput: "$20.000",
-    savePercent: "97.5%",
-  },
-  {
-    id: "grok-4.7",
-    name: "Grok 4.7",
-    contextWindow: "500K",
-    input: "$0.140",
-    officialInput: "$2.000",
-    cache: "$0.035",
-    output: "$0.450",
-    officialOutput: "$6.000",
-    savePercent: "93.0%",
-  },
-];
+const chatModels = BUILTIN_MODELS.filter(
+  (model) => model.category === "llm" && !model.id.endsWith(":free"),
+);
 
 export default function HomePage() {
-  const router = useRouter();
   const { isAuthenticated, signIn } = useRouterAuth();
-
   useEffect(() => {
-    document.title = "Const Router — Universal AI Gateway for Frontier Models";
+    document.title = "Const Router — One API. Your choice of model.";
   }, []);
-
-  // Particle Canvas Backdrop Loader (monochrome neutral palette, no blue)
-  useEffect(() => {
-    const existing = document.querySelector('script[src*="MainParticlesComponent"]');
-    if (!existing) {
-      const initScript = document.createElement("script");
-      initScript.type = "module";
-      initScript.src = "/_astro/MainParticlesComponent.astro_astro_type_script_index_0_lang.ZV8AJEPG.js?v=4";
-      initScript.onload = () => {
-        setTimeout(() => {
-          if (typeof (window as any).setAllParticlesTheme === "function") {
-            (window as any).setAllParticlesTheme("dark");
-          }
-        }, 30);
-      };
-      document.body.appendChild(initScript);
-
-      const welcomeScript = document.createElement("script");
-      welcomeScript.type = "module";
-      welcomeScript.src = "/_astro/index.astro_astro_type_script_index_0_lang.BxMooTve.js";
-      document.body.appendChild(welcomeScript);
-    }
-  }, []);
-
-  // Copy helper command
-  const [helperCopied, setHelperCopied] = useState(false);
-  const handleCopyHelper = () => {
-    navigator.clipboard.writeText('export OPENAI_BASE_URL="https://router.const.web.id/v1"');
-    setHelperCopied(true);
-    setTimeout(() => setHelperCopied(false), 2000);
-  };
-
-  // Integration tabs
-  const [activeTab, setActiveTab] = useState(0);
-  const [tabCopied, setTabCopied] = useState(false);
-
-  const integrationTabs = [
-    {
-      id: "cli",
-      label: "cURL / CLI",
-      filename: "test-gateway.sh",
-      note: "Standard OpenAI request format. Test connectivity and model inference:",
-      lang: "bash",
-      code: `export OPENAI_BASE_URL="https://router.const.web.id/v1"
-export OPENAI_API_KEY="sk-const-live-xxxxxxxxxxxx"
-
-curl $OPENAI_BASE_URL/chat/completions \\
-  -H "Authorization: Bearer $OPENAI_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "deepseek-v4.1-flash:free",
-    "messages": [{"role": "user", "content": "Explain Virtual Combos in 2 sentences."}]
-  }'`,
-    },
-    {
-      id: "python",
-      label: "Python (OpenAI SDK)",
-      filename: "client.py",
-      note: "Drop-in replacement with the standard OpenAI Python library:",
-      lang: "python",
-      code: `from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://router.const.web.id/v1",
-    api_key="sk-const-live-xxxxxxxxxxxx",
-)
-
-response = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
-    messages=[{"role": "user", "content": "Optimize this Python snippet."}],
-)
-
-print(response.choices[0].message.content)`,
-    },
-    {
-      id: "typescript",
-      label: "TypeScript / Node",
-      filename: "router.ts",
-      note: "Universal Node.js client with full streaming & tool execution support:",
-      lang: "typescript",
-      code: `import OpenAI from "openai";
-
-const client = new OpenAI({
-  baseURL: "https://router.const.web.id/v1",
-  apiKey: process.env.CONST_ROUTER_API_KEY,
-});
-
-const completion = await client.chat.completions.create({
-  model: "claude-sonnet-5.5",
-  messages: [{ role: "user", content: "Review this pull request diff." }],
-});
-
-console.log(completion.choices[0].message.content);`,
-    },
-    {
-      id: "claude",
-      label: "Claude Code (Anthropic Spec)",
-      filename: "claude-code.sh",
-      note: "Launch Anthropic Claude Code backed directly by Const Router:",
-      lang: "bash",
-      code: `# Point Claude Code CLI to Const Router's Anthropic Messages endpoint:
-export ANTHROPIC_BASE_URL="https://router.const.web.id"
-export ANTHROPIC_API_KEY="const_live_xxxxxxxxxxxx"
-
-# Run Claude Code with full tool calling:
-claude`,
-    },
-    {
-      id: "streaming",
-      label: "SSE Streaming",
-      filename: "stream.py",
-      note: "Direct edge stream passthrough with token telemetry on the final frame:",
-      lang: "python",
-      code: `stream = client.chat.completions.create(
-    model="qwen-3.8-omni-flash",
-    messages=[{"role": "user", "content": "Stream markdown breakdown."}],
-    stream=True,
-)
-
-for chunk in stream:
-    delta = chunk.choices[0].delta.content if chunk.choices else None
-    if delta:
-        print(delta, end="", flush=True)
-
-# Final stream frame delivers exact server telemetry:
-# {"usage": {"prompt_tokens": 14, "completion_tokens": 86}}
-# No character estimates. Exact tokens reported by upstream.`,
-    },
-  ];
-
-  const handleCopyCode = () => {
-    const code = integrationTabs[activeTab]?.code ?? "";
-    navigator.clipboard.writeText(code);
-    setTabCopied(true);
-    setTimeout(() => setTabCopied(false), 2000);
-  };
+  const apiKeyAction = (label = "Get an API key") =>
+    isAuthenticated ? (
+      <Link className="router-button router-button-primary" href="/keys">
+        {label}
+        <ArrowUpRight size={17} />
+      </Link>
+    ) : (
+      <button
+        className="router-button router-button-primary"
+        onClick={() => signIn("/keys")}
+      >
+        {label}
+        <ArrowUpRight size={17} />
+      </button>
+    );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#d4d4d4] font-sans selection:bg-white/20 selection:text-white">
-      {/* 1. NAVBAR */}
+    <div className="router-public">
       <LandingNavbar />
-
-      {/* 2. HERO SECTION */}
-      <section className="atmo-home-hero">
-        {/* Dynamic Canvas Backdrop (monochrome tones) */}
-        <div className="hero-video-wrapper">
-          <div className="hero-video-container" data-hero-particles="">
-            <div
-              className="main-particles-component-section"
-              data-main-particles-component=""
-              data-sync-theme="true"
-              data-theme="dark"
-              data-ring-width="0.006"
-              data-ring-width2="0.107"
-              data-ring-displacement="0.62"
-              data-density="230"
-              data-particles-scale="0.59"
-              data-color1="#ffffff"
-              data-color2="#a1a1aa"
-              data-color3="#52525b"
-            >
-              <div className="main-particles-container" data-container=""></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Hero Content (Badge removed, Exact headline and subheadline kept) */}
-        <div className="home-container home-hero-content">
-          <h1 className="hero-headline">
-            The Universal Gateway<br />
-            for Frontier AI
-          </h1>
-
-          <p className="home-hero-description">
-            14 frontier models behind a single OpenAI-compatible API. Multi-model failover, native SSE streaming, and transparent per-token metering with zero commitments.
-          </p>
-
-          <div className="home-helper">
-            <div className="atmo-helper-command">
-              <span className="text-white/60 font-mono">$</span>
-              <code className="text-xs sm:text-sm whitespace-nowrap text-white">
-                export OPENAI_BASE_URL="https://router.const.web.id/v1"
-              </code>
-              <button
-                type="button"
-                aria-label="Copy helper command"
-                className="atmo-command-copy cursor-pointer"
-                onClick={handleCopyHelper}
-              >
-                {helperCopied ? (
-                  <Check className="h-4 w-4 text-emerald-400" />
-                ) : (
-                  <Copy className="h-4 w-4 text-white/60" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* CTA Buttons: Get API Key & Explore Model (without icons!) */}
-          <div className="home-hero-actions">
-            {isAuthenticated ? (
-              <Link href="/keys" className="home-button home-button-primary">
-                <span>Get API Key</span>
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => signIn("/keys")}
-                className="home-button home-button-primary cursor-pointer"
-              >
-                <span>Get API Key</span>
-              </button>
-            )}
-
-            <a href="#models" className="home-button home-button-secondary">
-              <span>Explore Model</span>
-            </a>
-          </div>
-
-          <p className="home-hero-footnote">
-            OpenAI-compatible &bull; Anthropic Messages spec &bull; Pay per token &bull;{" "}
-            <Link href="/docs" className="hover:underline">Explore the docs &rarr;</Link>
-          </p>
-        </div>
-      </section>
-
-      {/* 3. SECTION: ONE API. A LOT LESS IN YOUR WAY */}
-      <section id="features" className="home-container home-section">
-        <div className="home-section-heading">
-          <h2>One API.<br />A lot less in your way.</h2>
-          <p>
-            Architected specifically for autonomous coding agents, developer tooling, and production workflows that cannot afford dropped connections or unpredictable billing.
-          </p>
-        </div>
-
-        <div className="features-grid-custom">
-          {/* Top Row: Asymmetrical 2 Cards */}
-          <div className="features-top-row">
-            {/* Card 1: Virtual Combos */}
-            <article className="feature-card">
-              <span className="feature-tag">Intelligent Routing</span>
-              <h3>Virtual Combos &amp; Automatic Failover</h3>
+      <main id="main-content">
+        <section className="router-hero">
+          <ParticleBackdrop />
+          <div className="router-container router-hero-content">
+            <div className="router-hero-copy">
+              <h1>
+                One API.
+                <br />
+                Your choice
+                <br /> of model.
+              </h1>
               <p>
-                Construct custom multi-model failover chains. If a provider returns 429 rate limits, 503 capacity errors, or latency spikes, Const Router automatically routes to the next healthy model without dropping your client connection.
+                Build with frontier models through a single OpenAI-compatible
+                API. Keep your client. Choose your model. See what each request
+                costs.
               </p>
-
-              <div className="router-visual-flow">
-                <div className="router-flow-step active">
-                  <div className="flex items-center gap-2">
-                    <span className="step-label">1. Primary Target</span>
-                    <span className="step-val">DeepSeek v4.1 Flash</span>
-                  </div>
-                  <span className="step-status green">Active / 184ms</span>
-                </div>
-
-                <div className="router-flow-step">
-                  <div className="flex items-center gap-2">
-                    <span className="step-label">2. Failover Chain</span>
-                    <span className="step-val">Qwen 3.8 Omni Flash</span>
-                  </div>
-                  <span className="step-status">Ready (Standby)</span>
-                </div>
-
-                <div className="router-flow-step">
-                  <div className="flex items-center gap-2">
-                    <span className="step-label">3. Fallback Tier</span>
-                    <span className="step-val">Claude Sonnet 5.5</span>
-                  </div>
-                  <span className="text-[11px] text-[#737373]">High-Tier Backup</span>
-                </div>
+              <div className="router-actions">
+                {apiKeyAction()}
+                <Link className="router-text-link" href="/docs">
+                  Read the docs <ArrowRight size={17} />
+                </Link>
               </div>
-            </article>
-
-            {/* Card 2: One Key */}
-            <article className="feature-card">
-              <span className="feature-tag">Unified Access</span>
-              <h3>One Key, All Models</h3>
-              <p>
-                Drop-in replacement for OpenAI and Anthropic SDKs. Keep your codebase, change only the base URL. Every model in the catalog answers to a single <code className="text-white font-mono">sk-const-live-</code> key.
-              </p>
-
-              <div className="key-clients-visual">
-                <div className="key-client-item">
-                  <span>Python SDK</span>
-                  <code>base_url="https://router.const.web.id/v1"</code>
-                </div>
-                <div className="key-client-item">
-                  <span>TypeScript / Node</span>
-                  <code>baseURL: "https://router.const.web.id/v1"</code>
-                </div>
-                <div className="key-client-item">
-                  <span>Claude Code CLI</span>
-                  <code>ANTHROPIC_BASE_URL="https://router.const.web.id"</code>
-                </div>
-                <div className="key-client-item">
-                  <span>Cursor / Cline</span>
-                  <code>OpenAI Compatible Endpoint</code>
-                </div>
+              <div className="hero-mobile-config">
+                <span>OpenAI-compatible base URL</span>
+                <code>https://router.const.web.id/v1</code>
               </div>
-            </article>
-          </div>
-
-          {/* Bottom Row: 3 Columns */}
-          <div className="features-bottom-row">
-            {/* Card 3: Stream */}
-            <article className="feature-card">
-              <span className="feature-tag">Stream</span>
-              <div className="mini-symbol-bars" aria-hidden="true">
-                <span></span> <span></span> <span></span> <span></span> <span></span>
-              </div>
-              <h3>Zero-Buffering SSE</h3>
-              <p>
-                Direct edge stream passthrough without buffering delays. Exact token usage reports delivered reliably in the stream terminator chunk. Stop the stream, stop paying.
-              </p>
-              <div className="mini-telemetry-badge">
-                <Zap className="h-3.5 w-3.5 text-emerald-400" />
-                <span>184ms TTFT &bull; Live Passthrough</span>
-              </div>
-            </article>
-
-            {/* Card 4: Guardrails */}
-            <article className="feature-card">
-              <span className="feature-tag">Guardrails</span>
-              <ShieldCheck className="h-5 w-5 text-white/80 my-1" />
-              <h3>Keys with Spend Limits</h3>
-              <p>
-                Create unlimited developer keys for team members or autonomous agent loops. Configure individual daily spend caps and allowed model lists to prevent runaway costs.
-              </p>
-              <div className="mini-telemetry-badge">
-                <span>Daily Spend Caps &bull; Allowlist</span>
-              </div>
-            </article>
-
-            {/* Card 5: Audit */}
-            <article className="feature-card">
-              <span className="feature-tag">Audit</span>
-              <Terminal className="h-5 w-5 text-white/80 my-1" />
-              <h3>Usage You Can Audit</h3>
-              <p>
-                Every request logged with prompt tokens, completion tokens, latency, and exact micro-cost. Filter by model or time window, inspect raw payload anytime.
-              </p>
-              <div className="mini-telemetry-badge">
-                <span>Exact Tokens &bull; Zero Estimates</span>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. SECTION: DROP-IN INTEGRATION WORKSPACE */}
-      <section id="start" className="home-container home-section">
-        <div className="home-section-heading">
-          <h2>Keep your code.<br />Change the endpoint.</h2>
-          <p>
-            Connect any tool, SDK, or coding agent in under 60 seconds by pointing the base URL to Const Router.
-          </p>
-        </div>
-
-        <div className="hp-workspace">
-          <div className="hp-workspace-bar">
-            <div className="flex items-center">
-              <div className="workspace-window-controls">
-                <span className="window-dot" />
-                <span className="window-dot" />
-                <span className="window-dot" />
-              </div>
-              <div className="hp-tabs" role="tablist">
-                {integrationTabs.map((tab, idx) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={idx === activeTab}
-                    onClick={() => setActiveTab(idx)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+              <div className="router-hero-caption">
+                <span>OpenAI request format</span>
+                <span>Streaming &amp; tool calls</span>
+                <span>Pay per token</span>
               </div>
             </div>
-
-            <button
-              className="hp-copy cursor-pointer"
-              type="button"
-              aria-label="Copy snippet"
-              onClick={handleCopyCode}
-            >
-              {tabCopied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  <span className="text-emerald-400">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 text-[#969696]" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="hp-code-panel">
-            <div className="hp-code-note">
-              <span>{integrationTabs[activeTab]?.note ?? ""}</span>
-              <span>{integrationTabs[activeTab]?.lang ?? ""}</span>
+            <div className="router-hero-integration">
+              <div className="router-hero-connection">
+                <span>Base URL</span>
+                <code>https://router.const.web.id/v1</code>
+              </div>
+              <CodeBlock
+                tabs={[QUICKSTART_TABS[0]!]}
+                label="Make a real chat request"
+              />
+              <p>
+                Set <code>CONST_API_KEY</code> to your API key.
+                <br />
+                This request uses your free model allowance.
+              </p>
             </div>
-            <pre>
-              <code>{integrationTabs[activeTab]?.code ?? ""}</code>
-            </pre>
           </div>
-        </div>
-
-        {/* 3-Part Reference Specs */}
-        <div className="hp-reference">
-          <div>
-            <span className="ref-label">OpenAI Base URL</span>
-            <code>https://router.const.web.id/v1</code>
-            <p>Universal OpenAI-compatible host for chat completions and transcription.</p>
-          </div>
-          <div>
-            <span className="ref-label">Anthropic Base URL</span>
-            <code>https://router.const.web.id</code>
-            <p>Direct Anthropic Messages spec passthrough for Claude Code and Anthropic clients.</p>
-          </div>
-          <div>
-            <span className="ref-label">Telemetry Header</span>
-            <code>X-Const-Cost</code>
-            <p>Exact micro-cost deducted in USD and latency returned in every response header.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. SECTION: MODELS CATALOG TABLE (WITH BRAND LOGOS & YOU SAVE %) */}
-      <section id="models" className="home-container home-section">
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
-              Model Catalog &amp; Live Rates
+          <a href="#start" className="router-hero-bottom router-container">
+            <span>A shorter path from idea to inference.</span>
+            <span>
+              Start building <ArrowRight size={16} />
+            </span>
+          </a>
+        </section>
+        <section
+          id="start"
+          className="router-container router-section router-integration"
+        >
+          <div className="router-section-heading">
+            <h2>
+              Keep the code.
+              <br />
+              Change the connection.
             </h2>
-            <p className="text-sm text-[#969696] pt-1">
-              14 frontier models with transparent per-token pricing and instant routing.
+            <p>
+              Use the OpenAI client you already know. Point it to Const Router,
+              add your key, and send your first request.
             </p>
           </div>
-          <Link href="/dashboard" className="home-text-link">
-            <span>Explore full catalog in Dashboard</span>
-            <span aria-hidden="true">&rarr;</span>
-          </Link>
-        </div>
-
-        <div className="clean-catalog-table">
-          <div className="overflow-x-auto">
-            <table>
+          <div className="router-integration-layout">
+            <div className="router-setup-steps">
+              <div>
+                <span>Base URL</span>
+                <code>https://router.const.web.id/v1</code>
+              </div>
+              <div>
+                <span>Authentication</span>
+                <p>Your Const API key, sent as a Bearer token.</p>
+              </div>
+              <div>
+                <span>Model</span>
+                <p>
+                  An exact catalog ID, or your own <code>combo/</code> slug.
+                </p>
+              </div>
+              <Link href="/docs#quickstart" className="router-text-link">
+                Full quickstart <ArrowUpRight size={16} />
+              </Link>
+            </div>
+            <CodeBlock tabs={QUICKSTART_TABS} label="Your first request" />
+          </div>
+        </section>
+        <section id="features" className="router-capabilities">
+          <div className="router-container">
+            <div className="router-section-heading">
+              <h2>
+                One connection.
+                <br />
+                Room to build.
+              </h2>
+              <p>
+                The gateway handles model access and usage accounting. You stay
+                focused on the application.
+              </p>
+            </div>
+            <div className="router-feature-row">
+              <div>
+                <h3>
+                  A model is a choice.
+                  <br />
+                  Not a migration.
+                </h3>
+                <p>
+                  Move between DeepSeek, Claude, GPT, Gemini, Qwen, GLM,
+                  MiniMax, and Grok using the same chat endpoint. Compare the
+                  fit for each task without rebuilding your integration.
+                </p>
+                <Link href="#models" className="router-text-link">
+                  Browse the models <ArrowRight size={16} />
+                </Link>
+              </div>
+              <div
+                className="router-route-diagram"
+                role="group"
+                aria-label="One chat endpoint can address different model IDs"
+              >
+                <code>POST /v1/chat/completions</code>
+                <div>
+                  <span>model</span>
+                  <code>deepseek-v4.1-flash:free</code>
+                </div>
+                <div>
+                  <span>model</span>
+                  <code>claude-sonnet-5.5</code>
+                </div>
+                <div>
+                  <span>model</span>
+                  <code>gpt-6.1-sol</code>
+                </div>
+              </div>
+            </div>
+            <div className="router-feature-row">
+              <div>
+                <h3>
+                  Have a second
+                  <br />
+                  model in mind.
+                </h3>
+                <p>
+                  Create a Virtual Combo with an ordered list of models. The
+                  router tries another candidate when eligible requests fail
+                  before a stream begins.
+                </p>
+                <Link href="/docs#combos" className="router-text-link">
+                  How fallback works <ArrowRight size={16} />
+                </Link>
+              </div>
+              <div className="router-combo-example">
+                <div>
+                  <code>combo/my-coding-stack</code>
+                  <span>Example configuration</span>
+                </div>
+                <ol>
+                  <li>
+                    <span>Primary</span>
+                    <code>deepseek-v4.1-flash</code>
+                  </li>
+                  <li>
+                    <span>Fallback</span>
+                    <code>qwen-3.8-omni-flash</code>
+                  </li>
+                  <li>
+                    <span>Fallback</span>
+                    <code>claude-sonnet-5.5</code>
+                  </li>
+                </ol>
+              </div>
+            </div>
+            <div className="router-detail-list">
+              <article>
+                <h3>Stream the response.</h3>
+                <p>
+                  Receive chat output as server-sent events, with tool-call and
+                  reasoning parameters passed to the selected model.
+                </p>
+              </article>
+              <article>
+                <h3>Give each project a key.</h3>
+                <p>
+                  Create named API keys, set daily token limits, and revoke
+                  access from your dashboard.
+                </p>
+              </article>
+              <article>
+                <h3>Follow the usage.</h3>
+                <p>
+                  Review request tokens, costs, duration, and status in your
+                  usage logs.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+        <section id="models" className="router-container router-section">
+          <div className="router-section-heading">
+            <h2>
+              The model you need.
+              <br />
+              The rate in plain sight.
+            </h2>
+            <p>
+              Published chat rates in USD per million tokens. Free variants use
+              the shared weekly allowance; standard IDs use your wallet balance.
+            </p>
+          </div>
+          <div id="pricing" className="router-model-table-wrap" role="region" aria-label="Chat model pricing" tabIndex={0}>
+            <table className="router-model-table">
+              <caption className="sr-only">
+                Const Router chat model pricing per million tokens
+              </caption>
               <thead>
                 <tr>
-                  <th className="text-left">Model</th>
-                  <th className="text-center">Context Window</th>
-                  <th className="text-right">Input / 1M Tokens</th>
-                  <th className="text-right">Output / 1M Tokens</th>
-                  <th className="text-center">You Save</th>
+                  <th scope="col">Model</th>
+                  <th scope="col">Context</th>
+                  <th scope="col">Input / 1M</th>
+                  <th scope="col">Cached / 1M</th>
+                  <th scope="col">Output / 1M</th>
                 </tr>
               </thead>
               <tbody>
-                {CATALOG_MODELS.map((model) => {
-                  return (
-                    <tr key={model.id}>
-                      <td>
-                        <div>
-                          <code>{model.id}</code>
-                          <span className="text-xs text-[#737373] block pt-0.5">{model.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-center font-mono text-xs text-[#a3a3a3]">
-                        {model.contextWindow}
-                      </td>
-                      <td className="text-right font-mono">
-                        <strong className="text-white font-medium">{model.input}</strong>
-                        <s>{model.officialInput}</s>
-                        {model.cache && <small>cache {model.cache}</small>}
-                      </td>
-                      <td className="text-right font-mono">
-                        <strong className="text-white font-medium">{model.output}</strong>
-                        <s>{model.officialOutput}</s>
-                      </td>
-                      <td className="text-center">
-                        <span className="save-percent-pill">
-                          Save {model.savePercent}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {chatModels.map((model) => (
+                  <tr key={model.id}>
+                    <th scope="row">
+                      <span>{model.name}</span>
+                      <code>{model.id}</code>
+                    </th>
+                    <td>{model.contextWindow}</td>
+                    <td>{model.pricing?.input ?? "—"}</td>
+                    <td>{model.pricing?.cache ?? "—"}</td>
+                    <td>{model.pricing?.output ?? "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
+            <ul className="router-model-mobile-list" aria-label="Chat model rates per million tokens">
+              {chatModels.map(model => <li key={model.id}>
+                <div className="router-model-mobile-title">
+                  <div><h3>{model.name}</h3><code>{model.id}</code></div>
+                  <span>{model.contextWindow} context</span>
+                </div>
+                <dl>
+                  <div><dt>Input / 1M</dt><dd>{model.pricing?.input ?? "—"}</dd></div>
+                  <div><dt>Cached / 1M</dt><dd>{model.pricing?.cache ?? "—"}</dd></div>
+                  <div><dt>Output / 1M</dt><dd>{model.pricing?.output ?? "—"}</dd></div>
+                </dl>
+              </li>)}
+            </ul>
           </div>
-        </div>
-      </section>
-
-      {/* 6. SECTION: SIMPLE, USAGE-BASED PRICING */}
-      <section id="pricing" className="home-container home-section">
-        <div className="home-section-heading text-center items-center">
-          <h2>Simple, usage-based pricing</h2>
-          <p className="text-center">
-            Pay strictly for tokens consumed. No subscriptions, no tiers, no recurring card lock-in.
-          </p>
-        </div>
-
-        <div className="clean-pricing-grid">
-          {/* Card 1: Pay As You Go */}
-          <article className="pricing-card featured">
-            <span className="pricing-badge">Zero Subscription Lock-In</span>
-            <div className="pricing-amount">$0 / month</div>
-            <p className="pricing-desc">
-              Deposit credits using QRIS or USDC on Solana. Balance drains purely per token consumed down to fractions of a cent.
-            </p>
-
-            <ul className="pricing-features-list">
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>One key for all 14 supported frontier models</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Input and output metered strictly from provider reports</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Prompt caching billed at up to 90% discount</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Unlimited API keys with custom daily spend limits</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Balance never expires &bull; zero recurring card charges</span>
-              </li>
-            </ul>
-
-            <button
-              type="button"
-              onClick={() => signIn("/keys")}
-              className="home-button home-button-primary w-full mt-auto cursor-pointer"
-            >
-              Get Started with Free Tier
-            </button>
-          </article>
-
-          {/* Card 2: Production Workflows */}
-          <article className="pricing-card">
-            <span className="pricing-badge">Production Grade</span>
-            <div className="pricing-amount">Usage-Based</div>
-            <p className="pricing-desc">
-              Engineered for long-running autonomous agent loops, multi-agent workspaces, and high-concurrency coding studios.
-            </p>
-
-            <ul className="pricing-features-list">
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Automated multi-model Virtual Combos with instant failover</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>SSE streaming with token usage on final frames</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Per-key daily rate limits &amp; custom model allowlists</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>Response latency &amp; cost headers on every request</span>
-              </li>
-              <li>
-                <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                <span>7M weekly free token allowance for eligible models</span>
-              </li>
-            </ul>
-
-            <Link href="/dashboard" className="home-button home-button-secondary w-full mt-auto">
-              Configure Virtual Combos
+          <div className="router-table-note">
+            <span>Rates come from the same catalog used by the gateway.</span>
+            <Link href="/models" className="router-text-link">
+              Full model catalog <ArrowUpRight size={15} />
             </Link>
-          </article>
-        </div>
-
-        {/* Value Strip */}
-        <div className="pricing-value-strip">
-          <p>
-            <strong>What does $1 get you?</strong> With <code className="text-white font-mono font-medium">deepseek-v4.1-flash</code>, $1 routes over <strong>80,000,000 tokens</strong> &mdash; enough to analyze an entire large codebase dozens of times.
-          </p>
-          <Link href="/models" className="text-xs text-white/80 hover:underline whitespace-nowrap">
-            View Live Rates &rarr;
-          </Link>
-        </div>
-      </section>
-
-      {/* 7. SECTION: QUICKSTART FLOW */}
-      <section className="home-container home-section">
-        <div className="home-section-heading">
-          <h2>From account to first request</h2>
-          <p>Start calling frontier models in four straightforward steps.</p>
-        </div>
-
-        <div className="home-flow-grid">
-          <article>
-            <span className="font-mono text-xs text-[#737373]">01</span>
-            <h3>Create Account</h3>
-            <p>Sign in with your email or Const account. Nothing else required to explore the catalog.</p>
-          </article>
-          <article>
-            <span className="font-mono text-xs text-[#737373]">02</span>
-            <h3>Add Balance</h3>
-            <p>Deposit USDC on Solana or top up with QRIS. Balance drains per token, never per month.</p>
-          </article>
-          <article>
-            <span className="font-mono text-xs text-[#737373]">03</span>
-            <h3>Generate a Key</h3>
-            <p>Create an sk-const-live- key, configure daily spend ceilings and allowed models.</p>
-          </article>
-          <article>
-            <span className="font-mono text-xs text-[#737373]">04</span>
-            <h3>Start Calling</h3>
-            <p>Point any OpenAI or Anthropic tool to router.const.web.id/v1.</p>
-          </article>
-        </div>
-      </section>
-
-      {/* 8. SECTION: BILLING METERING & LEDGER */}
-      <section id="billing" className="home-container home-section home-billing-layout">
-        <div className="home-billing-intro">
-          <h2>How your usage is billed</h2>
-          <p>
-            Metering comes directly from upstream provider usage reports, so the number you are charged reflects the exact tokens returned by the model &mdash; never a character estimate.
-          </p>
-          <h3>What you get</h3>
-          <ul>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              One key for the OpenAI and Anthropic compatible endpoints
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              14 frontier models across all major families
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              Real-time balance deduction per request down to 0.0001&cent;
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              Full SSE streaming with token usage on the final frame
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              Per-key daily rate limits and model restrictions
-            </li>
-            <li>
-              <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-              Usage dashboard with cost and latency breakdown
-            </li>
-          </ul>
-        </div>
-
-        <article className="home-billing-ledger">
-          <div className="home-ledger-header">
-            <span>How billing works</span>
-            <span className="text-xs text-[#969696] font-mono">Unit: USD / 1M</span>
           </div>
-          <ol>
-            <li>
-              <span className="font-mono">01</span>
-              <p>Deposit USDC on Solana, or top up with QRIS (instant IDR)</p>
-            </li>
-            <li>
-              <span className="font-mono">02</span>
-              <p>Input and output tokens counted separately at transparent rates</p>
-            </li>
-            <li>
-              <span className="font-mono">03</span>
-              <p>Cached input tokens billed at up to 90% discount</p>
-            </li>
-            <li>
-              <span className="font-mono">04</span>
-              <p className="home-formula">
-                cost = ((in &minus; cached) &times; input_price + cached &times; input_price &times; 0.10 + out &times; output_price) / 1M
+          <div id="billing" className="router-allowance">
+            <h3>Start with the free allowance.</h3>
+            <div>
+              <p>
+                7 million tokens per 7-day period, shared across the available
+                free chat models. Use the exact <code>:free</code> ID to draw
+                from your allowance.
               </p>
-            </li>
-            <li>
-              <span className="font-mono">05</span>
-              <p>Balance deducted the moment a request settles</p>
-            </li>
-            <li>
-              <span className="font-mono">06</span>
-              <p>A failed upstream request is never billed</p>
-            </li>
-            <li>
-              <span className="font-mono">07</span>
-              <p>Empty balance blocks new calls, never overdraws or charges a card</p>
-            </li>
-          </ol>
-        </article>
-      </section>
-
-      {/* 9. CLOSING CTA */}
-      <section className="home-container home-section text-center py-20 border-t border-[#262626]">
-        <div className="max-w-xl mx-auto space-y-5">
-          <h2 className="text-2xl sm:text-3xl font-medium tracking-tight text-white">
-            Start calling frontier models in minutes
-          </h2>
-          <p className="text-sm text-[#969696]">
-            Create a key, configure your daily ceilings, and connect your favorite coding agent.
-          </p>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => signIn("/keys")}
-              className="home-button home-button-primary cursor-pointer px-6"
-            >
-              <span>Get API Key</span>
-            </button>
+              <div className="router-free-models">
+                {FREE_MODEL_IDS.map((id) => (
+                  <code key={id}>{id}</code>
+                ))}
+              </div>
+              <Link href="/docs#models-allowance" className="router-text-link">
+                Understand billing <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* 10. STUDIO FOOTER */}
+        </section>
+        <section className="router-endpoints router-container">
+          <div className="router-section-heading">
+            <h2>Beyond the chat.</h2>
+            <p>
+              Bring search, speech, and source content into your workflow
+              through the same gateway.
+            </p>
+          </div>
+          <div className="router-endpoint-list">
+            {ROUTER_ENDPOINTS.filter(
+              (endpoint) =>
+                !["/v1/chat/completions", "/v1/models"].includes(endpoint.path),
+            ).map((endpoint) => (
+              <Link
+                href={`/docs#${({ "/v1/audio/transcriptions": "audio-transcription", "/v1/search": "web-search-api", "/v1/fetch": "web-fetch-api", "/v1/transcript": "youtube-transcript-api" } as Record<string, string>)[endpoint.path]}`}
+                key={endpoint.path}
+              >
+                <span>{endpoint.name}</span>
+                <code>
+                  {endpoint.method} {endpoint.path}
+                </code>
+                <ArrowUpRight size={17} />
+              </Link>
+            ))}
+          </div>
+        </section>
+        <section className="router-container router-closing">
+          <h2>
+            Your next idea
+            <br />
+            starts with a request.
+          </h2>
+          <div>
+            {apiKeyAction("Start building")}
+            <p>
+              Try a free model. Explore the API.
+              <br />
+              Build from there.
+            </p>
+          </div>
+        </section>
+      </main>
       <LandingFooter />
     </div>
   );

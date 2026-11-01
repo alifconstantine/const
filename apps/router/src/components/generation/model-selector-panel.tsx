@@ -70,7 +70,7 @@ export function ModelSelectorPanel({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-full sm:max-w-[440px] p-0 flex flex-col bg-card border-l border-border/80 shadow-2xl z-50 gap-0"
+        className="w-full sm:max-w-[440px] p-0 flex flex-col bg-card border-l border-border/80 z-50 gap-0"
       >
         {/* Header */}
         <div className="p-4 sm:p-5 flex items-center justify-between">
@@ -81,7 +81,7 @@ export function ModelSelectorPanel({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              className="h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
               aria-label="Close panel"
             >
               <X className="h-4 w-4" />
@@ -94,10 +94,11 @@ export function ModelSelectorPanel({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              aria-label="Search models or combos"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search models or combos..."
-              className="pl-9 h-10 rounded-xl text-sm font-sans border-border/80 bg-background text-foreground placeholder:text-muted-foreground/70"
+              className="pl-9 h-10 rounded-xl text-sm font-sans border-border/80 bg-background text-foreground placeholder:text-muted-foreground"
               autoFocus
             />
           </div>
@@ -114,7 +115,7 @@ export function ModelSelectorPanel({
               {/* Virtual Combos Section */}
               {filteredCombos.length > 0 && (
                 <div className="space-y-1">
-                  <div className="px-3 py-1 flex items-center justify-between text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+                  <div className="px-3 py-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5" />
                       Virtual Combos
@@ -130,16 +131,18 @@ export function ModelSelectorPanel({
                       m.modelId === `combo/${selectedModelId}`;
 
                     return (
-                      <div
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
                         key={m.id}
                         onClick={() => {
                           onSelectModel(m);
                           onClose();
                         }}
                         className={cn(
-                          "group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors select-none",
+                          "group flex w-full text-left items-center justify-between px-4 py-3 rounded-lg cursor-pointer transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           isSelected
-                            ? "bg-foreground text-background font-medium shadow-sm"
+                            ? "bg-primary/10 text-primary font-medium"
                             : "hover:bg-secondary/70 text-foreground",
                         )}
                       >
@@ -153,7 +156,7 @@ export function ModelSelectorPanel({
                                 className={cn(
                                   "text-[10px] px-1.5 py-0.5 rounded-md font-mono shrink-0",
                                   isSelected
-                                    ? "bg-background/20 text-background"
+                                    ? "bg-primary/10 text-primary"
                                     : "bg-secondary text-muted-foreground",
                                 )}
                               >
@@ -166,7 +169,7 @@ export function ModelSelectorPanel({
                             className={cn(
                               "text-xs truncate font-mono mt-0.5",
                               isSelected
-                                ? "text-background/80"
+                                ? "text-primary"
                                 : "text-muted-foreground",
                             )}
                           >
@@ -176,7 +179,7 @@ export function ModelSelectorPanel({
                         {isSelected && (
                           <Check className="h-4 w-4 stroke-[2.5] shrink-0 ml-2" />
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -185,7 +188,7 @@ export function ModelSelectorPanel({
               {/* Free & paid models Section */}
               {filteredStandardModels.length > 0 && (
                 <div className="space-y-1">
-                  <div className="px-3 py-1 text-xs font-semibold text-muted-foreground tracking-wider uppercase">
+                  <div className="px-3 py-1 text-xs font-medium text-muted-foreground">
                     Standard Models
                   </div>
                   {filteredStandardModels.map((m) => {
@@ -193,16 +196,18 @@ export function ModelSelectorPanel({
                       m.modelId === selectedModelId || m.id === selectedModelId;
 
                     return (
-                      <div
+                      <button
+                        type="button"
+                        aria-pressed={isSelected}
                         key={m.id}
                         onClick={() => {
                           onSelectModel(m);
                           onClose();
                         }}
                         className={cn(
-                          "group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-colors select-none",
+                          "group flex w-full text-left items-center justify-between px-4 py-3 rounded-lg cursor-pointer transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           isSelected
-                            ? "bg-foreground text-background font-medium shadow-sm"
+                            ? "bg-primary/10 text-primary font-medium"
                             : "hover:bg-secondary/70 text-foreground",
                         )}
                       >
@@ -214,7 +219,7 @@ export function ModelSelectorPanel({
                             className={cn(
                               "text-xs truncate font-mono mt-0.5",
                               isSelected
-                                ? "text-background/80"
+                                ? "text-primary"
                                 : "text-muted-foreground",
                             )}
                           >
@@ -224,7 +229,7 @@ export function ModelSelectorPanel({
                         {isSelected && (
                           <Check className="h-4 w-4 stroke-[2.5] shrink-0 ml-2" />
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -243,7 +248,7 @@ export function ModelSelectorPanel({
             size="sm"
             variant="outline"
             onClick={onClose}
-            className="h-8 px-4 rounded-full text-xs font-medium cursor-pointer border-border/70"
+            className="h-8 px-4 rounded-lg text-xs font-medium cursor-pointer border-border/70"
           >
             Done
           </Button>

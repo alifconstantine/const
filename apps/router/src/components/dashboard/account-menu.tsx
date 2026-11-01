@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
@@ -11,11 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -27,7 +22,6 @@ import {
   LogOut,
   Users,
   Settings,
-  Globe,
   BookOpen,
 } from "lucide-react";
 
@@ -66,7 +60,6 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
     api.auth.queries.currentUser,
     isAuthenticated ? {} : "skip"
   );
-  const [selectedLang, setSelectedLang] = useState("en");
 
   // Global shortcut Ctrl+, or Cmd+, to navigate to Settings
   useEffect(() => {
@@ -84,7 +77,7 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
     return (
       <div
         className={cn(
-          "flex items-center p-2 rounded-2xl bg-card/60 animate-pulse border border-border/50",
+          "flex items-center p-2 rounded-xl bg-card/60 animate-pulse border border-border/50",
           isCollapsed ? "justify-center" : "gap-3"
         )}
       >
@@ -109,7 +102,7 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
         <button
           type="button"
           className={cn(
-            "w-full flex items-center p-2 rounded-2xl border border-transparent hover:border-border hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent data-[state=open]:border-border transition-all cursor-pointer group outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            "w-full flex items-center p-2 rounded-xl border border-transparent hover:border-border hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent data-[state=open]:border-border transition-all cursor-pointer group outline-none focus-visible:ring-1 focus-visible:ring-ring",
             isCollapsed ? "justify-center" : "justify-between"
           )}
           title={displayName}
@@ -119,7 +112,7 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
               {user?.image ? (
                 <AvatarImage src={user.image} alt={displayName} />
               ) : null}
-              <AvatarFallback className="bg-secondary text-foreground text-[11px] font-mono font-medium">
+              <AvatarFallback className="bg-secondary text-foreground text-[11px] font-sans font-medium">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -130,7 +123,7 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
                     {displayName}
                   </p>
                   {user?.role === "admin" && (
-                    <span className="rounded-full bg-primary text-primary-foreground px-1.5 py-0.2 text-[9px] uppercase font-mono font-semibold tracking-wider shrink-0">
+                    <span className="rounded-full bg-primary text-primary-foreground px-1.5 py-0.2 text-[9px] uppercase font-sans font-semibold tracking-wider shrink-0">
                       Admin
                     </span>
                   )}
@@ -151,7 +144,7 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
         side={isCollapsed ? "right" : "top"}
         align={isCollapsed ? "end" : "start"}
         sideOffset={8}
-        className="w-60 rounded-2xl p-1.5 border border-border bg-popover text-popover-foreground shadow-lg space-y-0.5"
+        className="w-60 rounded-xl p-1.5 border border-border bg-popover text-popover-foreground shadow-lg space-y-0.5"
       >
         {/* 1. Settings */}
         <DropdownMenuItem
@@ -163,38 +156,9 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
               <Settings className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium text-foreground">Settings</span>
             </div>
-            <span className="text-[11px] font-mono text-muted-foreground">Ctrl+,</span>
+            <span className="text-[11px] font-sans text-muted-foreground">Ctrl+,</span>
           </Link>
         </DropdownMenuItem>
-
-        {/* 2. Language */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="rounded-xl py-2 px-3 text-xs text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent cursor-pointer transition-colors outline-none">
-            <div className="flex items-center gap-2.5">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground">Language</span>
-            </div>
-            <span className="ml-auto text-xs text-muted-foreground font-normal mr-1">
-              {selectedLang === "id" ? "Indonesia" : "English"}
-            </span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="rounded-xl border border-border bg-popover text-popover-foreground p-1 shadow-lg min-w-[150px]">
-            <DropdownMenuRadioGroup value={selectedLang} onValueChange={setSelectedLang}>
-              <DropdownMenuRadioItem
-                value="en"
-                className="rounded-lg text-xs py-1.5 px-2.5 cursor-pointer hover:bg-accent focus:bg-accent"
-              >
-                English
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem
-                value="id"
-                className="rounded-lg text-xs py-1.5 px-2.5 cursor-pointer hover:bg-accent focus:bg-accent"
-              >
-                Bahasa Indonesia
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
 
         {/* 3. Docs */}
         <DropdownMenuItem

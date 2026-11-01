@@ -181,6 +181,7 @@ function sidebarFixture(
       AccountMenu: () => React.createElement("div", null, "Account"),
     },
     "@const/ui": {
+      ScrollArea: ({ children, ...props }) => React.createElement("div", props, children),
       Button: ({ children, variant, size, ...props }) =>
         React.createElement("button", props, children),
       ConstLogoIcon: () => null,
@@ -237,14 +238,15 @@ test("sidebar remains usable when production settings or quota queries fail", ()
     settings: new Error("Missing function"),
   });
   assert.match(settingsMissing.html, /Models &amp; pricing/);
-  assert.match(settingsMissing.html, /700k free tokens/);
+  assert.match(settingsMissing.html, /700k left/);
   assert.doesNotMatch(settingsMissing.html, /Less than 15%/);
   const bothMissing = sidebarFixture({
     quota: new Error("Quota unavailable"),
     settings: new Error("Settings unavailable"),
   });
   assert.match(bothMissing.html, /Free usage unavailable/);
-  assert.match(bothMissing.html, /Retry connection/);
+  assert.match(bothMissing.html, /Check Overview for details/);
+  assert.match(bothMissing.html, /href="\/dashboard"/);
   assert.match(bothMissing.html, /href="\/models"/);
   assert.doesNotMatch(
     bothMissing.html,
@@ -361,14 +363,23 @@ const logs = () =>
   [...db.rows.values()].filter((r) => r.__table === "routerLogs");
 
 test("tool serialization flags reach the engine and reject invalid values", async () => {
-  const response = await chat.POST(request({ ...body(), parallel_tool_calls: false }));
+  const response = await chat.POST(
+    request({ ...body(), parallel_tool_calls: false }),
+  );
   assert.equal(response.status, 200);
   assert.equal(lastPayload.parallel_tool_calls, false);
-  assert.equal((await chat.POST(request({ ...body(), parallel_tool_calls: "false" }))).status, 400);
+  assert.equal(
+    (await chat.POST(request({ ...body(), parallel_tool_calls: "false" })))
+      .status,
+    400,
+  );
 });
 
 test("an incomplete upstream stream is reported as failure and releases reservations", async () => {
-  global.fetch = async () => new Response('data: {"choices":[{"delta":{"reasoning_content":"still thinking"}}]}\n\n');
+  global.fetch = async () =>
+    new Response(
+      'data: {"choices":[{"delta":{"reasoning_content":"still thinking"}}]}\n\n',
+    );
   const response = await chat.POST(request({ ...body(), stream: true }));
   const text = await response.text();
   assert.match(text, /incomplete_stream/);
@@ -377,9 +388,16 @@ test("an incomplete upstream stream is reported as failure and releases reservat
 });
 
 test("the usage parser distinguishes a completion event from a dropped socket", () => {
-  for (const tail of ['data: [DONE]\n\n', 'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}']) {
+  for (const tail of [
+    "data: [DONE]\n\n",
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+  ]) {
     const parser = new SseUsageParser();
-    parser.push(new TextEncoder().encode('data: {"choices":[{"delta":{"reasoning":"thought"}}]}\n\n' + tail));
+    parser.push(
+      new TextEncoder().encode(
+        'data: {"choices":[{"delta":{"reasoning":"thought"}}]}\n\n' + tail,
+      ),
+    );
     parser.finish();
     assert.equal(parser.hasTerminal, true);
     assert.equal(parser.outputText, "thought");
@@ -643,7 +661,11 @@ test("discovery retains both free and paid variants and authenticates combo disc
   assert(data.data.some((m) => m.id === free));
   assert(data.data.some((m) => m.id === "deepseek-v4.1-flash"));
   assert(data.data.find((m) => m.id === free).display_name.endsWith(":free"));
-  assert(!data.data.find((m) => m.id === "deepseek-v4.1-flash").display_name.endsWith(":free"));
+  assert(
+    !data.data
+      .find((m) => m.id === "deepseek-v4.1-flash")
+      .display_name.endsWith(":free"),
+  );
   assert(data.data.some((m) => m.id === "combo/coding"));
 });
 test("saved defaults and privacy settings affect requests", async () => {
@@ -800,4 +822,114 @@ test("saved chat ownership and revision checks prevent cross-user access and los
   );
   assert.equal((await db.get(created.chatId)).messages.length, 0);
   assert.equal((await db.query("routerMessages").collect()).length, 2);
+});
+
+test("Playground opens a local session without loading saved conversations", () => {
+  const React = appRequire("react");
+  const { renderToStaticMarkup } = appRequire("react-dom/server");
+  const calls = [];
+  const box = ({ children }) => React.createElement("div", null, children);
+  const ui = Object.fromEntries(
+    [
+      "Button",
+      "Slider",
+      "Badge",
+      "Select",
+      "SelectTrigger",
+      "SelectValue",
+      "SelectContent",
+      "SelectItem",
+      "ScrollArea",
+      "SheetContent",
+      "SheetTitle",
+    ].map((name) => [name, box]),
+  );
+  const pageLoad = sourceLoader({
+    "@const/backend/_generated/api": { api },
+    "@/components/providers/convex-client-provider": {
+      useRouterAuth: () => ({
+        isAuthenticated: true,
+        token: "valid.jwt.token",
+      }),
+    },
+    "convex/react": {
+      useQuery: (ref) => {
+        calls.push(ref.path);
+        assert.equal(ref.path, "router.combos.listCombos");
+        return [];
+      },
+      useMutation: (ref) => {
+        calls.push(ref.path);
+        assert.ok(
+          [
+            "router.chats.generateUploadUrl",
+            "router.chats.registerFile",
+          ].includes(ref.path),
+        );
+        return async () => {
+          throw Error("No upload should run while opening Playground");
+        };
+      },
+      usePaginatedQuery: () => {
+        throw Error("Playground must not load saved chats");
+      },
+    },
+    "@const/ui": {
+      ...ui,
+      Input: () => React.createElement("input", { readOnly: true }),
+      Sheet: () => null,
+      cn: (...values) => values.filter(Boolean).join(" "),
+      toast: { error: () => {}, success: () => {} },
+    },
+    "@/components/generation/model-selector-panel": {
+      ModelSelectorPanel: () => null,
+    },
+    "@/components/generation/system-instruction-panel": {
+      SystemInstructionPanel: () => null,
+    },
+    "@/components/generation/view-code-dialog": { ViewCodeDialog: () => null },
+    "@/components/generation/chat-message-item": {
+      ChatMessageItem: () => null,
+    },
+  });
+  const Page = pageLoad(
+    "apps/router/src/app/(dashboard)/generation/page.tsx",
+  ).default;
+  const html = renderToStaticMarkup(React.createElement(Page));
+  assert.match(html, /Playground/);
+  assert.match(html, /Message prompt/);
+  assert.doesNotMatch(html, /Chat history saved|Chat history|Untitled Chat/);
+  assert.deepEqual(
+    calls.sort(),
+    [
+      "router.chats.generateUploadUrl",
+      "router.chats.registerFile",
+      "router.combos.listCombos",
+    ].sort(),
+  );
+});
+
+const { chartBuckets, formatUsd } = load("apps/router/src/lib/router-analytics.ts");
+test("usage charts aggregate every point across long periods without losing requests, tokens, or cost", () => {
+ const now = Date.UTC(2026,10,1,12);
+ const timeline = Array.from({length: 720}, (_, index) => ({timestamp:now-(719-index)*3600000,tokens:100+index,requests:3,costUsd:0.000123}));
+ const buckets = chartBuckets(timeline, "30d", now);
+ assert.ok(buckets.length <= 50);
+ for(const metric of ["requests","tokens","costUsd"]) {
+  const expected = timeline.reduce((sum,p)=>sum+p[metric],0), actual = buckets.reduce((sum,p)=>sum+p[metric],0);
+  assert.ok(Math.abs(actual-expected)<1e-9, metric+" totals changed");
+ }
+ assert.deepEqual(chartBuckets([], "all", now), []);
+});
+test("short chart periods exclude earlier points and show zero-usage intervals honestly", () => {
+ const now = Date.UTC(2026,10,1,12);
+ const points = [{timestamp:now-72*3600000,tokens:100,requests:2,costUsd:1},{timestamp:now-3600000,tokens:500,requests:4,costUsd:0.01}];
+ const buckets = chartBuckets(points,"24h",now);
+ assert.equal(buckets.reduce((sum,p)=>sum+p.tokens,0),500);
+ assert.ok(buckets.some(p=>p.tokens===0));
+});
+test("sub-microdollar amounts never display as free usage", () => {
+ assert.equal(formatUsd(0.0000001),"<$0.000001");
+ assert.equal(formatUsd(0),"$0.00");
+ assert.equal(formatUsd(0.000012),"$0.000012");
 });
