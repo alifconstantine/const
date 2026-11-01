@@ -25,10 +25,14 @@ import { useCodeFontSize } from "../../lib/theme";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
 import { useRemoteRuntime } from "../../lib/remote-runtime";
+import type { AttachedFile } from "../workbench/chat-card";
+import { mediaKind } from "../../lib/workbench-activity";
+import { MediaPreviewTab } from "./media-preview-tab";
 const ExcalidrawEditor = React.lazy(() => import("../mcp-apps/excalidraw-editor"));
 
 interface FilePreviewTabProps {
   tab: RightPaneTab;
+  source?: AttachedFile;
   workspacePath?: string;
   onOpenFilePreview?: (filePath: string) => void;
   onOpenBrowser?: (url: string) => void;
@@ -49,6 +53,10 @@ interface BreadcrumbCrumb {
 }
 
 export function FilePreviewTab(props: FilePreviewTabProps) {
+  const kind = mediaKind(props.source?.name || props.tab.filePath || props.tab.title, props.source?.type)
+    || (!props.tab.filePath && props.source?.textContent ? "document" : null);
+  if (kind && props.tab.type !== "directory") return <MediaPreviewTab key={`${props.tab.id}:${props.tab.filePath || props.tab.sourceId}`} name={props.source?.name || props.tab.title}
+    filePath={props.source?.path || props.tab.filePath} source={props.source} kind={kind} workspacePath={props.workspacePath} />;
   if (props.tab.filePath && /[\\/]artifacts[\\/]diagrams[\\/][a-f0-9-]{36}\.excalidraw$/i.test(props.tab.filePath)) return <React.Suspense fallback={<div className="h-full grid place-items-center"><Loader2 className="size-5 animate-spin text-[#969696]" /></div>}><ExcalidrawEditor filePath={props.tab.filePath} /></React.Suspense>;
   return <StandardFilePreviewTab {...props} />;
 }

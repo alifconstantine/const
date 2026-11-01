@@ -3,6 +3,16 @@ import type { TranslationDictionary } from "./types";
 
 export const es: TranslationDictionary = {
   mcp: mcpTranslations.es,
+  activity: {
+    title: "Actividad",
+    jobs: "Procesos en segundo plano",
+    changes: "Cambios",
+    sources: "Fuentes",
+    text: "Texto",
+    empty: "Aún no hay actividad.",
+    previewUnavailable: "No se pudo mostrar este archivo multimedia. Puede no estar disponible o superar el límite de transferencia remota.",
+    documentUnavailable: "No hay una vista previa de texto para este documento."
+  },
   remoteControl: {
     startHint: "Inicia el control remoto para generar un código de vinculación y un QR.",
     pairDevice: "Vincular un dispositivo",

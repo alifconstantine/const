@@ -3,6 +3,16 @@ import type { TranslationDictionary } from "./types";
 
 export const id: TranslationDictionary = {
   mcp: mcpTranslations.id,
+  activity: {
+    title: "Aktivitas",
+    jobs: "Proses latar belakang",
+    changes: "Perubahan",
+    sources: "Sumber",
+    text: "Teks",
+    empty: "Belum ada aktivitas.",
+    previewUnavailable: "Media ini belum dapat ditampilkan. Berkas mungkin tidak tersedia atau melebihi batas transfer remote.",
+    documentUnavailable: "Pratinjau teks untuk dokumen ini belum tersedia."
+  },
   remoteControl: {
     startHint: "Mulai kendali jarak jauh untuk membuat kode pairing dan QR.",
     pairDevice: "Hubungkan perangkat",

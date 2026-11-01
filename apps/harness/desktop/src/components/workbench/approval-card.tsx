@@ -2,12 +2,10 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { PenLine, Terminal, Info, Copy, Check } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { useTranslation } from "../../lib/i18n";
-import { AttachedTaskBanner } from "./attached-task-banner";
 import { FileIcon } from "./file-icon";
 import type {
   ApprovalRequestData,
   ApprovalDecision,
-  BackgroundTaskItem,
 } from "../../vite-env";
 
 export interface ApprovalCardProps {
@@ -15,9 +13,6 @@ export interface ApprovalCardProps {
   project?: string;
   isResponding?: boolean;
   onDecide: (decision: ApprovalDecision, feedback?: string) => void;
-  runningTasks?: BackgroundTaskItem[];
-  onSelectTask?: (task: BackgroundTaskItem) => void;
-  onStopTask?: (taskId: string) => void;
   className?: string;
 }
 
@@ -34,9 +29,6 @@ export function ApprovalCard({
   project,
   isResponding = false,
   onDecide,
-  runningTasks,
-  onSelectTask,
-  onStopTask,
   className = "",
 }: ApprovalCardProps) {
   const { t } = useTranslation();
@@ -258,16 +250,6 @@ export function ApprovalCard({
         className
       )}
     >
-      {/* 0. Running Tasks Banner attached above card when tasks are active */}
-      {runningTasks && runningTasks.length > 0 && (
-        <AttachedTaskBanner
-          tasks={runningTasks}
-          onSelectTask={onSelectTask || (() => {})}
-          onStopTask={onStopTask || (() => {})}
-          className="-mx-3.5 -mt-3.5 sm:-mx-4 sm:-mt-4 mb-2.5 rounded-t-2xl border-b border-[#383838] bg-[#161616]"
-        />
-      )}
-
       {/* 1. Main Action Heading (inspired by Image 2 reference) */}
       <div className="flex items-center gap-2 mb-2 select-none">
         {isMutation ? (

@@ -3,6 +3,16 @@ import type { TranslationDictionary } from "./types";
 
 export const ja: TranslationDictionary = {
   mcp: mcpTranslations.ja,
+  activity: {
+    title: "アクティビティ",
+    jobs: "バックグラウンドジョブ",
+    changes: "変更",
+    sources: "ソース",
+    text: "テキスト",
+    empty: "アクティビティはまだありません。",
+    previewUnavailable: "メディアをプレビューできません。ファイルが利用できないか、リモート転送の上限を超えている可能性があります。",
+    documentUnavailable: "このドキュメントのテキストプレビューはありません。"
+  },
   remoteControl: {
     startHint: "リモート操作を開始すると、ペアリングコードとQRコードが表示されます。",
     pairDevice: "デバイスを接続",

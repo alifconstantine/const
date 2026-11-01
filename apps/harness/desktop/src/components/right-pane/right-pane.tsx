@@ -1,4 +1,4 @@
-import React, { useRef, memo } from "react";
+import React, { useRef, useMemo, memo } from "react";
 import { MessageSquare, Globe } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { OpenTabView } from "./open-tab-view";
@@ -15,6 +15,7 @@ import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./t
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 import type { ConversationItem } from "../../lib/conversation-store";
 import { useTranslation } from "../../lib/i18n";
+import { collectSessionSources } from "../../lib/workbench-activity";
 
 interface RightPaneProps {
   width: number;
@@ -94,6 +95,7 @@ export const RightPane = memo(function RightPane({
   const { t } = useTranslation();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const sources = useMemo(() => collectSessionSources(parentMessages || []), [parentMessages]);
 
   const renderTabContent = (tab: RightPaneTab) => {
     switch (tab.type) {
@@ -110,13 +112,18 @@ export const RightPane = memo(function RightPane({
             onOpenFileDiff={onOpenFileDiff}
           />
         );
-      case "file_diff":
-        return <FileDiffTab tab={tab} onRollbackFile={onRollbackFile} />;
+      case "file_diff": {
+        const mutation = mutations?.find(record => record.id === tab.mutation?.id) || tab.mutation;
+        return <FileDiffTab tab={{ ...tab, mutation }} onRollbackFile={onRollbackFile} />;
+      }
       case "file_preview":
       case "directory":
         return (
           <FilePreviewTab
             tab={tab}
+            source={sources.find(source => tab.sourceId
+              ? source.id === tab.sourceId && (!source.path || !tab.filePath || source.path === tab.filePath)
+              : source.path && source.path === tab.filePath)}
             workspacePath={workspacePath}
             onOpenFilePreview={onOpenFilePreview}
             onOpenBrowser={onOpenBrowser}
@@ -217,6 +224,9 @@ export const RightPane = memo(function RightPane({
           return (
             <div
               key={tab.id}
+              role="tabpanel"
+              aria-label={tab.title}
+              aria-hidden={!isTabActive}
               className={`w-full h-full min-h-0 ${
                 isTabActive
                   ? "flex flex-col flex-1 relative z-10"

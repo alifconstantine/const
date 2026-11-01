@@ -2,35 +2,39 @@ import React, { useState, useEffect, useRef } from "react";
 import { Terminal, Square, Loader2 } from "lucide-react";
 import type { RightPaneTab } from "./types";
 import { useTranslation } from "../../lib/i18n";
+import { ScrollArea, toast } from "@const/ui";
 
 interface TaskOutputTabProps {
   tab: RightPaneTab;
-  onStopTask?: (taskId: string) => void;
+  onStopTask?: (taskId: string) => void | Promise<void>;
 }
 
 export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState<boolean>(true);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taskId = tab.taskId || tab.id;
 
   useEffect(() => {
+    let disposed = false;
+    setLogs([]);
+    setIsRunning(false);
     if (window.electron?.getBackgroundTaskLogs && taskId) {
       window.electron.getBackgroundTaskLogs(taskId).then((initialLogs) => {
-        if (initialLogs && initialLogs.length > 0) {
+        if (!disposed && initialLogs && initialLogs.length > 0) {
           setLogs(initialLogs);
         }
-      });
+      }).catch(() => {});
     }
 
     if (window.electron?.listBackgroundTasks) {
       window.electron.listBackgroundTasks().then((tasks) => {
         const found = tasks.find((t) => t.id === taskId);
-        if (found) {
+        if (!disposed && found) {
           setIsRunning(found.status === "running");
         }
-      });
+      }).catch(() => {});
     }
 
     if (window.electron?.onBackgroundTaskEvent) {
@@ -48,8 +52,9 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
           }
         }
       });
-      return () => unsubscribe();
+      return () => { disposed = true; unsubscribe(); };
     }
+    return () => { disposed = true; };
   }, [taskId]);
 
   useEffect(() => {
@@ -59,10 +64,11 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
   }, [logs]);
 
   const handleStop = async () => {
-    if (window.electron?.killBackgroundTask && taskId) {
-      await window.electron.killBackgroundTask(taskId);
-      setIsRunning(false);
-      onStopTask?.(taskId);
+    try {
+      if (onStopTask) await onStopTask(taskId);
+      else if (await window.electron?.killBackgroundTask?.(taskId)) setIsRunning(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("common.failed"));
     }
   };
 
@@ -104,9 +110,10 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex-1 w-full p-4 overflow-y-auto font-mono text-xs leading-relaxed select-text"
+      <ScrollArea
+        viewportRef={scrollRef}
+        className="flex-1 min-h-0 w-full font-mono text-xs leading-relaxed select-text"
+        viewportClassName="p-4"
       >
         <div className="text-[#888888] pb-2 mb-2 border-b border-[#222222] flex items-center justify-between">
           <span>$ {command}</span>
@@ -133,7 +140,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
             ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

@@ -5,7 +5,6 @@ import {
   PanelLeft,
   Folder,
   MoreHorizontal,
-  Globe,
   SquareTerminal,
 } from "lucide-react";
 import {
@@ -39,9 +38,6 @@ interface TopToolbarProps {
   isDraggingRightSidebar?: boolean;
   onToggleRightSidebar?: () => void;
   onOpenTerminal?: () => void;
-  onOpenBrowser?: () => void;
-  onToggleBrowser?: () => void;
-  isBrowserActive?: boolean;
   isBottomPanelOpen?: boolean;
   onToggleBottomPanel?: () => void;
 }
@@ -64,9 +60,6 @@ export function TopToolbar({
   isDraggingRightSidebar = false,
   onToggleRightSidebar,
   onOpenTerminal,
-  onOpenBrowser,
-  onToggleBrowser,
-  isBrowserActive = false,
   isBottomPanelOpen = false,
   onToggleBottomPanel,
 }: TopToolbarProps) {
@@ -336,37 +329,13 @@ export function TopToolbar({
         {remote?.mobile && <div id="remote-header-telemetry" className="shrink-0" />}
       </div>
 
-      {/* Right section: Browser & Terminal toggles in Main Chat header (ONLY when sidepanel is open, without sliding transition) */}
+      {/* Right section: Terminal toggle in Main Chat header (ONLY when sidepanel is open, without sliding transition) */}
       {isRightSidebarOpen && (
         <div
           data-toolbar-actions
           className="flex items-center gap-0.5 shrink-0 ml-auto pointer-events-auto"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          {/* Browser Toggle */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              if (onToggleBrowser) {
-                onToggleBrowser();
-              } else if (onOpenBrowser) {
-                onOpenBrowser();
-              }
-            }}
-            className={cn(
-              "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
-              isBrowserActive
-                ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
-                : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
-            )}
-            title={isBrowserActive ? t("topToolbar.closeBrowser") : t("topToolbar.openBrowser")}
-            aria-label={t("topToolbar.browser")}
-          >
-            <Globe className="w-4 h-4" />
-          </button>
-
           {/* Terminal Toggle */}
           <button
             type="button"

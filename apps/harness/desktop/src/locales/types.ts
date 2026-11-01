@@ -1,4 +1,5 @@
 export interface TranslationDictionary {
+  activity: { title: string; jobs: string; changes: string; sources: string; text: string; empty: string; previewUnavailable: string; documentUnavailable: string };
   mcp: import("./mcp").McpTranslations;
   remoteControl: {
     startHint: string;

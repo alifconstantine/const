@@ -46,8 +46,6 @@ import {
   toast,
 } from "@const/ui";
 import { ImageLightbox } from "./image-lightbox";
-import { AttachedTaskBanner } from "./attached-task-banner";
-import type { BackgroundTaskItem } from "../../vite-env";
 import { getDefaultAgentMode, type ConversationItem } from "../../lib/conversation-store";
 import { useTranslation } from "../../lib/i18n";
 import {
@@ -379,9 +377,6 @@ interface ChatCardProps {
   initialPrompt?: string;
   /** Model ID or name to restore when switching to an existing conversation. */
   initialModel?: string;
-  runningTasks?: BackgroundTaskItem[];
-  onSelectTask?: (task: BackgroundTaskItem) => void;
-  onStopTask?: (taskId: string) => void;
   mode?: "request_review" | "ask_before_changes" | "full_access";
   onModeChange?: (mode: "request_review" | "ask_before_changes" | "full_access") => void;
   conversations?: ConversationItem[];
@@ -425,9 +420,6 @@ export function ChatCard({
   onOpenSettings,
   initialPrompt,
   initialModel,
-  runningTasks,
-  onSelectTask,
-  onStopTask,
   mode: controlledMode,
   onModeChange,
   conversations,
@@ -1540,16 +1532,6 @@ export function ChatCard({
             isAnyBottomMenuOpen ? "z-30" : "z-10"
           )}
         >
-          {/* Running Tasks Banner attached above input, matching Image 3 */}
-          {runningTasks && runningTasks.length > 0 && (
-            <AttachedTaskBanner
-              tasks={runningTasks}
-              onSelectTask={onSelectTask || (() => {})}
-              onStopTask={onStopTask || (() => {})}
-              className="rounded-t-2xl"
-            />
-          )}
-
           <div data-composer-body className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0 relative">
             {/* Mention Autocomplete Popover */}
             {mentionToken && (

@@ -2003,12 +2003,18 @@ app.whenReady().then(() => {
         ".bmp": "image/bmp",
         ".svg": "image/svg+xml",
         ".ico": "image/x-icon",
+        ".avif": "image/avif",
         ".mp4": "video/mp4",
         ".webm": "video/webm",
         ".mov": "video/quicktime",
+        ".m4v": "video/mp4",
+        ".ogv": "video/ogg",
         ".mp3": "audio/mpeg",
         ".wav": "audio/wav",
         ".ogg": "audio/ogg",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".flac": "audio/flac",
         ".pdf": "application/pdf",
       };
       const mime = mimeMap[ext] || "application/octet-stream";

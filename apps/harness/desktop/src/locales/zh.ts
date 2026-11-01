@@ -3,6 +3,16 @@ import type { TranslationDictionary } from "./types";
 
 export const zh: TranslationDictionary = {
   mcp: mcpTranslations.zh,
+  activity: {
+    title: "活动",
+    jobs: "后台任务",
+    changes: "更改",
+    sources: "来源",
+    text: "文本",
+    empty: "暂无活动。",
+    previewUnavailable: "无法预览此媒体。文件可能不可用，或超出了远程传输限制。",
+    documentUnavailable: "此文档暂无文本预览。"
+  },
   remoteControl: {
     startHint: "启动远程控制以生成配对码和二维码。",
     pairDevice: "配对设备",

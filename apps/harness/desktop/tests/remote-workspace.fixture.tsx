@@ -17,6 +17,7 @@ import { marked } from "marked";
 import { RemoteControlModal } from "../src/components/remote-control-modal";
 import { RemoteBrowserViewport } from "../src/components/right-pane/remote-browser-viewport";
 import type { RemoteDaemonStatus } from "../src/lib/remote-control";
+import mediaFixture from "./media-preview.fixture.json";
 import "../src/index.css";
 import "../src/remote.css";
 
@@ -72,6 +73,38 @@ if (longMenus) {
   });
 }
 const tasks: any[] = [];
+const activityFixture = new URLSearchParams(location.search).has("activity");
+const previewImage = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="720" height="480"><rect width="720" height="480" fill="#eae7dd"/><rect x="50" y="50" width="620" height="380" rx="20" fill="#292d34"/><circle cx="550" cy="160" r="55" fill="#d9bd74"/><path d="M90 370L270 150 440 370Z" fill="#899e8d"/><path d="M290 370L430 220 590 370Z" fill="#647b77"/><text x="88" y="106" fill="#eee" font-family="sans-serif" font-size="24">REFERENCE / 01</text></svg>')}`;
+const backgroundJobs: any[] = activityFixture ? [
+  { id: "server-job", command: "node server.js", name: "Local preview server", conversationId: "preview-chat", startTime: Date.now(), status: "running" },
+  { id: "build-job", command: "pnpm build", conversationId: "preview-chat", startTime: Date.now() - 10000, status: "completed" },
+] : [];
+const killedJobs: string[] = [];
+const revertedMutations: any[] = [];
+if (activityFixture) {
+  const attachments = [
+    { id: "reference", name: "reference.svg", type: "image", size: 800, base64: previewImage, path: "/workspace/reference.svg" },
+    { id: "second-reference", name: "reference.svg", type: "image", size: 800, base64: previewImage, path: "/workspace/alternative/reference.svg" },
+    { id: "brief", name: "brief.docx", type: "document", size: 1200, textContent: "Project brief\n\nBuild an interactive mission timeline with accessible controls." },
+    { id: "notes", name: "notes.txt", type: "document", size: 80, textContent: "Source notes remain readable in the file sidebar." },
+    { id: "video", name: "preview.webm", type: "video", size: 600, base64: mediaFixture.video },
+    { id: "audio", name: "voice.wav", type: "audio", size: 900, base64: mediaFixture.audio },
+    { id: "pdf", name: "source.pdf", type: "pdf", size: 600, base64: mediaFixture.pdf, textContent: "Source document preview\n\nAccessible PDF text for mobile readers." },
+    { id: "unavailable", name: "unavailable.png", type: "image", size: 8_000_000, path: "/workspace/unavailable.png" },
+  ];
+  Object.assign(conversations[0].messages[0], { attachments });
+  Object.assign(conversations[0].messages[1], {
+    content: "The preview server is running. The updated files and original sources are available in Activity.",
+    traceSteps: [
+      { id: "todo-plan", type: "tool", name: "todo_write", args: { todos: [{ id: "inspect", content: "Inspect workspace and sources", status: "completed" }, { id: "build", content: "Build the interactive timeline", status: "in_progress" }] }, result: "Plan saved" },
+      { id: "review-agent", type: "tool", name: "spawn_agent", args: { description: "Review accessibility", task: "Check keyboard controls" }, result: '<agent id="review-agent" status="completed">Keyboard controls verified</agent>' },
+    ],
+    mutations: [
+      { id: "edit-one", filePath: "/workspace/app.ts", targetFile: "app.ts", operation: "modify", previousContent: "original", newContent: "intermediate", timestamp: 1 },
+      { id: "edit-two", filePath: "/workspace/app.ts", targetFile: "app.ts", operation: "modify", previousContent: "intermediate", newContent: "final", timestamp: 2 },
+    ],
+  });
+}
 const browserInputs: any[] = [];
 const browserShots: any[] = [];
 let completeProgress: (() => void) | undefined;
@@ -185,8 +218,23 @@ api = createDesktopBridge(
         };
       if (channel === "conversations:get-transcript")
         return { events: [], messages: [] };
-      if (channel === "agent:get-running-sessions" || channel === "tasks:list")
-        return [];
+      if (channel === "agent:get-running-sessions") return [];
+      if (channel === "agent:rollback-file") {
+        revertedMutations.push(args[0].record);
+        return { success: true, message: "Reverted fixture edit" };
+      }
+      if (channel === "tasks:list") return backgroundJobs.filter(job => !args[0] || job.conversationId === args[0]);
+      if (channel === "tasks:get-output") return args[0] === "server-job" ? ["Preview listening at http://localhost:8765"] : ["Build completed successfully"];
+      if (channel === "tasks:kill") {
+        killedJobs.push(args[0]);
+        const job = backgroundJobs.find(job => job.id === args[0]);
+        if (!job || job.status !== "running") return false;
+        job.status = "killed";
+        emit("task:event", { type: "status", taskId: job.id, status: "killed", conversationId: job.conversationId });
+        return true;
+      }
+      if (channel === "file:read-as-data-url") return args[0] === "/workspace/unavailable.png"
+        ? { success: false, error: "Transfer limit exceeded" } : { success: true, dataUrl: previewImage };
       if (channel === "agent:get-session-snapshot") return null;
       if (channel === "agent:generate-title") return "Remote task";
       if (channel === "agent:send-message") {
@@ -277,6 +325,8 @@ api = createDesktopBridge(
 window.electron = api;
 (window as any).__remoteFixture = {
   completeProgress() { completeProgress?.(); },
+  killedJobs,
+  revertedMutations,
   browserInputs, browserShots,
   markdownWork,
   updateRemoteStatus,

@@ -276,6 +276,18 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 
 ---
 
+## Workbench Activity
+
+- The header `LayoutList` button toggles a floating Activity panel in place of the standalone browser shortcut. The browser remains available through the right pane's new-tab picker and chat links.
+- Activity groups Progress, Background jobs, Agents, Changes, and Sources. Progress and jobs initially expand; other sections show counts and expand on demand. Keep all sections inside a height-limited Radix ScrollArea.
+- Background jobs belong in Activity rather than above the composer. Show their current status, open output in the right pane, and offer a stop action only while running.
+- Changes show the net diff per file. Open the original mutation records for review and rollback; never send a synthetic aggregate to the rollback API.
+- Sources are the user's attachments. Preserve files with the same name from different paths, show image thumbnails, and open images, audio, video, PDFs, or extracted document text in the right pane. Retain remote file-transfer limits and provide localized preview errors.
+- When extracted PDF text is available, offer Preview and Text modes; start with text on mobile so the document remains readable without an embedded PDF viewer.
+- On mobile, selecting a source opens the media pane and dismisses Activity. Keep controls at least 44px and the card within the viewport.
+
+---
+
 ## Iconography & Empty States
 
 ### 1. Lucide Vector Icons over Emojis

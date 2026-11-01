@@ -415,6 +415,99 @@ async function run() {
     assert.equal(await js('window.__remoteFixture.browserInputs.find(input => input.action === "scroll").deltaY'), -200);
     assert.equal(await js('window.__remoteFixture.browserShots.every(shot => shot.annotate === false && shot.ephemeral === true)'), true);
   });
+  win.setSize(1440, 960);
+  await win.loadURL(process.argv[3]! + "?activity");
+  await waitFor('Boolean(document.querySelector(".workspace-shell"))');
+  await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
+  await waitFor('Boolean(document.querySelector("[data-workbench-activity]"))');
+  await check("Activity replaces the browser shortcut and groups progress, jobs, agents, changes and sources", async () => {
+    assert.deepEqual(await js(`Array.from(document.querySelectorAll('[data-activity-section]')).map(section => section.dataset.activitySection)`), ['progress','jobs','agents','changes','sources']);
+    await capture('activity-desktop-dark');
+    await js(`document.querySelector('[data-activity-section=changes] > button').click(); document.querySelector('[data-activity-section=sources] > button').click()`);
+    assert.equal(await js(`document.querySelectorAll('[data-activity-section=changes] button[title]').length`), 1);
+    assert.equal(await js(`document.querySelectorAll('[data-activity-section=sources] button[title]').length`), 8);
+    assert.equal(await js(`Boolean(document.querySelector('[data-activity-toggle] .lucide-layout-list'))`), true);
+    assert.equal(await js(`Boolean(document.querySelector('.workspace-toolbar button[aria-label="Browser"]'))`), false);
+    assert.equal(await js(`Array.from(document.querySelectorAll('[data-activity-section=sources] img')).every(image => image.complete && image.naturalWidth > 0)`), true);
+    await js(`document.querySelector('[data-activity-toggle]').click()`);
+    assert.equal(await js(`Boolean(document.querySelector('[data-workbench-activity]'))`), false);
+    await js(`document.querySelector('[data-activity-toggle]').click()`);
+    await waitFor('Boolean(document.querySelector("[data-workbench-activity]"))');
+    await js(`document.documentElement.classList.remove('dark')`);
+    await capture('activity-desktop-light');
+    await js(`document.documentElement.classList.add('dark')`);
+  });
+  await check("Sources preview images and extracted documents and keep same-named files in distinct tabs", async () => {
+    await js(`for (const id of ['changes','sources']) { const button = document.querySelector('[data-activity-section='+id+'] > button'); if (button.getAttribute('aria-expanded') !== 'true') button.click(); }`);
+    await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/reference.svg"]').click()`);
+    await waitFor(`Boolean(document.querySelector('[data-media-preview=image] img')?.naturalWidth)`);
+    await capture('activity-source-image');
+    await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/alternative/reference.svg"]').click()`);
+    await waitFor(`Array.from(document.querySelectorAll('.workspace-right-pane span.truncate')).filter(span => span.textContent === "reference.svg").length === 2`);
+    await js(`document.querySelector('[data-activity-section=sources] button[title="brief.docx"]').click()`);
+    await waitFor(`document.querySelector('[data-media-preview=document]')?.innerText.includes('accessible controls')`);
+    await capture('activity-source-document');
+    await js(`document.querySelector('[data-activity-section=sources] button[title="notes.txt"]').click()`);
+    await waitFor(`document.querySelector('.workspace-right-pane')?.innerText.includes('Source notes remain readable')`);
+    await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/unavailable.png"]').click()`);
+    await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-media-preview=image]')?.innerText.includes('could not be previewed')`);
+    assert.equal(await js(`Boolean(document.querySelector('[role=tabpanel][aria-hidden=false] [data-media-preview=image] button'))`), true);
+  });
+  await check("Sources play supported audio and video and embed PDF through the PDF viewer", async () => {
+    for (const [name, kind] of [['preview.webm','video'], ['voice.wav','audio']]) {
+      await js(`document.querySelector('[data-activity-section=sources] button[title="${name}"]').click()`);
+      await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-media-preview=${kind}] ${kind}')?.readyState >= 2`);
+      assert.equal(await js(`document.querySelector('[data-media-preview=${kind}] ${kind}').controls`), true);
+    }
+    await js(`document.querySelector('[data-activity-section=sources] button[title="source.pdf"]').click()`);
+    await waitFor(`Boolean(document.querySelector('[data-media-preview=pdf] embed[type="application/pdf"]'))`);
+    await capture('activity-source-pdf', 800);
+  });
+  await check("Changes open the original edits for review instead of using an aggregate as a rollback record", async () => {
+    await js(`document.querySelector('[data-activity-section=changes] button[title="/workspace/app.ts"]').click()`);
+    await waitFor(`document.querySelector('.workspace-right-pane')?.innerText.includes('original') && document.querySelector('.workspace-right-pane')?.innerText.includes('intermediate')`);
+    assert.equal(await js(`document.querySelector('.workspace-right-pane').innerText.includes('final')`), true);
+    await capture('activity-changes-review');
+    await js(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Undo all"]').click()`);
+    await waitFor(`document.querySelectorAll('[data-activity-section=changes] button[title]').length === 0`);
+    assert.deepEqual(await js(`window.__remoteFixture.revertedMutations.map(record => [record.id, record.previousContent])`), [['edit-two','intermediate'],['edit-one','original']]);
+    await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Undo all"]')?.disabled`);
+  });
+  await check("job output opens from Activity and stopping from its sidebar sends exactly one kill", async () => {
+    await js(`document.querySelector('[data-activity-section=jobs] button[title="node server.js"]').click()`);
+    await waitFor(`document.querySelector('.workspace-right-pane')?.innerText.includes('Preview listening')`);
+    await capture('activity-job-output');
+    await js(`document.querySelector('.workspace-right-pane button[title="Stop Task"]').click()`);
+    await waitFor(`document.querySelector('[data-activity-section=jobs]')?.innerText.includes('Stopped')`);
+    assert.deepEqual(await js(`window.__remoteFixture.killedJobs`), ['server-job']);
+    assert.equal(await js(`Boolean(document.querySelector('[data-activity-section=jobs] button[aria-label^="Stop Task"]'))`), false);
+    assert.equal(await js(`document.querySelector('[data-activity-section=jobs]').innerText.includes('Completed')`), true);
+  });
+  await check("Activity and media previews fit mobile and translate in all five languages", async () => {
+    win.setSize(320, 740);
+    await delay(250);
+    await js(`document.querySelector('.remote-sidebar-backdrop')?.click()`);
+    await js(`document.querySelector('[data-activity-toggle]').click()`);
+    await waitFor('Boolean(document.querySelector("[data-workbench-activity]"))');
+    for (const language of ['en', 'id', 'ja', 'zh', 'es']) {
+      await js(`window.dispatchEvent(new CustomEvent('const-language-changed', {detail:${JSON.stringify(language)}}))`);
+      await delay(120);
+      assert.equal(await js(`(() => { const panel = document.querySelector('[data-workbench-activity]'); const bounds = panel.getBoundingClientRect(); return bounds.left >= 0 && bounds.right <= innerWidth && panel.scrollWidth <= panel.clientWidth && !panel.innerText.includes('activity.'); })()`), true, language);
+    }
+    await js(`window.dispatchEvent(new CustomEvent('const-language-changed', {detail:'id'}))`);
+    await capture('activity-mobile-indonesian');
+    await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/reference.svg"]').click()`);
+    await waitFor(`Boolean(document.querySelector('[data-media-preview=image] img')?.naturalWidth)`);
+    assert.equal(await js(`Boolean(document.querySelector('[data-workbench-activity]'))`), false);
+    assert.equal(await js(`document.querySelector('[data-media-preview]').scrollWidth <= innerWidth`), true);
+    await capture('activity-mobile-image');
+    await js(`document.querySelector('[data-activity-toggle]').click()`);
+    await waitFor(`Boolean(document.querySelector('[data-workbench-activity]'))`);
+    await js(`const sources = document.querySelector('[data-activity-section=sources] > button'); if (sources.getAttribute('aria-expanded') !== 'true') sources.click();`);
+    await js(`document.querySelector('[data-activity-section=sources] button[title="source.pdf"]').click()`);
+    await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-media-preview=pdf]')?.innerText.includes('Accessible PDF text')`);
+    await capture('activity-mobile-pdf-text');
+  });
   win.destroy();
 }
 run().then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });

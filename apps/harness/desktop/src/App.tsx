@@ -18,6 +18,7 @@ import {
   Square,
   X,
   PanelRight,
+  LayoutList,
   Maximize2,
   Minimize2,
   SquareTerminal,
@@ -49,6 +50,7 @@ import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/exe
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
 import { ApprovalResponseGate, approvalResponseKey, removeMatchingApproval } from "./lib/approval-state";
 import { QuestionCard } from "./components/workbench/question-card";
+import { collectSessionSources, collectSessionChanges } from "./lib/workbench-activity";
 import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
 import { ChatMessageItem } from "./components/workbench/chat-message-item";
 import { archiveAssistantCommentary, serializeAssistantTranscript } from "./lib/assistant-transcript";
@@ -1109,23 +1111,28 @@ export function AuthenticatedContent({
   };
 
   // Background Tasks Management
-  const [runningTasks, setRunningTasks] = useState<BackgroundTaskItem[]>([]);
+  const [backgroundJobs, setBackgroundJobs] = useState<BackgroundTaskItem[]>([]);
+  const [isActivityVisible, setIsActivityVisible] = useState(true);
+  const [activityRequested, setActivityRequested] = useState(false);
+  useEffect(() => { setIsActivityVisible(true); setActivityRequested(false); }, [conversationId]);
 
   useEffect(() => {
     let disposed = false;
     let request = 0;
-    setRunningTasks([]);
+    setBackgroundJobs([]);
     const refresh = async () => {
       const currentRequest = ++request;
       try {
         const tasks = await window.electron?.listBackgroundTasks?.(conversationId);
         if (!disposed && currentRequest === request && tasks) {
-          setRunningTasks(tasks.filter((task) => task.status === "running"));
+          setBackgroundJobs(tasks);
         }
       } catch {}
     };
     void refresh();
-    const unsubscribe = window.electron?.onBackgroundTaskEvent?.(() => { void refresh(); });
+    const unsubscribe = window.electron?.onBackgroundTaskEvent?.(event => {
+      if (event.type !== "output") void refresh();
+    });
     return () => { disposed = true; unsubscribe?.(); };
   }, [conversationId]);
 
@@ -1151,8 +1158,12 @@ export function AuthenticatedContent({
 
   const handleStopBackgroundTask = async (taskId: string) => {
     if (window.electron?.killBackgroundTask) {
-      await window.electron.killBackgroundTask(taskId, conversationId);
-      setRunningTasks((prev) => prev.filter((t) => t.id !== taskId));
+      try {
+        const stopped = await window.electron.killBackgroundTask(taskId, conversationId);
+        if (!stopped) toast.error(t("common.failed"));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : t("common.failed"));
+      }
     }
   };
 
@@ -1207,20 +1218,6 @@ export function AuthenticatedContent({
     },
     [currentProject, conversationId]
   );
-
-  const isBrowserActive = Boolean(
-    isRightSidebarOpen &&
-      !isOpeningNewTab &&
-      rightPaneTabs.find((t) => t.id === activeRightPaneTabId)?.type === "browser"
-  );
-
-  const handleToggleBrowser = useCallback(() => {
-    if (isBrowserActive) {
-      setIsRightSidebarOpen(false);
-    } else {
-      handleOpenBrowser();
-    }
-  }, [isBrowserActive, handleOpenBrowser]);
 
   // Sync active browser tab with Electron BrowserController & listen for AI auto-open requests
   useEffect(() => {
@@ -1459,21 +1456,25 @@ export function AuthenticatedContent({
     return list;
   }, [messages]);
 
-  const sessionMediaAttachments = useMemo(() => {
-    const list: AttachedFile[] = [];
-    const seen = new Set<string>();
-    for (const msg of messages) {
-      if (Array.isArray(msg.attachments)) {
-        for (const att of msg.attachments) {
-          if (att && att.name && !seen.has(att.name)) {
-            seen.add(att.name);
-            list.push(att);
-          }
-        }
-      }
-    }
-    return list;
-  }, [messages]);
+  const sessionMediaAttachments = useMemo(() => collectSessionSources(messages), [messages]);
+  const sessionChanges = useMemo(() => collectSessionChanges(allSessionMutations), [allSessionMutations]);
+  const currentReviewMutations = useMemo(() => {
+    const byId = new Map(allSessionMutations.map(record => [record.id, record]));
+    return sidebarReviewMutations?.length
+      ? sidebarReviewMutations.map(record => byId.get(record.id) || record) : allSessionMutations;
+  }, [allSessionMutations, sidebarReviewMutations]);
+
+  const handleOpenSource = useCallback((source: AttachedFile) => {
+    const existing = rightPaneTabs.find(tab => tab.sourceId === source.id || (source.path && tab.filePath === source.path));
+    const id = existing?.id || `source_${source.id}`;
+    const sourceTab: RightPaneTab = { id, type: "file_preview", title: source.name, filePath: source.path,
+      sourceId: source.id, newContent: source.textContent };
+    setRightPaneTabs(tabs => existing ? tabs.map(tab => tab.id === id ? { ...tab, ...sourceTab } : tab) : [...tabs, sourceTab]);
+    setActiveRightPaneTabId(id);
+    setIsOpeningNewTab(false);
+    setIsRightSidebarOpen(true);
+    if (remote?.mobile) setIsActivityVisible(false);
+  }, [rightPaneTabs, remote?.mobile]);
 
   const handleOpenFileDiff = useCallback((mutation: FileMutationRecord) => {
     setIsRightSidebarOpen(true);
@@ -1536,7 +1537,7 @@ export function AuthenticatedContent({
     const existing = rightPaneTabs.find(
       (t) =>
         (t.type === "file_preview" || t.type === "directory") &&
-        (t.filePath === filePath || t.title === fileName)
+        t.filePath === filePath
     );
 
     if (existing) {
@@ -2949,14 +2950,15 @@ export function AuthenticatedContent({
         }
       } else if (event.type === "task_started") {
         if (event.task && targetConvoId === conversationIdRef.current) {
-          setRunningTasks((prev) => {
+          setBackgroundJobs((prev) => {
             const filtered = prev.filter((t) => t.id !== event.task.id);
             return [...filtered, event.task];
           });
         }
       } else if (event.type === "task_stopped") {
         if (event.taskId) {
-          setRunningTasks((prev) => prev.filter((t) => t.id !== event.taskId));
+          setBackgroundJobs((prev) => prev.map(task => task.id === event.taskId && task.status === "running"
+            ? { ...task, status: event.code === 0 ? "completed" : "failed" } : task));
         }
       } else if (event.type === "subagent_started") {
         if (event.agent) {
@@ -3425,6 +3427,7 @@ export function AuthenticatedContent({
   handleSendMessageRef.current = handleSendMessage;
 
   const handleRollback = useCallback(async (record: FileMutationRecord) => {
+    if (record.rolledBack) return;
     if (!window.electron?.rollbackFile) {
       toast.error(t("toast.rollbackDesktopOnly"));
       return;
@@ -4259,6 +4262,9 @@ export function AuthenticatedContent({
     handleCloseCurrentContext,
   ]);
 
+  const hasActivity = !!(activeTodos?.length || activeSubAgents?.length || backgroundJobs.length || sessionChanges.length || sessionMediaAttachments.length);
+  const showActivity = isActivityVisible && (hasActivity || activityRequested);
+
   return (
     <div
       className={cn(
@@ -4450,15 +4456,22 @@ export function AuthenticatedContent({
                     onOpenTerminal={handleToggleBottomPanel}
                     isBottomPanelOpen={isBottomPanelOpen}
                     onToggleBottomPanel={handleToggleBottomPanel}
-                    onOpenBrowser={handleOpenBrowser}
-                    onToggleBrowser={handleToggleBrowser}
-                    isBrowserActive={isBrowserActive}
                   />
                 );
               })()}
 
               {/* Main Conversation Canvas (Landing or Stream) */}
               <div className="flex-1 min-w-0 flex flex-col relative overflow-hidden">
+                {showActivity && <div className="absolute top-4 right-3 sm:right-6 z-30 max-w-[calc(100%-24px)] pointer-events-none">
+                  <FloatingWorkbenchCard key={conversationId} todos={activeTodos || []} subagents={activeSubAgents || EMPTY_SUBAGENTS}
+                    jobs={backgroundJobs} changes={sessionChanges} sources={sessionMediaAttachments} isExecuting={isExecuting}
+                    onSelectSubAgent={handleOpenSubAgent} onKillAgent={handleKillSubAgent}
+                    onSelectJob={handleSelectRunningTask} onStopJob={handleStopBackgroundTask}
+                    onSelectChange={change => handleOpenReview(allSessionMutations.filter(record =>
+                      !record.rolledBack && (record.filePath || record.targetFile) === (change.filePath || change.targetFile)))}
+                    onSelectSource={handleOpenSource}
+                    onClose={() => setIsActivityVisible(false)} className="pointer-events-auto" />
+                </div>}
                 {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
                 {messages.length === 0 ? (
           <div className="workspace-landing flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-hidden">
@@ -4496,9 +4509,6 @@ export function AuthenticatedContent({
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
                   onModelChange={handleModelChange}
-                  runningTasks={runningTasks}
-                  onSelectTask={handleSelectRunningTask}
-                  onStopTask={handleStopBackgroundTask}
                   mode={currentMode}
                   onModeChange={handleModeChange}
                   conversations={conversations}
@@ -4524,20 +4534,6 @@ export function AuthenticatedContent({
               isExecuting={isExecuting}
               scrollContainerRef={chatScrollRef}
             />}
-
-            {/* Top-Right Floating Card: Unified Todo & Sub-Agents */}
-            {((activeTodos && activeTodos.length > 0) || (activeSubAgents && activeSubAgents.length > 0)) && (
-              <div className="absolute top-4 right-6 z-30 flex flex-col gap-2.5 items-end pointer-events-none">
-                <FloatingWorkbenchCard
-                  todos={activeTodos || []}
-                  subagents={activeSubAgents || EMPTY_SUBAGENTS}
-                  isExecuting={isExecuting}
-                  onSelectSubAgent={handleOpenSubAgent}
-                  onKillAgent={handleKillSubAgent}
-                  className="pointer-events-auto"
-                />
-              </div>
-            )}
 
             {/* In-Task Find Bar (Ctrl+F) */}
             {isTaskFindOpen && (
@@ -4698,9 +4694,6 @@ export function AuthenticatedContent({
                       request={activeApproval}
                       project={currentProject}
                       isResponding={isRespondingApproval}
-                      runningTasks={runningTasks}
-                      onSelectTask={handleSelectRunningTask}
-                      onStopTask={handleStopBackgroundTask}
                       onDecide={(decision, feedback) =>
                         handleRespondApproval(
                           activeApproval.approvalId || activeApproval.id,
@@ -4733,9 +4726,6 @@ export function AuthenticatedContent({
                       onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                       initialPrompt={editingPrompt}
                       onModelChange={handleModelChange}
-                      runningTasks={runningTasks}
-                      onSelectTask={handleSelectRunningTask}
-                      onStopTask={handleStopBackgroundTask}
                       mode={currentMode}
                       onModeChange={handleModeChange}
                       conversations={conversations}
@@ -4862,11 +4852,7 @@ export function AuthenticatedContent({
                   onOpenTabType={handleOpenTabType}
                   onReorderTabs={handleReorderTabs}
                   workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-                  mutations={
-                    sidebarReviewMutations && sidebarReviewMutations.length > 0
-                      ? sidebarReviewMutations
-                      : allSessionMutations
-                  }
+                  mutations={currentReviewMutations}
                   onRollbackFile={handleRollback}
                   onRollbackAll={handleRollbackAll}
                   onOpenFileDiff={handleOpenFileDiff}
@@ -4904,28 +4890,18 @@ export function AuthenticatedContent({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <div className="flex items-center gap-0.5 pointer-events-auto">
-                {/* When Sidepanel is CLOSED, show stationary Browser & Terminal icons in window header (desktop only) */}
+                <button data-activity-toggle type="button" aria-label={t("activity.title")} aria-expanded={showActivity}
+                  onMouseDown={event => event.preventDefault()} onClick={() => {
+                    setActivityRequested(true);
+                    if (remote?.mobile && isRightSidebarOpen) { handleCloseRightSidebar(); setIsActivityVisible(true); }
+                    else setIsActivityVisible(showActivity ? false : true);
+                  }} title={t("activity.title")}
+                  className={cn("flex size-7 items-center justify-center rounded-md outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/10 text-[#666666] hover:bg-black/5 dark:text-[#999999] dark:hover:bg-white/10", showActivity && "bg-black/5 dark:bg-white/10 dark:text-white")}>
+                  <LayoutList className="size-4" />
+                </button>
+                {/* When Sidepanel is CLOSED, show the stationary Terminal icon in window header (desktop only) */}
                 {!isRightSidebarOpen && !remote?.mobile && (
                   <>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.currentTarget.blur();
-                        handleToggleBrowser();
-                      }}
-                      className={cn(
-                        "w-7 h-7 flex items-center justify-center rounded-md outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 active:bg-transparent transition-colors cursor-pointer select-none",
-                        isBrowserActive
-                          ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
-                          : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
-                      )}
-                      title={isBrowserActive ? t("topToolbar.closeBrowser") : t("topToolbar.openBrowser")}
-                      aria-label={t("topToolbar.browser")}
-                    >
-                      <Globe className="w-4 h-4" />
-                    </button>
-
                     <button
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}

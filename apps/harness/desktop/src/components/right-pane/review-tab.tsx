@@ -7,7 +7,7 @@ import {
   Layers,
   Check,
 } from "lucide-react";
-import { cn } from "@const/ui";
+import { ScrollArea, cn } from "@const/ui";
 import { DiffViewer } from "./diff-viewer";
 import { FileIcon } from "../workbench/file-icon";
 import { getMutationDiffStats } from "../workbench/review-dialog";
@@ -96,7 +96,7 @@ export function ReviewTab({
             <button
               type="button"
               onClick={handleRollbackAll}
-              disabled={isUndoingAll}
+              disabled={isUndoingAll || mutations.every(record => record.rolledBack)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#222222] hover:bg-[#2c2c2c] border border-[#333333] hover:border-[#444444] text-[11.5px] text-neutral-300 hover:text-white transition-all cursor-pointer font-medium disabled:opacity-50"
               title={t("common.undoAll")}
             >
@@ -108,11 +108,12 @@ export function ReviewTab({
       </div>
 
       {/* Accordion List of Mutated Files matching Image 3 */}
-      <div
+      <ScrollArea
         className={cn(
-          "flex-1 w-full min-h-0 overflow-y-auto divide-y divide-[#222222]",
+          "flex-1 w-full min-h-0",
           mutations.length === 1 && "flex flex-col"
         )}
+        viewportClassName="[&>div]:divide-y [&>div]:divide-[#222222]"
       >
         {mutations.map((mut, idx) => {
           const key = mut.id || `mut_${idx}`;
@@ -181,7 +182,7 @@ export function ReviewTab({
                   )}
 
                   {/* Undo Button */}
-                  {onRollbackFile && (
+                  {mut.rolledBack ? <span className="text-[11px] text-[#409D62]">{t("workbench.undone")}</span> : onRollbackFile && (
                     <button
                       type="button"
                       onClick={async (e) => {
@@ -215,7 +216,7 @@ export function ReviewTab({
             </div>
           );
         })}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

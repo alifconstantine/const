@@ -113,7 +113,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
           </button>
 
           {/* Revert / Undo File Button */}
-          {mutation && onRollbackFile && (
+          {mutation?.rolledBack ? <span className="text-[11px] text-[#409D62]">{t("workbench.undone")}</span> : mutation && onRollbackFile && (
             <button
               type="button"
               onClick={handleRollback}

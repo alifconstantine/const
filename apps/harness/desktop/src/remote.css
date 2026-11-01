@@ -5,6 +5,11 @@
   isolation: isolate;
   font-family: Inter, system-ui, sans-serif;
 }
+.remote-mobile [data-activity-toggle],
+.remote-mobile [data-workbench-activity] button {
+  min-width: 44px;
+  min-height: 44px;
+}
 .remote-gate {
   position: fixed;
   inset: 0;
