@@ -310,7 +310,7 @@ const client = new OpenAI({
             )}
             <p>
               Compatibility is with the documented endpoints and parameters on
-              this page. A Claude model in the catalog is called through chat
+              this page. Use a model ID from the current catalog for chat
               completions.
             </p>
           </Section>

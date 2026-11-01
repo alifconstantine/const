@@ -154,7 +154,7 @@ export default function HomePage() {
                   Not a migration.
                 </h3>
                 <p>
-                  Move between DeepSeek, Claude, GPT, Gemini, Qwen, GLM,
+                  Move between DeepSeek, GPT, Gemini, Qwen, GLM,
                   MiniMax, and Grok using the same chat endpoint. Compare the
                   fit for each task without rebuilding your integration.
                 </p>
@@ -174,7 +174,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <span>model</span>
-                  <code>claude-sonnet-5.5</code>
+                  <code>gemini-3.8-flash</code>
                 </div>
                 <div>
                   <span>model</span>
@@ -214,7 +214,7 @@ export default function HomePage() {
                   </li>
                   <li>
                     <span>Fallback</span>
-                    <code>claude-sonnet-5.5</code>
+                    <code>gpt-6.1-sol</code>
                   </li>
                 </ol>
               </div>
