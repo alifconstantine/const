@@ -71,7 +71,9 @@ export function applyWindowBranding(
   if (process.platform === "win32" && branding.shellIconPath) {
     const details: Parameters<BrowserWindow["setAppDetails"]>[0] = {
       appId: WINDOWS_APP_ID,
-      appIconPath: branding.shellIconPath,
+      // Installed shortcuts use the executable's embedded icon. Use that same
+      // resource for taskbar relaunches instead of a separately cached ICO path.
+      appIconPath: app.isPackaged ? path.resolve(process.execPath) : branding.shellIconPath,
       appIconIndex: 0,
       relaunchDisplayName: app.getName(),
     };

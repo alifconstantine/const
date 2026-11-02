@@ -56,6 +56,28 @@ app
     }
     applyWindowBranding(window, branding);
     if (process.platform === "win32") {
+      const shellDetails: Array<Parameters<BrowserWindow["setAppDetails"]>[0]> = [];
+      const originalSetAppDetails = window.setAppDetails.bind(window);
+      window.setAppDetails = (details) => {
+        shellDetails.push(details);
+        originalSetAppDetails(details);
+      };
+      const packagedDescriptor = Object.getOwnPropertyDescriptor(app, "isPackaged");
+      try {
+        Object.defineProperty(app, "isPackaged", { configurable: true, value: true });
+        applyWindowBranding(window, branding);
+        assert.equal(shellDetails.at(-1)?.appIconPath, path.resolve(process.execPath));
+        assert.equal(shellDetails.at(-1)?.appIconIndex, 0);
+        assert.equal(shellDetails.at(-1)?.relaunchCommand, `"${path.resolve(process.execPath)}"`);
+        Object.defineProperty(app, "isPackaged", { configurable: true, value: false });
+        applyWindowBranding(window, branding);
+        assert.equal(shellDetails.at(-1)?.appIconPath, branding.shellIconPath);
+        assert.equal(shellDetails.at(-1)?.relaunchCommand, undefined);
+      } finally {
+        if (packagedDescriptor) Object.defineProperty(app, "isPackaged", packagedDescriptor);
+        else Reflect.deleteProperty(app, "isPackaged");
+        window.setAppDetails = originalSetAppDetails;
+      }
       assert(
         messages.some((message) => message.kind === 0 && message.handle !== 0n),
         "ICON_SMALL must be set on the HWND after construction.",

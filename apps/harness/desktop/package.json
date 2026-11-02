@@ -136,6 +136,11 @@
       "icon": "build/icon.ico",
       "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
     },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
     "linux": {
       "icon": "build/icon.png",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
