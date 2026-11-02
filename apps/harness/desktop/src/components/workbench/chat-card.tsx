@@ -2407,17 +2407,15 @@ export function ChatCard({
         const uncachedInputTokens = metrics ? (metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens)) : 0;
 
         const telemetry = (
-          <div data-remote-telemetry className={cn("w-full flex items-center pt-2 pb-0.5 px-1 select-none",
-            telemetryIconOnly ? "justify-start gap-1 flex-nowrap" : "justify-between gap-2 sm:gap-4 flex-wrap")}>
+          <div data-remote-telemetry className="w-full flex items-center justify-between gap-2 sm:gap-4 pt-2 pb-0.5 px-1 select-none flex-wrap">
             {/* Left: Session statistics & Context Windows */}
-            <div className={cn("flex items-center min-w-0", telemetryIconOnly ? "gap-1 flex-nowrap" : "gap-1.5 sm:gap-2 flex-wrap")}>
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
               {metrics && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
-                        telemetryIconOnly && "size-7 justify-center p-0")}
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.sessionStatistics")}
                       data-telemetry-control="statistics"
                       aria-label={t("workbench.sessionStatistics")}
@@ -2488,8 +2486,7 @@ export function ChatCard({
                           ? "text-red-500 hover:text-red-400 hover:bg-red-500/10 data-[state=open]:bg-red-500/15"
                           : rawPercentUsed >= 75
                           ? "text-[#e79737] hover:text-[#ff9838] hover:bg-[#e79737]/10 data-[state=open]:bg-[#e79737]/15"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground",
-                        telemetryIconOnly && "size-7 justify-center p-0"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground"
                       )}
                       title={`${t("workbench.telemetryContextTitle")}: ~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)}`}
                       aria-label={t("workbench.telemetryContextTitle")}
@@ -2652,13 +2649,12 @@ export function ChatCard({
 
             {/* Right: Token usage (Database) */}
             {metrics && (
-              <div className={cn("flex items-center shrink-0", !telemetryIconOnly && "ml-auto")}>
+              <div className="flex items-center ml-auto shrink-0">
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
-                        telemetryIconOnly && "size-7 justify-center p-0")}
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                       title={t("workbench.telemetryUsage")}
                       data-telemetry-control="usage"
                       aria-label={t("workbench.telemetryUsage")}
