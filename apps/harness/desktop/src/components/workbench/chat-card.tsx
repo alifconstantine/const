@@ -456,6 +456,7 @@ export function ChatCard({
   }, []);
 
   const isNarrow = forceIconOnly || containerNarrow;
+  const telemetryIconOnly = isNarrow || Boolean(remote?.mobile);
 
   const [prompt, setPrompt] = useState("");
   const editorRef = useRef<RichMentionEditorRef>(null);
@@ -2406,21 +2407,23 @@ export function ChatCard({
         const uncachedInputTokens = metrics ? (metrics.uncachedInputTokens ?? Math.max(0, metrics.inputTokens - cachedInputTokens)) : 0;
 
         const telemetry = (
-          <div data-remote-telemetry className="w-full flex items-center justify-between gap-2 sm:gap-4 pt-2 pb-0.5 px-1 select-none flex-wrap">
+          <div data-remote-telemetry className={cn("w-full flex items-center pt-2 pb-0.5 px-1 select-none",
+            telemetryIconOnly ? "justify-start gap-1 flex-nowrap" : "justify-between gap-2 sm:gap-4 flex-wrap")}>
             {/* Left: Session statistics & Context Windows */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+            <div className={cn("flex items-center min-w-0", telemetryIconOnly ? "gap-1 flex-nowrap" : "gap-1.5 sm:gap-2 flex-wrap")}>
               {metrics && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+                      className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+                        telemetryIconOnly && "size-7 justify-center p-0")}
                       title={t("workbench.sessionStatistics")}
                       data-telemetry-control="statistics"
                       aria-label={t("workbench.sessionStatistics")}
                     >
                       <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                      <span data-telemetry-label>
+                      <span data-telemetry-label className={telemetryIconOnly ? "hidden" : undefined}>
                         {t(metrics.turns === 1 ? "workbench.telemetryTurn" : "workbench.telemetryTurns").replace("{count}", String(metrics.turns))} &middot; {t(metrics.steps === 1 ? "workbench.telemetryStep" : "workbench.telemetrySteps").replace("{count}", String(metrics.steps ?? "—"))} &middot; {metrics.tokPerSec === undefined ? "—" : metrics.tokPerSec.toFixed(1)} tok/s
                       </span>
                     </button>
@@ -2485,7 +2488,8 @@ export function ChatCard({
                           ? "text-red-500 hover:text-red-400 hover:bg-red-500/10 data-[state=open]:bg-red-500/15"
                           : rawPercentUsed >= 75
                           ? "text-[#e79737] hover:text-[#ff9838] hover:bg-[#e79737]/10 data-[state=open]:bg-[#e79737]/15"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground",
+                        telemetryIconOnly && "size-7 justify-center p-0"
                       )}
                       title={`${t("workbench.telemetryContextTitle")}: ~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)}`}
                       aria-label={t("workbench.telemetryContextTitle")}
@@ -2525,7 +2529,7 @@ export function ChatCard({
                           )}
                         />
                       </svg>
-                      <span className="tabular-nums font-medium" data-telemetry-label>
+                      <span className={cn("tabular-nums font-medium", telemetryIconOnly && "hidden")} data-telemetry-label>
                         {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`}
                       </span>
                     </button>
@@ -2648,18 +2652,19 @@ export function ChatCard({
 
             {/* Right: Token usage (Database) */}
             {metrics && (
-              <div className="flex items-center ml-auto shrink-0">
+              <div className={cn("flex items-center shrink-0", !telemetryIconOnly && "ml-auto")}>
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+                      className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+                        telemetryIconOnly && "size-7 justify-center p-0")}
                       title={t("workbench.telemetryUsage")}
                       data-telemetry-control="usage"
                       aria-label={t("workbench.telemetryUsage")}
                     >
                       <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                      <span data-telemetry-label>
+                      <span data-telemetry-label className={telemetryIconOnly ? "hidden" : undefined}>
                         {metrics.hasUsage ? formatTokenDisplay(convTokens) : "—"} tok &middot; {t("workbench.telemetryCacheHit")} {metrics.cacheHitRate === undefined ? "—" : `${metrics.cacheHitRate.toFixed(1)}%`}
                       </span>
                     </button>
