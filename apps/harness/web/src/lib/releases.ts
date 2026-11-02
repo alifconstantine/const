@@ -1,3 +1,6 @@
+import { githubHeaders } from "./app-updates";
+import { updateDownloadUrl } from "../../../shared/updates/releases";
+
 export interface DesktopBuild {
   name: string;
   url: string;
@@ -13,7 +16,7 @@ export async function getDesktopBuilds(): Promise<{
     const response = await fetch(
       "https://api.github.com/repos/alifconstantine/const/releases?per_page=10",
       {
-        headers: { Accept: "application/vnd.github+json" },
+        headers: githubHeaders(process.env.HARNESS_RELEASES_TOKEN),
         next: { revalidate: 3600 },
         signal: AbortSignal.timeout(5000),
       },
@@ -24,7 +27,7 @@ export async function getDesktopBuilds(): Promise<{
     const builds: DesktopBuild[] = [];
     const seen = new Set<string>();
     for (const release of releases) {
-      if (release.draft || release.prerelease || !Array.isArray(release.assets))
+      if (release.draft || release.prerelease || !/^harness-v\d+\.\d+\.\d+$/.test(release.tag_name || "") || !Array.isArray(release.assets))
         continue;
       for (const asset of release.assets) {
         if (
@@ -59,7 +62,8 @@ export async function getDesktopBuilds(): Promise<{
         const key = `${os}:${arch}:${name.split(".").pop()}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        builds.push({ name, url: asset.browser_download_url, os, arch });
+        if (!Number.isSafeInteger(asset.id) || asset.id <= 0) continue;
+        builds.push({ name, url: updateDownloadUrl(asset.id, release.tag_name), os, arch });
       }
     }
     return { builds, available: true };

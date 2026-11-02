@@ -1,4 +1,6 @@
 import "./settings/settings.css";
+import { DesktopUpdateControl } from "./app-update-control";
+import { useRemoteRuntime } from "../lib/remote-runtime";
 import { SkillsSettings } from "./settings/skills-settings";
 import { CONST_ROUTER_LLM_MODELS } from "../lib/models-config";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -176,6 +178,7 @@ export function SettingsView({
 
   // Appearance & Theme settings
   const { t, language, setLanguage } = useTranslation();
+  const remoteRuntime = useRemoteRuntime();
   const [theme, setTheme] = useTheme();
   const [conversationWidth, setConversationWidth] = useConversationWidth();
   const [zoom, setZoom] = useInterfaceZoom();
@@ -234,10 +237,6 @@ export function SettingsView({
 
   const [soundAlerts, setSoundAlerts] = useState<boolean>(() => {
     return localStorage.getItem("const_harness_sound_alerts") !== "false";
-  });
-
-  const [autoUpdates, setAutoUpdates] = useState<boolean>(() => {
-    return localStorage.getItem("const_harness_auto_updates") !== "false";
   });
 
   const [launchOnStartup, setLaunchOnStartup] = useState<boolean>(() => {
@@ -340,14 +339,6 @@ export function SettingsView({
     }
   };
 
-  const handleToggleAutoUpdates = (enabled: boolean) => {
-    setAutoUpdates(enabled);
-    localStorage.setItem("const_harness_auto_updates", String(enabled));
-    if (window.electron?.saveConfig) {
-      window.electron.saveConfig({ autoCheckUpdates: enabled }).catch(() => {});
-    }
-  };
-
   const handleToggleLaunchOnStartup = (enabled: boolean) => {
     setLaunchOnStartup(enabled);
     localStorage.setItem("const_harness_launch_on_startup", String(enabled));
@@ -390,9 +381,6 @@ export function SettingsView({
           }
           if (cfg?.taskNotifications !== undefined) {
             setTaskNotifications(cfg.taskNotifications);
-          }
-          if (cfg?.autoCheckUpdates !== undefined) {
-            setAutoUpdates(cfg.autoCheckUpdates);
           }
           if (cfg?.launchOnStartup !== undefined) {
             setLaunchOnStartup(cfg.launchOnStartup);
@@ -829,16 +817,11 @@ export function SettingsView({
                       />
                     </div>
                   </SettingsRow>
-                  <SettingsRow
-                    label={t("settings.autoUpdates")}
-                    htmlFor="settings-updates"
+                  {!remoteRuntime && <SettingsRow
+                    label={t("updates.title")}
                   >
-                    <Switch
-                      id="settings-updates"
-                      checked={autoUpdates}
-                      onCheckedChange={handleToggleAutoUpdates}
-                    />
-                  </SettingsRow>
+                    <DesktopUpdateControl settings />
+                  </SettingsRow>}
                   <SettingsRow
                     label={t("settings.launchOnStartup")}
                     htmlFor="settings-startup"

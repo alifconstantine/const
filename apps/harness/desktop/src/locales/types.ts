@@ -1,4 +1,5 @@
 export interface TranslationDictionary {
+  updates: import("../../../shared/updates/strings").UpdateStrings;
   activity: { title: string; jobs: string; changes: string; sources: string; text: string; empty: string; previewUnavailable: string; documentUnavailable: string };
   mcp: import("./mcp").McpTranslations;
   remoteControl: {

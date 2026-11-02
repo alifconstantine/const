@@ -1,9 +1,11 @@
 {
   "name": "@const/harness-desktop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
+    "test:updates": "tsx --test electron/app-updates.test.ts && node scripts/test-remote-workspace.cjs --updates",
+    "test:updates:preview": "vite --config tests/app-updates.vite.ts",
     "clean": "node -e \"const fs=require('fs'); ['dist','dist-electron'].forEach(d => fs.rmSync(d, {recursive:true, force:true}));\"",
     "dev": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && vite",
     "build": "pnpm clean && node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
@@ -36,6 +38,7 @@
     "generate:intelligence-prompt": "node scripts/generate-intelligence-prompt.cjs"
   },
   "dependencies": {
+    "@const/harness-shared": "workspace:*",
     "@const/agent": "workspace:*",
     "@const/backend": "workspace:*",
     "@const/remote": "workspace:*",

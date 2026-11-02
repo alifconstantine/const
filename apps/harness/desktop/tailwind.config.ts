@@ -3,7 +3,7 @@ import baseConfig from "@const/ui/tailwind.config";
 
 const config: Config = {
   darkMode: ["class"],
-  content: ["./src/**/*.{ts,tsx}", "./index.html", "../../../packages/ui/src/**/*.{ts,tsx}"],
+  content: ["./src/**/*.{ts,tsx}", "../shared/updates/**/*.{ts,tsx}", "./index.html", "../../../packages/ui/src/**/*.{ts,tsx}"],
   presets: [baseConfig],
 };
 

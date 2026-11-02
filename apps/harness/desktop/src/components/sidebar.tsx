@@ -1,4 +1,5 @@
 import { useRemoteRuntime } from "../lib/remote-runtime";
+import { DesktopUpdateControl } from "./app-update-control";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   ConstLogoIcon,
@@ -735,6 +736,7 @@ export function Sidebar({
             className="flex items-center gap-0.5 text-[#666666] dark:text-[#999999]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
+            <DesktopUpdateControl />
             {!remote?.mobile && <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}

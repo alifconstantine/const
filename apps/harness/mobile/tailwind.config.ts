@@ -6,6 +6,7 @@ const config: Config = {
   content: [
     "./index.html",
     "./src/**/*.{ts,tsx}",
+    "../shared/updates/**/*.{ts,tsx}",
     "../../../packages/ui/src/**/*.{ts,tsx}",
   ],
   presets: [baseConfig],

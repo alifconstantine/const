@@ -55,6 +55,18 @@ export function createDesktopBridge(
     },
     openExternal: (url: string) =>
       ipcRenderer.invoke("auth:open-external", url),
+    updates: {
+      getState: () => ipcRenderer.invoke("app-update:state"),
+      check: () => ipcRenderer.invoke("app-update:check"),
+      download: () => ipcRenderer.invoke("app-update:download"),
+      install: () => ipcRenderer.invoke("app-update:install"),
+      setPreferences: (value: import("../../../shared/updates/releases").UpdatePreferences) => ipcRenderer.invoke("app-update:preferences", value),
+      onState: (listener: (state: import("../../../shared/updates/releases").UpdateState) => void) => {
+        const handler = (_event: unknown, state: import("../../../shared/updates/releases").UpdateState) => listener(state);
+        ipcRenderer.on("app-update:changed", handler);
+        return () => { ipcRenderer.removeListener("app-update:changed", handler); };
+      },
+    },
     openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
     showNotification: (payload: {
       title: string;

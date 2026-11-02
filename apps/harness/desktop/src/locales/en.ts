@@ -1,7 +1,9 @@
 import { mcpTranslations } from "./mcp";
+import { updateStrings } from "../../../shared/updates/strings";
 import type { TranslationDictionary } from "./types";
 
 export const en: TranslationDictionary = {
+  updates: updateStrings("en"),
   mcp: mcpTranslations.en,
   activity: {
     title: "Activity",

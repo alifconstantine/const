@@ -1,7 +1,9 @@
 import { mcpTranslations } from "./mcp";
+import { updateStrings } from "../../../shared/updates/strings";
 import type { TranslationDictionary } from "./types";
 
 export const zh: TranslationDictionary = {
+  updates: updateStrings("zh"),
   mcp: mcpTranslations.zh,
   activity: {
     title: "活动",

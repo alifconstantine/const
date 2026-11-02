@@ -23,6 +23,7 @@ import { DEFAULT_CONVEX_URL } from "@const/remote/config";
 import { broker } from "@const/remote/protocol";
 import { normalizePairingCode, openWithCode } from "@const/remote/crypto";
 import { languages, useTranslation } from "./i18n";
+import { MobileUpdateControl } from "./app-updates";
 import { readPairings, savePairing, leaveWorkspace, clearPairings, type Connection } from "./pairing-store";
 
 interface DesktopSession {
@@ -383,6 +384,7 @@ export default function App() {
           >
             <RefreshCw size={18} />
           </button>
+          <MobileUpdateControl />
           <button
             className="icon-button"
             aria-label={t("disconnect")}
@@ -407,6 +409,7 @@ export default function App() {
       <header className="app-header safe-top-padding">
         <ConstLogoIcon className="h-7 w-7" />
         <span className="text-base font-medium">Const Harness</span>
+        <div className="ml-auto"><MobileUpdateControl /></div>
       </header>
       <ScrollArea className="min-h-0 flex-1">
         <main className="mx-auto w-full max-w-lg px-6 pb-8 pt-6">

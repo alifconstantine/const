@@ -289,6 +289,14 @@ declare global {
       setThemeMode?: (mode: "system" | "light" | "dark") => Promise<any>;
       onSystemThemeChange?: (callback: (mode: "dark" | "light") => void) => () => void;
       openExternal: (url: string) => Promise<boolean>;
+      updates?: {
+        getState(): Promise<import("../../shared/updates/releases").UpdateState>;
+        check(): Promise<import("../../shared/updates/releases").UpdateState>;
+        download(): Promise<import("../../shared/updates/releases").UpdateState>;
+        install(): Promise<import("../../shared/updates/releases").UpdateState>;
+        setPreferences(value: import("../../shared/updates/releases").UpdatePreferences): Promise<import("../../shared/updates/releases").UpdateState>;
+        onState(listener: (state: import("../../shared/updates/releases").UpdateState) => void): () => void;
+      };
       openDirectoryDialog: () => Promise<string | null>;
       showNotification?: (payload: { title: string; body: string; silent?: boolean }) => Promise<boolean>;
       openConstFolder?: () => Promise<boolean>;

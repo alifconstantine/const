@@ -73,6 +73,8 @@ import { dispatchRemoteDesktop } from "./remote-desktop-controller";
 import { createRemoteSessionState, updateRemoteSessionState, type RemoteSessionState } from "./remote-session-state";
 import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
 import { matchesAuthState } from "./auth-state";
+import { DesktopAppUpdates } from "./app-updates";
+import { updateStrings } from "../../shared/updates/strings";
 
 registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
@@ -187,6 +189,7 @@ export interface UserConfig {
   queueMode?: "queue" | "steer";
   taskNotifications?: boolean;
   autoCheckUpdates?: boolean;
+  autoDownloadUpdates?: boolean;
   launchOnStartup?: boolean;
   soundAlerts?: boolean;
   personalizationWorkRole?: string;
@@ -1295,6 +1298,27 @@ app.whenReady().then(() => {
     sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
+  const appUpdates = new DesktopAppUpdates({
+    version: app.getVersion(),
+    target: { os: process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux", arch: process.arch },
+    packaged: app.isPackaged, directory: path.join(app.getPath("userData"), "updates"),
+    preferences: () => { const config = loadUserConfig(); return { autoCheck: config.autoCheckUpdates !== false, autoDownload: config.autoDownloadUpdates !== false }; },
+    savePreferences: value => { saveUserConfig({ autoCheckUpdates: value.autoCheck, autoDownloadUpdates: value.autoDownload }); },
+    emit: state => { for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send("app-update:changed", state); },
+    busy: () => activeSessions.size > 0 || globalTaskManager.listTasks().some(task => task.status === "running") || globalSubAgentManager.listSubAgents().some(agent => agent.status === "running"),
+    openExternal: url => shell.openExternal(url), openInstaller: file => shell.openPath(file), quit: () => app.quit(),
+  });
+  for (const [channel, action] of Object.entries({
+    state: () => appUpdates.getState(), check: appUpdates.check, download: appUpdates.download,
+    install: appUpdates.install, preferences: appUpdates.setPreferences,
+  })) {
+    handleDesktopIpc(`app-update:${channel}`, (event, value) => {
+      if (event.senderFrame !== event.sender.mainFrame || !BrowserWindow.fromWebContents(event.sender)) throw new Error("UPDATE_CAPABILITY_DENIED");
+      return action(value);
+    });
+  }
+  appUpdates.start();
+  app.once("before-quit", () => appUpdates.dispose());
   const remoteLive = new Map<string, RemoteSessionState>();
   const remoteRevisions = new Map<string, { runId: string; revision: number }>();
   const sideParents = new Map<string, string>();
@@ -1700,6 +1724,7 @@ app.whenReady().then(() => {
         snapshot: { revision: 0, updatedAt: Date.now(), status: "starting", objective: String([...payload.messages].reverse().find((message) => message.role === "user")?.content || "").slice(0, 4000), recentOutput: "" },
         sideInstructions: new Map(),
       };
+      if (appUpdates.getState().status === "installing") return { success: false, error: updateStrings(loadUserConfig().language || "en").installing };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
       const savedHistory = payload.sessionKind === "companion"
         ? conversationDb.getConversation(payload.parentConversationId!)?.sideConversations?.find(side => side.id === convoId)?.messages

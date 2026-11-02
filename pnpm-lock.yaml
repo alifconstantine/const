@@ -87,6 +87,9 @@ importers:
       '@const/backend':
         specifier: workspace:*
         version: link:../../../packages/backend
+      '@const/harness-shared':
+        specifier: workspace:*
+        version: link:../shared
       '@const/remote':
         specifier: workspace:*
         version: link:../../../packages/remote
@@ -241,6 +244,9 @@ importers:
       '@const/backend':
         specifier: workspace:*
         version: link:../../../packages/backend
+      '@const/harness-shared':
+        specifier: workspace:*
+        version: link:../shared
       '@const/remote':
         specifier: workspace:*
         version: link:../../../packages/remote
@@ -299,6 +305,22 @@ importers:
       vite:
         specifier: ^6.2.0
         version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(sass@1.51.0)(tsx@4.20.6)(yaml@2.9.0)
+
+  apps/harness/shared:
+    dependencies:
+      '@const/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.38.0(react@19.3.0)
+      react:
+        specifier: ^19.0.0
+        version: 19.3.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.10
+        version: 19.2.18
 
   apps/harness/web:
     dependencies:
@@ -4595,6 +4617,7 @@ packages:
   '@smithy/core@3.33.3':
     resolution: {integrity: sha512-CsOeKq/9kA3y6VJHt+/+VTCtBaxJ4OTFpgrjIUhPpDIKxBci1k2bJaQASF2h/ELWrulGp+t97DZ0mevfAD8idg==}
     engines: {node: '>=18.0.0'}
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.5.2':
     resolution: {integrity: sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==}

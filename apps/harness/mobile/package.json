@@ -1,6 +1,6 @@
 {
   "name": "@const/harness-mobile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "scripts": {
     "dev": "node scripts/build-workspace.mjs --dev && vite",
@@ -11,6 +11,7 @@
     "sync:android": "pnpm build && cap sync android"
   },
   "dependencies": {
+    "@const/harness-shared": "workspace:*",
     "@capacitor/android": "^8.5.1",
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",

@@ -6,6 +6,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 async function main() {
+  const updates = process.argv.includes('--updates');
   const root = path.resolve(__dirname, '..');
   const temp = mkdtempSync(path.join(tmpdir(), 'const-remote-ui-tests-'));
   let server;
@@ -15,7 +16,7 @@ async function main() {
     const fromVite = createRequire(require.resolve('vite/package.json'));
     const entry = path.join(temp, 'tests.cjs');
     await fromVite('esbuild').build({
-      entryPoints: [path.join(root, 'tests/remote-workspace.integration.ts')],
+      entryPoints: [path.join(root, updates ? 'tests/app-updates.integration.ts' : 'tests/remote-workspace.integration.ts')],
       bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: entry,
     });
     console.log('Building isolated remote workspace fixture…');
@@ -23,7 +24,7 @@ async function main() {
     delete env.ELECTRON_RUN_AS_NODE;
     const viteBin = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
     const output = path.join(temp, 'site');
-    builder = spawn(process.execPath, [viteBin, 'build', '--config', 'tests/remote-workspace.vite.ts', '--outDir', output, '--logLevel', 'error'], { cwd: root, env, stdio: 'inherit', windowsHide: true });
+    builder = spawn(process.execPath, [viteBin, 'build', '--config', updates ? 'tests/app-updates.vite.ts' : 'tests/remote-workspace.vite.ts', '--outDir', output, '--logLevel', 'error'], { cwd: root, env, stdio: 'inherit', windowsHide: true });
     const buildCode = await new Promise((resolve, reject) => {
       builder.on('error', reject);
       builder.on('exit', resolve);
@@ -37,7 +38,7 @@ async function main() {
       catch { response.writeHead(404).end(); }
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const url = `http://127.0.0.1:${server.address().port}/tests/remote-workspace.html`;
+    const url = `http://127.0.0.1:${server.address().port}/tests/${updates ? 'app-updates.html' : 'remote-workspace.html'}`;
     console.log('Fixture ready; running Chromium checks…');
     child = spawn(require('electron'), [entry, temp, url], { env, stdio: 'inherit', windowsHide: true });
     const timer = setTimeout(() => child.kill(), 120_000);
