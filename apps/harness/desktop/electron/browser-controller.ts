@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { BrowserSessionState } from "./browser/session-state";
 import { assertBrowserNavigation, normalizeBrowserUrl } from "./browser/navigation-policy.js";
 import {
   type AriaSnapshotBaseline,
@@ -84,6 +85,7 @@ function getCdpCodeForKey(key: string): string {
 }
 
 export interface ControlState {
+  conversationId?: string;
   holder: "bot" | "human";
   since: string;
   requested: boolean;
@@ -177,22 +179,80 @@ function parseAllowedDomains(raw: string | undefined): string[] {
 }
 
 export class BrowserController {
-  private controlState: ControlState = {
-    holder: "bot",
-    since: new Date().toISOString(),
-    requested: false,
-  };
+  private readonly sessions = new BrowserSessionState(() => ({
+    control: { holder: "bot", since: new Date().toISOString(), requested: false } as ControlState,
+    tabs: new Map<string, RegisteredTab>(),
+    activeTabId: null as string | null,
+    pendingTabs: new Set<string>(),
+    snapshotCounter: 0,
+    screenshotQueue: Promise.resolve() as Promise<void>,
+    registerWaiters: [] as Array<(tab: RegisteredTab) => void>,
+    helpWaiters: [] as Array<(info: { status: "resolved"; message: string }) => void>,
+    toolTail: Promise.resolve() as Promise<unknown>,
+  }));
+  private get controlState() { return this.sessions.current.control; }
+  private set controlState(value: ControlState) { this.sessions.current.control = value; }
+  private get registeredTabs() { return this.sessions.current.tabs; }
+  private get activeTabId() { return this.sessions.current.activeTabId; }
+  private set activeTabId(value: string | null) { this.sessions.current.activeTabId = value; }
+  private get registerWaiters() { return this.sessions.current.registerWaiters; }
+  private get helpResolutionWaiters() { return this.sessions.current.helpWaiters; }
+  private get snapshotCounter() { return this.sessions.current.snapshotCounter; }
+  private set snapshotCounter(value: number) { this.sessions.current.snapshotCounter = value; }
+  private get screenshotQueue() { return this.sessions.current.screenshotQueue; }
+  private set screenshotQueue(value: Promise<void>) { this.sessions.current.screenshotQueue = value; }
+
+  public inSession<T>(conversationId: string | undefined, operation: () => T, signal?: AbortSignal): T {
+    return this.sessions.run(conversationId, operation, signal);
+  }
+
+  public forTab<T>(tabId: string | undefined, operation: () => T): T {
+    if (!tabId) return this.inSession(undefined, operation);
+    const owner = this.tabOwner(tabId);
+    if (owner === undefined) throw new Error(`Browser tab '${tabId}' is not registered.`);
+    return this.inSession(owner, operation);
+  }
+
+  private tabOwner(tabId: string): string | undefined {
+    return this.sessions.find(state => state.tabs.has(tabId)) ??
+      this.sessions.find(state => state.pendingTabs.has(tabId) || state.activeTabId === tabId);
+  }
+
+  public assertTabOwnership(tabId: string): void {
+    const owner = this.tabOwner(tabId);
+    if (owner !== undefined && owner !== this.sessions.sessionId) throw new Error("Browser tab belongs to another conversation.");
+  }
+
+  /** Bound page promises also reject when their guest is destroyed or a run stops. */
+  private async awaitPage<T>(target: WebContents, operation: Promise<T>, timeoutMs = 30_000): Promise<T> {
+    const signal = this.sessions.signal;
+    let onDestroyed: () => void = () => {};
+    let onAbort: () => void = () => {};
+    try {
+      return await withBrowserTimeout(Promise.race([operation, new Promise<never>((_resolve, reject) => {
+        onDestroyed = () => reject(new Error("Browser tab was closed while the operation was running."));
+        onAbort = () => reject(new Error("Browser operation cancelled."));
+        target.once("destroyed", onDestroyed);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (target.isDestroyed()) onDestroyed();
+        if (signal?.aborted) onAbort();
+      })]), timeoutMs);
+    } finally {
+      target.removeListener("destroyed", onDestroyed);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+
+  private executePageScript(target: WebContents, script: string, userGesture?: boolean): Promise<any> {
+    if (this.sessions.signal?.aborted) return Promise.reject(new Error("Browser operation cancelled."));
+    return this.awaitPage(target, target.executeJavaScript(script, userGesture));
+  }
 
   private parentWindow: BrowserWindow | null = null;
-  private registeredTabs = new Map<string, RegisteredTab>();
-  private activeTabId: string | null = null;
-  private snapshotCounter = 0;
   private lastScreenshotPruneAt = 0;
   /** Optional host allowlist. When empty every http(s) host stays reachable. */
   private allowedDomains: string[] = [];
 
-  private registerWaiters: Array<(tab: RegisteredTab) => void> = [];
-  private helpResolutionWaiters: Array<(info: { status: "resolved"; message: string }) => void> = [];
 
   private onStateChangeCallback?: (state: ControlState) => void;
   private onAiActionCallback?: (action: { type: string; details?: any }) => void;
@@ -200,6 +260,7 @@ export class BrowserController {
     url: string;
     tabId?: string;
     newTab?: boolean;
+    conversationId?: string;
   }) => Promise<string | null>;
 
   constructor(options?: {
@@ -209,6 +270,7 @@ export class BrowserController {
       url: string;
       tabId?: string;
       newTab?: boolean;
+      conversationId?: string;
     }) => Promise<string | null>;
   }) {
     if (options?.onStateChange) this.onStateChangeCallback = options.onStateChange;
@@ -224,6 +286,7 @@ export class BrowserController {
       url: string;
       tabId?: string;
       newTab?: boolean;
+      conversationId?: string;
     }) => Promise<string | null>;
   }) {
     if (callbacks.onStateChange) this.onStateChangeCallback = callbacks.onStateChange;
@@ -319,6 +382,7 @@ export class BrowserController {
   private pruneDestroyedTabs() {
     for (const [id, reg] of this.registeredTabs.entries()) {
       if (!reg.contents || reg.contents.isDestroyed()) {
+        reg.telemetry.detach();
         this.registeredTabs.delete(id);
         if (this.activeTabId === id) {
           this.activeTabId = null;
@@ -328,6 +392,7 @@ export class BrowserController {
   }
 
   public registerWebview(tabId: string, guestContentsId: number) {
+    this.assertTabOwnership(tabId);
     const contents = webContents.fromId(guestContentsId);
     if (!contents || contents.isDestroyed()) {
       console.warn(`[BrowserController] Could not find WebContents with ID ${guestContentsId}`);
@@ -384,6 +449,7 @@ export class BrowserController {
 
   private setupGuestWebContentsHooks(tabRecord: RegisteredTab) {
     const { contents, telemetry } = tabRecord;
+    const sessionState = this.sessions.current;
     if (contents.isDestroyed()) return;
 
     telemetry.attachToWebContents(contents);
@@ -391,7 +457,7 @@ export class BrowserController {
     // Prevent unload dialogs from hanging navigation while AI is driving
     contents.removeAllListeners("will-prevent-unload");
     contents.on("will-prevent-unload", (event) => {
-      if (this.controlState.holder === "bot") {
+      if (sessionState.control.holder === "bot") {
         event.preventDefault();
       }
     });
@@ -427,7 +493,9 @@ export class BrowserController {
       .catch(() => {});
   }
 
-  public unregisterWebview(tabId: string) {
+  public unregisterWebview(tabId: string, guestContentsId?: number) {
+    if (guestContentsId !== undefined && this.registeredTabs.get(tabId)?.guestContentsId !== guestContentsId) return;
+    this.registeredTabs.get(tabId)?.telemetry.detach();
     this.registeredTabs.delete(tabId);
     if (this.activeTabId === tabId) {
       // Fall back to the last registered tab (most recent)
@@ -437,6 +505,7 @@ export class BrowserController {
   }
 
   public setActiveTab(tabId: string) {
+    this.assertTabOwnership(tabId);
     this.pruneDestroyedTabs();
     const reg = this.registeredTabs.get(tabId);
     if (reg) {
@@ -504,25 +573,31 @@ export class BrowserController {
     }));
   }
 
-  private waitForNextTabRegistration(timeoutMs = 6000): Promise<RegisteredTab | null> {
+  private waitForNextTabRegistration(tabId: string, timeoutMs = 6000): Promise<RegisteredTab | null> {
     return new Promise((resolve) => {
+      const signal = this.sessions.signal;
+      const pendingTabs = this.sessions.current.pendingTabs;
+      pendingTabs.add(tabId);
       let settled = false;
-      const timer = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        const idx = this.registerWaiters.indexOf(onRegister);
-        if (idx !== -1) this.registerWaiters.splice(idx, 1);
-        resolve(this.getTargetTab());
-      }, timeoutMs);
-
-      const onRegister = (tab: RegisteredTab) => {
+      const finish = (tab: RegisteredTab | null) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        pendingTabs.delete(tabId);
+        signal?.removeEventListener("abort", onAbort);
+        const idx = this.registerWaiters.indexOf(onRegister);
+        if (idx !== -1) this.registerWaiters.splice(idx, 1);
         resolve(tab);
       };
-
+      const timer = setTimeout(() => finish(null), timeoutMs);
+      const onAbort = () => finish(null);
+      const onRegister = (tab: RegisteredTab) => {
+        if (tab.tabId !== tabId) { this.registerWaiters.push(onRegister); return; }
+        finish(tab);
+      };
       this.registerWaiters.push(onRegister);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
   }
 
@@ -537,15 +612,21 @@ export class BrowserController {
     tabId?: string;
     newTab?: boolean;
   }): Promise<RegisteredTab> {
+    if (this.sessions.signal?.aborted) throw new Error("Browser operation cancelled.");
+    if (options?.tabId) {
+      this.assertTabOwnership(options.tabId);
+      if (options.newTab && this.registeredTabs.has(options.tabId)) throw new Error("Browser tab is already open. Use a new tab ID or omit newTab.");
+    }
     if (!options?.newTab) {
       const existing = this.getTargetTab(options?.tabId);
       if (existing) {
         // Ensure the right sidepanel is open and this browser tab is active in the UI
         if (this.onTabOpenRequestCallback) {
           void this.onTabOpenRequestCallback({
-            url: options?.url ? this.normalizeUrl(options.url) : "",
+            url: "",
             tabId: existing.tabId,
             newTab: false,
+            conversationId: this.sessions.sessionId || undefined,
           }).catch(() => {});
         }
         return existing;
@@ -554,13 +635,16 @@ export class BrowserController {
 
     if (this.onTabOpenRequestCallback) {
       const targetUrl = this.normalizeUrl(options?.url || "https://www.google.com");
-      const waiter = this.waitForNextTabRegistration(6500);
+      const tabId = options?.tabId || `browser_${crypto.randomUUID()}`;
+      const waiter = this.waitForNextTabRegistration(tabId, 6500);
       await this.onTabOpenRequestCallback({
         url: targetUrl,
-        tabId: options?.tabId,
+        tabId,
+        conversationId: this.sessions.sessionId || undefined,
         newTab: Boolean(options?.newTab),
       });
       const registered = await waiter;
+      if (this.sessions.signal?.aborted) throw new Error("Browser operation cancelled.");
       if (registered && !registered.contents.isDestroyed()) {
         // Give the newly mounted webview a brief moment to finish initial DOM attach
         await new Promise((r) => setTimeout(r, 250));
@@ -568,7 +652,7 @@ export class BrowserController {
       }
     }
 
-    const fallback = this.getTargetTab(options?.tabId);
+    const fallback = !options?.newTab && this.getTargetTab(options?.tabId);
     if (fallback) return fallback;
 
     throw new Error(
@@ -591,9 +675,9 @@ export class BrowserController {
         since: new Date().toISOString(),
         requested: false,
       };
-      this.onStateChangeCallback?.(this.controlState);
+      this.onStateChangeCallback?.(this.getControl());
     }
-    return { ...this.controlState };
+    return { ...this.controlState, conversationId: this.sessions.sessionId || undefined };
   }
 
   private updateControl(patch: Partial<ControlState>) {
@@ -617,13 +701,13 @@ export class BrowserController {
     const tab = await this.ensureTargetTab({ tabId: input.tabId });
     const target = tab.contents;
     this.takeControl();
-    if (input.action === "navigate") await target.loadURL(this.normalizeUrl(String(input.url || "")));
+    if (input.action === "navigate") await this.awaitPage(target, target.loadURL(this.normalizeUrl(String(input.url || ""))));
     if (input.action === "back" && target.navigationHistory.canGoBack()) target.navigationHistory.goBack();
     if (input.action === "forward" && target.navigationHistory.canGoForward()) target.navigationHistory.goForward();
     if (input.action === "reload") target.reload();
     if (input.action === "click") {
       if (![input.x, input.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) throw new Error("invalid");
-      const viewport = await target.executeJavaScript("({width:innerWidth,height:innerHeight})");
+      const viewport = await this.executePageScript(target, "({width:innerWidth,height:innerHeight})");
       const x = Math.min(viewport.width - 1, Math.round(input.x * viewport.width)), y = Math.min(viewport.height - 1, Math.round(input.y * viewport.height));
       target.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
       target.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 });
@@ -643,7 +727,7 @@ export class BrowserController {
     if (input.action === "devtools") target.openDevTools({ mode: "detach" });
     if (input.action === "evaluate") {
       if (typeof input.script !== "string" || input.script.length > 100000) throw new Error("invalid");
-      return await target.executeJavaScript(input.script, true);
+      return await this.executePageScript(target, input.script, true);
     }
     return { url: target.getURL(), canGoBack: target.navigationHistory.canGoBack(), canGoForward: target.navigationHistory.canGoForward() };
   }
@@ -743,10 +827,22 @@ export class BrowserController {
     timeoutMs = 5 * 60 * 1000
   ): Promise<{ status: "resolved" | "timeout"; message: string }> {
     return new Promise((resolve) => {
+      const signal = this.sessions.signal;
       let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        const index = this.helpResolutionWaiters.indexOf(onResolved);
+        if (index !== -1) this.helpResolutionWaiters.splice(index, 1);
+        signal?.removeEventListener("abort", onAbort);
+        this.releaseControl();
+        resolve({ status: "timeout", message: "Browser help request cancelled." });
+      };
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
+        signal?.removeEventListener("abort", onAbort);
         const idx = this.helpResolutionWaiters.indexOf(onResolved);
         if (idx !== -1) this.helpResolutionWaiters.splice(idx, 1);
         resolve({
@@ -760,10 +856,13 @@ export class BrowserController {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         resolve(info);
       };
 
       this.helpResolutionWaiters.push(onResolved);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
   }
 
@@ -794,8 +893,7 @@ export class BrowserController {
     }
     const spec = secretRef ? parseSelectorSpec(secretRef) : null;
 
-    const writeOutcome = await target
-      .executeJavaScript(`
+    const writeOutcome = await this.executePageScript(target, `
       (function() {
         const spec = ${JSON.stringify(spec)};
         const secret = ${JSON.stringify(text)};
@@ -940,7 +1038,7 @@ export class BrowserController {
     const currentUrl = target.getURL();
     if (currentUrl !== cleanUrl) {
       try {
-        await target.loadURL(cleanUrl);
+        await this.awaitPage(target, target.loadURL(cleanUrl));
       } catch (err: any) {
         // Ignore ERR_ABORTED (-3) which happens on client-side / SPA redirects
         if (err?.errno !== -3 && err?.code !== "ERR_ABORTED" && !String(err?.message || "").includes("ERR_ABORTED")) {
@@ -985,15 +1083,15 @@ export class BrowserController {
     const target = tab.contents;
     tab.lastUsedAt = Date.now();
 
-    this.snapshotCounter++;
+    const snapshotId = ++this.snapshotCounter;
     this.injectRuntimeHelpers(tab);
 
     const maskValues = [
       ...(options?.maskValues || []),
       ...(this.controlState.secretTabId === tab.tabId && this.controlState.secretRef ? [this.controlState.secretRef] : []),
     ];
-    const script = buildEnhancedSnapshotScript(this.snapshotCounter, { ...options, maskValues });
-    const raw = await target.executeJavaScript(script);
+    const script = buildEnhancedSnapshotScript(snapshotId, { ...options, maskValues });
+    const raw = await this.executePageScript(target, script);
 
     const processedAria = postProcessAriaSnapshot(
       raw.ariaSnapshot || "",
@@ -1096,7 +1194,7 @@ export class BrowserController {
     }
 
     return {
-      snapshotId: this.snapshotCounter,
+      snapshotId,
       tabId: tab.tabId,
       url: raw.url,
       title: raw.title,
@@ -1157,8 +1255,7 @@ export class BrowserController {
       details: { tabId: tab.tabId, ref: rawTarget, x: targetX, y: targetY },
     });
 
-    await target
-      .executeJavaScript(`
+    await this.executePageScript(target, `
         if (window.__constShowClickRipple) {
           window.__constShowClickRipple(${targetX}, ${targetY});
         }
@@ -1274,8 +1371,7 @@ export class BrowserController {
           `Element '${rawTarget}' not found after waiting ${DEFAULT_WAIT_TIMEOUT_MS}ms. Call browser_snapshot to get updated element refs.`
         );
       }
-      await target
-        .executeJavaScript(`
+      await this.executePageScript(target, `
           if (window.__constShowClickRipple) {
             window.__constShowClickRipple(${focused.x}, ${focused.y});
           }
@@ -1312,8 +1408,7 @@ export class BrowserController {
     }
 
     // Ensure React controlled inputs & contenteditable elements accurately reflect the typed value
-    await target
-      .executeJavaScript(`
+    await this.executePageScript(target, `
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -1437,7 +1532,7 @@ export class BrowserController {
       })();
     `;
     return this.pollUntil(async () => {
-      const pos = await target.executeJavaScript(script).catch(() => null);
+      const pos = await this.executePageScript(target, script).catch(() => null);
       return pos && typeof pos.x === "number" && typeof pos.y === "number" ? pos : null;
     }, timeoutMs);
   }
@@ -1492,7 +1587,7 @@ export class BrowserController {
       })();
     `;
     return this.pollUntil(async () => {
-      const focused = await target.executeJavaScript(script).catch(() => null);
+      const focused = await this.executePageScript(target, script).catch(() => null);
       return focused && typeof focused.x === "number" ? focused : null;
     }, timeoutMs);
   }
@@ -1558,8 +1653,7 @@ export class BrowserController {
 
     const matched = await this.pollUntil(async () => {
       if (spec) {
-        const stateOk = await target
-          .executeJavaScript(`
+        const stateOk = await this.executePageScript(target, `
             (function() {
               const spec = ${JSON.stringify(spec)};
               ${PAGE_SELECTOR_HELPERS}
@@ -1576,8 +1670,7 @@ export class BrowserController {
         return stateOk ? true : null;
       }
       if (typeof params.text === "string") {
-        const found = await target
-          .executeJavaScript(`
+        const found = await this.executePageScript(target, `
             (function() {
               const wanted = ${JSON.stringify(params.text)}.toLowerCase();
               const body = (document.body && document.body.innerText) || "";
@@ -1631,8 +1724,7 @@ export class BrowserController {
     tab.lastUsedAt = Date.now();
 
     const scope = params.selector ? parseSelectorSpec(params.selector) : null;
-    const result = await target
-      .executeJavaScript(`
+    const result = await this.executePageScript(target, `
         (function() {
           const spec = ${JSON.stringify(scope)};
           ${PAGE_SELECTOR_HELPERS}
@@ -1700,8 +1792,7 @@ export class BrowserController {
     const scope = params.selector ? parseSelectorSpec(params.selector) : null;
     const limit = Math.max(1, Math.min(50, Math.floor(Number.isFinite(params.limit) ? params.limit! : 20)));
 
-    const result = await target
-      .executeJavaScript(`
+    const result = await this.executePageScript(target, `
         (function() {
           const spec = ${JSON.stringify(scope)};
           const needle = ${JSON.stringify(params.text)}.trim().toLowerCase();
@@ -1875,8 +1966,7 @@ export class BrowserController {
       details: { tabId: tab.tabId, ref: rawTarget, characters: params.text.length },
     });
 
-    const wrote = await target
-      .executeJavaScript(`
+    const wrote = await this.executePageScript(target, `
         (function() {
           const text = ${JSON.stringify(params.text)};
           let el = document.activeElement;
@@ -2033,7 +2123,7 @@ export class BrowserController {
 
     if (rawTarget) {
       const spec = parseSelectorSpec(rawTarget);
-      await target.executeJavaScript(`
+      await this.executePageScript(target, `
         (function() {
           const spec = ${JSON.stringify(spec)};
           ${PAGE_SELECTOR_HELPERS}
@@ -2045,9 +2135,9 @@ export class BrowserController {
         })();
       `);
     } else if (params.direction === "top") {
-      await target.executeJavaScript(`window.scrollTo({ top: 0, behavior: 'instant' });`);
+      await this.executePageScript(target, `window.scrollTo({ top: 0, behavior: 'instant' });`);
     } else if (params.direction === "bottom") {
-      await target.executeJavaScript(
+      await this.executePageScript(target,
         `window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });`
       );
     } else {
@@ -2063,12 +2153,12 @@ export class BrowserController {
           });
         } catch {}
       }
-      await target.executeJavaScript(
+      await this.executePageScript(target,
         `window.scrollBy({ left: ${deltaX}, top: ${deltaY}, behavior: 'instant' });`
       );
     }
 
-    const scrollState = await target.executeJavaScript(`({
+    const scrollState = await this.executePageScript(target, `({
       scrollX: Math.round(window.scrollX),
       scrollY: Math.round(window.scrollY),
       scrollHeight: document.documentElement ? document.documentElement.scrollHeight : window.innerHeight
@@ -2106,7 +2196,6 @@ export class BrowserController {
     } catch {}
   }
 
-  private screenshotQueue: Promise<void> = Promise.resolve();
 
   public async screenshot(params?: Parameters<BrowserController["captureScreenshot"]>[0]) {
     const previous = this.screenshotQueue;
@@ -2144,8 +2233,7 @@ export class BrowserController {
     const rawTarget = params?.ref || params?.selector;
     if (rawTarget) {
       const spec = parseSelectorSpec(rawTarget);
-      await target
-        .executeJavaScript(`
+      await this.executePageScript(target, `
           (function() {
             const spec = ${JSON.stringify(spec)};
             ${PAGE_SELECTOR_HELPERS}
@@ -2185,7 +2273,7 @@ export class BrowserController {
 
         if (annotationTargets.length > 0) {
           annotationToken = `const-shot-${crypto.randomUUID()}`;
-          await target.executeJavaScript(
+          await this.executePageScript(target,
             buildInstallAnnotationOverlayScript(annotationToken, annotationTargets)
           );
           await new Promise((r) => setTimeout(r, 40));
@@ -2197,7 +2285,7 @@ export class BrowserController {
     const maskToken = `const-mask-${crypto.randomUUID()}`;
     try {
       // Mask visible credential/OTP fields even when annotation is disabled.
-      await target.executeJavaScript(`(() => {
+      await this.executePageScript(target, `(() => {
         const root = document.createElement('div');
         root.id = ${JSON.stringify(maskToken)};
         root.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
@@ -2244,11 +2332,10 @@ export class BrowserController {
       if (!image || image.isEmpty()) throw new Error("The browser did not produce a screenshot. Bring the tab into view and retry.");
     } finally {
       if (!target.isDestroyed()) {
-        await target.executeJavaScript(`document.getElementById(${JSON.stringify(maskToken)})?.remove()`).catch(() => {});
+        await this.executePageScript(target, `document.getElementById(${JSON.stringify(maskToken)})?.remove()`).catch(() => {});
       }
       if (annotationToken && !target.isDestroyed()) {
-        await target
-          .executeJavaScript(buildRemoveAnnotationOverlayScript(annotationToken))
+        await this.executePageScript(target, buildRemoveAnnotationOverlayScript(annotationToken))
           .catch(() => {});
       }
     }
@@ -2374,7 +2461,7 @@ export class BrowserController {
             const rawTarget = step.ref || step.selector;
             if (rawTarget && step.value !== undefined) {
               const spec = parseSelectorSpec(rawTarget);
-              const selected = await target.executeJavaScript(`
+              const selected = await this.executePageScript(target, `
                 (function() {
                   const spec = ${JSON.stringify(spec)};
                   const wanted = ${JSON.stringify(String(step.value))};
@@ -2401,7 +2488,7 @@ export class BrowserController {
               const deadline = Date.now() + waitMs;
               let found = false;
               while (Date.now() <= deadline) {
-                found = await target.executeJavaScript(`
+                found = await this.executePageScript(target, `
                   (function() {
                     const spec = ${JSON.stringify(spec)};
                     ${PAGE_SELECTOR_HELPERS}
@@ -2438,7 +2525,7 @@ export class BrowserController {
           return { ok: false, error: err && err.message ? err.message : String(err), stack: err && err.stack ? err.stack : undefined };
         }
       })()`;
-      const env = await target.executeJavaScript(wrappedScript);
+      const env = await this.executePageScript(target, wrappedScript);
       if (env && env.ok === false) {
         throw new Error(`Page evaluate error: ${env.error}`);
       }
@@ -2534,7 +2621,7 @@ export class BrowserController {
       })();
     `;
 
-    target.executeJavaScript(overlayCode).catch(() => {});
+    this.executePageScript(target, overlayCode).catch(() => {});
   }
 
   // ---------------------------------------------------------------------------
@@ -2543,13 +2630,21 @@ export class BrowserController {
 
   public async executeTool(
     toolName: string,
-    args: Record<string, any>
+    args: Record<string, any>,
+    context?: { sessionId?: string; signal?: AbortSignal },
   ): Promise<{ result: any; isError: boolean }> {
+    if (context) return this.inSession(context.sessionId, () => {
+      const state = this.sessions.current;
+      const run = state.toolTail.then(() => this.executeTool(toolName, args));
+      state.toolTail = run.catch(() => {});
+      return run;
+    }, context.signal);
+    if (this.sessions.signal?.aborted) return { result: "Browser operation cancelled.", isError: true };
     const norm = toolName.toLowerCase().replace(/[-_]/g, "");
     try {
       if (norm === "browsertabs") {
         if (args.tabId) {
-          this.setActiveTab(String(args.tabId));
+          this.getTargetTab(String(args.tabId));
         }
         const tabs = this.listTabs();
         return {

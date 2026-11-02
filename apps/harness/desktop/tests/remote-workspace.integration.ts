@@ -416,6 +416,31 @@ async function run() {
     assert.equal(await js('window.__remoteFixture.browserShots.every(shot => shot.annotate === false && shot.ephemeral === true)'), true);
   });
   win.setSize(1440, 960);
+  await win.loadURL(process.argv[3]!);
+  await waitFor('Boolean(document.querySelector(".workspace-shell"))');
+  await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
+  await check("browser requests stay in their owner's pane and guests survive workspace switches", async () => {
+    await js(`window.electron.saveConversation({id:'browser-chat-b',title:'Browser workspace B',project:'/workspace/const',createdAt:Date.now(),updatedAt:Date.now(),messages:[]})`);
+    await js(`window.__remoteFixture.emit('conversations:changed', {conversationId:'browser-chat-b'})`);
+    await waitFor(`document.querySelector('.workspace-sidebar').innerText.includes('Browser workspace B')`);
+    await js(`window.__remoteFixture.emit('browser:open-tab-request', {conversationId:'preview-chat',tabId:'browser-a',url:'https://a.test'})`);
+    await waitFor(`document.querySelector('[data-pane-tab-id=browser-a]')?.getAttribute('aria-hidden') === 'false'`);
+    await js(`window.__browserA = document.querySelector('[data-pane-tab-id=browser-a]'); window.__browserInputA = window.__browserA.querySelector('input')`);
+    await js(`window.__remoteFixture.emit('browser:open-tab-request', {conversationId:'browser-chat-b',tabId:'browser-b',url:'https://b.test'})`);
+    await waitFor(`Boolean(document.querySelector('[data-pane-tab-id=browser-b]'))`);
+    assert.equal(await js(`document.querySelector('[data-pane-tab-id=browser-b]').getAttribute('aria-hidden')`), 'true');
+    assert.equal(await js(`document.querySelector('[data-pane-tab-id=browser-a]').getAttribute('aria-hidden')`), 'false');
+    await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Browser workspace B').click()`);
+    await waitFor(`document.querySelector('[data-pane-tab-id=browser-b]')?.getAttribute('aria-hidden') === 'false'`);
+    assert.equal(await js(`document.querySelector('[data-pane-tab-id=browser-a]') === window.__browserA && window.__browserInputA === window.__browserA.querySelector('input')`), true);
+    await js(`window.__remoteFixture.emit('browser:open-tab-request', {conversationId:'preview-chat',tabId:'browser-a',url:'https://a.test/next'})`);
+    await waitFor(`document.querySelector('[data-pane-tab-id=browser-a] input')?.value === 'https://a.test/next'`);
+    assert.equal(await js(`document.querySelector('[data-pane-tab-id=browser-b]').getAttribute('aria-hidden')`), 'false');
+    await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
+    await waitFor(`document.querySelector('[data-pane-tab-id=browser-a]')?.getAttribute('aria-hidden') === 'false'`);
+    assert.equal(await js(`window.__browserInputA === document.querySelector('[data-pane-tab-id=browser-a] input')`), true);
+    await capture('browser-workspace-isolation');
+  });
   await win.loadURL(process.argv[3]! + "?activity");
   await waitFor('Boolean(document.querySelector(".workspace-shell"))');
   await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
@@ -437,6 +462,11 @@ async function run() {
     await capture('activity-desktop-light');
     await js(`document.documentElement.classList.add('dark')`);
   });
+  await check("empty agent groups disappear while populated Activity groups remain", async () => {
+    await js(`window.__remoteFixture.clearAgents()`);
+    await waitFor(`!document.querySelector('[data-activity-section=agents]')`);
+    assert.deepEqual(await js(`Array.from(document.querySelectorAll('[data-activity-section]')).map(section => section.dataset.activitySection)`), ['progress','jobs','changes','sources']);
+  });
   await check("Sources preview images and extracted documents and keep same-named files in distinct tabs", async () => {
     await js(`for (const id of ['changes','sources']) { const button = document.querySelector('[data-activity-section='+id+'] > button'); if (button.getAttribute('aria-expanded') !== 'true') button.click(); }`);
     await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/reference.svg"]').click()`);
@@ -447,6 +477,15 @@ async function run() {
     await js(`document.querySelector('[data-activity-section=sources] button[title="brief.docx"]').click()`);
     await waitFor(`document.querySelector('[data-media-preview=document]')?.innerText.includes('accessible controls')`);
     await capture('activity-source-document');
+    assert.equal(await js(`(() => {
+      const toolbar = document.querySelector('.workspace-toolbar');
+      const activity = toolbar.querySelector('[data-activity-toggle]');
+      const terminal = toolbar.querySelector('button[aria-label="Terminal"]');
+      return document.querySelectorAll('[data-activity-toggle]').length === 1 &&
+        activity.parentElement === terminal.parentElement &&
+        activity.getBoundingClientRect().right <= terminal.getBoundingClientRect().left;
+    })()`), true);
+    await capture('activity-beside-terminal');
     await js(`document.querySelector('[data-activity-section=sources] button[title="notes.txt"]').click()`);
     await waitFor(`document.querySelector('.workspace-right-pane')?.innerText.includes('Source notes remain readable')`);
     await js(`document.querySelector('[data-activity-section=sources] button[title="/workspace/unavailable.png"]').click()`);
@@ -470,6 +509,7 @@ async function run() {
     await capture('activity-changes-review');
     await js(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Undo all"]').click()`);
     await waitFor(`document.querySelectorAll('[data-activity-section=changes] button[title]').length === 0`);
+    assert.equal(await js(`Boolean(document.querySelector('[data-activity-section=changes]'))`), false);
     assert.deepEqual(await js(`window.__remoteFixture.revertedMutations.map(record => [record.id, record.previousContent])`), [['edit-two','intermediate'],['edit-one','original']]);
     await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Undo all"]')?.disabled`);
   });

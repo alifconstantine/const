@@ -1,3 +1,4 @@
+import { isPermanentQuotaResponse } from "./model-retry.js";
 import { consumeChatStream, abortableDelay } from "./chat-stream.js";
 
 import fs from "node:fs";
@@ -659,7 +660,7 @@ async function fetchWithRetry(
 
       // Transient HTTP errors: 429 (Rate limit) or 5xx server errors
       const isTransientHttp =
-        response.status === 429 ||
+        (response.status === 429 && !(await isPermanentQuotaResponse(response))) ||
         response.status === 500 ||
         response.status === 502 ||
         response.status === 503 ||

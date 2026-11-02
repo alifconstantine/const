@@ -264,6 +264,151 @@ async function run() {
     assert.ok(shot.dataUrl.startsWith("data:image/jpeg;base64,"));
     assert.ok(!shot.filePath);
   });
+  await check("concurrent chats isolate tabs, explicit targets and help controls", async () => {
+    const scoped = new BrowserController();
+    const second = await addGuest("workspace-b-guest");
+    scoped.inSession("a", () => scoped.registerWebview("a-tab", guest.id));
+    scoped.inSession("b", () => scoped.registerWebview("b-tab", second.id));
+    const [a, b] = await Promise.all([
+      scoped.executeTool("browser_evaluate", { script: "return 'workspace A'" }, { sessionId: "a" }),
+      scoped.executeTool("browser_evaluate", { script: "return 'workspace B'" }, { sessionId: "b" }),
+    ]);
+    assert.equal(JSON.parse(a.result).tabId, "a-tab");
+    assert.equal(JSON.parse(b.result).tabId, "b-tab");
+    const crossed = await scoped.executeTool("browser_evaluate", { tabId: "a-tab", script: "return 'wrong'" }, { sessionId: "b" });
+    assert.equal(crossed.isError, true);
+    const crossedSelection = await scoped.executeTool("browser_tabs", { tabId: "a-tab" }, { sessionId: "b" });
+    assert.equal(crossedSelection.isError, true);
+    await host.webContents.executeJavaScript(`document.getElementById('primary').style.visibility = 'hidden'; document.getElementById('primary').inert = true`);
+    const typed = await scoped.executeTool("browser_type", { selector: "#editor", text: "workspace A input" }, { sessionId: "a" });
+    assert.equal(typed.isError, false);
+    assert.equal(await js(`document.querySelector('#editor').value`), "workspace A input");
+    assert.notEqual(await second.executeJavaScript(`document.querySelector('#editor').value`), "workspace A input");
+    scoped.inSession("a", () => scoped.requestHelp("A needs verification"));
+    scoped.forTab("b-tab", () => scoped.releaseControl());
+    assert.equal(scoped.inSession("a", () => scoped.getControl().requested), true);
+    assert.equal(scoped.inSession("b", () => scoped.getControl().requested), false);
+    assert.deepEqual(scoped.inSession("b", () => scoped.listTabs().map(tab => tab.tabId)), ["b-tab"]);
+    scoped.inSession("a", () => scoped.unregisterWebview("a-tab"));
+    scoped.inSession("b", () => scoped.unregisterWebview("b-tab"));
+  });
+  await check("tools within one chat serialize while pre-cancelled calls never execute", async () => {
+    const scoped = new BrowserController();
+    scoped.inSession("a", () => scoped.registerWebview("serial-tab", guest.id));
+    const first = scoped.executeTool("browser_evaluate", { script: "window.__steps = []; await new Promise(resolve => setTimeout(resolve, 50)); window.__steps.push('first'); return true" }, { sessionId: "a" });
+    const second = scoped.executeTool("browser_evaluate", { script: "window.__steps.push('second'); return window.__steps" }, { sessionId: "a" });
+    assert.equal((await first).isError, false);
+    assert.deepEqual(JSON.parse((await second).result).result, ["first", "second"]);
+    const abort = new AbortController();
+    abort.abort();
+    const cancelled = await scoped.executeTool("browser_evaluate", { script: "window.__steps.push('wrong'); return true" }, { sessionId: "a", signal: abort.signal });
+    assert.equal(cancelled.isError, true);
+    assert.deepEqual(await js("window.__steps"), ["first", "second"]);
+    scoped.inSession("a", () => scoped.unregisterWebview("serial-tab"));
+  });
+  await check("another chat's snapshot cannot invalidate a pending secret reference", async () => {
+    const scoped = new BrowserController();
+    const second = await addGuest("snapshot-b-guest");
+    scoped.inSession("a", () => scoped.registerWebview("a-secret", guest.id));
+    scoped.inSession("b", () => scoped.registerWebview("b-snapshot", second.id));
+    const snapshot = await scoped.inSession("a", () => scoped.snapshot());
+    const ref = snapshot.elements.find(element => element.name === "Custom code")!.ref;
+    scoped.inSession("a", () => scoped.requestSecret("verification code", ref));
+    await scoped.inSession("b", () => scoped.snapshot());
+    await scoped.inSession("b", () => scoped.snapshot());
+    await scoped.inSession("a", () => scoped.supplySecret("isolated-secret-321"));
+    assert.equal(await js(`document.querySelector('#custom').value`), "isolated-secret-321");
+    assert.equal(await second.executeJavaScript(`document.querySelector('#custom').value`), "");
+    scoped.inSession("a", () => scoped.unregisterWebview("a-secret"));
+    scoped.inSession("b", () => scoped.unregisterWebview("b-snapshot"));
+  });
+  await check("new-tab requests cannot reuse another chat's registered tab", async () => {
+    let requests = 0;
+    const scoped = new BrowserController({ onTabOpenRequest: async () => { requests++; return null; } });
+    scoped.inSession("a", () => scoped.registerWebview("owned-a", guest.id));
+    const result = await scoped.executeTool("browser_navigate", { url: origin, tabId: "owned-a", newTab: true }, { sessionId: "b" });
+    assert.equal(result.isError, true);
+    assert.match(result.result, /another conversation/);
+    assert.equal(requests, 0);
+    assert.equal(scoped.inSession("a", () => scoped.getTargetTab()!.guestContentsId), guest.id);
+    scoped.inSession("a", () => scoped.unregisterWebview("owned-a"));
+  });
+  await check("pending auto-open tabs already have an owner before guest registration", async () => {
+    const scoped = new BrowserController({ onTabOpenRequest: async payload => payload.tabId! });
+    const waiting = scoped.inSession("a", () => scoped.ensureTargetTab({ tabId: "pending-a", newTab: true }));
+    await assert.rejects(scoped.inSession("b", () => scoped.ensureTargetTab({ tabId: "pending-a", newTab: true })), /another conversation/);
+    assert.throws(() => scoped.inSession("b", () => scoped.setActiveTab("pending-a")), /another conversation/);
+    assert.throws(() => scoped.inSession("b", () => scoped.registerWebview("pending-a", guest.id)), /another conversation/);
+    scoped.inSession("a", () => scoped.registerWebview("pending-a", guest.id));
+    assert.equal((await waiting).tabId, "pending-a");
+    scoped.inSession("a", () => scoped.unregisterWebview("pending-a"));
+  });
+  await check("late cleanup from a replaced guest cannot unregister its replacement", async () => {
+    const scoped = new BrowserController();
+    const replacement = await addGuest("replacement-guest");
+    const originalListeners = guest.listenerCount("console-message");
+    const replacementListeners = replacement.listenerCount("console-message");
+    scoped.inSession("a", () => {
+      scoped.registerWebview("replace-tab", guest.id);
+      scoped.registerWebview("replace-tab", replacement.id);
+      assert.equal(guest.listenerCount("console-message"), originalListeners);
+      scoped.unregisterWebview("replace-tab", guest.id);
+      assert.equal(scoped.getTargetTab()!.guestContentsId, replacement.id);
+      scoped.unregisterWebview("replace-tab", replacement.id);
+      assert.equal(scoped.getTargetTab(), null);
+      assert.equal(replacement.listenerCount("console-message"), replacementListeners);
+    });
+  });
+  await check("auto-open correlates each registration with its requested chat and tab", async () => {
+    const requests: Array<{ tabId?: string; conversationId?: string }> = [];
+    const scoped = new BrowserController({ onTabOpenRequest: async payload => { requests.push(payload); return payload.tabId!; } });
+    const a = scoped.inSession("a", () => scoped.ensureTargetTab());
+    const b = scoped.inSession("b", () => scoped.ensureTargetTab());
+    assert.deepEqual(requests.map(request => request.conversationId), ["a", "b"]);
+    assert.notEqual(requests[0].tabId, requests[1].tabId);
+    const second = webContents.getAllWebContents().find(contents => contents.getType() === "webview" && contents.id !== guest.id)!;
+    scoped.inSession("b", () => scoped.registerWebview(requests[1].tabId!, second.id));
+    scoped.inSession("a", () => scoped.registerWebview("unrelated", guest.id));
+    scoped.inSession("a", () => scoped.registerWebview(requests[0].tabId!, guest.id));
+    assert.equal((await a).tabId, requests[0].tabId);
+    assert.equal((await b).tabId, requests[1].tabId);
+    scoped.inSession("a", () => { scoped.unregisterWebview(requests[0].tabId!); scoped.unregisterWebview("unrelated"); });
+    scoped.inSession("b", () => scoped.unregisterWebview(requests[1].tabId!));
+  });
+  await check("cancellation releases a browser evaluation that never settles", async () => {
+    const scoped = new BrowserController();
+    scoped.inSession("stuck", () => scoped.registerWebview("stuck-tab", guest.id));
+    await delay(50);
+    const baselineListeners = guest.listenerCount("destroyed");
+    const abort = new AbortController();
+    const running = scoped.executeTool("browser_evaluate", { script: "return await new Promise(() => {})" }, { sessionId: "stuck", signal: abort.signal });
+    await delay(100);
+    abort.abort();
+    const result = await running;
+    assert.equal(result.isError, true);
+    assert.match(result.result, /cancelled/);
+    assert.equal(guest.listenerCount("destroyed"), baselineListeners);
+    scoped.inSession("stuck", () => scoped.unregisterWebview("stuck-tab"));
+  });
+  await check("page promise timeout and guest destruction release their listeners", async () => {
+    const baselineListeners = guest.listenerCount("destroyed");
+    await assert.rejects((driver as any).awaitPage(guest, new Promise(() => {}), 50), /timed out/);
+    assert.equal(guest.listenerCount("destroyed"), baselineListeners);
+    const doomed = await addGuest("doomed");
+    const operation = (driver as any).awaitPage(doomed, new Promise(() => {}));
+    const rejected = assert.rejects(operation, /closed/);
+    await host.webContents.executeJavaScript(`document.getElementById('doomed').remove()`);
+    await rejected;
+  });
+  await check("cancelling human help clears the pending request", async () => {
+    const abort = new AbortController();
+    const help = driver.executeTool("browser_request_help", { reason: "verification" }, { signal: abort.signal });
+    await delay(30);
+    abort.abort();
+    const result = await help;
+    assert.equal(result.isError, true);
+    assert.equal(driver.getControl().requested, false);
+  });
   host.destroy();
   console.log(`Browser integration: ${passed} checks passed on Electron ${process.versions.electron}.`);
 }

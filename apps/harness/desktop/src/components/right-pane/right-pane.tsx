@@ -23,6 +23,7 @@ interface RightPaneProps {
   minWidth?: number;
   onWidthChange: (width: number) => void;
   tabs: RightPaneTab[];
+  backgroundBrowserTabs?: RightPaneTab[];
   activeTabId: string | null;
   isOpeningNewTab: boolean;
   onSelectTab: (tabId: string) => void;
@@ -61,6 +62,7 @@ export const RightPane = memo(function RightPane({
   minWidth = 300,
   onWidthChange,
   tabs,
+  backgroundBrowserTabs = [],
   activeTabId,
   isOpeningNewTab,
   onSelectTab,
@@ -218,15 +220,17 @@ export const RightPane = memo(function RightPane({
           />
         ) : null}
 
-        {tabs.map((tab) => {
-          const isTabActive = !isOpeningNewTab && tab.id === activeTabId;
+        {[...tabs, ...backgroundBrowserTabs.filter(background => !tabs.some(tab => tab.id === background.id))].map((tab) => {
+          const isTabActive = !isOpeningNewTab && tab.id === activeTabId && tabs.some(item => item.id === tab.id);
           const isBrowser = tab.type === "browser";
           return (
             <div
               key={tab.id}
+              data-pane-tab-id={tab.id}
               role="tabpanel"
               aria-label={tab.title}
               aria-hidden={!isTabActive}
+              inert={!isTabActive}
               className={`w-full h-full min-h-0 ${
                 isTabActive
                   ? "flex flex-col flex-1 relative z-10"

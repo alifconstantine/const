@@ -46,7 +46,8 @@ import { normalizeToolName } from "./tool-policy.js";
 
 export type BrowserToolHandler = (
   toolName: string,
-  args: Record<string, any>
+  args: Record<string, any>,
+  context?: ComputerToolContext,
 ) => Promise<{ result: any; isError: boolean }>;
 
 export type ComputerToolHandler = (
@@ -5685,7 +5686,7 @@ export async function executeNativeTool(
           isError: true,
         };
       }
-      return await handler(toolName, args);
+      return await handler(toolName, args, { sessionId: options.conversationId ?? options.parentConfig?.conversationId, signal });
     }
 
     // -----------------------------------------------------------------------

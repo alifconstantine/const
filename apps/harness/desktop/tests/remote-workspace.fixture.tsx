@@ -107,6 +107,7 @@ if (activityFixture) {
 }
 const browserInputs: any[] = [];
 const browserShots: any[] = [];
+const browserUrls = new Map<string, string>();
 let completeProgress: (() => void) | undefined;
 const config: any = {
   activeModel: "test-model",
@@ -131,12 +132,12 @@ function updateRemoteStatus(patch: Partial<RemoteDaemonStatus>) {
 api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
-      if (channel === "browser:open-tab") return { tabId: "fixture-browser", url: "https://example.test" };
+      if (channel === "browser:open-tab") { browserUrls.set(args[1]?.tabId || "fixture-browser", args[0]); return { tabId: args[1]?.tabId || "fixture-browser", url: args[0] }; }
       if (channel === "browser:screenshot") {
         browserShots.push(args[0]);
-        return { url: "https://example.test", title: "Browser fixture", dataUrl: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="390" height="600"><rect width="390" height="600" fill="#222"/><text x="24" y="48" fill="white">Remote browser fixture</text></svg>')}` };
+        return { url: browserUrls.get(args[0]?.tabId) || "https://example.test", title: "Browser fixture", dataUrl: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="390" height="600"><rect width="390" height="600" fill="#222"/><text x="24" y="48" fill="white">Remote browser fixture</text></svg>')}` };
       }
-      if (channel === "browser:remote-input") { browserInputs.push(args[0]); return { url: "https://example.test" }; }
+      if (channel === "browser:remote-input") { browserInputs.push(args[0]); if (args[0].action === "navigate") browserUrls.set(args[0].tabId, args[0].url); return { url: browserUrls.get(args[0].tabId) || "https://example.test" }; }
       if (["remote:start-session", "remote:refresh-session", "remote:stop-session"].includes(channel)) {
         if (remoteActionError) throw new Error(remoteActionError);
         if (channel === "remote:stop-session") return updateRemoteStatus({ status: "idle", sessionId: null, pairingUrl: null, pairingCode: null, expiresAt: null, connectedDevices: [] });
@@ -339,6 +340,10 @@ window.electron = api;
     emit("conversations:changed", { conversationId: id });
   },
   emit,
+  clearAgents() {
+    conversations[0].messages[1].traceSteps = conversations[0].messages[1].traceSteps.filter((step: any) => step.name !== "spawn_agent");
+    emit("conversations:changed", { conversationId: conversations[0].id });
+  },
 };
 localStorage.setItem("const_app_language", "en");
 localStorage.setItem("const_harness_theme", "dark");

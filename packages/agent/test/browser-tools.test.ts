@@ -23,8 +23,9 @@ describe("Desktop browser tool integration", () => {
     const args = { text: "Confirm result", tabId: "selected-tab" };
     const response = { result: "Expected text was missing", isError: true };
     const browserHandler = vi.fn().mockResolvedValue(response);
-    const result = await executeNativeTool(name, args, process.cwd(), { browserHandler });
-    expect(browserHandler).toHaveBeenCalledExactlyOnceWith(name, args);
+    const signal = new AbortController().signal;
+    const result = await executeNativeTool(name, args, process.cwd(), { browserHandler, conversationId: "workspace-b", signal });
+    expect(browserHandler).toHaveBeenCalledExactlyOnceWith(name, args, { sessionId: "workspace-b", signal });
     expect(result).toEqual(response);
   });
 });

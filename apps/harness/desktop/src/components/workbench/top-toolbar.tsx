@@ -40,6 +40,7 @@ interface TopToolbarProps {
   onOpenTerminal?: () => void;
   isBottomPanelOpen?: boolean;
   onToggleBottomPanel?: () => void;
+  activityControl?: React.ReactNode;
 }
 
 export function TopToolbar({
@@ -62,6 +63,7 @@ export function TopToolbar({
   onOpenTerminal,
   isBottomPanelOpen = false,
   onToggleBottomPanel,
+  activityControl,
 }: TopToolbarProps) {
   const { t } = useTranslation();
   const remote = useRemoteRuntime();
@@ -336,6 +338,7 @@ export function TopToolbar({
           className="flex items-center gap-0.5 shrink-0 ml-auto pointer-events-auto"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
+          {activityControl}
           {/* Terminal Toggle */}
           <button
             type="button"
@@ -354,8 +357,8 @@ export function TopToolbar({
                 ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
                 : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
             )}
-            title={isBottomPanelOpen ? t("topToolbar.closeTerminal") : t("topToolbar.openTerminal")}
-            aria-label={t("topToolbar.terminal")}
+            title={isBottomPanelOpen ? t("bottomPanel.closePanel") : t("topToolbar.openTerminal")}
+            aria-label={t("rightPane.terminal")}
           >
             <SquareTerminal className="w-4 h-4" />
           </button>

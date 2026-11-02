@@ -11,10 +11,12 @@ import { useTranslation } from "../../lib/i18n";
 /** Reuse BrowserTab's existing controls with the host guest, without a browser-only webview tag. */
 export function RemoteBrowserViewport({
   tabId,
+  conversationId,
   url,
   webviewRef,
 }: {
   tabId: string;
+  conversationId?: string;
   url: string;
   webviewRef: MutableRefObject<any>;
 }) {
@@ -106,7 +108,7 @@ export function RemoteBrowserViewport({
       if (
         disposed ||
         busy ||
-        (image.current && !image.current.getClientRects().length)
+        (image.current && (!image.current.getClientRects().length || image.current.closest('[aria-hidden="true"]')))
       )
         return;
       busy = true;
@@ -130,7 +132,7 @@ export function RemoteBrowserViewport({
       }
     };
     refresh.current = capture;
-    void window.electron!.browser!.openTab!(url, { tabId, newTab: false })
+    void window.electron!.browser!.openTab!(url, { tabId, conversationId, newTab: false })
       .then(capture)
       .catch(() => setFailed(true));
     const timer = setInterval(() => void capture(), 1500);
@@ -139,7 +141,7 @@ export function RemoteBrowserViewport({
       clearInterval(timer);
       refresh.current = async () => {};
     };
-  }, [tabId, shim]);
+  }, [tabId, conversationId, shim]);
   return (
     <div
       className="relative h-full min-h-0 flex-1 touch-none overflow-hidden bg-[#161616] outline-none"

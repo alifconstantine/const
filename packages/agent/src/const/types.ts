@@ -293,7 +293,7 @@ export interface AgentConfig {
   maxOutputTokens?: number;
   contextWindow?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
-  browserHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
+  browserHandler?: (toolName: string, args: Record<string, any>, context?: ComputerToolContext) => Promise<{ result: any; isError: boolean }>;
   computerHandler?: (toolName: string, args: Record<string, any>, context?: ComputerToolContext) => Promise<ToolExecutionResult>;
   voiceConfig?: any;
   imageConfig?: any;

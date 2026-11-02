@@ -279,7 +279,9 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 ## Workbench Activity
 
 - The header `LayoutList` button toggles a floating Activity panel in place of the standalone browser shortcut. The browser remains available through the right pane's new-tab picker and chat links.
+- When the sidepanel is open on desktop, keep Activity in the main chat header immediately to the left of Terminal. On mobile, retain the visible window-header control.
 - Activity groups Progress, Background jobs, Agents, Changes, and Sources. Progress and jobs initially expand; other sections show counts and expand on demand. Keep all sections inside a height-limited Radix ScrollArea.
+- Omit groups with no items. Show the overall empty message only when the user explicitly opens an empty Activity panel.
 - Background jobs belong in Activity rather than above the composer. Show their current status, open output in the right pane, and offer a stop action only while running.
 - Changes show the net diff per file. Open the original mutation records for review and rollback; never send a synthetic aggregate to the rollback API.
 - Sources are the user's attachments. Preserve files with the same name from different paths, show image thumbnails, and open images, audio, video, PDFs, or extracted document text in the right pane. Retain remote file-transfer limits and provide localized preview errors.

@@ -34,6 +34,7 @@ function ActivitySection({ id, title, count, icon, children }: {
   const hasItems = Number(count) > 0 || String(count).includes("/");
   const hadItems = useRef(hasItems);
   useEffect(() => { if (expandAutomatically && hasItems && !hadItems.current) setOpen(true); hadItems.current = hasItems; }, [hasItems, expandAutomatically]);
+  if (!hasItems) return null;
   return <section data-activity-section={id}>
     <button type="button" aria-expanded={open} onClick={() => setOpen(value => !value)}
       className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs text-[#666666] hover:bg-black/5 dark:text-[#969696] dark:hover:bg-white/5">

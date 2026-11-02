@@ -74,7 +74,7 @@ import { createRemoteSessionState, updateRemoteSessionState, type RemoteSessionS
 import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config";
 import { matchesAuthState } from "./auth-state";
 
-registerGlobalBrowserToolHandler(async (toolName, args) => {
+registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
   if (config.enableBrowserUse === false) {
     return {
@@ -82,7 +82,7 @@ registerGlobalBrowserToolHandler(async (toolName, args) => {
       isError: true,
     };
   }
-  return browserController.executeTool(toolName, args);
+  return browserController.executeTool(toolName, args, context);
 });
 
 registerGlobalComputerToolHandler(async (toolName, args, context) => {
@@ -1667,7 +1667,7 @@ app.whenReady().then(() => {
             if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { type: "question_resolved", toolCallId, conversationId: convoId, runId });
           });
         },
-        browserHandler: async (toolName, args) => {
+        browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
           if (cfg.enableBrowserUse === false) {
             return {
@@ -1675,7 +1675,7 @@ app.whenReady().then(() => {
               isError: true,
             };
           }
-          return await browserController.executeTool(toolName, args);
+          return await browserController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
@@ -2670,7 +2670,7 @@ app.whenReady().then(() => {
         mode: "full_access",
         thinkingLevel: "medium",
         maxTurns: 200,
-        browserHandler: async (toolName, args) => {
+        browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
           if (cfg.enableBrowserUse === false) {
             return {
@@ -2678,7 +2678,7 @@ app.whenReady().then(() => {
               isError: true,
             };
           }
-          return await browserController.executeTool(toolName, args);
+          return await browserController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
@@ -2950,7 +2950,7 @@ app.whenReady().then(() => {
         sendDesktopEvent(win.webContents, "browser:ai-action", action);
       }
     },
-    onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean }) => {
+    onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean; conversationId?: string }) => {
       if (win && !win.isDestroyed()) {
         sendDesktopEvent(win.webContents, "browser:open-tab-request", payload);
         return payload.tabId || "browser-tab-default";
@@ -2961,105 +2961,107 @@ app.whenReady().then(() => {
 
   handleDesktopIpc(
     "browser:register-tab",
-    async (_event, payload: { tabId: string; guestContentsId: number }) => {
-      browserController.registerWebview(payload.tabId, payload.guestContentsId);
+    async (_event, payload: { tabId: string; guestContentsId: number; conversationId?: string }) => {
+      browserController.inSession(payload.conversationId, () => browserController.registerWebview(payload.tabId, payload.guestContentsId));
       return true;
     }
   );
 
-  handleDesktopIpc("browser:open-tab", async (_event, payload: { url: string; tabId?: string; newTab?: boolean }) => {
+  handleDesktopIpc("browser:open-tab", async (_event, payload: { url: string; tabId?: string; newTab?: boolean; conversationId?: string }) => {
     if (win && !win.isDestroyed()) {
-      sendDesktopEvent(win.webContents, "browser:open-tab-request", payload);
+      const conversationId = payload.conversationId || (payload.tabId ? browserController.forTab(payload.tabId, () => browserController.getControl().conversationId) : undefined);
+      if (payload.tabId) browserController.inSession(conversationId, () => browserController.assertTabOwnership(payload.tabId!));
+      sendDesktopEvent(win.webContents, "browser:open-tab-request", { ...payload, conversationId });
       return true;
     }
     return false;
   });
 
-  handleDesktopIpc("browser:unregister-tab", async (_event, tabId: string) => {
-    browserController.unregisterWebview(tabId);
+  handleDesktopIpc("browser:unregister-tab", async (_event, tabId: string, guestContentsId?: number) => {
+    browserController.forTab(tabId, () => browserController.unregisterWebview(tabId, guestContentsId));
     return true;
   });
 
-  handleDesktopIpc("browser:set-active-tab", async (_event, tabId: string) => {
-    browserController.setActiveTab(tabId);
+  handleDesktopIpc("browser:set-active-tab", async (_event, tabId: string, conversationId?: string) => {
+    browserController.inSession(conversationId, () => browserController.setActiveTab(tabId));
     return true;
   });
 
-  handleDesktopIpc("browser:list-tabs", async () => {
-    return browserController.listTabs();
+  handleDesktopIpc("browser:list-tabs", async (_event, conversationId?: string) => {
+    return browserController.inSession(conversationId, () => browserController.listTabs());
   });
-  handleDesktopIpc("browser:remote-input", async (_event, input: any) => browserController.remoteInput(input));
+  handleDesktopIpc("browser:remote-input", async (_event, input: any) => browserController.forTab(input?.tabId, () => browserController.remoteInput(input)));
 
-  handleDesktopIpc("browser:get-control", async () => {
-    return browserController.getControl();
-  });
-
-  handleDesktopIpc("browser:take-control", async () => {
-    return browserController.takeControl();
+  handleDesktopIpc("browser:get-control", async (_event, tabId?: string) => {
+    return browserController.forTab(tabId, () => browserController.getControl());
   });
 
-  handleDesktopIpc("browser:release-control", async () => {
-    return browserController.releaseControl();
+  handleDesktopIpc("browser:take-control", async (_event, tabId?: string) => {
+    return browserController.forTab(tabId, () => browserController.takeControl());
   });
 
-  handleDesktopIpc("browser:supply-secret", async (_event, text: string) => {
-    return await browserController.supplySecret(text);
+  handleDesktopIpc("browser:release-control", async (_event, tabId?: string) => {
+    return browserController.forTab(tabId, () => browserController.releaseControl());
+  });
+
+  handleDesktopIpc("browser:supply-secret", async (_event, text: string, tabId?: string) => {
+    return await browserController.forTab(tabId, () => browserController.supplySecret(text));
   });
 
   handleDesktopIpc("browser:navigate", async (_event, url: string, options?: any) => {
-    return await browserController.navigate(url, options);
+    return await browserController.forTab(options?.tabId, () => browserController.navigate(url, options));
   });
 
   handleDesktopIpc("browser:snapshot", async (_event, args?: any) => {
-    return await browserController.snapshot(args);
+    return await browserController.forTab(args?.tabId, () => browserController.snapshot(args));
   });
 
   handleDesktopIpc("browser:click", async (_event, args: any) => {
-    return await browserController.click(args);
+    return await browserController.forTab(args?.tabId, () => browserController.click(args));
   });
 
   handleDesktopIpc("browser:type", async (_event, args: any) => {
-    return await browserController.type(args);
+    return await browserController.forTab(args?.tabId, () => browserController.type(args));
   });
 
   handleDesktopIpc("browser:key", async (_event, args: any) => {
-    return await browserController.key(args);
+    return await browserController.forTab(args?.tabId, () => browserController.key(args));
   });
 
   handleDesktopIpc("browser:scroll", async (_event, args: any) => {
-    return await browserController.scroll(args);
+    return await browserController.forTab(args?.tabId, () => browserController.scroll(args));
   });
 
   handleDesktopIpc("browser:screenshot", async (_event, args?: any) => {
-    return await browserController.screenshot(args);
+    return await browserController.forTab(args?.tabId, () => browserController.screenshot(args));
   });
 
   handleDesktopIpc("browser:console", async (_event, args?: any) => {
-    return await browserController.readConsoleAndNetwork(args);
+    return await browserController.forTab(args?.tabId, () => browserController.readConsoleAndNetwork(args));
   });
 
   handleDesktopIpc("browser:evaluate", async (_event, args: any) => {
-    return await browserController.evaluate(args);
+    return await browserController.forTab(args?.tabId, () => browserController.evaluate(args));
   });
 
   handleDesktopIpc("browser:wait-for", async (_event, args: any) => {
-    return await browserController.waitFor(args);
+    return await browserController.forTab(args?.tabId, () => browserController.waitFor(args));
   });
 
   handleDesktopIpc("browser:verify-text", async (_event, args: any) => {
-    return await browserController.verifyText(args);
+    return await browserController.forTab(args?.tabId, () => browserController.verifyText(args));
   });
 
   handleDesktopIpc("browser:find", async (_event, args: any) => {
-    return await browserController.find(args);
+    return await browserController.forTab(args?.tabId, () => browserController.find(args));
   });
 
   handleDesktopIpc("browser:hover", async (_event, args: any) => {
-    return await browserController.hover(args);
+    return await browserController.forTab(args?.tabId, () => browserController.hover(args));
   });
 
   handleDesktopIpc("browser:paste", async (_event, args: any) => {
-    return await browserController.paste(args);
+    return await browserController.forTab(args?.tabId, () => browserController.paste(args));
   });
 
   handleDesktopIpc("browser:get-allowed-domains", async () => {

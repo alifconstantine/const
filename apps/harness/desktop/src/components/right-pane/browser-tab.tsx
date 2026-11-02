@@ -153,13 +153,15 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
+    let registeredContentsId: number | undefined;
 
     const register = () => {
       try {
         if (typeof webview.getWebContentsId === "function") {
           const id = webview.getWebContentsId();
           if (id) {
-            window.electron?.browser?.registerTab(tab.id, id);
+            registeredContentsId = id;
+            void window.electron?.browser?.registerTab(tab.id, id, tab.conversationId).catch(() => {});
           }
         }
       } catch {}
@@ -170,31 +172,33 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
     return () => {
       webview.removeEventListener("dom-ready", register);
-      window.electron?.browser?.unregisterTab(tab.id);
+      if (registeredContentsId !== undefined) void window.electron?.browser?.unregisterTab(tab.id, registeredContentsId).catch(() => {});
     };
-  }, [tab.id]);
+  }, [tab.id, tab.conversationId]);
 
   // Sync Control State and AI action events
   useEffect(() => {
     if (!window.electron?.browser) return;
 
-    window.electron.browser.getControl().then((st) => {
-      if (st) setControlState(st);
-    });
+    let disposed = false;
+    window.electron.browser.getControl(tab.id).then((st) => {
+      if (!disposed && st) setControlState(st);
+    }).catch(() => {});
 
     const unsubControl = window.electron.browser.onControlChanged((st) => {
-      if (st) setControlState(st);
+      if (st && (st.conversationId || undefined) === (tab.conversationId || undefined)) setControlState(st);
     });
 
     return () => {
+      disposed = true;
       unsubControl();
     };
-  }, []);
+  }, [tab.id, tab.conversationId]);
 
   // Permission action handler
   const handleHandBack = async () => {
     if (window.electron?.browser) {
-      const st = await window.electron.browser.releaseControl();
+      const st = await window.electron.browser.releaseControl(tab.id);
       if (st) setControlState(st);
     }
   };
@@ -209,7 +213,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     setIsSubmittingSecret(true);
     setSecretError(null);
     try {
-      await browserApi.supplySecret(secretInput);
+      await browserApi.supplySecret(secretInput, tab.id);
       setSecretInput("");
     } catch {
       setSecretInput("");
@@ -1077,7 +1081,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             height: "100%",
           }}
         >
-          {remote ? <RemoteBrowserViewport tabId={tab.id} url={initialUrlRef.current || currentUrl} webviewRef={webviewRef} /> : <webview
+          {remote ? <RemoteBrowserViewport conversationId={tab.conversationId} tabId={tab.id} url={initialUrlRef.current || currentUrl} webviewRef={webviewRef} /> : <webview
             ref={webviewRef}
             src={initialUrlRef.current || currentUrl}
             partition="persist:const_browser"

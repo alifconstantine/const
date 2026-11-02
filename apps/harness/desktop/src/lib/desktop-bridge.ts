@@ -305,18 +305,18 @@ export function createDesktopBridge(
     browser: {
       remoteInput: (input: any) =>
         ipcRenderer.invoke("browser:remote-input", input),
-      registerTab: (tabId: string, guestContentsId: number) =>
-        ipcRenderer.invoke("browser:register-tab", { tabId, guestContentsId }),
-      unregisterTab: (tabId: string) =>
-        ipcRenderer.invoke("browser:unregister-tab", tabId),
-      setActiveTab: (tabId: string) =>
-        ipcRenderer.invoke("browser:set-active-tab", tabId),
-      listTabs: () => ipcRenderer.invoke("browser:list-tabs"),
-      getControl: () => ipcRenderer.invoke("browser:get-control"),
-      takeControl: () => ipcRenderer.invoke("browser:take-control"),
-      releaseControl: () => ipcRenderer.invoke("browser:release-control"),
-      supplySecret: (text: string) =>
-        ipcRenderer.invoke("browser:supply-secret", text),
+      registerTab: (tabId: string, guestContentsId: number, conversationId?: string) =>
+        ipcRenderer.invoke("browser:register-tab", { tabId, guestContentsId, conversationId }),
+      unregisterTab: (tabId: string, guestContentsId?: number) =>
+        ipcRenderer.invoke("browser:unregister-tab", tabId, guestContentsId),
+      setActiveTab: (tabId: string, conversationId?: string) =>
+        ipcRenderer.invoke("browser:set-active-tab", tabId, conversationId),
+      listTabs: (conversationId?: string) => ipcRenderer.invoke("browser:list-tabs", conversationId),
+      getControl: (tabId?: string) => ipcRenderer.invoke("browser:get-control", tabId),
+      takeControl: (tabId?: string) => ipcRenderer.invoke("browser:take-control", tabId),
+      releaseControl: (tabId?: string) => ipcRenderer.invoke("browser:release-control", tabId),
+      supplySecret: (text: string, tabId?: string) =>
+        ipcRenderer.invoke("browser:supply-secret", text, tabId),
       navigate: (url: string, options?: any) =>
         ipcRenderer.invoke("browser:navigate", url, options),
       snapshot: (args?: any) => ipcRenderer.invoke("browser:snapshot", args),
@@ -354,6 +354,7 @@ export function createDesktopBridge(
           url: string;
           tabId?: string;
           newTab?: boolean;
+          conversationId?: string;
         }) => void,
       ) => {
         const handler = (_event: any, data: any) => callback(data);
@@ -361,7 +362,7 @@ export function createDesktopBridge(
         return () =>
           ipcRenderer.removeListener("browser:open-tab-request", handler);
       },
-      openTab: (url: string, options?: { tabId?: string; newTab?: boolean }) =>
+      openTab: (url: string, options?: { tabId?: string; newTab?: boolean; conversationId?: string }) =>
         ipcRenderer.invoke("browser:open-tab", { url, ...options }),
     },
     computer: {

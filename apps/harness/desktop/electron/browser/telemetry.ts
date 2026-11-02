@@ -1,4 +1,4 @@
-import type { WebContents } from "electron";
+import type { Event, WebContents, WebContentsConsoleMessageEventParams } from "electron";
 import {
   MAX_HOST_CONSOLE_TEXT_CHARS,
   sanitizeBodyPreview,
@@ -213,14 +213,22 @@ export class TabTelemetryBuffer {
   private hostEntries: BrowserConsoleEntry[] = [];
   private seq = 1;
   private attachedContentsId?: number;
+  private detachListeners?: () => void;
+
+  public detach(): void {
+    this.detachListeners?.();
+    this.detachListeners = undefined;
+    this.attachedContentsId = undefined;
+  }
 
   public attachToWebContents(contents: WebContents) {
     if (contents.isDestroyed() || this.attachedContentsId === contents.id) {
       return;
     }
+    this.detach();
     this.attachedContentsId = contents.id;
 
-    contents.on("console-message", (event) => {
+    const onConsole = (event: Event<WebContentsConsoleMessageEventParams>) => {
       const { message, level, lineNumber: line, sourceId } = event;
       if (!message || message.startsWith("__HARNESS_ELEMENT_")) return;
       const mappedLevel: BrowserConsoleLevel =
@@ -231,9 +239,9 @@ export class TabTelemetryBuffer {
         text: message.slice(0, MAX_HOST_CONSOLE_TEXT_CHARS),
         location: sourceId ? `${sourceId}:${line}` : undefined,
       });
-    });
+    };
 
-    contents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    const onLoadFailure = (_event: Event, errorCode: number, errorDescription: string, validatedURL: string, isMainFrame: boolean) => {
       if (errorCode === -3) return; // Ignore ERR_ABORTED
       this.pushHostEntry({
         type: "requestfailed",
@@ -241,7 +249,16 @@ export class TabTelemetryBuffer {
         text: `Load failed (${errorCode} ${errorDescription})${isMainFrame ? " [main_frame]" : ""}: ${validatedURL}`,
         location: validatedURL,
       });
-    });
+    };
+    const onDestroyed = () => this.detach();
+    contents.on("console-message", onConsole);
+    contents.on("did-fail-load", onLoadFailure);
+    contents.once("destroyed", onDestroyed);
+    this.detachListeners = () => {
+      contents.removeListener("console-message", onConsole);
+      contents.removeListener("did-fail-load", onLoadFailure);
+      contents.removeListener("destroyed", onDestroyed);
+    };
   }
 
   private pushHostEntry(entry: Omit<BrowserConsoleEntry, "seq" | "ts">) {

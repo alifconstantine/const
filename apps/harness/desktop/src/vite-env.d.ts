@@ -498,11 +498,11 @@ declare global {
       ) => () => void;
       browser?: {
         remoteInput?: (input: any) => Promise<any>;
-        registerTab: (tabId: string, guestContentsId: number) => Promise<boolean>;
-        unregisterTab: (tabId: string) => Promise<boolean>;
-        setActiveTab: (tabId: string) => Promise<boolean>;
-        listTabs?: () => Promise<any[]>;
-        getControl: () => Promise<{
+        registerTab: (tabId: string, guestContentsId: number, conversationId?: string) => Promise<boolean>;
+        unregisterTab: (tabId: string, guestContentsId?: number) => Promise<boolean>;
+        setActiveTab: (tabId: string, conversationId?: string) => Promise<boolean>;
+        listTabs?: (conversationId?: string) => Promise<any[]>;
+        getControl: (tabId?: string) => Promise<{
           holder: "bot" | "human";
           since: string;
           requested: boolean;
@@ -512,10 +512,10 @@ declare global {
           secretRef?: string;
           secretSnapshotId?: number;
         }>;
-        takeControl: () => Promise<any>;
-        releaseControl: () => Promise<any>;
-        supplySecret: (text: string) => Promise<{ success: boolean; characters: number }>;
-        navigate: (url: string, options?: { tabId?: string; newTab?: boolean }) => Promise<any>;
+        takeControl: (tabId?: string) => Promise<any>;
+        releaseControl: (tabId?: string) => Promise<any>;
+        supplySecret: (text: string, tabId?: string) => Promise<{ success: boolean; characters: number }>;
+        navigate: (url: string, options?: { tabId?: string; newTab?: boolean; conversationId?: string }) => Promise<any>;
         snapshot: (args?: any) => Promise<any>;
         click: (args: any) => Promise<any>;
         type: (args: any) => Promise<any>;
@@ -534,11 +534,11 @@ declare global {
         onControlChanged: (callback: (state: any) => void) => () => void;
         onAiAction: (callback: (action: any) => void) => () => void;
         onOpenTabRequest?: (
-          callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void
+          callback: (data: { url: string; tabId?: string; newTab?: boolean; conversationId?: string }) => void
         ) => () => void;
         openTab?: (
           url: string,
-          options?: { tabId?: string; newTab?: boolean }
+          options?: { tabId?: string; newTab?: boolean; conversationId?: string }
         ) => Promise<boolean>;
       };
       computer?: {

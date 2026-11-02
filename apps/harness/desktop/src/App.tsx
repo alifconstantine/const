@@ -1,3 +1,4 @@
+import { openBrowserPane, retainBrowserTabs } from "./lib/browser-pane-state";
 import { useRemoteRuntime } from "./lib/remote-runtime";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
@@ -751,6 +752,11 @@ export function AuthenticatedContent({
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
   const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState<boolean>(false);
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
+  const [retainedBrowsers, setRetainedBrowsers] = useState<RightPaneTab[]>([]);
+  const backgroundBrowserTabs = useMemo(() => retainedBrowsers.filter(tab => tab.conversationId !== conversationId), [retainedBrowsers, conversationId]);
+  useEffect(() => {
+    setRetainedBrowsers(previous => retainBrowserTabs(previous, rightPaneTabs, conversationId));
+  }, [rightPaneTabs, conversationId]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
   const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
   const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
@@ -881,8 +887,8 @@ export function AuthenticatedContent({
     if (!targetConvoId) return;
     const state =
       explicitState ||
-      getStoredRightPaneState(targetConvoId) ||
       convoRightPaneMapRef.current.get(targetConvoId) ||
+      getStoredRightPaneState(targetConvoId) ||
       {
         isOpen: false,
         isExpanded: false,
@@ -906,7 +912,7 @@ export function AuthenticatedContent({
         (t) => t.id === state.activeTabId && t.type === "browser"
       );
       if (activeBrowserTab) {
-        window.electron?.browser?.setActiveTab(activeBrowserTab.id);
+        void window.electron?.browser?.setActiveTab(activeBrowserTab.id, targetConvoId).catch(() => {});
       }
     }
 
@@ -1172,66 +1178,54 @@ export function AuthenticatedContent({
   };
 
   const handleOpenBrowser = useCallback(
-    (initialUrl?: any, options?: { tabId?: string; newTab?: boolean }) => {
-      setIsRightSidebarOpen(true);
-      setIsOpeningNewTab(false);
-      const hasCustomUrl =
-        typeof initialUrl === "string" &&
-        initialUrl.trim().length > 0 &&
-        initialUrl !== "[object Object]";
-      const resolvedUrl = hasCustomUrl ? initialUrl.trim() : "https://www.google.com";
-
-      setRightPaneTabs((prev) => {
-        const browserTabs = prev.filter((t) => t.type === "browser");
-
-        if (!options?.newTab && browserTabs.length > 0) {
-          // 1. Explicit tabId if requested
-          // 2. Currently active tab if it is a browser tab
-          // 3. Otherwise the LAST (most recently opened) browser tab
-          const targetTab =
-            (options?.tabId ? browserTabs.find((t) => t.id === options.tabId) : undefined) ||
-            browserTabs.find((t) => t.id === activeRightPaneTabIdRef.current) ||
-            browserTabs[browserTabs.length - 1]!;
-
-          setActiveRightPaneTabId(targetTab.id);
-          window.electron?.browser?.setActiveTab(targetTab.id);
-
-          if (hasCustomUrl && resolvedUrl !== targetTab.url) {
-            return prev.map((t) => (t.id === targetTab.id ? { ...t, url: resolvedUrl } : t));
-          }
-          return prev;
-        }
-
-        const count = browserTabs.length;
-        const newTab: RightPaneTab = {
-          id: options?.tabId || `browser_${Date.now()}`,
-          type: "browser",
-          title: count === 0 ? "Browser" : `Browser ${count + 1}`,
-          url: resolvedUrl,
-          project: currentProject,
-          conversationId,
-        };
-        setActiveRightPaneTabId(newTab.id);
-        window.electron?.browser?.setActiveTab(newTab.id);
-        return [...prev, newTab];
+    (initialUrl?: any, options?: { tabId?: string; newTab?: boolean; conversationId?: string }) => {
+      const ownerId = options?.conversationId || conversationIdRef.current;
+      const foreground = ownerId === conversationIdRef.current;
+      const previous = foreground ? {
+        isOpen: isRightSidebarOpenRef.current,
+        isExpanded: isRightSidebarExpandedRef.current,
+        tabs: rightPaneTabsRef.current,
+        activeTabId: activeRightPaneTabIdRef.current,
+        reviewMutations: sidebarReviewMutationsRef.current,
+      } : convoRightPaneMapRef.current.get(ownerId) || getStoredRightPaneState(ownerId) || {
+        isOpen: false, tabs: [], activeTabId: null, reviewMutations: null,
+      };
+      const url = typeof initialUrl === "string" && initialUrl.trim() && initialUrl !== "[object Object]" ? initialUrl.trim() : undefined;
+      const state = openBrowserPane(previous, url, options || {}, {
+        conversationId: ownerId,
+        project: foreground ? currentProject : undefined,
+        title: t("rightPane.browser"),
       });
+      convoRightPaneMapRef.current.set(ownerId, state);
+      storeRightPaneState(ownerId, state);
+      setRetainedBrowsers(previous => retainBrowserTabs(previous, state.tabs, ownerId));
+      if (foreground) {
+        rightPaneTabsRef.current = state.tabs;
+        activeRightPaneTabIdRef.current = state.activeTabId;
+        setRightPaneTabs(state.tabs);
+        setActiveRightPaneTabId(state.activeTabId);
+        setIsRightSidebarOpen(true);
+        setIsOpeningNewTab(false);
+      }
+      if (state.activeTabId) void window.electron?.browser?.setActiveTab(state.activeTabId, ownerId).catch(() => {});
     },
-    [currentProject, conversationId]
+    [currentProject, t]
   );
 
   // Sync active browser tab with Electron BrowserController & listen for AI auto-open requests
   useEffect(() => {
     const activeTab = rightPaneTabs.find((t) => t.id === activeRightPaneTabId);
     if (activeTab && activeTab.type === "browser") {
-      window.electron?.browser?.setActiveTab(activeTab.id);
+      void window.electron?.browser?.setActiveTab(activeTab.id, conversationId).catch(() => {});
     }
-  }, [activeRightPaneTabId, rightPaneTabs]);
+  }, [activeRightPaneTabId, rightPaneTabs, conversationId]);
 
   useEffect(() => {
     const unsub = window.electron?.browser?.onOpenTabRequest?.((data) => {
       handleOpenBrowser(data?.url, {
         tabId: data?.tabId,
         newTab: data?.newTab,
+        conversationId: data?.conversationId,
       });
     });
     return () => {
@@ -1256,6 +1250,15 @@ export function AuthenticatedContent({
   }, [handleOpenBrowser]);
 
   const handleUpdateTab = useCallback((tabId: string, updates: Partial<RightPaneTab>) => {
+    // Hidden guests keep their owner's cache current without touching the visible pane.
+    for (const [ownerId, state] of convoRightPaneMapRef.current) {
+      if (ownerId === conversationIdRef.current || !state.tabs.some(tab => tab.id === tabId)) continue;
+      const next = { ...state, tabs: state.tabs.map(tab => tab.id === tabId ? { ...tab, ...updates } : tab) };
+      convoRightPaneMapRef.current.set(ownerId, next);
+      storeRightPaneState(ownerId, next);
+      setRetainedBrowsers(previous => retainBrowserTabs(previous, next.tabs, ownerId));
+      return;
+    }
     setRightPaneTabs((prev) => {
       const index = prev.findIndex((tab) => tab.id === tabId);
       if (index < 0 || Object.entries(updates).every(([key, value]) => prev[index]?.[key as keyof RightPaneTab] === value)) return prev;
@@ -3887,6 +3890,7 @@ export function AuthenticatedContent({
     telemetryByConversationRef.current.delete(id);
     deleteConversation(id);
     convoRightPaneMapRef.current.delete(id);
+    setRetainedBrowsers(previous => previous.filter(tab => tab.conversationId !== id));
     removeStoredRightPaneState(id);
     const updated = loadConversations();
     setConversations(updated);
@@ -4264,7 +4268,17 @@ export function AuthenticatedContent({
 
   const hasActivity = !!(activeTodos?.length || activeSubAgents?.length || backgroundJobs.length || sessionChanges.length || sessionMediaAttachments.length);
   const showActivity = isActivityVisible && (hasActivity || activityRequested);
-
+  const activityControl = (
+    <button data-activity-toggle type="button" aria-label={t("activity.title")} aria-expanded={showActivity}
+      onMouseDown={event => event.preventDefault()} onClick={() => {
+        setActivityRequested(true);
+        if (remote?.mobile && isRightSidebarOpen) { handleCloseRightSidebar(); setIsActivityVisible(true); }
+        else setIsActivityVisible(!showActivity);
+      }} title={t("activity.title")}
+      className={cn("flex size-7 items-center justify-center rounded-md outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/10 text-[#666666] hover:bg-black/5 dark:text-[#999999] dark:hover:bg-white/10", showActivity && "bg-black/5 dark:bg-white/10 dark:text-white")}>
+      <LayoutList className="size-4" />
+    </button>
+  );
   return (
     <div
       className={cn(
@@ -4456,6 +4470,7 @@ export function AuthenticatedContent({
                     onOpenTerminal={handleToggleBottomPanel}
                     isBottomPanelOpen={isBottomPanelOpen}
                     onToggleBottomPanel={handleToggleBottomPanel}
+                    activityControl={remote?.mobile ? undefined : activityControl}
                   />
                 );
               })()}
@@ -4844,6 +4859,7 @@ export function AuthenticatedContent({
                   onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
                   onDraggingChange={setIsDraggingRightSidebar}
                   tabs={rightPaneTabs}
+                  backgroundBrowserTabs={backgroundBrowserTabs}
                   activeTabId={activeRightPaneTabId}
                   isOpeningNewTab={isOpeningNewTab}
                   onSelectTab={handleSelectRightPaneTab}
@@ -4890,15 +4906,7 @@ export function AuthenticatedContent({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             >
               <div className="flex items-center gap-0.5 pointer-events-auto">
-                <button data-activity-toggle type="button" aria-label={t("activity.title")} aria-expanded={showActivity}
-                  onMouseDown={event => event.preventDefault()} onClick={() => {
-                    setActivityRequested(true);
-                    if (remote?.mobile && isRightSidebarOpen) { handleCloseRightSidebar(); setIsActivityVisible(true); }
-                    else setIsActivityVisible(showActivity ? false : true);
-                  }} title={t("activity.title")}
-                  className={cn("flex size-7 items-center justify-center rounded-md outline-none focus-visible:bg-black/5 dark:focus-visible:bg-white/10 text-[#666666] hover:bg-black/5 dark:text-[#999999] dark:hover:bg-white/10", showActivity && "bg-black/5 dark:bg-white/10 dark:text-white")}>
-                  <LayoutList className="size-4" />
-                </button>
+                {(!isRightSidebarOpen || remote?.mobile) && activityControl}
                 {/* When Sidepanel is CLOSED, show the stationary Terminal icon in window header (desktop only) */}
                 {!isRightSidebarOpen && !remote?.mobile && (
                   <>
@@ -4915,8 +4923,8 @@ export function AuthenticatedContent({
                           ? "text-black dark:text-white bg-black/5 dark:bg-white/10"
                           : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10"
                       )}
-                      title={isBottomPanelOpen ? t("topToolbar.closeTerminal") : t("topToolbar.openTerminal")}
-                      aria-label={t("topToolbar.terminal")}
+                      title={isBottomPanelOpen ? t("bottomPanel.closePanel") : t("topToolbar.openTerminal")}
+                      aria-label={t("rightPane.terminal")}
                     >
                       <SquareTerminal className="w-4 h-4" />
                     </button>
