@@ -18,6 +18,7 @@ import { RemoteControlModal } from "../src/components/remote-control-modal";
 import { RemoteBrowserViewport } from "../src/components/right-pane/remote-browser-viewport";
 import type { RemoteDaemonStatus } from "../src/lib/remote-control";
 import mediaFixture from "./media-preview.fixture.json";
+import { assistantOutputSample } from "./assistant-output.sample";
 import "../src/index.css";
 import "../src/remote.css";
 
@@ -66,6 +67,20 @@ const conversations: any[] = [
   },
 ];
 const longMenus = new URLSearchParams(location.search).has("long-menus");
+const outputFormattingFixture = new URLSearchParams(location.search).has("output-formatting");
+const clipboardWrites: string[] = [];
+if (outputFormattingFixture) {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { async writeText(value: string) { clipboardWrites.push(value); } } });
+  conversations[0].id = "session_output_review";
+  conversations[0].title = "Review AI output formatting";
+  conversations[0].messages[0].content = "Show the output formatting review sample, including preview links and implementation details.";
+  Object.assign(conversations[0].messages[1], {
+    content: assistantOutputSample,
+    mutations: [{ id: "output-html", filePath: "/workspace/const/outputs/04-driftlab/index.html", targetFile: "outputs/04-driftlab/index.html", operation: "create", previousContent: null, newContent: "<main>Driftlab preview fixture</main>", timestamp: Date.now() }],
+  });
+  localStorage.setItem("const_harness_active_conversation_id", "session_output_review");
+  localStorage.setItem("const_harness_current_project", "/workspace/const");
+}
 if (longMenus) {
   for (let index = 1; index <= 24; index++) conversations.push({
     id: `preview-project-${index}`, title: `Workspace ${index}`, project: `/workspace/project-${index}`,
@@ -107,6 +122,7 @@ if (activityFixture) {
 }
 const browserInputs: any[] = [];
 const browserShots: any[] = [];
+const fileReads: any[] = [];
 const browserUrls = new Map<string, string>();
 let completeProgress: (() => void) | undefined;
 const config: any = {
@@ -132,6 +148,10 @@ function updateRemoteStatus(patch: Partial<RemoteDaemonStatus>) {
 api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
+      if (channel === "workspace:read-file") {
+        fileReads.push(args);
+        return { content: String(args[0]).endsWith("index.html") ? "<main>Driftlab preview fixture</main>" : "Output review fixture document", truncated: false };
+      }
       if (channel === "browser:open-tab") { browserUrls.set(args[1]?.tabId || "fixture-browser", args[0]); return { tabId: args[1]?.tabId || "fixture-browser", url: args[0] }; }
       if (channel === "browser:screenshot") {
         browserShots.push(args[0]);
@@ -325,6 +345,8 @@ api = createDesktopBridge(
 );
 window.electron = api;
 (window as any).__remoteFixture = {
+  clipboardWrites,
+  fileReads,
   completeProgress() { completeProgress?.(); },
   killedJobs,
   revertedMutations,

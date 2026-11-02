@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { markdownLinkHref } from "./markdown-links";
 import { resolveMarkdownLink } from "./markdown-links";
+
+test("workspace-relative and POSIX file links round-trip without losing their base or delimiters", () => {
+  for (const path of ["outputs/hero/index.html", "index.html", "./docs/report.pdf", "../notes.md", "/tmp/report #1.html", "D:/Project/output #1.html"]) {
+    const expected = path.replace(/^\.\//, "");
+    assert.deepEqual(resolveMarkdownLink(markdownLinkHref(path)), { type: "file", path: expected });
+  }
+  assert.deepEqual(resolveMarkdownLink("file:///tmp/report.html"), { type: "file", path: "/tmp/report.html" });
+  assert.deepEqual(resolveMarkdownLink("folder:///tmp/"), { type: "folder", path: "/tmp/" });
+  assert.deepEqual(resolveMarkdownLink(markdownLinkHref("outputs/")), { type: "folder", path: "outputs/" });
+});
+
+test("unsafe and unknown schemes cannot become file or folder actions", () => {
+  for (const value of ["javascript:alert(1)", "javascript:alert(1)/", "data:text/html,<h1>x</h1>", "vbscript:msgbox(1)", "java\tscript:alert(1)"]) assert.deepEqual(resolveMarkdownLink(value), { type: "none" });
+});
 
 test("resolveMarkdownLink correctly resolves standard http and https URLs", () => {
   assert.deepEqual(resolveMarkdownLink("https://google.com"), {

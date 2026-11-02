@@ -288,6 +288,15 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 - When extracted PDF text is available, offer Preview and Text modes; start with text on mobile so the document remains readable without an embedded PDF viewer.
 - On mobile, selecting a source opens the media pane and dismisses Activity. Keep controls at least 44px and the card within the viewport.
 
+## Assistant Output
+
+- Preserve fenced code, indented code, and inline code exactly. Mention rendering runs through the Markdown tokenizer and never rewrites literal source. Copy code always copies the source rather than decorated HTML.
+- Lead implementation replies with the outcome and an actionable deliverable link, then the important changes, verified checks, and limitations. An explicitly titled implementation-details section may collapse after generation; results and required instructions remain outside it. User messages never collapse into these sections.
+- Resolve relative file links against the active workspace. Canonical workspace links survive sanitization; unsupported URI schemes remain blocked. Offer file shortcuts only for deliverables both named in the answer and present in mutation records.
+- Render blockquotes recursively so lists, paragraphs, and code retain their structure. Ordered lists preserve their starting number for both visual and assistive reading.
+- Inline code uses a quiet fill without individual borders. Code blocks use the shared, escaped syntax highlighter on a dark code surface, bounded horizontal Radix scrolling, and a localized Copy action. Invalid decoration falls back to the original escaped source.
+- Message actions appear on keyboard focus and remain visible without hover on mobile/touch surfaces. Touch actions have at least 44px targets.
+
 ---
 
 ## Iconography & Empty States

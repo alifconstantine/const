@@ -201,6 +201,8 @@ export interface TranslationDictionary {
     previousMatch: string;
     nextMatch: string;
     copyResponse: string;
+    outputFiles: string;
+    previewOutput: string;
     goodResponse: string;
     badResponse: string;
     scrollToBottom: string;

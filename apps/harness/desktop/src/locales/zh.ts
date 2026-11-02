@@ -214,6 +214,8 @@ export const zh: TranslationDictionary = {
     previousMatch: "上一处匹配 (Shift+Enter)",
     nextMatch: "下一处匹配 (Enter)",
     copyResponse: "复制回复",
+    outputFiles: "文件",
+    previewOutput: "预览 {file}",
     goodResponse: "满意的回复",
     badResponse: "不佳的回复",
     scrollToBottom: "滚动到底部",

@@ -214,6 +214,8 @@ export const es: TranslationDictionary = {
     previousMatch: "Coincidencia anterior (Shift+Enter)",
     nextMatch: "Siguiente coincidencia (Enter)",
     copyResponse: "Copiar respuesta",
+    outputFiles: "Archivos",
+    previewOutput: "Vista previa de {file}",
     goodResponse: "Buena respuesta",
     badResponse: "Mala respuesta",
     scrollToBottom: "Desplazarse al final",

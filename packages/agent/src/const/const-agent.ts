@@ -1,4 +1,5 @@
 import { isPermanentQuotaResponse } from "./model-retry.js";
+import { RESPONSE_PRESENTATION_GUIDANCE } from "./prompt-guidance.js";
 import { consumeChatStream, abortableDelay } from "./chat-stream.js";
 
 import fs from "node:fs";
@@ -504,6 +505,8 @@ CONTINUATION & ERROR RECOVERY:
 - Read tool results and exit codes. After a failed edit, inspect the latest file before retrying. Change the approach when an operation fails; do not repeat identical failing arguments.
 - Verify outcomes before reporting success. Explain blockers and incomplete work clearly.
 - Keep explanations concise and report relevant changes and verification. Create commits only when requested.
+\nRESPONSE PRESENTATION:
+${RESPONSE_PRESENTATION_GUIDANCE}
 ${workspaceMemory ? `\n${workspaceMemory}` : ""}${projectContext ? `\n<project_context>${projectContext}</project_context>` : ""}${skillsPrompt}`;
 
   if (customPrompt) {

@@ -3,6 +3,43 @@
 @import "@const/ui/globals.css";
 @import "@openuidev/react-ui/styles/index.css";
 
+/* Keep message controls discoverable on touchscreens and while using a keyboard. */
+.message-actions button:focus-visible {
+  outline: 1px solid #969696;
+  outline-offset: 2px;
+}
+@media (hover: none), (pointer: coarse) {
+  .message-actions { opacity: 1; pointer-events: auto; }
+  .message-actions button, .response-code-copy, .response-output-link { min-width: 44px; min-height: 44px; }
+}
+.remote-mobile .message-actions { opacity: 1; pointer-events: auto; }
+.remote-mobile .message-actions button,
+.remote-mobile .response-code-copy,
+.remote-mobile .response-output-link { min-width: 44px; min-height: 44px; }
+
+/* File contents lead in a narrow SidePanel; the optional tree overlays them. */
+@container file-preview (max-width: 560px) {
+  [data-file-parent-path] { display: none; }
+  [data-file-workspace-tree] {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 10;
+    width: 208px;
+    max-width: 80%;
+  }
+  .file-preview-mode button { padding-inline: 6px; }
+  .file-preview-mode span { display: none; }
+  .file-preview-markdown { padding: 12px; }
+}
+[data-file-preview-toolbar] button:focus-visible {
+  outline: 1px solid #969696;
+  outline-offset: 1px;
+}
+@media (hover: none), (pointer: coarse) {
+  [data-file-preview-toolbar] button { min-width: 44px; min-height: 44px; }
+}
+.remote-mobile [data-file-preview-toolbar] button { min-width: 44px; min-height: 44px; }
+
 .xterm .xterm-helper-textarea {
   user-select: text !important;
   -webkit-user-select: text !important;

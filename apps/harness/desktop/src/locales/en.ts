@@ -214,6 +214,8 @@ export const en: TranslationDictionary = {
     previousMatch: "Previous match (Shift+Enter)",
     nextMatch: "Next match (Enter)",
     copyResponse: "Copy response",
+    outputFiles: "Files",
+    previewOutput: "Preview {file}",
     goodResponse: "Good response",
     badResponse: "Bad response",
     scrollToBottom: "Scroll to bottom",

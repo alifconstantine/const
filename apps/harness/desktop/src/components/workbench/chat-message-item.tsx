@@ -1,4 +1,4 @@
-import React, { useState, memo } from "react";
+import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import { Check, Copy, Pencil, ThumbsUp, ThumbsDown } from "lucide-react";
 import { ScrollArea, UserMessageBubble, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -11,6 +11,8 @@ import { assistantResponseToText } from "../intelligence-ui/protocol";
 import type { IntelligenceUiState } from "../intelligence-ui/schema";
 import { messageApps } from "../../lib/mcp/apps";
 import { McpAppCard } from "../mcp-apps/app-card";
+import { collectResponseOutputs } from "../../lib/response-outputs";
+import { FileIcon } from "./file-icon";
 
 export interface ChatMessage {
   id: string;
@@ -120,6 +122,10 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const { t } = useTranslation();
   const [internalCopied, setInternalCopied] = useState(false);
   const [internalFeedback, setInternalFeedback] = useState<"good" | "bad" | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+  const outputFiles = useMemo(() => message?.role === "assistant" && !isExecuting
+    ? collectResponseOutputs(message.content || "", message.mutations) : [], [message?.role, message?.content, message?.mutations, isExecuting]);
 
   if (!message) return null;
 
@@ -215,7 +221,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
 
         {/* User action bar (Copy, Edit, Timestamp) - hidden in read-only mode */}
         {!isReadOnly && !isEditing && (
-          <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none font-sans">
+          <div className="message-actions flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none font-sans">
             {message.timestamp && (
               <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
                 {formatMessageTimestamp(message.timestamp)}
@@ -227,6 +233,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 onClick={() => onCopyMessage(message.id, message.content)}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                 title={t("workbench.copyMessage")}
+                aria-label={t("workbench.copyMessage")}
               >
                 {copiedId === message.id ? (
                   <Check className="w-3.5 h-3.5 text-[#4ade80]" />
@@ -247,6 +254,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 }}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                 title={t("workbench.editMessage")}
+                aria-label={t("workbench.editMessage")}
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
@@ -286,6 +294,18 @@ export const ChatMessageItem = memo(function ChatMessageItem({
       />
 
       {/* Formatted Markdown Content */}
+      {!isExecuting && outputFiles.length > 0 && onOpenFilePreview && (
+        <div data-response-outputs className="flex flex-wrap items-center gap-2 py-1">
+          <span className="text-xs text-[#666666] dark:text-[#969696]">{t("workbench.outputFiles")}</span>
+          {outputFiles.map(path => <button key={path} type="button" onClick={() => onOpenFilePreview(path)} title={path}
+            aria-label={t("workbench.previewOutput").replace("{file}", path)}
+            className="response-output-link group/output flex min-h-7 min-w-0 max-w-full items-center rounded-md text-xs text-[#262626] dark:text-white outline-none focus-visible:ring-1 focus-visible:ring-[#969696]">
+            <span className="flex min-w-0 items-center gap-1.5 rounded-md bg-black/5 px-2 py-1 group-hover/output:bg-black/10 dark:bg-white/5 dark:group-hover/output:bg-white/10">
+              <FileIcon filename={path} className="size-3.5 shrink-0" /><span className="truncate">{path.replace(/\\/g, "/").split("/").pop()}</span>
+            </span>
+          </button>)}
+        </div>
+      )}
       {messageApps(message).map(app => <McpAppCard key={app.id} app={app} onOpenFile={onOpenFilePreview} />)}
       {!isExecuting && message.content ? (
         <div data-final-answer className="px-0.5 select-text cursor-text">
@@ -317,7 +337,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
 
       {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
       {!isExecuting && message.content && (
-        <div className="flex items-center gap-1.5 pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none pointer-events-none group-hover:pointer-events-auto font-sans">
+        <div data-response-actions className="message-actions flex items-center gap-1.5 pt-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity text-xs text-[#666666] dark:text-[#969696] select-none pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto font-sans">
           <button
             type="button"
             onClick={async () => {
@@ -327,12 +347,14 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 try {
                   await navigator.clipboard.writeText(assistantResponseToText(message.content));
                   setInternalCopied(true);
-                  setTimeout(() => setInternalCopied(false), 2000);
+                  clearTimeout(copyTimer.current);
+                  copyTimer.current = setTimeout(() => setInternalCopied(false), 2000);
                 } catch {}
               }
             }}
             className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
             title={t("workbench.copyResponse")}
+            aria-label={t("workbench.copyResponse")}
           >
             {isCopied ? (
               <Check className="w-3.5 h-3.5 text-[#4ade80]" />
@@ -356,6 +378,8 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
             )}
             title={t("workbench.goodResponse")}
+            aria-label={t("workbench.goodResponse")}
+            aria-pressed={activeFeedback === "good"}
           >
             <ThumbsUp className="w-3.5 h-3.5" />
           </button>
@@ -375,6 +399,8 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
             )}
             title={t("workbench.badResponse")}
+            aria-label={t("workbench.badResponse")}
+            aria-pressed={activeFeedback === "bad"}
           >
             <ThumbsDown className="w-3.5 h-3.5" />
           </button>

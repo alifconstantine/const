@@ -214,6 +214,8 @@ export const id: TranslationDictionary = {
     previousMatch: "Kecocokan sebelumnya (Shift+Enter)",
     nextMatch: "Kecocokan berikutnya (Enter)",
     copyResponse: "Salin respons",
+    outputFiles: "Berkas",
+    previewOutput: "Pratinjau {file}",
     goodResponse: "Respons bagus",
     badResponse: "Respons buruk",
     scrollToBottom: "Gulir ke bawah",

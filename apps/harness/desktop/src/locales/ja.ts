@@ -214,6 +214,8 @@ export const ja: TranslationDictionary = {
     previousMatch: "前の一致 (Shift+Enter)",
     nextMatch: "次の一致 (Enter)",
     copyResponse: "回答をコピー",
+    outputFiles: "ファイル",
+    previewOutput: "{file}をプレビュー",
     goodResponse: "良い回答",
     badResponse: "悪い回答",
     scrollToBottom: "一番下までスクロール",

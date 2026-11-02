@@ -28,6 +28,15 @@ export function sanitizeInlineMarkdown(html: string): string {
     ALLOWED_ATTR: ["class", "href", "title", "src", "alt", "rel"],
     ALLOW_DATA_ATTR: false,
     ALLOWED_URI_REGEXP:
-      /^(?:(?:https?|mailto|file|folder|trajectory):|\/(?!\/)|#)/i,
+      /^(?:(?:https?|mailto|tel|file|folder|workspace|trajectory|conversation|plugin|browser):|\/(?!\/)|#)/i,
   });
+}
+
+/** A highlighter may decorate source text; it must never change or execute it. */
+export function sanitizeHighlightedCode(html: string, source: string): string {
+  const clean = DOMPurify.sanitize(html, { ALLOWED_TAGS: ["span"], ALLOWED_ATTR: ["class"], ALLOW_DATA_ATTR: false });
+  const template = document.createElement("template");
+  template.innerHTML = clean;
+  if (template.content.textContent === source.replace(/\r\n/g, "\n")) return clean;
+  return source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

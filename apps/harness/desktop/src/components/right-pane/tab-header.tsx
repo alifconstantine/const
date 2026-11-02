@@ -219,7 +219,7 @@ export function TabHeader({
         <button
           type="button"
           onClick={onCollapse}
-          className="w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer text-[#8e8e8e] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 mr-1.5 shrink-0 outline-none focus-visible:outline-none ring-0"
+          className="w-11 h-11 rounded flex items-center justify-center transition-colors cursor-pointer text-[#8e8e8e] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 mr-1.5 shrink-0 outline-none focus-visible:outline-none ring-0"
           title={t("rightPane.hidePanel")}
           aria-label={t("rightPane.hidePanel")}
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -240,7 +240,7 @@ export function TabHeader({
             setIsDropdownOpen((prev) => !prev);
             setSearchQuery("");
           }}
-          className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+          className={`${remote?.mobile ? "w-11 h-11" : "w-6 h-6"} rounded flex items-center justify-center transition-colors cursor-pointer ${
             isDropdownOpen
               ? "bg-white/10 text-white"
               : "text-[#8e8e8e] hover:text-white hover:bg-white/5"
@@ -338,6 +338,12 @@ export function TabHeader({
       </div>
 
       {/* 2. Middle: Scrollable Tab Strip with tabs and '+' button immediately following the last tab */}
+      {remote?.mobile ? (
+        <div data-pane-mobile-title className="flex-1 min-w-0 mr-20 pl-2 text-xs font-medium text-[#262626] dark:text-white truncate"
+          title={tabs.find(tab => tab.id === activeTabId)?.title}>
+          {isOpeningNewTab ? t("rightPane.openNewTab") : tabs.find(tab => tab.id === activeTabId)?.title}
+        </div>
+      ) : (
       <div
         ref={tabListRef}
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -490,6 +496,7 @@ export function TabHeader({
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
+      )}
     </div>
   );
 }

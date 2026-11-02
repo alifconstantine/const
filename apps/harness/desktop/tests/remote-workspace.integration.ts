@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { app, BrowserWindow } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { outputCodeSample } from "./assistant-output.sample";
 
 app.setPath("userData", process.argv[2]!);
 app.on("window-all-closed", () => {});
@@ -547,6 +548,90 @@ async function run() {
     await js(`document.querySelector('[data-activity-section=sources] button[title="source.pdf"]').click()`);
     await waitFor(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-media-preview=pdf]')?.innerText.includes('Accessible PDF text')`);
     await capture('activity-mobile-pdf-text');
+  });
+  win.setSize(1440, 960);
+  await win.loadURL(process.argv[3]! + "?output-formatting");
+  await waitFor('Boolean(document.querySelector("[data-response-details]"))');
+  await check("final output keeps results and verification visible with optional implementation details", async () => {
+    assert.equal(await js(`document.querySelector('[data-response-details]').open`), false);
+    assert.equal(await js(`document.querySelector('[data-final-answer]').innerText.includes('Remaining limitations')`), true);
+    assert.equal(await js(`document.querySelector('[data-final-answer]').innerText.includes('No model request')`), true);
+    assert.equal(await js(`document.querySelectorAll('[data-response-outputs] button').length`), 1);
+    await capture('assistant-output-summary-dark');
+  });
+  await check("relative file links survive sanitization and open against the workspace", async () => {
+    assert.equal(await js(`document.querySelector('[data-final-answer] a').getAttribute('href')`), 'workspace:///outputs/04-driftlab/index.html');
+    await js(`document.querySelector('[data-final-answer] a').click()`);
+    await waitFor(`window.__remoteFixture.fileReads.some(args => args[0] === 'outputs/04-driftlab/index.html' && args[1] === '/workspace/const')`);
+    await js(`document.querySelector('[data-response-outputs] button').click()`);
+    await waitFor(`window.__remoteFixture.fileReads.some(args => args[0] === '/workspace/const/outputs/04-driftlab/index.html')`);
+    await waitFor(`Boolean(document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-code]'))`);
+    assert.equal(await js(`Boolean(document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-workspace-tree]'))`), false);
+    win.setSize(1080, 900);
+    await delay(300);
+    const codeWidth = await js(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-code]').getBoundingClientRect().width`);
+    assert.ok(codeWidth >= 290, 'file contents retain the available SidePanel width');
+    await capture('file-preview-compact');
+    await js(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Toggle file tree"]').click()`);
+    assert.equal(await js(`getComputedStyle(document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-workspace-tree]')).position`), 'absolute');
+    assert.equal(await js(`document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-code]').getBoundingClientRect().width`), codeWidth);
+    await capture('file-preview-tree-overlay');
+    await js(`document.querySelector('[role=tabpanel][aria-hidden=false] button[title="Toggle file tree"]').click()`);
+    win.setSize(1440, 960);
+    await js(`document.querySelector('button[aria-label="Toggle right sidebar"]').click()`);
+  });
+  await check("code remains literal and copyable with safe syntax highlighting inside expandable details", async () => {
+    await js(`document.querySelector('[data-response-details] summary').click()`);
+    const code = await js(`document.querySelector('[data-response-code][data-language=javascript]').textContent`);
+    assert.equal(code, outputCodeSample);
+    assert.equal(await js(`Boolean(document.querySelector('[data-response-code][data-language=javascript] span'))`), true);
+    assert.equal(await js(`document.querySelector('[data-response-code][data-language=html]').textContent`), '<img src="x" onerror="window.__outputXss = true">');
+    assert.equal(await js(`window.__outputXss === undefined && !document.querySelector('[data-response-code] img')`), true);
+    assert.equal(await js(`Boolean(document.querySelector('blockquote ul')) && Boolean(document.querySelector('blockquote pre'))`), true);
+    assert.equal(await js(`document.querySelector('[data-response-details] ol').getAttribute('start')`), '3');
+    await js(`document.querySelector('[data-response-code][data-language=javascript]').closest('[data-response-code-block]').querySelector('.response-code-copy').click()`);
+    assert.equal(await js(`window.__remoteFixture.clipboardWrites.at(-1)`), outputCodeSample);
+    await capture('assistant-output-details-dark');
+    await js(`document.documentElement.classList.remove('dark')`);
+    await capture('assistant-output-details-light');
+    await js(`document.documentElement.classList.add('dark')`);
+  });
+  await check("message actions appear on keyboard focus and mobile targets remain usable without hover", async () => {
+    await js(`document.querySelector('[data-response-actions] button').focus()`);
+    assert.equal(await js(`getComputedStyle(document.querySelector('[data-response-actions]')).pointerEvents`), 'auto');
+    win.setSize(390, 844);
+    await delay(300);
+    await js(`document.querySelector('.remote-sidebar-backdrop')?.click(); if (document.querySelector('.workspace-shell').dataset.rightOpen === 'true') document.querySelector('button[aria-label="Toggle right sidebar"]').click(); document.querySelector('[data-workbench-activity] button[aria-label="Close"]')?.click()`);
+    await delay(300);
+    assert.equal(await js(`getComputedStyle(document.querySelector('[data-response-actions]')).opacity`), '1');
+    assert.equal(await js(`Array.from(document.querySelectorAll('[data-response-actions] button')).every(button => { const bounds = button.getBoundingClientRect(); return bounds.width >= 44 && bounds.height >= 44; })`), true);
+    assert.equal(await js(`document.querySelector('.workspace-chat').scrollWidth <= document.querySelector('.workspace-chat').clientWidth`), true);
+    await js(`document.querySelector('[data-response-details]').open = false; document.querySelector('[data-response-outputs]').scrollIntoView({block:'start'})`);
+    await capture('assistant-output-mobile');
+    await js(`document.querySelector('[data-response-actions]').scrollIntoView({block:'end'})`);
+    await capture('assistant-output-mobile-actions');
+  });
+  await check("file previews preserve readable code and compact chrome on narrow mobile screens", async () => {
+    await js(`document.querySelector('[data-response-outputs] button').click()`);
+    await waitFor(`Boolean(document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-code]'))`);
+    for (const width of [390, 320]) {
+      win.setSize(width, 844);
+      await delay(300);
+      assert.equal(await js(`(() => {
+        const preview = document.querySelector('[role=tabpanel][aria-hidden=false] [data-file-preview]');
+        const code = preview.querySelector('[data-file-code]');
+        const toolbar = preview.querySelector('[data-file-preview-toolbar]');
+        return preview.scrollWidth <= preview.clientWidth && toolbar.scrollWidth <= toolbar.clientWidth
+          && code.getBoundingClientRect().width >= preview.clientWidth - 1
+          && Array.from(toolbar.querySelectorAll('button')).filter(button => button.getBoundingClientRect().width > 0).every(button => button.getBoundingClientRect().height >= 44);
+      })()`), true, `mobile preview ${width}px`);
+      assert.equal(await js(`(() => {
+        const title = document.querySelector('[data-pane-mobile-title]').getBoundingClientRect();
+        const activity = document.querySelector('[data-activity-toggle]').getBoundingClientRect();
+        return title.width > 40 && title.right <= activity.left;
+      })()`), true, `mobile tab title does not overlap stationary controls at ${width}px`);
+      await capture(`file-preview-mobile-${width}`);
+    }
   });
   win.destroy();
 }

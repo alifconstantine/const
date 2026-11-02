@@ -102,7 +102,9 @@ function StandardFilePreviewTab({
   const [content, setContent] = useState<string>(tab.newContent || tab.previousContent || "");
   const [isLoading, setIsLoading] = useState<boolean>(!content && Boolean(tab.filePath));
   const [copied, setCopied] = useState(false);
-  const [isWorkspaceTreeOpen, setIsWorkspaceTreeOpen] = useState(() => !remote?.mobile);
+  const [isWorkspaceTreeOpen, setIsWorkspaceTreeOpen] = useState(
+    () => !remote?.mobile && (tab.type === "directory" || Boolean(tab.isDirectory))
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   // Popover menus state
@@ -777,18 +779,13 @@ function StandardFilePreviewTab({
   const rootChildren = treeData[""] || [];
 
   return (
-    <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-[#141414] select-none font-sans relative">
+    <div data-file-preview className="flex-1 min-w-0 w-full h-full flex flex-col overflow-hidden bg-[#141414] select-none font-sans relative" style={{ containerType: "inline-size", containerName: "file-preview" }}>
       {/* 1. Header Bar: Breadcrumbs + Actions (matching Image 2) */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#282828] bg-[#1a1a1a] text-xs text-neutral-400 shrink-0 relative z-20">
+      <div data-file-preview-toolbar className="flex min-h-10 items-center justify-between gap-2 px-3 py-1 bg-[#1a1a1a] text-xs text-neutral-400 shrink-0 relative z-20">
         {/* Breadcrumb Path with clickable sibling dropdowns */}
-        <div
-          onWheel={(e) => {
-            if (e.deltaY !== 0) {
-              e.currentTarget.scrollLeft += e.deltaY;
-            }
-          }}
-          className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
-        >
+        <ScrollArea orientation="horizontal" className="min-w-0 flex-1" viewportClassName="[&>div]:!block">
+        <div className="flex items-center gap-1 whitespace-nowrap py-1 text-xs select-none">
+          <span data-file-parent-path={activeFilePath ? "" : undefined} className="contents">
           {/* Root Workspace Folder */}
           <button
             type="button"
@@ -823,10 +820,11 @@ function StandardFilePreviewTab({
             </React.Fragment>
           ))}
 
+          {activeFilePath && <span className="text-neutral-600 shrink-0">›</span>}
+          </span>
           {/* Active File or Folder Name */}
           {activeFilePath && (
             <>
-              <span className="text-neutral-600 shrink-0">›</span>
               <div
                 className="flex items-center gap-1.5 shrink-0 text-white font-medium"
                 title={activeFilePath}
@@ -841,12 +839,13 @@ function StandardFilePreviewTab({
             </>
           )}
         </div>
+        </ScrollArea>
 
         {/* Action Controls matching Image 2 */}
         <div className="flex items-center gap-1 shrink-0">
           {/* Formatted / Raw Toggle for Markdown */}
           {isMarkdown && activeFilePath && !isDirectory && (
-            <div className="flex items-center rounded-md bg-[#222222] p-0.5 border border-[#2e2e2e] mr-1">
+            <div className="file-preview-mode flex items-center rounded-md bg-[#222222] p-0.5 mr-1">
               <button
                 type="button"
                 onClick={() => setMode("formatted")}
@@ -887,7 +886,7 @@ function StandardFilePreviewTab({
                 "p-1.5 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer",
                 isMoreMenuOpen && "bg-white/10 text-white"
               )}
-              title={t("workbench.taskOptions")}
+              title={t("topToolbar.taskOptions")}
             >
               <MoreVertical className="w-3.5 h-3.5" />
             </button>
@@ -951,6 +950,7 @@ function StandardFilePreviewTab({
                   : "text-neutral-400 hover:text-white hover:bg-white/5"
               )}
               title={t("rightPane.toggleFileTree")}
+              aria-expanded={isWorkspaceTreeOpen}
             >
               <PanelRight className="w-3.5 h-3.5" />
             </button>
@@ -993,7 +993,7 @@ function StandardFilePreviewTab({
       </div>
 
       {/* 2. Main Content Split View: Left (Code Viewer / Directory Explorer) | Right (Workspace Tree Panel) */}
-      <div className="flex-1 w-full min-h-0 flex overflow-hidden">
+      <div className="flex-1 w-full min-h-0 flex overflow-hidden relative">
         {/* Left Side: Code Viewer / Directory Viewer / Placeholder */}
         <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col bg-[#141414]">
           {isLoading ? (
@@ -1103,19 +1103,21 @@ function StandardFilePreviewTab({
             </div>
           ) : isMarkdown && mode === "formatted" ? (
             /* Formatted Markdown Rendering */
-            <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto font-sans select-text leading-relaxed text-[#d4d4d4]">
+            <ScrollArea className="flex-1 min-h-0 w-full" viewportClassName="select-text">
+            <div className="file-preview-markdown p-4 max-w-4xl mx-auto font-sans leading-relaxed text-[#d4d4d4]">
               <MarkdownContent
                 content={content}
                 onOpenFilePreview={onOpenFilePreview}
                 onOpenBrowser={onOpenBrowser}
               />
             </div>
+            </ScrollArea>
           ) : (
             /* Monospace Code Viewer matching Image 2 with Line Numbers & Fold chevrons */
-            <ScrollArea className="w-full max-w-full h-full">
+            <ScrollArea orientation="both" data-file-code className="w-full max-w-full h-full">
               <div
                 style={{ fontSize: `${codeFontSize}px` }}
-                className="w-full max-w-full py-3 font-mono leading-5 select-text [tab-size:2]"
+                className="min-w-full w-max py-2 font-mono leading-5 select-text [tab-size:2]"
               >
                 {rawLines.map((line, idx) => {
                   if (hiddenLineIndices.has(idx)) {
@@ -1128,10 +1130,10 @@ function StandardFilePreviewTab({
                   return (
                     <div
                       key={idx}
-                      className="flex items-start w-full max-w-full hover:bg-white/[0.03] transition-colors group"
+                      className="flex items-start w-full hover:bg-white/[0.03] transition-colors group"
                     >
                       {/* Line Number & Fold Chevron matching Image 2 */}
-                      <div className="w-12 px-2 text-right select-none text-[11px] text-neutral-600 dark:text-[#555555] shrink-0 border-r border-[#262626] self-stretch flex items-center justify-end gap-1">
+                      <div className="w-10 px-1.5 text-right select-none text-[11px] text-neutral-500 shrink-0 self-stretch flex items-center justify-end gap-1">
                         <span>{idx + 1}</span>
                         {foldable ? (
                           <button
@@ -1152,7 +1154,7 @@ function StandardFilePreviewTab({
                       </div>
 
                       {/* Syntax Highlighted Code Line */}
-                      <div className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4] flex items-center flex-wrap gap-1">
+                      <div className="flex-1 px-2 whitespace-pre text-[#d4d4d4] flex items-center gap-1">
                         <span
                           dangerouslySetInnerHTML={{
                             __html: highlightedLines[idx] || "&nbsp;",
@@ -1179,9 +1181,9 @@ function StandardFilePreviewTab({
 
         {/* Right Side: Collapsible Workspace Tree Panel matching Image 2 */}
         {workspacePath && isWorkspaceTreeOpen && (
-          <div className={cn("h-full bg-[#141414] flex flex-col shrink-0 select-none", remote?.mobile ? "w-[45%] min-w-0" : "w-64 max-w-[40%] min-w-[200px]")}>
+          <div data-file-workspace-tree className="h-full w-52 max-w-[40%] min-w-0 bg-[#1a1a1a] flex flex-col shrink-0 select-none">
             {/* Header: Workspace ˇ + Refresh Button */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[#282828] shrink-0">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 shrink-0">
               <div className="flex items-center gap-1 text-xs font-semibold text-neutral-300">
                 <span>{t("rightPane.workspace")}</span>
                 <ChevronDown className="w-3 h-3 text-neutral-500" />

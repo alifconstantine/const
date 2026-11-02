@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
-import { marked, type Token, type Tokens } from "marked";
-import { isPlainInlineText, sanitizeInlineMarkdown } from "../../lib/safe-markdown";
-import { Check, Copy } from "lucide-react";
-import { cn, ScrollArea } from "@const/ui";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { type Token, type Tokens } from "marked";
+import { createResponseMarkdown, responseSections } from "./markdown-parser";
+import { highlightCodeToHtmlLines, escapeHtml } from "../../lib/code-highlighter";
+import { isPlainInlineText, sanitizeInlineMarkdown, sanitizeHighlightedCode } from "../../lib/safe-markdown";
+import { Check, Copy, ChevronDown } from "lucide-react";
+import { cn, ScrollArea, toast } from "@const/ui";
 import { ResponseTable } from "../intelligence-ui/response-table";
 import { FileIcon } from "./file-icon";
 import { renderMentionBadgeHtml } from "./rich-mention-editor";
@@ -23,96 +25,7 @@ interface MarkdownContentProps {
   isStreaming?: boolean;
 }
 
-function tokenizeMarkdown(content: string) {
-  if (!content) return [];
-
-  // 1. Normalize @[Title](path) mentions into native badge pills matching AI input
-  let processed = content.replace(/@\[([^\]]+)\](?:\(([^)]+)\))/g, (_, label, path) => {
-    const trimmedLabel = label.trim();
-    const trimmedPath = path.trim().replace(/\\/g, "/");
-    let kind = "file";
-    let href = `file:///${trimmedPath}`;
-
-    if (trimmedPath.startsWith("plugin://")) {
-      kind = "plugin";
-      href = trimmedPath;
-    } else if (
-      trimmedPath.includes("transcript.jsonl") ||
-      trimmedPath.startsWith("brain/") ||
-      trimmedPath.startsWith("conversation://") ||
-      trimmedPath.startsWith("trajectory://")
-    ) {
-      const convoId =
-        trimmedPath.match(/brain\/([^\/\\]+)/)?.[1] ||
-        trimmedPath.replace(/^(?:conversation|trajectory):\/\/\/?/, "");
-      kind = "session";
-      href = `trajectory://${convoId || trimmedPath}`;
-    } else if (trimmedPath.endsWith("/")) {
-      kind = "directory";
-      href = `folder:///${trimmedPath}`;
-    }
-
-    return renderMentionBadgeHtml({ href, title: trimmedLabel, kind });
-  });
-
-  // 2. Normalize legacy/simple @[path] mentions
-  processed = processed.replace(/@\[([^\]]+)\]/g, (_, rawPath) => {
-    const trimmed = rawPath.trim();
-    const normalized = trimmed.replace(/\\/g, "/");
-    let kind = "file";
-    let href = `file:///${normalized}`;
-    let title = normalized.split("/").filter(Boolean).pop() || trimmed;
-
-    if (normalized.includes("transcript.jsonl") || normalized.startsWith("brain/")) {
-      const convoId = normalized.match(/brain\/([^\/\\]+)/)?.[1];
-      kind = "session";
-      href = `trajectory://${convoId || normalized}`;
-    } else if (normalized.endsWith("/")) {
-      kind = "directory";
-      href = `folder:///${normalized}`;
-    }
-
-    return renderMentionBadgeHtml({ href, title, kind });
-  });
-
-  // 3. Normalize any previously formatted links: [💬 Title](trajectory://...), [📁 Title](folder://...), [Title](file://...)
-  processed = processed.replace(/\[(?:💬|📁|📄)?\s*([^\]]+)\]\((trajectory:\/\/[^)]+|folder:\/\/\/[^)]+|file:\/\/\/[^)]+)\)/g, (_, label, href) => {
-    const cleanLabel = label.trim().replace(/^[\s💬📁📄]+/, "");
-    let kind = "file";
-    if (href.startsWith("trajectory://")) {
-      kind = "session";
-    } else if (href.startsWith("folder://") || cleanLabel.endsWith("/")) {
-      kind = "directory";
-    }
-    return renderMentionBadgeHtml({ href, title: cleanLabel, kind });
-  });
-
-  // 4. Normalize standalone file/folder mentions like @"path/to/dir/" or @src/index.ts
-  processed = processed.replace(/(^|[\s(])@(?:"([^"]+)"|([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-./\\]+\/))(?=$|[\s),.?!])/g, (match, prefix, quotedPath, unquotedPath) => {
-    const raw = quotedPath || unquotedPath;
-    if (!raw) return match;
-    const normalized = raw.trim().replace(/\\/g, "/");
-    let kind = "file";
-    let href = `file:///${normalized}`;
-    let title = normalized.split("/").filter(Boolean).pop() || normalized;
-    if (normalized.endsWith("/")) {
-      kind = "directory";
-      href = `folder:///${normalized}`;
-    }
-    return `${prefix}${renderMentionBadgeHtml({ href, title, kind })}`;
-  });
-
-  // Normalize file;file:/// or file; links into valid file:/// links for marked
-  processed = processed.replace(/\]\(file;file:\/\/\/?/gi, "](file:///");
-  processed = processed.replace(/\]\(file;/gi, "](file:///");
-
-  // Normalize single-space indented list items so they parse cleanly into nested lists
-  const normalizedContent = processed.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
-    return spaces.length === 1 ? `\n  ${bullet} ` : match;
-  });
-
-  return marked.lexer(normalizedContent, { gfm: true, breaks: true });
-}
+const responseMarkdown = createResponseMarkdown(renderMentionBadgeHtml);
 
 export function MarkdownContent({
   content,
@@ -124,7 +37,8 @@ export function MarkdownContent({
   isStreaming = false,
 }: MarkdownContentProps) {
   // Layout changes and panel controls must not reparse the entire transcript.
-  const tokens = useMemo(() => tokenizeMarkdown(content), [content]);
+  const tokens = useMemo(() => responseMarkdown.lexer(content), [content]);
+  const sections = useMemo(() => responseSections(tokens, isStreaming || variant === "user"), [tokens, isStreaming, variant]);
   if (!content) return null;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -195,9 +109,15 @@ export function MarkdownContent({
         className
       )}
     >
-      {tokens.map((token, index) => (
-        <TokenRenderer key={index} token={token} variant={variant} isStreaming={isStreaming} />
-      ))}
+      {sections.map((section, index) => section.kind === "details" ? (
+        <details key={index} data-response-details className="group/details">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl bg-black/[0.025] px-3 py-2 text-sm font-medium outline-none focus-visible:ring-1 focus-visible:ring-[#969696] dark:bg-white/[0.025] [&::-webkit-details-marker]:hidden">
+            <span className="flex-1"><InlineRenderer text={section.heading.text} /></span>
+            <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 text-[#969696] transition-transform group-open/details:rotate-180 motion-reduce:transition-none" />
+          </summary>
+          <div className="space-y-3 pb-1 pt-2">{section.tokens.map((token, child) => <TokenRenderer key={child} token={token} variant={variant} />)}</div>
+        </details>
+      ) : <TokenRenderer key={index} token={section.token} variant={variant} isStreaming={isStreaming} />)}
     </div>
   );
 }
@@ -273,10 +193,10 @@ const TokenRenderer = React.memo(function TokenRenderer({
       if (list.ordered) {
         const start = list.start || 1;
         return (
-          <ol className={cn("space-y-2 my-2.5 last:mb-0 pl-0.5 text-[#262626] dark:text-white cursor-text select-text", isNested && "my-1.5 pl-2 space-y-1.5")}>
+          <ol start={Number(start)} className={cn("space-y-2 my-2.5 last:mb-0 pl-0.5 text-[#262626] dark:text-white cursor-text select-text", isNested && "my-1.5 pl-2 space-y-1.5")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2.5 leading-[1.65] cursor-text select-text">
-                <span className="select-none font-sans tabular-nums text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
+                <span aria-hidden="true" className="select-none font-sans tabular-nums text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0 cursor-text select-text">
@@ -296,7 +216,8 @@ const TokenRenderer = React.memo(function TokenRenderer({
                   type="checkbox"
                   checked={item.checked}
                   readOnly
-                  className="mt-1 mr-0.5 rounded accent-[#ff7a00] shrink-0 pointer-events-none"
+                  aria-label={item.text}
+                  className="mt-1 mr-0.5 rounded accent-[#969696] shrink-0 pointer-events-none"
                 />
               ) : (
                 <span className={cn(
@@ -318,8 +239,8 @@ const TokenRenderer = React.memo(function TokenRenderer({
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-[#b0b0b0] dark:border-[#383838] pl-3.5 py-1.5 my-2.5 last:mb-0 text-[#262626] dark:text-[#a8a8a8] bg-black/[0.03] dark:bg-white/[0.02] rounded-r-lg italic cursor-text select-text">
-          <InlineRenderer text={bq.text} />
+        <blockquote className="space-y-2 rounded-xl bg-black/[0.035] px-4 py-2.5 my-3 last:mb-0 text-[#262626] dark:bg-white/[0.035] dark:text-white cursor-text select-text">
+          {bq.tokens.map((child, index) => <TokenRenderer key={index} token={child} variant={variant} isStreaming={isStreaming} />)}
         </blockquote>
       );
     }
@@ -396,32 +317,42 @@ function TableBlock({ header, rows, align }: { header: Tokens.TableCell[]; rows:
 function CodeBlock({ code, language }: { code: string; language: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
+  const highlighted = useMemo(() => {
+    if (code.length > 100_000) return escapeHtml(code);
+    const aliases: Record<string, string> = { javascript: "js", typescript: "ts", python: "py", shell: "sh", plaintext: "text" };
+    const tag = language.toLowerCase().split(/[\s:{]/)[0] || "text";
+    return sanitizeHighlightedCode(highlightCodeToHtmlLines(code, aliases[tag] || tag).join("\n"), code);
+  }, [code, language]);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
+      toast.error(t("common.failedToCopy"));
     }
   };
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[#f4f4f6] dark:bg-[#181818] border border-[#e2e2e4] dark:border-[#2e2e2e] my-3 select-none">
+    <div data-response-code-block className="rounded-xl overflow-hidden bg-[#f4f4f6] dark:bg-[#181818] border border-[#e2e2e4] dark:border-[#2e2e2e] my-3 select-none">
       {/* Code Header Strip */}
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#eaeaea] dark:bg-[#202020] border-b border-[#e2e2e4] dark:border-[#2e2e2e] text-xs">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#eaeaea] dark:bg-[#202020] text-xs">
         <div className="flex items-center gap-1.5">
           <FileIcon filename={language} className="w-3.5 h-3.5" />
-          <span className="font-mono text-[11px] text-[#888888] dark:text-[#888888] lowercase">
+          <span className="font-sans text-xs text-[#666666] dark:text-[#969696] lowercase">
             {language}
           </span>
         </div>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] text-[#888888] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
+          className="response-code-copy flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs text-[#666666] hover:bg-black/5 dark:text-[#969696] dark:hover:bg-white/5 outline-none focus-visible:ring-1 focus-visible:ring-[#969696]"
           title={t("workbench.copyCode")}
+          aria-label={t("workbench.copyCode")}
         >
           {copied ? (
             <>
@@ -438,9 +369,9 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       </div>
 
       {/* Code Body */}
-      <ScrollArea orientation="horizontal" thumbClassName="bg-white/20 hover:bg-white/30">
-      <pre className="p-3.5 text-[13px] leading-5 font-mono text-[#262626] dark:text-white select-text">
-        <code>{code}</code>
+      <ScrollArea orientation="horizontal" className="bg-[#181818]" thumbClassName="bg-white/20 hover:bg-white/30">
+      <pre className="p-3.5 text-[13px] leading-6 font-mono text-white select-text">
+        <code data-response-code data-language={language} dangerouslySetInnerHTML={{ __html: highlighted }} />
       </pre>
       </ScrollArea>
     </div>
@@ -451,14 +382,14 @@ const InlineRenderer = React.memo(function InlineRenderer({ text }: { text: stri
   // Parse inline markdown: bold, italic, inline code, links
   const html = useMemo(() => {
     if (isPlainInlineText(text)) return null;
-    const parsed = marked.parseInline(text, { gfm: true, breaks: true });
+    const parsed = responseMarkdown.parseInline(text);
     return typeof parsed === "string" ? sanitizeInlineMarkdown(parsed) : null;
   }, [text]);
   if (typeof html === "string") {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="cursor-text select-text [&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:cursor-pointer [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium"
+        className="cursor-text select-text [&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[13px] [&_code]:px-1 [&_code]:py-px [&_code]:rounded [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:cursor-pointer [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium"
       />
     );
   }
