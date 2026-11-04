@@ -78,6 +78,10 @@ async function main() {
   assert.equal(await js(`document.querySelector('button[type=submit]').disabled`), true);
   await js(`document.querySelector('#add-credit-heading').closest('section').querySelector('[role=status]').scrollIntoView({ block: 'center' })`);
   await capture("credits-unavailable-mobile");
+  await win.loadURL("http://127.0.0.1:5192/credits?state=checkout-unavailable");
+  await wait(`document.body.innerText.includes('QRIS checkout could not be loaded')`);
+  assert.equal(await js(`document.body.innerText.includes('Transaction history') && document.body.innerText.includes('Available credit')`), true);
+  assert.equal(await js(`document.body.innerText.includes('Credits could not be loaded')`), false);
   await win.loadURL("http://127.0.0.1:5192/models");
   await wait(`document.body.innerText.includes('Models & pricing')`);
   assert.equal(await js(`document.body.innerText.includes(':free') || document.body.innerText.includes('Weekly free allowance')`), false);

@@ -53,6 +53,7 @@ function read(ref: Parameters<typeof getFunctionName>[0], args?: unknown) {
   if (args === "skip") return undefined;
   const name = getFunctionName(ref);
   const state = new URLSearchParams(window.location.search).get("state");
+  if (state === "checkout-unavailable" && name.startsWith("router/payments:")) throw new Error("Fixture checkout service unavailable");
   if (state === "error" && !name.startsWith("auth/"))
     throw new Error(
       "Fixture query failure. Retry after removing ?state=error.",

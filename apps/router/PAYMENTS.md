@@ -13,7 +13,9 @@ Set these in the **Convex deployment's environment**, not the browser or Router'
 - `SUMOPOD_WEBHOOK_SECRET`: project signing secret (`whsec_…`), preferred. Or `SUMOPOD_WEBHOOK_TOKEN` (`whtok_…`) for the documented token verification alternative. When both are supplied, signatures are required.
 - `ROUTER_PUBLIC_URL`: HTTPS console URL, defaults to `https://router.const.web.id`.
 
-The provided API key is saved only in the ignored `packages/backend/.env.local`. This local file does not set the deployment's runtime environment. No signing secret/token or selling exchange rate has been supplied yet. Checkout stays disabled until the required deployment configuration is complete.
+Payment credentials are stored in the ignored `packages/backend/.env.local` and configured separately in the Convex production environment. Never commit their values. Checkout stays disabled when any required deployment configuration is missing.
+
+Production configuration was activated on 2026-11-04 for `earnest-hawk-132`, matching the backend used by `router.const.web.id`. The initial selling rate is Rp18,500 per USD; this is a configured checkout rate, not an automatically updated market quote. Update `SUMOPOD_IDR_PER_USD` when the selling rate changes. Existing invoices retain their original rate.
 
 In SumoPod Settings, configure the webhook URL as:
 
@@ -46,3 +48,5 @@ pnpm --filter @const/harness-mobile check-types
 ```
 
 The tests use synthetic provider responses and signing secrets and never issue a live payment.
+
+The QRIS section has its own query error boundary so unavailable checkout functions cannot hide the account balance or transaction history. Deploy the backend before the matching frontend when adding new payment queries.

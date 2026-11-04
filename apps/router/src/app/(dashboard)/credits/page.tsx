@@ -142,7 +142,7 @@ export function CreditsView({
           </Link>
         </div>
       </section>
-      {topUp}
+      {topUp && <QueryBoundary name="QRIS checkout">{topUp}</QueryBoundary>}
       <section className="space-y-5" aria-label="Transaction history">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-medium">Transaction history</h2>
