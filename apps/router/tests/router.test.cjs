@@ -888,7 +888,9 @@ test('quotes use integer cents, round IDR upward and reject invalid amounts', ()
   assert.deepEqual(paymentContract.quotePayment(101, 17001), { amountIdr: 17172, creditNanoUsd: 1010000000 });
   for (const value of [0, -1, 99, 50001, 100.1, NaN, Infinity]) assert.throws(() => paymentContract.quotePayment(value, 17000));
   assert.equal(paymentContract.isPaymentLink('https://pay.sumopod.com/pay/payment-1'), true);
-  for (const value of ['https://evil.test/pay/id', 'https://pay.sumopod.com.evil.test/pay/id', 'javascript:alert(1)', 'https://a:b@pay.sumopod.com/pay/id']) assert.equal(paymentContract.isPaymentLink(value), false);
+  assert.equal(paymentContract.isPaymentLink('https://checkout.pymnt.app/payment-links/19f59992-558d-4f32-b9df-f1000bf81036'), true);
+  assert.equal(paymentContract.isPaymentLink('https://checkout.pymnt.app/949c9251-d33d-41e1-8f32-5342da523c1e'), true);
+  for (const value of ['https://evil.test/pay/id', 'https://pay.sumopod.com.evil.test/pay/id', 'javascript:alert(1)', 'https://a:b@pay.sumopod.com/pay/id', 'https://checkout.pymnt.app.evil.test/payment-links/id', 'http://checkout.pymnt.app/payment-links/id', 'https://checkout.pymnt.app/other/id', 'https://a:b@checkout.pymnt.app/payment-links/id', 'https://checkout.pymnt.app:444/payment-links/id', 'https://checkout.pymnt.app/payment-links/id/extra']) assert.equal(paymentContract.isPaymentLink(value), false);
 });
 
 test('reference rates validate currency, dates and finite values before caching', () => {
@@ -955,7 +957,7 @@ test('checkout action calls QRIS once per request ID and never credits an unpaid
     assert.equal(body.payment_method_type_code, 'QRIS');
     assert.equal(body.amount, 170000);
     assert.equal(body.success_return_url, 'https://router.const.web.id/credits');
-    return Response.json({ payment_id: 'payment-1', order_id: body.order_id, amount: body.amount, fee: 1490, net_amount: 168510, status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString(), payment_link_url: 'https://pay.sumopod.com/pay/payment-1' });
+    return Response.json({ payment_id: 'payment-1', order_id: body.order_id, amount: body.amount, currency: 'IDR', fee: 1490, net_amount: 168510, status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString().replace('Z', '12345Z'), payment_link_url: 'https://checkout.pymnt.app/payment-links/19f59992-558d-4f32-b9df-f1000bf81036', created_at: null });
   };
   const args = { creditCents: 1000, requestId: 'request-payment-0001' };
   const first = await payments.createPayment.handler(paymentCtx(), args);
@@ -963,6 +965,7 @@ test('checkout action calls QRIS once per request ID and never credits an unpaid
   assert.equal(calls, 1);
   assert.equal((await db.get('wallet')).balanceUsd, 1);
   assert.equal((await db.query('routerPayments').first()).status, 'pending');
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u1' }, {}))[0].paymentLinkUrl, 'https://checkout.pymnt.app/payment-links/19f59992-558d-4f32-b9df-f1000bf81036');
 });
 test('ambiguous provider failure retains the order and retry never creates a second invoice', async () => {
   paymentEnvironment(); let calls = 0;
@@ -1042,4 +1045,29 @@ test('invalid provider JSON does not attach a checkout or credit the wallet', as
   }
   assert.equal((await db.get('wallet')).balanceUsd, 1);
   assert.equal((await db.query('routerPayments').collect()).filter(order => order.paymentLinkUrl).length, 0);
+});
+
+test('hosted checkout still rejects mismatched currency or invoice identity', async () => {
+  paymentEnvironment();
+  const base = { payment_id: 'payment-1', amount: 170000, currency: 'IDR', fee: 1490, net_amount: 168510, status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString(), payment_link_url: 'https://checkout.pymnt.app/payment-links/19f59992-558d-4f32-b9df-f1000bf81036' };
+  for (const [index, changed] of [{ currency: 'USD' }, { amount: 170001 }, { order_id: 'CONST-wrong-order' }, { payment_link_url: 'https://checkout.pymnt.app.evil.test/payment-links/id' }].entries()) {
+    global.fetch = async (_url, options) => Response.json({ ...base, order_id: JSON.parse(options.body).order_id, ...changed });
+    await assert.rejects(payments.createPayment.handler(paymentCtx(), { creditCents: 1000, requestId: 'request-hosted-invalid-' + index }), /invalid checkout/);
+  }
+  assert.equal((await db.query('routerPayments').collect()).some(order => order.paymentLinkUrl), false);
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+});
+
+test('historical invoice recovery restores its link without crediting or inventing fees', async () => {
+  const { order } = await preparePayment();
+  await payments.attachPayment.handler(ctx, { orderId: order.orderId, paymentId: 'recovered-payment', paymentLinkUrl: 'https://checkout.pymnt.app/949c9251-d33d-41e1-8f32-5342da523c1e', expiresAt: order.createdAt + 86400000 });
+  const recovered = (await payments.listPayments.handler({ ...ctx, userId: 'u1' }, {}))[0];
+  assert.equal(recovered.status, 'pending');
+  assert.equal(recovered.feeIdr, undefined);
+  assert.equal(recovered.netAmountIdr, undefined);
+  assert.equal(recovered.amountIdr, 170000);
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+  await payments.settlePayment.handler(ctx, paidEvent({ paymentId: 'recovered-payment' }));
+  await payments.settlePayment.handler(ctx, paidEvent({ paymentId: 'recovered-payment' }));
+  assert.equal((await db.get('wallet')).balanceUsd, 11);
 });

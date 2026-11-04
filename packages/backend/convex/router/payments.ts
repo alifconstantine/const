@@ -109,10 +109,17 @@ export const attachPayment = internalMutation({
     paymentId: v.string(),
     paymentLinkUrl: v.string(),
     expiresAt: v.number(),
-    feeIdr: v.number(),
-    netAmountIdr: v.number(),
+    // Historical recovery can restore a verified link without inventing missing fee metadata.
+    feeIdr: v.optional(v.number()),
+    netAmountIdr: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (
+      !isPaymentLink(args.paymentLinkUrl) ||
+      !Number.isFinite(args.expiresAt) ||
+      !args.paymentId
+    )
+      throw new Error("Invalid payment link");
     const order = await ctx.db
       .query("routerPayments")
       .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
@@ -129,8 +136,10 @@ export const attachPayment = internalMutation({
       paymentId: args.paymentId,
       paymentLinkUrl: args.paymentLinkUrl,
       expiresAt: args.expiresAt,
-      feeIdr: args.feeIdr,
-      netAmountIdr: args.netAmountIdr,
+      ...(args.feeIdr !== undefined ? { feeIdr: args.feeIdr } : {}),
+      ...(args.netAmountIdr !== undefined
+        ? { netAmountIdr: args.netAmountIdr }
+        : {}),
       status: order.status === "creating" ? "pending" : order.status,
       updatedAt: Date.now(),
     });
@@ -219,6 +228,7 @@ export const createPayment = action({
       !data.payment_id ||
       data.order_id !== order.orderId ||
       data.amount !== order.amountIdr ||
+      (data.currency !== undefined && data.currency !== "IDR") ||
       !isPaymentLink(data.payment_link_url) ||
       data.status !== "pending" ||
       !Number.isFinite(expiresAt) ||

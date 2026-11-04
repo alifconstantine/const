@@ -53,8 +53,13 @@ export function isPaymentLink(value: unknown): value is string {
   try {
     const url = new URL(value);
     return (
-      url.origin === "https://pay.sumopod.com" &&
-      url.pathname.startsWith("/pay/") &&
+      ((url.origin === "https://pay.sumopod.com" &&
+        /^\/pay\/[a-zA-Z0-9-]+\/?$/.test(url.pathname)) ||
+        (url.origin === "https://checkout.pymnt.app" &&
+          (/^\/payment-links\/[a-zA-Z0-9-]+\/?$/.test(url.pathname) ||
+            /^\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/?$/i.test(
+              url.pathname,
+            )))) &&
       !url.username &&
       !url.password
     );

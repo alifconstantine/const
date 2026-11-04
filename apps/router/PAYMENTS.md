@@ -42,6 +42,12 @@ Checkout requests use a client request ID and are limited to five new orders per
 
 Recent payment status and wallet balance update through Convex subscriptions. The payment link opens in a new tab, so the console remains available while the user pays. A payment is marked expired locally when its recorded expiry passes.
 
+Recent payments keeps a **Continue payment** link for every pending, unexpired invoice, including after the console reloads. Paid, failed and expired invoices have no payment action. An invoice still being created after two minutes is shown as **Needs review**; this is an uncertain checkout, not proof that payment failed. Reconcile it before creating a replacement.
+
+Live SumoPod responses verified on 2026-11-04 return hosted checkout URLs at `https://checkout.pymnt.app/payment-links/…`, whereas the Quick Start example uses `https://pay.sumopod.com/pay/…`. The hosted page can also provide a direct checkout URL at `https://checkout.pymnt.app/<uuid>`. Validation accepts these two exact origins and their payment paths, and rejects lookalike hosts, credentials and other paths. Amount, order, optional currency, expiry, status and fee reconciliation are still checked. An unpaid live diagnostic invoice was created to verify this response format; no payment was made or credit granted.
+
+Historical orders missing their response URL require merchant-provided order-to-link mapping. After checking the hosted checkout's amount, currency, pending status and `SUMOPAY-<payment_id>` reference, an operator can use internal `attachPayment` to restore the corresponding link and payment ID. Do not guess missing fee metadata; recovery allows it to remain absent. Bound the restored expiry to the original 24-hour invoice window. Recovery only restores access to the checkout; signed webhook completion remains required to grant credit.
+
 ## Verification
 
 ```

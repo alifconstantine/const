@@ -49,6 +49,17 @@ const records: Record<string, unknown> = {
     email: "alex@example.test",
   },
 };
+if (new URLSearchParams(location.search).get("state") === "recent-payments") {
+  records["router/payments:listPayments"] = ["pending", "completed", "expired", "failed", "creating"].map((status, index) => ({
+    orderId: `CONST-history-${status}`,
+    creditCents: 100,
+    amountIdr: 17000,
+    idrPerUsd: 17000,
+    status,
+    ...(status === "creating" ? {} : { paymentLinkUrl: `https://checkout.pymnt.app/payment-links/history-${status}`, expiresAt: Date.now() + (status === "expired" ? -60_000 : 86_400_000) }),
+    createdAt: Date.now() - (index + 1) * 600_000,
+  }));
+}
 function read(ref: Parameters<typeof getFunctionName>[0], args?: unknown) {
   if (args === "skip") return undefined;
   const name = getFunctionName(ref);

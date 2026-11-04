@@ -80,6 +80,27 @@ async function main() {
   assert.equal(await js(`document.body.innerText.includes('Your checkout is ready')`), false);
   await js(`window.__routerFixture.setPaymentState('completed')`);
   await wait(`document.body.innerText.includes('Payment verified. Your credit has been added.')`);
+  await win.loadURL("http://127.0.0.1:5192/credits?state=recent-payments");
+  await wait(`Boolean(document.querySelector('[aria-labelledby="recent-payments-heading"]'))`);
+  assert.equal(await js(`document.querySelectorAll('[aria-labelledby="recent-payments-heading"] a').length`), 1);
+  assert.equal(await js(`document.querySelector('[aria-label="Payment CONST-history-pending"] a').href`), 'https://checkout.pymnt.app/payment-links/history-pending');
+  assert.equal(await js(`document.querySelector('[aria-label="Payment CONST-history-pending"] a').target`), '_blank');
+  for (const [status, label] of [['pending', 'Awaiting payment'], ['completed', 'Paid · credited'], ['expired', 'Expired'], ['failed', 'Payment failed'], ['creating', 'Needs review']]) {
+    assert.equal(await js(`document.querySelector('[aria-label="Payment CONST-history-${status}"]').innerText.includes('${label}')`), true);
+  }
+  assert.equal(await js(`window.__routerFixture.mutations.length`), 0);
+  win.webContents.reload();
+  await wait(`Boolean(document.querySelector('[aria-label="Continue payment for $1.00 credit"]'))`);
+  assert.equal(await js(`window.__routerFixture.mutations.length`), 0);
+  assert.equal(await overflow(), true);
+  await js(`document.querySelector('#recent-payments-heading').scrollIntoView({ block: 'start' })`);
+  await capture("credits-recent-mobile-320");
+  win.setSize(1440, 1100);
+  await wait(`innerWidth === 1440`);
+  await js(`document.querySelector('#recent-payments-heading').scrollIntoView({ block: 'start' })`);
+  await capture("credits-recent-desktop");
+  win.setSize(320, 900);
+  await wait(`innerWidth === 320`);
   await win.loadURL("http://127.0.0.1:5192/credits?state=checkout-error");
   await wait(`Boolean(document.querySelector('#credit-usd'))`);
   await js(`document.querySelector('form').requestSubmit()`);

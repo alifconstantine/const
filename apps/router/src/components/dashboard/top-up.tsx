@@ -72,12 +72,17 @@ export function TopUpView({
   const selected = payments.find(
     (payment) => payment.orderId === selectedOrder,
   );
-  const effectiveStatus = (payment: Payment) =>
-    payment.status === "pending" &&
-    payment.expiresAt !== undefined &&
-    payment.expiresAt <= now
-      ? "expired"
-      : payment.status;
+  const effectiveStatus = (payment: Payment) => {
+    if (
+      payment.status === "pending" &&
+      payment.expiresAt !== undefined &&
+      payment.expiresAt <= now
+    )
+      return "expired";
+    if (payment.status === "creating" && now - payment.createdAt >= 2 * 60_000)
+      return "unconfirmed";
+    return payment.status;
+  };
   const selectedStatus = selected ? effectiveStatus(selected) : undefined;
   const payableSelected =
     selected?.creditCents === cents &&
@@ -86,7 +91,8 @@ export function TopUpView({
   const confirmingSelected = Boolean(
     selectedOrder &&
     (!selected ||
-      (selected.creditCents === cents && selectedStatus === "creating")),
+      (selected.creditCents === cents &&
+        (selectedStatus === "creating" || selectedStatus === "unconfirmed"))),
   );
   const summaryRate = payableSelected ? selected!.idrPerUsd : config?.idrPerUsd;
   const summaryTotal = payableSelected ? selected!.amountIdr : total;
@@ -271,7 +277,9 @@ export function TopUpView({
               {busy
                 ? "Creating checkout…"
                 : confirmingSelected
-                  ? "Confirming checkout…"
+                  ? selectedStatus === "unconfirmed"
+                    ? "Checkout needs review"
+                    : "Confirming checkout…"
                   : "Create QRIS checkout"}
             </Button>
           )}
@@ -311,6 +319,8 @@ export function TopUpView({
             "This checkout has expired. Create a new checkout to continue."
           ) : selectedStatus === "failed" ? (
             "This payment failed. Create a new checkout to try again."
+          ) : selectedStatus === "unconfirmed" ? (
+            "The checkout link could not be confirmed. Keep your payment reference and contact support before starting another payment."
           ) : selectedStatus === "pending" && selected?.paymentLinkUrl ? (
             <>Your checkout is ready. Select Pay with QRIS to continue.</>
           ) : (
@@ -319,15 +329,25 @@ export function TopUpView({
         </div>
       )}
       {payments.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium">Recent payments</h3>
+        <section
+          aria-labelledby="recent-payments-heading"
+          className="space-y-3"
+        >
+          <h3 id="recent-payments-heading" className="text-sm font-medium">
+            Recent payments
+          </h3>
+          <p className="text-xs leading-6 text-muted-foreground">
+            Reopen an unpaid checkout here if you closed the payment page.
+            Status updates automatically after payment verification.
+          </p>
           <div className="divide-y divide-border rounded-xl border border-border bg-card px-5">
             {payments.map((payment) => {
               const status = effectiveStatus(payment);
               return (
                 <article
                   key={payment.orderId}
-                  className="flex flex-wrap items-center justify-between gap-4 py-4"
+                  aria-label={`Payment ${payment.orderId}`}
+                  className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium tabular-nums">
@@ -345,14 +365,26 @@ export function TopUpView({
                         ? ` · Expires ${new Date(payment.expiresAt).toLocaleString()}`
                         : ""}
                     </p>
+                    {status === "unconfirmed" && (
+                      <p className="mt-2 max-w-prose text-xs leading-5 text-muted-foreground">
+                        Checkout link unavailable. Keep this reference and
+                        contact support before starting another payment.
+                      </p>
+                    )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs capitalize text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                    <span className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-secondary-foreground">
                       {status === "creating"
                         ? "Confirming checkout"
-                        : status === "completed"
-                          ? "Paid · credited"
-                          : status}
+                        : status === "unconfirmed"
+                          ? "Needs review"
+                          : status === "completed"
+                            ? "Paid · credited"
+                            : status === "pending"
+                              ? "Awaiting payment"
+                              : status === "failed"
+                                ? "Payment failed"
+                                : "Expired"}
                     </span>
                     {status === "pending" && payment.paymentLinkUrl && (
                       <Button
@@ -365,8 +397,9 @@ export function TopUpView({
                           href={payment.paymentLinkUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-label={`Continue payment for ${formatUsd(payment.creditCents / 100)} credit`}
                         >
-                          Pay with QRIS <ArrowUpRight className="size-3.5" />
+                          Continue payment <ArrowUpRight className="size-3.5" />
                         </a>
                       </Button>
                     )}
@@ -375,7 +408,7 @@ export function TopUpView({
               );
             })}
           </div>
-        </div>
+        </section>
       )}
     </section>
   );
