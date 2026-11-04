@@ -57,8 +57,9 @@ pre, code { font-variant-ligatures: none; }
 .router-skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; padding: .75rem 1rem; border-radius: .5rem; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 .router-skip-link:focus { top: 1rem; }
 @media (max-width: 767px) {
-  .router-page-content { padding: 1.5rem 1rem 2.5rem; }
+  .router-page-content { padding: 1.5rem 1rem calc(2.5rem + env(safe-area-inset-bottom)); }
   .router-shell button:not([role="switch"]), .router-shell a[role="button"], .router-shell select { min-height: 2.75rem; }
+  .router-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .router-shell textarea, .router-shell select { font-size: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

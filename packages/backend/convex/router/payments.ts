@@ -1,5 +1,6 @@
 import {
   action,
+  mutation,
   query,
   internalMutation,
   httpAction,
@@ -26,12 +27,16 @@ export const getCheckoutConfig = query({
   },
 });
 export const listPayments = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { archived: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
     const { userId } = await resolveIdentity(ctx);
     const orders = await ctx.db
       .query("routerPayments")
-      .withIndex("by_user_created", (q) => q.eq("userId", userId))
+      .withIndex("by_user_archived_created", (q) =>
+        args.archived
+          ? q.eq("userId", userId).gt("archivedAt", 0)
+          : q.eq("userId", userId).eq("archivedAt", undefined),
+      )
       .order("desc")
       .take(20);
     return orders.map((order) => ({
@@ -43,6 +48,22 @@ export const listPayments = query({
           ? "expired"
           : order.status,
     }));
+  },
+});
+export const setPaymentVisibility = mutation({
+  args: { orderId: v.string(), hidden: v.boolean() },
+  handler: async (ctx, args) => {
+    const { userId } = await resolveIdentity(ctx);
+    const order = await ctx.db
+      .query("routerPayments")
+      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+      .unique();
+    if (!order || order.userId !== userId)
+      throw new ConvexError("Payment not found.");
+    if (args.hidden === (order.archivedAt !== undefined)) return;
+    await ctx.db.patch(order._id, {
+      archivedAt: args.hidden ? Date.now() : undefined,
+    });
   },
 });
 export const preparePayment = internalMutation({

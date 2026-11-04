@@ -39,7 +39,7 @@ export function Sidebar({ onNavigate, className, isCollapsed = false, onToggleCo
             const active = pathname === item.href || pathname?.startsWith(item.href + "/");
             const Icon = item.icon;
             return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} title={isCollapsed ? item.title : undefined}
-              className={cn("flex min-h-10 items-center gap-3 rounded-lg text-[13px] transition-colors", isCollapsed ? "justify-center px-2" : "px-3", active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground")}>
+              className={cn("flex min-h-11 md:min-h-10 items-center gap-3 rounded-lg text-[13px] transition-colors", isCollapsed ? "justify-center px-2" : "px-3", active ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground")}>
               <Icon className={cn("size-4 shrink-0 stroke-[1.65]", active && "text-[var(--router-highlight)]")} />{!isCollapsed && <span>{item.title}</span>}
             </Link>;
           })}
@@ -47,7 +47,7 @@ export function Sidebar({ onNavigate, className, isCollapsed = false, onToggleCo
       </nav>
     </ScrollArea>
     {!isCollapsed && <div className="shrink-0 space-y-4 px-5 pb-4">
-      <Link href="/docs" onClick={onNavigate} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"><BookOpen className="size-3.5" />Documentation</Link>
+      <Link href="/docs" onClick={onNavigate} className="flex min-h-11 md:min-h-0 items-center gap-2 text-xs text-muted-foreground hover:text-foreground"><BookOpen className="size-3.5" />Documentation</Link>
     </div>}
     <div className={cn("shrink-0 pb-3", isCollapsed ? "px-2" : "px-3")}><AccountMenu isCollapsed={isCollapsed} /></div>
   </aside>;

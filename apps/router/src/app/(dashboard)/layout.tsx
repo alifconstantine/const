@@ -26,7 +26,7 @@ class SafeCreditBoundary extends React.Component<{ children: React.ReactNode }, 
   render() { return this.state.hasError ? <CreditBalanceLink value="Unavailable" /> : this.props.children; }
 }
 function CreditBalanceLink({ value }: { value: string }) {
-  return <Link href="/credits" aria-label={"Credit balance: " + value} className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium tabular-nums transition-colors hover:bg-secondary">
+  return <Link href="/credits" aria-label={"Credit balance: " + value} className="inline-flex h-11 sm:h-10 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium tabular-nums transition-colors hover:bg-secondary">
     <CreditCard className="size-3.5 text-muted-foreground" /><span>{value}</span>
   </Link>;
 }
@@ -50,6 +50,9 @@ const ROUTE_TITLES: Record<string, string> = {
   "/deposit": "Credits & balance",
   "/settings": "Settings & data",
   "/docs": "Documentation",
+};
+const MOBILE_ROUTE_TITLES: Record<string, string> = {
+  "/credits": "Credits", "/deposit": "Credits", "/models": "Models", "/settings": "Settings",
 };
 
 export default function DashboardLayout({
@@ -183,15 +186,15 @@ export function DashboardShell({ children, currentTitle = "Overview", isGenerati
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 sm:px-7">
         <div className="flex min-w-0 items-center gap-2.5 text-sm">
-          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} className="size-10 shrink-0 md:hidden" aria-label="Open navigation"><Menu className="size-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} className="size-11 shrink-0 md:hidden" aria-label="Open navigation"><Menu className="size-4" /></Button>
           <span className="hidden text-muted-foreground lg:inline">Workspace</span><ChevronRight className="hidden size-3 text-muted-foreground lg:inline" />
-          <span className="truncate font-medium">{currentTitle}</span>
+          <span className="truncate font-medium"><span className="sm:hidden">{MOBILE_ROUTE_TITLES[pathname || ""] || currentTitle}</span><span className="hidden sm:inline">{currentTitle}</span></span>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Link href="/docs" className="hidden items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground lg:flex"><BookOpen className="size-3.5" />Docs</Link>
           <div className="hidden sm:block"><ThemeToggle /></div>
           <SafeCreditBoundary><HeaderCreditBalance /></SafeCreditBoundary>
-          <Button asChild size="sm" className="h-9 gap-1.5 rounded-lg px-2.5 text-xs sm:px-3"><Link href="/keys"><Plus className="size-3.5" /><span className="hidden sm:inline">Create key</span><span className="sm:hidden">Key</span></Link></Button>
+          <Button asChild size="sm" className="size-11 shrink-0 gap-1.5 rounded-lg p-0 text-xs sm:h-9 sm:w-auto sm:px-3"><Link href="/keys" aria-label="Create API key"><Plus className="size-3.5" /><span className="hidden sm:inline">Create key</span></Link></Button>
         </div>
       </header>
       <main id="router-main" tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col outline-none">

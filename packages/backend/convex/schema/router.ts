@@ -206,11 +206,13 @@ export const routerTables = {
     status: v.union(v.literal("creating"), v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("expired")),
     expiresAt: v.optional(v.number()),
     paidAt: v.optional(v.string()),
+    archivedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_order", ["orderId"])
     .index("by_payment", ["paymentId"])
     .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_archived_created", ["userId", "archivedAt", "createdAt"])
     .index("by_user_request", ["userId", "requestId"]),
 
   // 8. Deposit & Credit Transaction History

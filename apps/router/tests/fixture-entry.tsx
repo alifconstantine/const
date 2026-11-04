@@ -12,6 +12,9 @@ import ModelsPage from "../src/app/(dashboard)/models/page";
 import EndpointsPage from "../src/app/(dashboard)/endpoints/page";
 import SettingsPage from "../src/app/(dashboard)/settings/page";
 import GenerationPage from "../src/app/(dashboard)/generation/page";
+import KeysPage from "../src/app/(dashboard)/keys/page";
+import LogsPage from "../src/app/(dashboard)/logs/page";
+import CombosPage from "../src/app/(dashboard)/combos/page";
 import { usePathname } from "./fixture-navigation";
 import { analytics, logs, quota, transactions, wallet } from "./fixture-data";
 import { TopUp } from "../src/components/dashboard/top-up";
@@ -119,6 +122,12 @@ function Fixture() {
       <SettingsPage />
     ) : path === "/generation" ? (
       <GenerationPage />
+    ) : path === "/keys" ? (
+      <KeysPage />
+    ) : path === "/logs" ? (
+      <LogsPage />
+    ) : path === "/combos" ? (
+      <CombosPage />
     ) : (
       overview
     );
@@ -129,6 +138,9 @@ function Fixture() {
     "/endpoints": "API endpoints",
     "/settings": "Settings",
     "/generation": "Playground",
+    "/keys": "API Keys",
+    "/logs": "Usage logs",
+    "/combos": "Combos",
   };
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>

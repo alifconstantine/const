@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "@const/backend/_generated/api";
 import { Button, Input, cn } from "@const/ui";
@@ -36,10 +36,18 @@ const rupiah = (value: number) =>
 export function TopUpView({
   config,
   payments = [],
+  paymentsLoading = false,
   create,
+  showHidden = false,
+  onToggleHidden,
+  setVisibility,
 }: {
   config?: Config;
   payments?: Payment[];
+  paymentsLoading?: boolean;
+  showHidden?: boolean;
+  onToggleHidden?: () => void;
+  setVisibility?: (orderId: string, hidden: boolean) => Promise<unknown>;
   create?: (
     creditCents: number,
     requestId: string,
@@ -50,6 +58,23 @@ export function TopUpView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState("");
+  const [visibilityBusy, setVisibilityBusy] = useState("");
+  const [visibilityError, setVisibilityError] = useState("");
+  const [visibilityNotice, setVisibilityNotice] = useState("");
+  const visibilityPending = useRef(false);
+  const historySection = useRef<HTMLElement>(null);
+  const previousHistoryView = useRef(showHidden);
+  useEffect(() => {
+    if (paymentsLoading || previousHistoryView.current === showHidden) return;
+    previousHistoryView.current = showHidden;
+    const frame = requestAnimationFrame(() =>
+      historySection.current?.scrollIntoView({
+        block: "start",
+        behavior: "instant",
+      }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [showHidden, paymentsLoading]);
   const [now, setNow] = useState(Date.now());
   const attempt = useRef<{ amount: number; requestId: string } | null>(null);
   const pending = useRef(false);
@@ -96,6 +121,27 @@ export function TopUpView({
   );
   const summaryRate = payableSelected ? selected!.idrPerUsd : config?.idrPerUsd;
   const summaryTotal = payableSelected ? selected!.amountIdr : total;
+  async function changeVisibility(orderId: string) {
+    if (!setVisibility || visibilityPending.current) return;
+    visibilityPending.current = true;
+    setVisibilityBusy(orderId);
+    setVisibilityError("");
+    setVisibilityNotice("");
+    try {
+      await setVisibility(orderId, !showHidden);
+      if (selectedOrder === orderId) setSelectedOrder("");
+      setVisibilityNotice(
+        showHidden
+          ? "Payment restored to Recent payments."
+          : "Payment hidden. You can restore it from Hidden payments. This does not cancel the checkout.",
+      );
+    } catch {
+      setVisibilityError("Could not update this payment. Please try again.");
+    } finally {
+      visibilityPending.current = false;
+      setVisibilityBusy("");
+    }
+  }
   async function checkout(event: React.FormEvent) {
     event.preventDefault();
     if (
@@ -328,86 +374,152 @@ export function TopUpView({
           )}
         </div>
       )}
-      {payments.length > 0 && (
+      {(payments.length > 0 || onToggleHidden) && (
         <section
+          ref={historySection}
           aria-labelledby="recent-payments-heading"
           className="space-y-3"
         >
-          <h3 id="recent-payments-heading" className="text-sm font-medium">
-            Recent payments
-          </h3>
-          <p className="text-xs leading-6 text-muted-foreground">
-            Reopen an unpaid checkout here if you closed the payment page.
-            Status updates automatically after payment verification.
-          </p>
-          <div className="divide-y divide-border rounded-xl border border-border bg-card px-5">
-            {payments.map((payment) => {
-              const status = effectiveStatus(payment);
-              return (
-                <article
-                  key={payment.orderId}
-                  aria-label={`Payment ${payment.orderId}`}
-                  className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium tabular-nums">
-                      {formatUsd(payment.creditCents / 100)} credit{" "}
-                      <span className="ml-2 font-normal text-muted-foreground">
-                        {rupiah(payment.amountIdr)}
-                      </span>
-                    </p>
-                    <p className="mt-1 break-all text-[11px] text-muted-foreground">
-                      {payment.orderId}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {new Date(payment.createdAt).toLocaleString()}
-                      {payment.expiresAt && status === "pending"
-                        ? ` · Expires ${new Date(payment.expiresAt).toLocaleString()}`
-                        : ""}
-                    </p>
-                    {status === "unconfirmed" && (
-                      <p className="mt-2 max-w-prose text-xs leading-5 text-muted-foreground">
-                        Checkout link unavailable. Keep this reference and
-                        contact support before starting another payment.
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                    <span className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-secondary-foreground">
-                      {status === "creating"
-                        ? "Confirming checkout"
-                        : status === "unconfirmed"
-                          ? "Needs review"
-                          : status === "completed"
-                            ? "Paid · credited"
-                            : status === "pending"
-                              ? "Awaiting payment"
-                              : status === "failed"
-                                ? "Payment failed"
-                                : "Expired"}
-                    </span>
-                    {status === "pending" && payment.paymentLinkUrl && (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11 gap-2"
-                      >
-                        <a
-                          href={payment.paymentLinkUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Continue payment for ${formatUsd(payment.creditCents / 100)} credit`}
-                        >
-                          Continue payment <ArrowUpRight className="size-3.5" />
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 id="recent-payments-heading" className="text-sm font-medium">
+              {showHidden ? "Hidden payments" : "Recent payments"}
+            </h3>
+            {onToggleHidden && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11"
+                disabled={Boolean(visibilityBusy)}
+                onClick={() => {
+                  onToggleHidden();
+                  setSelectedOrder("");
+                  setError("");
+                  setVisibilityNotice("");
+                  setVisibilityError("");
+                }}
+              >
+                {showHidden ? "Back to recent payments" : "Hidden payments"}
+              </Button>
+            )}
           </div>
+          <p className="text-xs leading-6 text-muted-foreground">
+            {showHidden
+              ? "Hiding a payment does not cancel its checkout. Payments made before or after hiding are still verified and credited."
+              : "Reopen an unpaid checkout here if you closed the payment page. Hide payments you no longer need; you can restore them later."}
+          </p>
+          {visibilityError && (
+            <p role="alert" className="text-sm text-destructive">
+              {visibilityError}
+            </p>
+          )}
+          {visibilityNotice && (
+            <p role="status" className="text-sm text-muted-foreground">
+              {visibilityNotice}
+            </p>
+          )}
+          {paymentsLoading && (
+            <p
+              role="status"
+              className="px-5 py-6 text-sm text-muted-foreground"
+            >
+              Loading payments…
+            </p>
+          )}
+          {!paymentsLoading && !payments.length && (
+            <p className="rounded-xl border border-border px-5 py-6 text-sm text-muted-foreground">
+              {showHidden ? "No hidden payments." : "No recent payments."}
+            </p>
+          )}
+          {payments.length > 0 && (
+            <div className="divide-y divide-border rounded-xl border border-border bg-card px-5">
+              {payments.map((payment) => {
+                const status = effectiveStatus(payment);
+                return (
+                  <article
+                    key={payment.orderId}
+                    aria-label={`Payment ${payment.orderId}`}
+                    className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium tabular-nums">
+                        {formatUsd(payment.creditCents / 100)} credit{" "}
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {rupiah(payment.amountIdr)}
+                        </span>
+                      </p>
+                      <p className="mt-1 break-all text-[11px] text-muted-foreground">
+                        {payment.orderId}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {new Date(payment.createdAt).toLocaleString()}
+                        {payment.expiresAt && status === "pending"
+                          ? ` · Expires ${new Date(payment.expiresAt).toLocaleString()}`
+                          : ""}
+                      </p>
+                      {status === "unconfirmed" && (
+                        <p className="mt-2 max-w-prose text-xs leading-5 text-muted-foreground">
+                          Checkout link unavailable. Keep this reference and
+                          contact support before starting another payment.
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                      <span className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-secondary-foreground">
+                        {status === "creating"
+                          ? "Confirming checkout"
+                          : status === "unconfirmed"
+                            ? "Needs review"
+                            : status === "completed"
+                              ? "Paid · credited"
+                              : status === "pending"
+                                ? "Awaiting payment"
+                                : status === "failed"
+                                  ? "Payment failed"
+                                  : "Expired"}
+                      </span>
+                      {!showHidden &&
+                        status === "pending" &&
+                        payment.paymentLinkUrl && (
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 gap-2"
+                          >
+                            <a
+                              href={payment.paymentLinkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Continue payment for ${formatUsd(payment.creditCents / 100)} credit`}
+                            >
+                              Continue payment{" "}
+                              <ArrowUpRight className="size-3.5" />
+                            </a>
+                          </Button>
+                        )}
+                      {setVisibility && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="min-h-11"
+                          aria-label={`${showHidden ? "Restore" : "Hide"} payment ${payment.orderId}`}
+                          disabled={Boolean(visibilityBusy)}
+                          onClick={() => void changeVisibility(payment.orderId)}
+                        >
+                          {visibilityBusy === payment.orderId ? (
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                          ) : null}
+                          {showHidden ? "Restore" : "Hide"}
+                        </Button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
     </section>
@@ -415,6 +527,7 @@ export function TopUpView({
 }
 
 export function TopUp() {
+  const [showHidden, setShowHidden] = useState(false);
   const { isAuthenticated } = useRouterAuth();
   const config = useQuery(
     api.router.payments.getCheckoutConfig,
@@ -422,13 +535,18 @@ export function TopUp() {
   );
   const payments = useQuery(
     api.router.payments.listPayments,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? { archived: showHidden } : "skip",
   );
   const create = useAction(api.router.payments.createPayment);
+  const setVisibility = useMutation(api.router.payments.setPaymentVisibility);
   return (
     <TopUpView
       config={config}
       payments={payments}
+      paymentsLoading={payments === undefined}
+      showHidden={showHidden}
+      onToggleHidden={() => setShowHidden((value) => !value)}
+      setVisibility={(orderId, hidden) => setVisibility({ orderId, hidden })}
       create={(creditCents, requestId, expectedIdrPerUsd) =>
         create({ creditCents, requestId, expectedIdrPerUsd })
       }

@@ -40,6 +40,8 @@ const records: Record<string, unknown> = {
   "router/credits:getCreditTransactions": transactions,
   "router/logs:getDashboardAnalytics": analytics,
   "router/logs:listLogs": logs,
+  "router/logs:paginateLogs": logs.map((log, index) => ({ ...log, requestId: `fixture-request-${index}`, promptTokens: log.totalTokens, completionTokens: 0, durationMs: 1250, costNanoUsd: 12000 })),
+  "router/keys:listKeys": [{ _id: "fixture-key", name: "Mobile integration", keyPrefix: "sk-const-live-test", status: "active", usedTodayTokens: 128, createdAt: Date.now(), lastUsedAt: Date.now() }],
   "router/combos:listCombos": empty,
   "router/providers:listProviders": empty,
   "router/models:listCustomModels": empty,
@@ -49,7 +51,7 @@ const records: Record<string, unknown> = {
     email: "alex@example.test",
   },
 };
-if (new URLSearchParams(location.search).get("state") === "recent-payments") {
+if (["recent-payments", "archive-error"].includes(new URLSearchParams(location.search).get("state") || "")) {
   records["router/payments:listPayments"] = ["pending", "completed", "expired", "failed", "creating"].map((status, index) => ({
     orderId: `CONST-history-${status}`,
     creditCents: 100,
@@ -71,6 +73,7 @@ function read(ref: Parameters<typeof getFunctionName>[0], args?: unknown) {
     );
   if (state === "loading" && !name.startsWith("auth/")) return undefined;
   if (state === "unavailable" && name === "router/payments:getCheckoutConfig") return { available: false, idrPerUsd: null, minCreditCents: 100, maxCreditCents: 50000 };
+  if (name === "router/payments:listPayments") return (records[name] as Array<Record<string, unknown>>).filter(payment => Boolean(payment.archivedAt) === Boolean((args as { archived?: boolean })?.archived));
   return records[name] ?? empty;
 }
 export function useQuery(
@@ -103,6 +106,11 @@ export function useMutation(ref: Parameters<typeof getFunctionName>[0]) {
     fixtureCounters.mutations.push({ name, args });
     if (name === "router/settings:saveSettings")
       records["router/settings:getSettings"] = args;
+    if (name === "router/payments:setPaymentVisibility") {
+      if (new URLSearchParams(location.search).get("state") === "archive-error") throw new Error("Synthetic archive failure");
+      const input = args as { orderId: string; hidden: boolean };
+      records["router/payments:listPayments"] = (records["router/payments:listPayments"] as Array<Record<string, unknown>>).map(payment => payment.orderId === input.orderId ? { ...payment, archivedAt: input.hidden ? Date.now() : undefined } : payment);
+    }
     update();
     return { success: true };
   };

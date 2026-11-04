@@ -56,6 +56,10 @@ function database() {
               conditions.push((r) => r[k] >= value);
               return ops;
             },
+            gt(k, value) {
+              conditions.push((r) => r[k] > value);
+              return ops;
+            },
           };
           fn?.(ops);
           return q;
@@ -1070,4 +1074,34 @@ test('historical invoice recovery restores its link without crediting or inventi
   await payments.settlePayment.handler(ctx, paidEvent({ paymentId: 'recovered-payment' }));
   await payments.settlePayment.handler(ctx, paidEvent({ paymentId: 'recovered-payment' }));
   assert.equal((await db.get('wallet')).balanceUsd, 11);
+});
+
+test('payment visibility is authenticated, owner-scoped, reversible and idempotent', async () => {
+  const { order } = await preparePayment();
+  const args = { orderId: order.orderId, hidden: true };
+  await assert.rejects(payments.setPaymentVisibility.handler(ctx, args), /Unauthorized/);
+  await assert.rejects(payments.setPaymentVisibility.handler({ ...ctx, userId: 'u2' }, args), /Payment not found/);
+  await payments.setPaymentVisibility.handler({ ...ctx, userId: 'u1' }, args);
+  const hiddenAt = (await db.get(order._id)).archivedAt;
+  await payments.setPaymentVisibility.handler({ ...ctx, userId: 'u1' }, args);
+  assert.equal((await db.get(order._id)).archivedAt, hiddenAt);
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u1' }, {})).length, 0);
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u1' }, { archived: true })).length, 1);
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u2' }, { archived: true })).length, 0);
+  await payments.setPaymentVisibility.handler({ ...ctx, userId: 'u1' }, { ...args, hidden: false });
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u1' }, {})).length, 1);
+  assert.equal((await db.get(order._id)).status, 'creating');
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+});
+
+test('hiding an invoice does not stop verified completion or create duplicate credit', async () => {
+  const { order } = await preparePayment();
+  await payments.setPaymentVisibility.handler({ ...ctx, userId: 'u1' }, { orderId: order.orderId, hidden: true });
+  await payments.settlePayment.handler(ctx, paidEvent());
+  await payments.settlePayment.handler(ctx, paidEvent());
+  assert.equal((await db.get('wallet')).balanceUsd, 11);
+  const hidden = await payments.listPayments.handler({ ...ctx, userId: 'u1' }, { archived: true });
+  assert.equal(hidden[0].status, 'completed');
+  assert.equal(hidden[0].amountIdr, order.amountIdr);
+  assert.equal((await db.query('creditTransactions').collect()).filter(tx => tx.type === 'deposit').length, 1);
 });
