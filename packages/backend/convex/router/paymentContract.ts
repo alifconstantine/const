@@ -2,10 +2,14 @@ import { ConvexError } from "convex/values";
 
 export const MIN_CREDIT_CENTS = 100;
 export const MAX_CREDIT_CENTS = 50_000;
-export function checkoutConfig() {
-  const rate = Number(process.env.SUMOPOD_IDR_PER_USD);
+export function checkoutConfig(rate: number | null = null) {
   const idrPerUsd =
-    Number.isSafeInteger(rate) && rate > 0 && rate <= 1_000_000 ? rate : null;
+    typeof rate === "number" &&
+    Number.isSafeInteger(rate) &&
+    rate > 0 &&
+    rate <= 1_000_000
+      ? rate
+      : null;
   const origin = process.env.ROUTER_PUBLIC_URL || "https://router.const.web.id";
   let validOrigin = false;
   try {

@@ -12,6 +12,7 @@ import { formatUsd } from "@/lib/router-analytics";
 type Config = {
   available: boolean;
   idrPerUsd: number | null;
+  referenceDate?: string | null;
   minCreditCents: number;
   maxCreditCents: number;
 };
@@ -42,6 +43,7 @@ export function TopUpView({
   create?: (
     creditCents: number,
     requestId: string,
+    expectedIdrPerUsd: number,
   ) => Promise<{ orderId: string }>;
 }) {
   const [amount, setAmount] = useState("10");
@@ -105,7 +107,11 @@ export function TopUpView({
     if (attempt.current?.amount !== cents)
       attempt.current = { amount: cents, requestId: crypto.randomUUID() };
     try {
-      const result = await create(cents, attempt.current.requestId);
+      const result = await create(
+        cents,
+        attempt.current.requestId,
+        config.idrPerUsd!,
+      );
       setSelectedOrder(result.orderId);
       attempt.current = null;
     } catch (failure) {
@@ -139,7 +145,7 @@ export function TopUpView({
           <fieldset disabled={busy} className="space-y-3">
             <legend className="mb-3 text-sm font-medium">Credit amount</legend>
             <div className="grid grid-cols-4 gap-2">
-              {[5, 10, 25, 50].map((value) => (
+              {[1, 5, 10, 25].map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -212,6 +218,21 @@ export function TopUpView({
               </dd>
             </div>
           </dl>
+          {config?.referenceDate && !payableSelected && (
+            <p className="text-xs leading-6 text-muted-foreground">
+              Daily reference rate · {config.referenceDate}. Checked hourly.
+              Source:{" "}
+              <a
+                href="https://frankfurter.dev/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4"
+              >
+                Frankfurter
+              </a>
+              .
+            </p>
+          )}
           <p className="max-w-prose text-xs leading-6 text-muted-foreground">
             Scan the QR code on SumoPod’s checkout with your banking or e-wallet
             app. The exchange rate is fixed when your payment is created.
@@ -264,7 +285,8 @@ export function TopUpView({
                 role="status"
                 className="text-xs leading-6 text-muted-foreground"
               >
-                QRIS payments are being configured. Please try again later.
+                QRIS checkout is temporarily unavailable. Please try again
+                later.
               </p>
             )
           )}
@@ -374,7 +396,9 @@ export function TopUp() {
     <TopUpView
       config={config}
       payments={payments}
-      create={(creditCents, requestId) => create({ creditCents, requestId })}
+      create={(creditCents, requestId, expectedIdrPerUsd) =>
+        create({ creditCents, requestId, expectedIdrPerUsd })
+      }
     />
   );
 }

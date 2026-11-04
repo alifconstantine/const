@@ -9,13 +9,20 @@ On Credits (also `/deposit`), users choose $1–$500 in USD and pay an IDR invoi
 Set these in the **Convex deployment's environment**, not the browser or Router's public environment:
 
 - `SUMOPOD_API_KEY`: project API key.
-- `SUMOPOD_IDR_PER_USD`: your selling exchange rate, a positive integer in IDR per USD. No live exchange-rate feed or automatic exchange-rate adjustment is assumed. Review this rate when currency prices change.
 - `SUMOPOD_WEBHOOK_SECRET`: project signing secret (`whsec_…`), preferred. Or `SUMOPOD_WEBHOOK_TOKEN` (`whtok_…`) for the documented token verification alternative. When both are supplied, signatures are required.
 - `ROUTER_PUBLIC_URL`: HTTPS console URL, defaults to `https://router.const.web.id`.
 
 Payment credentials are stored in the ignored `packages/backend/.env.local` and configured separately in the Convex production environment. Never commit their values. Checkout stays disabled when any required deployment configuration is missing.
 
-Production configuration was activated on 2026-11-04 for `earnest-hawk-132`, matching the backend used by `router.const.web.id`. The initial selling rate is Rp18,500 per USD; this is a configured checkout rate, not an automatically updated market quote. Update `SUMOPOD_IDR_PER_USD` when the selling rate changes. Existing invoices retain their original rate.
+Production configuration was activated on 2026-11-04 for `earnest-hawk-132`, matching the backend used by `router.const.web.id`.
+
+## Automatic USD/IDR reference rate
+
+The server checks [Frankfurter's blended USD/IDR endpoint](https://api.frankfurter.dev/v2/rate/USD/IDR) every hour. This is a daily reference rate, not an intraday market feed. The public blended API supports commercial SaaS billing without an API key; see [its documentation](https://frankfurter.dev/). No customer data is sent to the rate provider.
+
+The singleton `routerExchangeRates` cache updates subscribed checkout screens. Rates are rounded up to whole rupiah (less than Rp1 per USD), and the final invoice total is rounded up to whole rupiah. No extra exchange-rate margin is added. Presets are $1, $5, $10 and $25; custom purchases remain $1–$500.
+
+After deploying, initialize the cache with `pnpm --filter @const/backend exec convex run router/exchangeRates:refresh '{}' --deployment earnest-hawk-132`. The hourly cron maintains it. `SUMOPOD_IDR_PER_USD` is no longer used. Checkout is disabled until the first successful fetch, after 26 hours without a successful fetch, or if the reference observation is over seven days old (allowing weekends and holidays). Invalid responses never overwrite the last valid rate. The server rechecks freshness and the displayed rate when creating an invoice; changed quotes require review. Existing invoices and retries keep their original amount even if the feed is unavailable.
 
 In SumoPod Settings, configure the webhook URL as:
 

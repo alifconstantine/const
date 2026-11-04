@@ -3,6 +3,12 @@ import { v } from "convex/values";
 import { chatMessageValidator } from "../router/validators";
 
 export const routerTables = {
+  routerExchangeRates: defineTable({
+    pair: v.literal("USD_IDR"),
+    idrPerUsd: v.number(),
+    referenceDate: v.string(),
+    fetchedAt: v.number(),
+  }).index("by_pair", ["pair"]),
   // 1. User API Keys to access Const Router AI Gateway (sk-const-live-xxxx)
   apiKeys: defineTable({
     userId: v.id("users"),

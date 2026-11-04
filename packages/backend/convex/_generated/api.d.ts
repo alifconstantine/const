@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as auth_queries from "../auth/queries.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as learn_artifacts from "../learn/artifacts.js";
 import type * as learn_collections from "../learn/collections.js";
@@ -21,6 +22,8 @@ import type * as router_chats from "../router/chats.js";
 import type * as router_combos from "../router/combos.js";
 import type * as router_credits from "../router/credits.js";
 import type * as router_crypto from "../router/crypto.js";
+import type * as router_exchangeRateContract from "../router/exchangeRateContract.js";
+import type * as router_exchangeRates from "../router/exchangeRates.js";
 import type * as router_gateway from "../router/gateway.js";
 import type * as router_keys from "../router/keys.js";
 import type * as router_logs from "../router/logs.js";
@@ -51,6 +54,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   "auth/queries": typeof auth_queries;
+  crons: typeof crons;
   http: typeof http;
   "learn/artifacts": typeof learn_artifacts;
   "learn/collections": typeof learn_collections;
@@ -62,6 +66,8 @@ declare const fullApi: ApiFromModules<{
   "router/combos": typeof router_combos;
   "router/credits": typeof router_credits;
   "router/crypto": typeof router_crypto;
+  "router/exchangeRateContract": typeof router_exchangeRateContract;
+  "router/exchangeRates": typeof router_exchangeRates;
   "router/gateway": typeof router_gateway;
   "router/keys": typeof router_keys;
   "router/logs": typeof router_logs;

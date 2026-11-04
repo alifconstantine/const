@@ -33,7 +33,7 @@ export const fixtureCounters = {
   },
 };
 const records: Record<string, unknown> = {
-  "router/payments:getCheckoutConfig": { available: true, idrPerUsd: 17000, minCreditCents: 100, maxCreditCents: 50000 },
+  "router/payments:getCheckoutConfig": { available: true, idrPerUsd: 17000, referenceDate: "2026-11-04", minCreditCents: 100, maxCreditCents: 50000 },
   "router/payments:listPayments": [],
   "router/settings:getSettings": settings,
   "router/credits:getUserCredits": wallet,

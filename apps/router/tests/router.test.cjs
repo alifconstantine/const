@@ -123,6 +123,7 @@ const load = sourceLoader({
     query: (x) => x,
     mutation: (x) => x,
     internalMutation: (x) => x,
+    internalAction: (x) => x,
     action: (x) => x,
     httpAction: (x) => x,
   },
@@ -136,6 +137,8 @@ const catalog = load("packages/backend/convex/router/modelCatalog.ts");
 const settings = load("packages/backend/convex/router/settings.ts");
 const payments = load("packages/backend/convex/router/payments.ts");
 const paymentContract = load("packages/backend/convex/router/paymentContract.ts");
+const exchangeRates = load("packages/backend/convex/router/exchangeRates.ts");
+const rateContract = load("packages/backend/convex/router/exchangeRateContract.ts");
 const { calculateQuotaState, WEEK_MS } = load(
   "packages/backend/convex/router/quotas.ts",
 );
@@ -146,111 +149,6 @@ const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
-function sidebarFixture(
-  results,
-  authenticated = true,
-  exerciseSubscription = false,
-) {
-  const React = appRequire("react");
-  const { renderToStaticMarkup } = appRequire("react-dom/server");
-  const { useQueries, ConvexProvider } = appRequire("convex/react");
-  const { anyApi, getFunctionName } = appRequire("convex/server");
-  let subscriptions;
-  let renders = 0;
-  const sidebarLoad = sourceLoader({
-    "convex/react": {
-      useQueries: (queries) => {
-        subscriptions = queries;
-        renders++;
-        if (exerciseSubscription) {
-          const values = useQueries(queries);
-          // A single follow-up render exercises the actual Convex subscription
-          // hook's identity checks, which a stubbed hook cannot catch.
-          const [rerendered, setRerendered] = React.useState(false);
-          if (!rerendered) setRerendered(true);
-          return values;
-        }
-        return results;
-      },
-    },
-    "next/navigation": { usePathname: () => "/models" },
-    "next/link": ({ children, ...props }) =>
-      React.createElement("a", props, children),
-    "@const/backend/_generated/api": {
-      api: exerciseSubscription ? anyApi : api,
-    },
-    "@/components/providers/convex-client-provider": {
-      useRouterAuth: () => ({ isAuthenticated: authenticated }),
-    },
-    "./account-menu": {
-      AccountMenu: () => React.createElement("div", null, "Account"),
-    },
-    "@const/ui": {
-      ScrollArea: ({ children, ...props }) => React.createElement("div", props, children),
-      Button: ({ children, variant, size, ...props }) =>
-        React.createElement("button", props, children),
-      ConstLogoIcon: () => null,
-      cn: (...names) => names.filter(Boolean).join(" "),
-    },
-  });
-  const { Sidebar } = sidebarLoad(
-    "apps/router/src/components/dashboard/sidebar.tsx",
-  );
-  const client = {
-    watchQuery: (query) => ({
-      localQueryResult: () => {
-        const value = getFunctionName(query).endsWith(":getSettings")
-          ? results.settings
-          : results.wallet;
-        if (value instanceof Error) throw value;
-        return value;
-      },
-      onUpdate: () => () => {},
-    }),
-  };
-  return {
-    html: renderToStaticMarkup(
-      React.createElement(
-        ConvexProvider,
-        { client },
-        React.createElement(Sidebar),
-      ),
-    ),
-    subscriptions,
-    renders,
-  };
-}
-test("sidebar rerenders settle with the real Convex subscription hook", () => {
-  for (const authenticated of [false, true]) {
-    for (const results of [
-      {},
-      {
-        wallet: { availableUsd: 10 },
-        settings: { notifyLowQuota: true },
-      },
-      { wallet: new Error("Unavailable"), settings: new Error("Unavailable") },
-    ]) {
-      const { html, renders } = sidebarFixture(results, authenticated, true);
-      assert.match(html, /href="\/models"/);
-      assert.equal(renders, 2);
-    }
-  }
-});
-test("sidebar remains usable when balance query fails and recovers", () => {
-  const failed = sidebarFixture({ wallet: new Error("Balance unavailable") });
-  assert.match(failed.html, /Balance unavailable/);
-  assert.match(failed.html, /href="\/models"/);
-  const recovered = sidebarFixture({ wallet: { availableUsd: 10 } });
-  assert.match(recovered.html, /\$10.00/);
-  assert.doesNotMatch(recovered.html, /Weekly free allowance/);
-});
-
-test("sidebar skips protected subscriptions before authentication", () => {
-  const { html, subscriptions } = sidebarFixture({}, false);
-  assert.deepEqual(subscriptions, {});
-  assert.match(html, /href="\/models"/);
-  assert.doesNotMatch(html, /Free usage unavailable|7M free tokens/);
-});
 const secret = "router-test-secret-32-characters-minimum";
 process.env.ROUTER_GATEWAY_SECRET = secret;
 process.env.NEXT_PUBLIC_CONVEX_URL = "https://router-test.invalid";
@@ -963,7 +861,7 @@ test("sub-microdollar amounts never display as free usage", () => {
 // Payment tests exercise the production actions, verifier and ledger mutations.
 function paymentEnvironment() {
   process.env.SUMOPOD_API_KEY = 'test-sumopod-key';
-  process.env.SUMOPOD_IDR_PER_USD = '17000';
+  db.seed('routerExchangeRates', 'usd-idr', { pair: 'USD_IDR', idrPerUsd: 17000, referenceDate: new Date().toISOString().slice(0, 10), fetchedAt: Date.now() });
   process.env.SUMOPOD_WEBHOOK_TOKEN = 'whtok_test';
   delete process.env.SUMOPOD_WEBHOOK_SECRET;
 }
@@ -980,11 +878,11 @@ test('checkout fails closed without a rate or verified-webhook credentials', asy
   assert.equal(paymentContract.checkoutConfig().available, false);
   await assert.rejects(preparePayment(0), /credit amount/);
   paymentEnvironment();
+  assert.equal((await payments.getCheckoutConfig.handler({ ...ctx, userId: 'u1' }, {})).available, true);
   delete process.env.SUMOPOD_WEBHOOK_TOKEN;
-  assert.equal(paymentContract.checkoutConfig().available, false);
+  assert.equal(paymentContract.checkoutConfig(17000).available, false);
   process.env.SUMOPOD_WEBHOOK_TOKEN = 'whtok_test';
-  process.env.SUMOPOD_IDR_PER_USD = 'NaN';
-  assert.equal(paymentContract.checkoutConfig().available, false);
+  assert.equal(paymentContract.checkoutConfig(NaN).available, false);
 });
 test('quotes use integer cents, round IDR upward and reject invalid amounts', () => {
   assert.deepEqual(paymentContract.quotePayment(101, 17001), { amountIdr: 17172, creditNanoUsd: 1010000000 });
@@ -992,10 +890,54 @@ test('quotes use integer cents, round IDR upward and reject invalid amounts', ()
   assert.equal(paymentContract.isPaymentLink('https://pay.sumopod.com/pay/payment-1'), true);
   for (const value of ['https://evil.test/pay/id', 'https://pay.sumopod.com.evil.test/pay/id', 'javascript:alert(1)', 'https://a:b@pay.sumopod.com/pay/id']) assert.equal(paymentContract.isPaymentLink(value), false);
 });
+
+test('reference rates validate currency, dates and finite values before caching', () => {
+  const now = Date.UTC(2026, 10, 4, 12);
+  const valid = { base: 'USD', quote: 'IDR', date: '2026-11-04', rate: 18143.12 };
+  assert.deepEqual(rateContract.parseReferenceRate(valid, now), { idrPerUsd: 18144, referenceDate: '2026-11-04' });
+  for (const changed of [{ base: 'EUR' }, { quote: 'EUR' }, { date: '2026-11-05' }, { date: '2026-02-30' }, { date: '2026-10-20' }, { rate: '18143' }, { rate: NaN }, { rate: Infinity }, { rate: 0 }, { rate: 1e7 }]) {
+    assert.throws(() => rateContract.parseReferenceRate({ ...valid, ...changed }, now));
+  }
+  const cached = { idrPerUsd: 18144, referenceDate: valid.date, fetchedAt: now };
+  assert.equal(rateContract.usableReferenceRate(cached, now + rateContract.RATE_CACHE_MAX_AGE), 18144);
+  assert.equal(rateContract.usableReferenceRate(cached, now + rateContract.RATE_CACHE_MAX_AGE + 1), null);
+  assert.equal(rateContract.usableReferenceRate({ ...cached, referenceDate: '2026-10-20' }, now), null);
+  assert.equal(rateContract.usableReferenceRate(null, now), null);
+});
+
+test('new checkout refuses changed or stale rates but retries preserve an existing invoice', async () => {
+  const { order } = await preparePayment();
+  await db.patch('usd-idr', { idrPerUsd: 18000 });
+  const args = { creditCents: 1000, requestId: 'request-payment-0002', orderId: 'CONST-new', expectedIdrPerUsd: 17000 };
+  await assert.rejects(payments.preparePayment.handler({ ...ctx, userId: 'u1' }, args), /rate changed/);
+  await db.patch('usd-idr', { fetchedAt: Date.now() - rateContract.RATE_CACHE_MAX_AGE - 1000 });
+  assert.equal((await payments.getCheckoutConfig.handler({ ...ctx, userId: 'u1' }, {})).available, false);
+  await assert.rejects(payments.preparePayment.handler({ ...ctx, userId: 'u1' }, args), /temporarily unavailable/);
+  const retry = await payments.preparePayment.handler({ ...ctx, userId: 'u1' }, { ...args, requestId: order.requestId });
+  assert.equal(retry.isNew, false);
+  assert.equal(retry.order.amountIdr, 170000);
+  assert.equal((await db.query('routerPayments').collect()).length, 1);
+});
+
+test('rate refresh stores valid observations and preserves cache on failure', async () => {
+  paymentEnvironment();
+  const refreshCtx = { runMutation: (ref, args) => exchangeRates.storeReferenceRate.handler(ctx, args) };
+  global.fetch = async url => {
+    assert.equal(url, 'https://api.frankfurter.dev/v2/rate/USD/IDR');
+    return Response.json({ base: 'USD', quote: 'IDR', date: new Date().toISOString().slice(0, 10), rate: 18143.12 });
+  };
+  await exchangeRates.refresh.handler(refreshCtx, {});
+  assert.equal((await db.get('usd-idr')).idrPerUsd, 18144);
+  global.fetch = async () => Response.json({ base: 'USD', quote: 'IDR', date: '2020-01-01', rate: 5 });
+  await assert.rejects(exchangeRates.refresh.handler(refreshCtx, {}), /Outdated/);
+  global.fetch = async () => new Response('unavailable', { status: 503 });
+  await assert.rejects(exchangeRates.refresh.handler(refreshCtx, {}), /unavailable/);
+  assert.equal((await db.get('usd-idr')).idrPerUsd, 18144);
+});
 test('checkout requires authentication, isolates history and freezes the original quote', async () => {
   const { order } = await preparePayment();
   await assert.rejects(payments.preparePayment.handler(ctx, { creditCents: 1000, requestId: 'request-payment-0002', orderId: 'CONST-other' }), /Unauthorized/);
-  process.env.SUMOPOD_IDR_PER_USD = '18000';
+  await db.patch('usd-idr', { idrPerUsd: 18000 });
   const again = await payments.preparePayment.handler({ ...ctx, userId: 'u1' }, { creditCents: 1000, requestId: order.requestId, orderId: 'CONST-duplicate' });
   assert.equal(again.isNew, false);
   assert.equal(again.order.amountIdr, 170000);

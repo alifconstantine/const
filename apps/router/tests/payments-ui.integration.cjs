@@ -24,13 +24,27 @@ async function main() {
   await wait(`Boolean(document.querySelector('#credit-usd'))`);
   assert.equal(await js(`document.querySelector('#credit-usd').value`), "10");
   assert.equal(await js(`document.querySelector('button[type=submit]').disabled`), false);
+  assert.deepEqual(await js(`Array.from(document.querySelectorAll('form button')).map(button => button.textContent.trim()).filter(label => label.startsWith('$'))`), ["$1", "$5", "$10", "$25"]);
+  assert.equal(await js(`document.querySelector('aside').innerText.includes('Available credit') || document.querySelector('aside').innerText.includes('Add credit with QRIS')`), false);
+  assert.equal(await js(`document.querySelector('aside').innerText.includes('Documentation')`), true);
   assert.equal(await overflow(), true);
   await capture("credits-desktop");
   await js(`window.__setCredit = value => { const input = document.querySelector('#credit-usd'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); }; true`);
-  for (const invalid of ["0", "501", "1.001", "1e2"]) {
+  for (const invalid of ["0", "0.99", "501", "1.001", "1e2"]) {
     await js(`window.__setCredit('${invalid}')`);
     await wait(`document.querySelector('button[type=submit]').disabled`);
   }
+  await js(`Array.from(document.querySelectorAll('form button')).find(button => button.textContent === '$1').click()`);
+  await wait(`document.querySelector('#credit-usd').value === '1' && !document.querySelector('button[type=submit]').disabled`);
+  assert.match(await js(`document.querySelector('#add-credit-heading').closest('section').innerText`), /17[.]000/);
+  win.setSize(320, 1000);
+  await wait(`innerWidth === 320`);
+  assert.equal(await overflow(), true);
+  assert.match(await js(`document.querySelector('#add-credit-heading').closest('section').innerText`), /Daily reference rate.*2026-11-04/);
+  await js(`document.querySelector('#add-credit-heading').scrollIntoView({ block: 'start' })`);
+  await capture("credits-reference-mobile");
+  win.setSize(1440, 1100);
+  await wait(`innerWidth === 1440`);
   await js(`window.__setCredit('12.50')`);
   await wait(`!document.querySelector('button[type=submit]').disabled`);
   assert.match(await js(`document.querySelector('#add-credit-heading').closest('section').innerText`), /212[.]500/);
@@ -74,7 +88,7 @@ async function main() {
   await js(`document.querySelector('section [role=alert]').scrollIntoView({ block: 'center' })`);
   await capture("credits-checkout-error-mobile");
   await win.loadURL("http://127.0.0.1:5192/credits?state=unavailable");
-  await wait(`document.body.innerText.includes('QRIS payments are being configured')`);
+  await wait(`document.body.innerText.includes('QRIS checkout is temporarily unavailable')`);
   assert.equal(await js(`document.querySelector('button[type=submit]').disabled`), true);
   await js(`document.querySelector('#add-credit-heading').closest('section').querySelector('[role=status]').scrollIntoView({ block: 'center' })`);
   await capture("credits-unavailable-mobile");

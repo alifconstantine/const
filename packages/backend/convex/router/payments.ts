@@ -15,12 +15,13 @@ import {
   verifyPaymentWebhook,
 } from "./paymentContract";
 import { NANO_USD } from "./modelCatalog";
+import { readCheckoutConfig } from "./exchangeRates";
 
 export const getCheckoutConfig = query({
   args: {},
   handler: async (ctx) => {
     await resolveIdentity(ctx);
-    const { returnUrl: _, ...config } = checkoutConfig();
+    const { returnUrl: _, ...config } = await readCheckoutConfig(ctx);
     return config;
   },
 });
@@ -45,17 +46,16 @@ export const listPayments = query({
   },
 });
 export const preparePayment = internalMutation({
-  args: { creditCents: v.number(), requestId: v.string(), orderId: v.string() },
+  args: {
+    creditCents: v.number(),
+    requestId: v.string(),
+    orderId: v.string(),
+    expectedIdrPerUsd: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const { userId } = await resolveIdentity(ctx);
-    const config = checkoutConfig();
-    if (!config.available || !config.idrPerUsd)
-      throw new ConvexError(
-        "QRIS checkout is not configured yet. Try again later.",
-      );
     if (!/^[a-zA-Z0-9-]{16,80}$/.test(args.requestId))
       throw new ConvexError("Invalid checkout request.");
-    const quote = quotePayment(args.creditCents, config.idrPerUsd);
     const previous = await ctx.db
       .query("routerPayments")
       .withIndex("by_user_request", (q) =>
@@ -67,6 +67,19 @@ export const preparePayment = internalMutation({
         throw new ConvexError("Checkout amount changed. Start a new payment.");
       return { order: previous, isNew: false };
     }
+    const config = await readCheckoutConfig(ctx);
+    if (!config.available || !config.idrPerUsd)
+      throw new ConvexError(
+        "QRIS checkout or its exchange rate is temporarily unavailable. Try again later.",
+      );
+    if (
+      args.expectedIdrPerUsd !== undefined &&
+      args.expectedIdrPerUsd !== config.idrPerUsd
+    )
+      throw new ConvexError(
+        "The exchange rate changed. Review the updated total and try again.",
+      );
+    const quote = quotePayment(args.creditCents, config.idrPerUsd);
     const recent = await ctx.db
       .query("routerPayments")
       .withIndex("by_user_created", (q) => q.eq("userId", userId))
@@ -139,7 +152,11 @@ export const markCreationFailed = internalMutation({
 });
 
 export const createPayment = action({
-  args: { creditCents: v.number(), requestId: v.string() },
+  args: {
+    creditCents: v.number(),
+    requestId: v.string(),
+    expectedIdrPerUsd: v.optional(v.number()),
+  },
   handler: async (ctx, args): Promise<{ orderId: string }> => {
     const { order, isNew }: { order: Doc<"routerPayments">; isNew: boolean } =
       await ctx.runMutation(internal.router.payments.preparePayment, {
@@ -194,7 +211,9 @@ export const createPayment = action({
       throw new ConvexError(
         "The payment provider returned an invalid checkout. Check payment history before trying again.",
       );
-    const expiresAt = Date.parse(typeof data.expires_at === "string" ? data.expires_at : "");
+    const expiresAt = Date.parse(
+      typeof data.expires_at === "string" ? data.expires_at : "",
+    );
     if (
       typeof data.payment_id !== "string" ||
       !data.payment_id ||
