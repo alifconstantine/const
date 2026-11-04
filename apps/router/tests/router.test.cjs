@@ -123,6 +123,8 @@ const load = sourceLoader({
     query: (x) => x,
     mutation: (x) => x,
     internalMutation: (x) => x,
+    action: (x) => x,
+    httpAction: (x) => x,
   },
   "../_generated/api": { api, internal },
   "@const/backend/_generated/api": { api, internal },
@@ -132,6 +134,8 @@ const keys = load("packages/backend/convex/router/keys.ts");
 const combos = load("packages/backend/convex/router/combos.ts");
 const catalog = load("packages/backend/convex/router/modelCatalog.ts");
 const settings = load("packages/backend/convex/router/settings.ts");
+const payments = load("packages/backend/convex/router/payments.ts");
+const paymentContract = load("packages/backend/convex/router/paymentContract.ts");
 const { calculateQuotaState, WEEK_MS } = load(
   "packages/backend/convex/router/quotas.ts",
 );
@@ -197,7 +201,7 @@ function sidebarFixture(
       localQueryResult: () => {
         const value = getFunctionName(query).endsWith(":getSettings")
           ? results.settings
-          : results.quota;
+          : results.wallet;
         if (value instanceof Error) throw value;
         return value;
       },
@@ -221,10 +225,10 @@ test("sidebar rerenders settle with the real Convex subscription hook", () => {
     for (const results of [
       {},
       {
-        quota: { remainingTokens: 700_000 },
+        wallet: { availableUsd: 10 },
         settings: { notifyLowQuota: true },
       },
-      { quota: new Error("Unavailable"), settings: new Error("Unavailable") },
+      { wallet: new Error("Unavailable"), settings: new Error("Unavailable") },
     ]) {
       const { html, renders } = sidebarFixture(results, authenticated, true);
       assert.match(html, /href="\/models"/);
@@ -232,33 +236,15 @@ test("sidebar rerenders settle with the real Convex subscription hook", () => {
     }
   }
 });
-test("sidebar remains usable when production settings or quota queries fail", () => {
-  const quota = { weeklyLimitTokens: 7_000_000, remainingTokens: 700_000 };
-  const settingsMissing = sidebarFixture({
-    quota,
-    settings: new Error("Missing function"),
-  });
-  assert.match(settingsMissing.html, /Models &amp; pricing/);
-  assert.match(settingsMissing.html, /700k left/);
-  assert.doesNotMatch(settingsMissing.html, /Less than 15%/);
-  const bothMissing = sidebarFixture({
-    quota: new Error("Quota unavailable"),
-    settings: new Error("Settings unavailable"),
-  });
-  assert.match(bothMissing.html, /Free usage unavailable/);
-  assert.match(bothMissing.html, /Check Overview for details/);
-  assert.match(bothMissing.html, /href="\/dashboard"/);
-  assert.match(bothMissing.html, /href="\/models"/);
-  assert.doesNotMatch(
-    bothMissing.html,
-    /7M free tokens|Quota unavailable|Settings unavailable/,
-  );
-  const recovered = sidebarFixture({
-    quota,
-    settings: { notifyLowQuota: true },
-  });
-  assert.match(recovered.html, /Less than 15%/);
+test("sidebar remains usable when balance query fails and recovers", () => {
+  const failed = sidebarFixture({ wallet: new Error("Balance unavailable") });
+  assert.match(failed.html, /Balance unavailable/);
+  assert.match(failed.html, /href="\/models"/);
+  const recovered = sidebarFixture({ wallet: { availableUsd: 10 } });
+  assert.match(recovered.html, /\$10.00/);
+  assert.doesNotMatch(recovered.html, /Weekly free allowance/);
 });
+
 test("sidebar skips protected subscriptions before authentication", () => {
   const { html, subscriptions } = sidebarFixture({}, false);
   assert.deepEqual(subscriptions, {});
@@ -343,7 +329,7 @@ test.beforeEach(async () => {
 test.after(() => {
   global.fetch = originalFetch;
 });
-const free = "deepseek-v4.1-flash:free";
+const standard = "deepseek-v4.1-flash";
 function request(
   body,
   headers = { Authorization: "Bearer sk-const-live-test" },
@@ -354,7 +340,7 @@ function request(
     body: JSON.stringify(body),
   });
 }
-const body = (model = free) => ({
+const body = (model = standard) => ({
   model,
   messages: [{ role: "user", content: "Hi" }],
   stream: false,
@@ -385,7 +371,7 @@ test("an incomplete upstream stream is reported as failure and releases reservat
   const text = await response.text();
   assert.match(text, /incomplete_stream/);
   assert.equal(logs()[0].status, 502);
-  assert.equal((await db.query("userQuotas").first()).reservedTokens, 0);
+  assert.equal((await db.get("wallet")).reservedNanoUsd, 0);
 });
 
 test("the usage parser distinguishes a completion event from a dropped socket", () => {
@@ -404,7 +390,7 @@ test("the usage parser distinguishes a completion event from a dropped socket", 
     assert.equal(parser.outputText, "thought");
   }
 });
-const ticketArgs = (model = free) => ({
+const ticketArgs = (model = standard) => ({
   secret,
   rawApiKey: "sk-const-live-test",
   requestId: "req_ticket",
@@ -424,19 +410,16 @@ const result = (id, extra = {}) => ({
   usageEstimated: false,
   ...extra,
 });
-test("only three explicitly listed IDs can use :free", () => {
-  assert.equal(
-    catalog.BUILTIN_MODELS.filter((m) => m.tier === "free").length,
-    3,
-  );
-  assert.equal(catalog.getManagedModel("gpt-6.1-sol:free"), undefined);
-  assert.equal(catalog.getManagedModel("atmo/arbitrary:free"), undefined);
-  assert.equal(catalog.getManagedModel("deepseek-v4.1-flash").tier, "paid");
-  assert.equal(
-    catalog.normalizeConstModelName(free),
-    "atmo/alicn/deepseek-v4.1-flash-1017",
-  );
+test("catalog has no free variants and every chat model has a nonzero rate", () => {
+  assert.equal(catalog.BUILTIN_MODELS.filter(m => m.tier === "free").length, 0);
+  for (const model of catalog.BUILTIN_MODELS) {
+    assert.equal(model.tier, "paid");
+    assert.equal(catalog.getManagedModel(model.modelId + ":free"), undefined);
+    if (model.category === "llm") assert(catalog.tokenCostNano(model.modelId, 20, 5) > 0);
+  }
+  assert.equal(catalog.normalizeConstModelName(standard), "atmo/alicn/deepseek-v4.1-flash-1017");
 });
+
 test("unauthenticated, revoked, and expired credentials never call the engine", async () => {
   assert.equal((await chat.POST(request(body(), {}))).status, 401);
   assert.equal(
@@ -462,25 +445,21 @@ test("forged free suffix and malformed messages are rejected before dispatch", a
     400,
   );
   assert.equal(
-    (await chat.POST(request({ model: free, messages: { bad: true } }))).status,
+    (await chat.POST(request({ model: standard, messages: { bad: true } }))).status,
     400,
   );
   assert.equal(fetches, 0);
 });
-test("free request reduces weekly quota and retains cache as input, without wallet debit", async () => {
+test("standard model request debits wallet and does not create a weekly quota", async () => {
   const res = await chat.POST(request(body()));
   assert.equal(res.status, 200);
-  assert.equal(res.headers.get("access-control-allow-origin"), "*");
-  assert.equal((await res.json()).model, free);
-  const quota = await db.query("userQuotas").first();
-  assert.equal(quota.usedTokens, 25);
-  assert.equal(quota.reservedTokens, 0);
-  assert.equal((await db.get("wallet")).balanceUsd, 1);
-  assert.equal(logs()[0].billingTier, "free");
+  assert.equal((await res.json()).model, standard);
+  assert.equal(await db.query("userQuotas").first(), null);
+  assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - catalog.tokenCostNano(standard, 20, 5, 4));
+  assert.equal(logs()[0].billingTier, "paid");
   assert.equal(logs()[0].cachedTokens, 4);
-  assert.equal(logs()[0].ip, undefined);
-  assert.equal(logs()[0].prompt, undefined);
 });
+
 test("paid request uses actual cached price, settles once, and releases reservation", async () => {
   const ticket = await gateway.begin.handler(ctx, ticketArgs("gpt-6.1-sol"));
   await gateway.settle.handler(ctx, result(ticket.id));
@@ -561,20 +540,12 @@ test("settlement rejects negative values and untrusted callers", async () => {
   );
   assert.equal(logs().length, 0);
 });
-test("reservations prevent concurrent free requests overspending the remaining allowance", async () => {
-  db.seed("userQuotas", "quota", {
-    userId: "u1",
-    weeklyLimitTokens: 100,
-    usedTokens: 0,
-    periodStartAt: Date.now(),
-    periodEndAt: Date.now() + WEEK_MS,
-    reservedTokens: 0,
-  });
+test("reservations prevent concurrent paid requests overspending the wallet", async () => {
+  await db.patch("wallet", { balanceNanoUsd: catalog.tokenCostNano(standard, 20, 64), balanceUsd: 0 });
   await gateway.begin.handler(ctx, ticketArgs());
-  await assert.rejects(
-    gateway.begin.handler(ctx, { ...ticketArgs(), requestId: "another" }),
-  );
+  await assert.rejects(gateway.begin.handler(ctx, { ...ticketArgs(), requestId: "another" }), /Insufficient credits/);
 });
+
 test("daily key rollover clears prior-day counters and stale reservations", async () => {
   await db.patch("key1", {
     dailyLimitTokens: 100,
@@ -604,7 +575,7 @@ test("weekly rollover resets both token and image counters", () => {
   assert.equal(state.usedImages, 0);
   assert.equal(state.reservedTokens, 0);
 });
-test("combo forces stream true, preserves tool messages, and debits free usage for its target", async () => {
+test("combo forces stream true, preserves tool messages, and bills its selected target", async () => {
   db.seed("routerCombos", "combo", {
     userId: "u1",
     name: "Coding",
@@ -614,7 +585,7 @@ test("combo forces stream true, preserves tool messages, and debits free usage f
     contextLength: 10000,
     models: [
       {
-        modelId: free,
+        modelId: standard,
         providerId: "const",
         providerName: "Const",
         priority: 1,
@@ -645,8 +616,8 @@ test("combo forces stream true, preserves tool messages, and debits free usage f
   assert.equal(lastPayload.stream, true);
   assert.equal(lastPayload.messages[0].tool_calls[0].id, "call1");
   assert.equal(lastPayload.messages[1].tool_call_id, "call1");
-  assert.equal((await db.query("userQuotas").first()).usedTokens, 25);
-  assert.equal(logs()[0].resolvedModel, free);
+  assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - catalog.tokenCostNano(standard, 20, 5, 4));
+  assert.equal(logs()[0].resolvedModel, standard);
   assert.equal(logs()[0].model, "combo/coding");
   await db.patch("combo", { status: "disabled" });
   await assert.rejects(
@@ -661,8 +632,8 @@ test("round robin persists its selection between executions", async () => {
     status: "active",
     strategy: "round-robin",
     models: [
-      { modelId: free, providerId: "const", priority: 1 },
-      { modelId: "glm-5.3-flash:free", providerId: "const", priority: 2 },
+      { modelId: standard, providerId: "const", priority: 1 },
+      { modelId: "glm-5.3-flash", providerId: "const", priority: 2 },
     ],
   });
   const one = await combos.prepareCombo.handler(
@@ -697,7 +668,7 @@ test("SSE usage survives every possible split position", () => {
     assert.equal(parser.cachedTokens, 100);
   }
 });
-test("discovery retains both free and paid variants and authenticates combo discovery", async () => {
+test("discovery lists only paid models and authenticates combo discovery", async () => {
   db.seed("routerCombos", "combo", {
     userId: "u1",
     name: "Coding",
@@ -713,9 +684,9 @@ test("discovery retains both free and paid variants and authenticates combo disc
     }),
   );
   const data = await response.json();
-  assert(data.data.some((m) => m.id === free));
+  assert(data.data.some((m) => m.id === standard));
   assert(data.data.some((m) => m.id === "deepseek-v4.1-flash"));
-  assert(data.data.find((m) => m.id === free).display_name.endsWith(":free"));
+  assert(data.data.every(m => !m.id.endsWith(":free")));
   assert(
     !data.data
       .find((m) => m.id === "deepseek-v4.1-flash")
@@ -727,7 +698,7 @@ test("saved defaults and privacy settings affect requests", async () => {
   await settings.saveSettings.handler(
     { ...ctx, userId: "u1" },
     {
-      defaultModel: free,
+      defaultModel: standard,
       defaultTemperature: 0.25,
       enableStreaming: false,
       logPayloads: true,
@@ -797,7 +768,7 @@ test("failed upstream calls release held credit without charging the wallet", as
     global.fetch = origFetch;
   }
 });
-test("cancelled streaming requests persist partial usage and release free reservations", async () => {
+test("cancelled streaming requests persist partial usage and release credit reservations", async () => {
   const response = await chat.POST(request({ ...body(), stream: true }));
   const reader = response.body.getReader();
   await reader.read();
@@ -805,7 +776,7 @@ test("cancelled streaming requests persist partial usage and release free reserv
   await new Promise((r) => setTimeout(r, 10));
   assert.equal(logs()[0].status, 499);
   assert(logs()[0].totalTokens > 0);
-  assert.equal((await db.query("userQuotas").first()).reservedTokens, 0);
+  assert.equal((await db.get("wallet")).reservedNanoUsd, 0);
 });
 test("new accounts have a readable zero credit balance, not a query crash", async () => {
   const credits = load("packages/backend/convex/router/credits.ts");
@@ -836,7 +807,7 @@ test("saved chat ownership and revision checks prevent cross-user access and los
   const created = await chats.createChat.handler(
     { ...ctx, userId: "u1" },
     {
-      modelId: free,
+      modelId: standard,
       providerId: "const",
       temperature: 0.7,
       messages: [message],
@@ -987,4 +958,146 @@ test("sub-microdollar amounts never display as free usage", () => {
  assert.equal(formatUsd(0.0000001),"<$0.000001");
  assert.equal(formatUsd(0),"$0.00");
  assert.equal(formatUsd(0.000012),"$0.000012");
+});
+
+// Payment tests exercise the production actions, verifier and ledger mutations.
+function paymentEnvironment() {
+  process.env.SUMOPOD_API_KEY = 'test-sumopod-key';
+  process.env.SUMOPOD_IDR_PER_USD = '17000';
+  process.env.SUMOPOD_WEBHOOK_TOKEN = 'whtok_test';
+  delete process.env.SUMOPOD_WEBHOOK_SECRET;
+}
+test.afterEach(() => {
+  for (const name of ['SUMOPOD_API_KEY', 'SUMOPOD_IDR_PER_USD', 'SUMOPOD_WEBHOOK_TOKEN', 'SUMOPOD_WEBHOOK_SECRET']) delete process.env[name];
+});
+const paymentCtx = () => ({ ...ctx, userId: 'u1', runMutation: (ref, args) => payments[ref.path.split('.').at(-1)].handler({ ...ctx, userId: 'u1' }, args) });
+async function preparePayment(creditCents = 1000, orderId = 'CONST-test-order', requestId = 'request-payment-0001') {
+  paymentEnvironment();
+  return payments.preparePayment.handler({ ...ctx, userId: 'u1' }, { creditCents, requestId, orderId });
+}
+const paidEvent = (extra = {}) => ({ eventType: 'payment.completed', orderId: 'CONST-test-order', paymentId: 'payment-1', amountIdr: 170000, status: 'completed', ...extra });
+test('checkout fails closed without a rate or verified-webhook credentials', async () => {
+  assert.equal(paymentContract.checkoutConfig().available, false);
+  await assert.rejects(preparePayment(0), /credit amount/);
+  paymentEnvironment();
+  delete process.env.SUMOPOD_WEBHOOK_TOKEN;
+  assert.equal(paymentContract.checkoutConfig().available, false);
+  process.env.SUMOPOD_WEBHOOK_TOKEN = 'whtok_test';
+  process.env.SUMOPOD_IDR_PER_USD = 'NaN';
+  assert.equal(paymentContract.checkoutConfig().available, false);
+});
+test('quotes use integer cents, round IDR upward and reject invalid amounts', () => {
+  assert.deepEqual(paymentContract.quotePayment(101, 17001), { amountIdr: 17172, creditNanoUsd: 1010000000 });
+  for (const value of [0, -1, 99, 50001, 100.1, NaN, Infinity]) assert.throws(() => paymentContract.quotePayment(value, 17000));
+  assert.equal(paymentContract.isPaymentLink('https://pay.sumopod.com/pay/payment-1'), true);
+  for (const value of ['https://evil.test/pay/id', 'https://pay.sumopod.com.evil.test/pay/id', 'javascript:alert(1)', 'https://a:b@pay.sumopod.com/pay/id']) assert.equal(paymentContract.isPaymentLink(value), false);
+});
+test('checkout requires authentication, isolates history and freezes the original quote', async () => {
+  const { order } = await preparePayment();
+  await assert.rejects(payments.preparePayment.handler(ctx, { creditCents: 1000, requestId: 'request-payment-0002', orderId: 'CONST-other' }), /Unauthorized/);
+  process.env.SUMOPOD_IDR_PER_USD = '18000';
+  const again = await payments.preparePayment.handler({ ...ctx, userId: 'u1' }, { creditCents: 1000, requestId: order.requestId, orderId: 'CONST-duplicate' });
+  assert.equal(again.isNew, false);
+  assert.equal(again.order.amountIdr, 170000);
+  assert.deepEqual(await payments.listPayments.handler({ ...ctx, userId: 'u2' }, {}), []);
+  assert.equal((await payments.listPayments.handler({ ...ctx, userId: 'u1' }, {})).length, 1);
+});
+test('checkout action calls QRIS once per request ID and never credits an unpaid invoice', async () => {
+  paymentEnvironment(); let calls = 0;
+  global.fetch = async (url, options) => {
+    calls++;
+    assert.equal(url, 'https://api-pay.sumopod.com/api/v1/payments');
+    assert.equal(options.headers['X-Api-Key'], 'test-sumopod-key');
+    const body = JSON.parse(options.body);
+    assert.equal(body.currency, 'IDR');
+    assert.equal(body.payment_method_type_code, 'QRIS');
+    assert.equal(body.amount, 170000);
+    assert.equal(body.success_return_url, 'https://router.const.web.id/credits');
+    return Response.json({ payment_id: 'payment-1', order_id: body.order_id, amount: body.amount, fee: 1490, net_amount: 168510, status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString(), payment_link_url: 'https://pay.sumopod.com/pay/payment-1' });
+  };
+  const args = { creditCents: 1000, requestId: 'request-payment-0001' };
+  const first = await payments.createPayment.handler(paymentCtx(), args);
+  assert.deepEqual(await payments.createPayment.handler(paymentCtx(), args), first);
+  assert.equal(calls, 1);
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+  assert.equal((await db.query('routerPayments').first()).status, 'pending');
+});
+test('ambiguous provider failure retains the order and retry never creates a second invoice', async () => {
+  paymentEnvironment(); let calls = 0;
+  global.fetch = async () => { calls++; throw new Error('socket closed'); };
+  const args = { creditCents: 1000, requestId: 'request-payment-0001' };
+  await assert.rejects(payments.createPayment.handler(paymentCtx(), args), /confirmation is delayed/);
+  await payments.createPayment.handler(paymentCtx(), args);
+  assert.equal(calls, 1);
+  assert.equal((await db.query('routerPayments').first()).status, 'creating');
+});
+test('duplicate and reordered completion webhooks credit exactly once and preserve reservations', async () => {
+  await preparePayment();
+  await db.patch('wallet', { reservedNanoUsd: 10000 });
+  await payments.settlePayment.handler(ctx, paidEvent({ eventType: 'payment.expired', status: 'expired' }));
+  await payments.settlePayment.handler(ctx, paidEvent());
+  await payments.settlePayment.handler(ctx, paidEvent());
+  await payments.settlePayment.handler(ctx, paidEvent({ eventType: 'payment.failed', status: 'failed' }));
+  const wallet = await db.get('wallet');
+  assert.equal(wallet.balanceNanoUsd, 11e9);
+  assert.equal(wallet.totalDepositedUsd, 11);
+  assert.equal(wallet.reservedNanoUsd, 10000);
+  assert.equal((await db.query('creditTransactions').collect()).length, 1);
+  assert.equal((await db.query('routerPayments').first()).status, 'completed');
+});
+test('mismatched order, amount, status or payment ID cannot credit the wallet', async () => {
+  await preparePayment();
+  await payments.attachPayment.handler(ctx, { orderId: 'CONST-test-order', paymentId: 'payment-1', paymentLinkUrl: 'https://pay.sumopod.com/pay/payment-1', expiresAt: Date.now() + 1000, feeIdr: 1490, netAmountIdr: 168510 });
+  for (const extra of [{ orderId: 'missing' }, { amountIdr: 1 }, { paymentId: 'other' }, { status: 'pending' }]) await assert.rejects(payments.settlePayment.handler(ctx, paidEvent(extra)));
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+});
+test('webhook signature verifies raw bytes, rejects tampering and stale timestamps, and supports rotation', async () => {
+  const { createHmac } = require('node:crypto');
+  paymentEnvironment();
+  const key = Buffer.from('test-signing-key');
+  process.env.SUMOPOD_WEBHOOK_SECRET = 'whsec_' + key.toString('base64');
+  const raw = '{"event_type":"payment.test"}';
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', key).update('evt_1.' + timestamp + '.' + raw).digest('base64');
+  const headers = new Headers({ 'svix-id': 'evt_1', 'svix-timestamp': timestamp, 'svix-signature': 'v1,old v1,' + signature, 'x-webhook-token': 'whtok_test' });
+  assert.equal(await paymentContract.verifyPaymentWebhook(headers, raw), true);
+  assert.equal(await paymentContract.verifyPaymentWebhook(headers, raw + ' '), false);
+  assert.equal(await paymentContract.verifyPaymentWebhook(headers, raw, Date.now() + 301000), false);
+  headers.delete('svix-signature');
+  assert.equal(await paymentContract.verifyPaymentWebhook(headers, raw), false);
+});
+test('webhook rejects unsigned payloads, acknowledges tests and credits authenticated events', async () => {
+  await preparePayment();
+  const request = (body, headers = {}) => new Request('https://example.convex.site/payments/sumopod/webhook', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  const event = { event_type: 'payment.completed', data: { payment_id: 'payment-1', order_id: 'CONST-test-order', amount: 170000, status: 'completed' } };
+  assert.equal((await payments.sumopodWebhook(paymentCtx(), request(event))).status, 401);
+  assert.equal((await payments.sumopodWebhook(paymentCtx(), request({ event_type: 'payment.test' }, { 'x-webhook-token': 'whtok_test' }))).status, 200);
+  assert.equal((await payments.sumopodWebhook(paymentCtx(), request(event, { 'x-webhook-token': 'whtok_test' }))).status, 200);
+  assert.equal((await db.get('wallet')).balanceUsd, 11);
+});
+
+test('one provider payment cannot credit two different orders', async () => {
+  await preparePayment();
+  await payments.settlePayment.handler(ctx, paidEvent());
+  await preparePayment(1000, 'CONST-other-order', 'request-payment-0002');
+  await assert.rejects(payments.settlePayment.handler(ctx, paidEvent({ orderId: 'CONST-other-order' })), /already belongs/);
+  assert.equal((await db.get('wallet')).balanceUsd, 11);
+});
+test('completed payment creates a missing wallet and adds only the purchased credit', async () => {
+  await preparePayment();
+  await db.delete('wallet');
+  await payments.settlePayment.handler(ctx, paidEvent());
+  const wallet = await db.query('userCredits').first();
+  assert.equal(wallet.balanceNanoUsd, 10e9);
+  assert.equal(wallet.totalDepositedUsd, 10);
+});
+
+test('invalid provider JSON does not attach a checkout or credit the wallet', async () => {
+  paymentEnvironment();
+  for (const [index, value] of [null, [], { expires_at: { toString: null } }].entries()) {
+    global.fetch = async () => Response.json(value);
+    await assert.rejects(payments.createPayment.handler(paymentCtx(), { creditCents: 1000, requestId: 'request-invalid-json-' + index }), /invalid checkout/);
+  }
+  assert.equal((await db.get('wallet')).balanceUsd, 1);
+  assert.equal((await db.query('routerPayments').collect()).filter(order => order.paymentLinkUrl).length, 0);
 });

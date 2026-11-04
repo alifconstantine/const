@@ -8,7 +8,7 @@ import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { AccountMenu } from "./account-menu";
 import { Button, ScrollArea, cn, ConstLogoIcon } from "@const/ui";
-import { calculateQuotaMetrics } from "@/lib/quota";
+import { formatUsd } from "@/lib/router-analytics";
 import { LayoutGrid, ScrollText, Key, Terminal, GitFork, Box, Bot, Settings, BookOpen, PanelLeftClose, PanelLeftOpen, Wallet } from "lucide-react";
 
 const navigation = [
@@ -34,14 +34,11 @@ export function Sidebar({ onNavigate, className, isCollapsed = false, onToggleCo
   const pathname = usePathname();
   const { isAuthenticated } = useRouterAuth();
   const queries = useMemo((): RequestForQueries => isAuthenticated ? {
-    quota: { query: api.router.quotas.getUserQuota, args: {} },
-    settings: { query: api.router.settings.getSettings, args: {} },
+    wallet: { query: api.router.credits.getUserCredits, args: {} },
   } : {}, [isAuthenticated]);
   const result = useQueries(queries);
-  const failed = result.quota instanceof Error;
-  const quota: FunctionReturnType<typeof api.router.quotas.getUserQuota> | undefined = failed ? undefined : result.quota;
-  const settings = result.settings instanceof Error ? undefined : result.settings;
-  const metrics = calculateQuotaMetrics(quota);
+  const failed = result.wallet instanceof Error;
+  const wallet: FunctionReturnType<typeof api.router.credits.getUserCredits> | undefined = failed ? undefined : result.wallet;
   return <aside aria-label="Workspace navigation" className={cn("flex h-full w-full min-h-0 flex-col bg-sidebar text-sidebar-foreground", className)}>
     <div className={cn("flex h-20 shrink-0 items-center gap-2", isCollapsed ? "justify-center px-2" : "justify-between px-5")}>
       {!isCollapsed && <Link href="/dashboard" onClick={onNavigate} className="flex min-w-0 items-center gap-2.5 text-foreground" aria-label="Const Router overview"><ConstLogoIcon size="sm" className="size-6 shrink-0" /><span className="text-base font-semibold tracking-tight">Const<span className="ml-1.5 font-normal text-muted-foreground">Router</span></span></Link>}
@@ -64,12 +61,10 @@ export function Sidebar({ onNavigate, className, isCollapsed = false, onToggleCo
     </ScrollArea>
     {!isCollapsed && <div className="shrink-0 space-y-4 px-5 pb-4">
       <Link href="/docs" onClick={onNavigate} className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"><BookOpen className="size-3.5" />Documentation</Link>
-      {failed ? <p className="text-xs text-muted-foreground">Free usage unavailable. Check Overview for details.</p> : <Link href="/dashboard" onClick={onNavigate} className="block space-y-2.5 text-xs" aria-label="View free token allowance">
-        <div className="flex items-center justify-between"><span className="text-muted-foreground">Weekly free allowance</span><span className="tabular-nums text-foreground">{quota ? metrics.formattedRemaining + " left" : "…"}</span></div>
-        <div role="progressbar" aria-label="Free token allowance remaining" aria-valuemin={0} aria-valuemax={100} aria-valuenow={quota ? Math.round(metrics.percentRemaining) : undefined} className="h-1 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-[var(--router-highlight)] transition-[width] duration-200 motion-reduce:transition-none" style={{ width: (quota ? metrics.percentRemaining : 0) + "%" }} /></div>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">{quota ? "Resets in " + metrics.resetsInText : "Loading your allowance"}</p>
+      {failed ? <p className="text-xs text-muted-foreground">Balance unavailable. Open Credits to retry.</p> : <Link href="/credits" onClick={onNavigate} className="block space-y-2 text-xs" aria-label="View credit balance">
+        <div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">Available credit</span><span className="tabular-nums text-foreground">{wallet ? formatUsd(wallet.availableUsd) : "…"}</span></div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">Add credit with QRIS</p>
       </Link>}
-      {settings?.notifyLowQuota && metrics.isLow && <p role="status" className="text-xs text-amber-500">Less than 15% of free tokens remain.</p>}
     </div>}
     <div className={cn("shrink-0 pb-3", isCollapsed ? "px-2" : "px-3")}><AccountMenu isCollapsed={isCollapsed} /></div>
   </aside>;

@@ -842,6 +842,9 @@ export interface TranslationDictionary {
     timeRange: string;
     dailyTokenTrend: string;
     noTrendData: string;
+    creditBalance: string;
+    creditBalanceNote: string;
+    addCredit: string;
     weeklyQuotaCard: string;
     percentLeft: string;
     remaining: string;

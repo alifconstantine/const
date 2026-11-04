@@ -7,7 +7,7 @@ const QUICK_SETUP_CODE = {
   -H "Authorization: Bearer sk-const-live-YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "deepseek-v4.1-flash:free",
+    "model": "deepseek-v4.1-flash",
     "messages": [{"role": "user", "content": "Hello world"}]
   }'`,
   python: `from openai import OpenAI
@@ -18,7 +18,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
+    model="deepseek-v4.1-flash",
     messages=[{"role": "user", "content": "Hello world"}],
 )
 print(response.choices[0].message.content)`,
@@ -30,7 +30,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "deepseek-v4.1-flash:free",
+  model: "deepseek-v4.1-flash",
   messages: [{ role: "user", content: "Hello world" }],
 });
 console.log(response.choices[0].message.content);`,

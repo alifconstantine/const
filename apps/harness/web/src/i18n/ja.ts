@@ -10,7 +10,7 @@ export const ja: Copy = {
   "footer.link.terms": "利用規約",
 
   "builds.unavailable":
-    "公開済みダウンロードを読み込めませんでした。リリースページを確認するか、ソースからビルドしてください。",
+    "ダウンロード情報を読み込めませんでした。しばらくしてから再試行してください。",
   "meta.title":
     "Const Harness — 開発者のためのローカルファースト AI エージェントワークベンチ",
   "meta.description":
@@ -92,9 +92,9 @@ export const ja: Copy = {
   "download.title": "Const Harness で離陸する",
   "download.subtitle":
     "開発者向けのモダンなエージェントワークベンチ。あなたのワークフローにすぐ当てはまります。",
-  "download.primary": "x64 版をダウンロード",
-  "download.secondary": "ARM64 版をダウンロード",
-  "download.note": "Windows・macOS・Linux · ダウンロードページでビルドを選択",
+  "download.primary": "Windows版をダウンロード",
+  "download.secondary": "Android APK",
+  "download.note": "Windows・Android APK対応 · macOS、Linux、iPhoneは近日公開",
   "faq.title": "よくある質問",
   "faq.0.q": "Const Harnessを始めるには？",
   "faq.0.a":
@@ -203,10 +203,42 @@ export const ja: Copy = {
   "preview.schedule": "毎日のプロジェクト検証",
   "preview.daily": "毎日 09:00",
   "preview.complete": "前回の実行が完了",
+  "builds.notPublished": "未公開",
+  "builds.windowsDescription":
+    "ローカルプロジェクト、ツール、AIエージェントのためのデスクトップ作業環境。",
+  "builds.windowsX64": "Windows x64",
+  "builds.windowsArm64": "Windows ARM64",
+  "builds.x64Hint": "Intel・AMD搭載PC",
+  "builds.arm64Hint": "ARM版Windows",
+  "builds.androidDescription":
+    "スマートフォンからデスクトップの作業環境にアクセス。AndroidアプリをAPKで直接ダウンロードできます。",
+  "builds.androidApk": "Android APK",
+  "builds.apkHint": "Androidスマートフォンに直接インストール",
+  "builds.archHelp": "どのWindows版を選べばよいですか？",
+  "builds.archHelpBody":
+    "設定 → システム → バージョン情報で「システムの種類」を確認してください。Intel・AMDプロセッサにはx64、ARMプロセッサにはARM64を選択します。",
+  "builds.apkHelp": "APKのインストール方法",
+  "builds.apkStep1":
+    "AndroidスマートフォンにAPKをダウンロードし、ファイルを開きます。",
+  "builds.apkStep2":
+    "Androidから確認が表示されたら、このブラウザーまたはファイル管理アプリからのインストールを許可し、APKに戻ります。",
+  "builds.apkStep3":
+    "インストール後にHarnessを開き、起動中のデスクトップアプリとペアリングします。",
+  "builds.remoteRequirement":
+    "Androidはデスクトップに接続します。コンピューターでHarnessを起動したままにしてください。",
+  "builds.morePlatforms": "その他のプラットフォーム",
+  "builds.browserTitle": "ブラウザーから作業環境へ",
+  "builds.browserDescription":
+    "スマートフォン、タブレット、別のコンピューターから起動中のデスクトップに接続できます。",
+  "builds.browserAction": "リモート作業環境を開く",
+  "builds.setupGuide": "セットアップガイドを読む",
+  "builds.retry": "再確認",
+  "builds.checking": "ダウンロードを確認中…",
   "builds.title": "Const Harnessを入手",
-  "builds.subtitle": "公開済みのビルドを選ぶか、ソースからビルドしてください。",
+  "builds.subtitle":
+    "Windowsアプリをインストールするか、Androidアプリで外出先から接続できます。",
   "builds.empty":
-    "最近のリリースに対応するバイナリはありません。全リリースを確認するかソースからビルドできます。",
+    "インストーラーはまだ公開されていません。後でもう一度ご確認ください。",
   "builds.releases": "全リリースを見る",
   "builds.source": "ソースからビルド",
   "builds.back": "ホームに戻る",

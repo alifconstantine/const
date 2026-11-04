@@ -36,7 +36,7 @@ export function DownloadCtaSection() {
 
             <div className="ch-download-cta-actions flex flex-wrap items-center gap-3">
               <Link
-                href="/download?arch=x64"
+                href="/download?os=windows&arch=x64"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#111827] text-white hover:bg-black dark:bg-white dark:text-black dark:hover:bg-zinc-200 font-medium text-sm transition-all shadow-md"
                 data-analytics-event="download-cta"
                 data-download-type="x64"
@@ -47,10 +47,10 @@ export function DownloadCtaSection() {
                 <span>{t("download.primary")}</span>
               </Link>
               <Link
-                href="/download?arch=arm64"
+                href="/download?os=android"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-black/15 bg-black/5 text-[#111827] hover:bg-black/10 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 backdrop-blur-md font-medium text-sm transition-all"
                 data-analytics-event="download-cta"
-                data-download-type="arm64"
+                data-download-type="android-apk"
               >
                 <span>{t("download.secondary")}</span>
               </Link>

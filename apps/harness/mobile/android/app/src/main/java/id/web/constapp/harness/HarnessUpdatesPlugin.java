@@ -70,7 +70,8 @@ public class HarnessUpdatesPlugin extends Plugin {
         Long size = call.getLong("size");
         try {
             URI uri = new URI(address);
-            if (!version.matches("\\d{1,9}\\.\\d{1,9}\\.\\d{1,9}") || !tag.equals("harness-v" + version) || !expected.matches("[a-f0-9]{64}") || size == null || size <= 0 || size > 2147483648L
+            boolean matchingTag = tag.equals("harness-v" + version) || ("0.0.2".equals(version) && "harness-v.0.0.2".equals(tag));
+            if (!version.matches("\\d{1,9}\\.\\d{1,9}\\.\\d{1,9}") || !matchingTag || !expected.matches("[a-f0-9]{64}") || size == null || size <= 0 || size > 2147483648L
                 || !"https".equals(uri.getScheme()) || !"harness.const.web.id".equals(uri.getHost()) || (uri.getPort() != -1 && uri.getPort() != 443) || uri.getFragment() != null
                 || !"/api/app-updates/download".equals(uri.getPath()) || uri.getRawQuery() == null || !uri.getRawQuery().matches("asset=\\d{1,16}&tag=" + java.util.regex.Pattern.quote(tag)) || uri.getUserInfo() != null) throw new Exception();
         } catch (Exception error) { call.reject("INVALID_RELEASE"); return; }

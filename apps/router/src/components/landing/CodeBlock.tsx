@@ -9,7 +9,7 @@ export const QUICKSTART_TABS = [
   -H "Authorization: Bearer $CONST_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "deepseek-v4.1-flash:free",
+    "model": "deepseek-v4.1-flash",
     "messages": [{"role": "user", "content": "Hello, Const."}],
     "stream": false
   }'`,
@@ -25,7 +25,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
+    model="deepseek-v4.1-flash",
     messages=[{"role": "user", "content": "Hello, Const."}],
     stream=False,
 )
@@ -41,7 +41,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "deepseek-v4.1-flash:free",
+  model: "deepseek-v4.1-flash",
   messages: [{ role: "user", content: "Hello, Const." }],
   stream: false,
 });

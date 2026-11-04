@@ -8,9 +8,10 @@ Controls are localized in English, Indonesian, Spanish, Japanese and Chinese. Re
 
 - Repository: `alifconstantine/const`.
 - Only published, non-prerelease tags matching `harness-vMAJOR.MINOR.PATCH` are considered. Const Learn tags such as `v0.0.1` are excluded.
+- The existing published tag `harness-v.0.0.2` is accepted as a legacy alias for version `0.0.2`; keep its exact tag in download URLs. Future releases must use the canonical format above.
 - Versions are compared numerically, and asset selection matches the installed platform and architecture. Missing artifacts do not get invented URLs.
 - Apps fetch the public feed at `https://harness.const.web.id/api/app-updates`. Installer URLs point to its `/download` endpoint, not to the private repository.
-- Automatic checks run shortly after startup and every six hours when enabled. Manual checking is always available.
+- Automatic checks run shortly after startup and every six hours when enabled. The update control appears only after a newer release is confirmed. Idle, checking, current, and failed checks without a newer release do not show an update button.
 - Automatic downloading can be disabled separately. Installation is always initiated by the user.
 
 ## Windows

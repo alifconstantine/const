@@ -12,14 +12,14 @@ A shared API gateway for the model catalog in `src/lib/model-specs.ts`, with a d
 
 ## Users and tasks
 
-The developer audience is inferred from the repository's SDK examples and API workflows. Visitors compare models and rates, obtain a key through Const Accounts, configure an OpenAI-compatible client, and inspect requests, token allowance, and paid usage. The user explicitly requested improvements across landing, Overview, Playground, Models & pricing, Endpoints, Credits, Settings, and Docs.
+The developer audience is inferred from the repository's SDK examples and API workflows. Visitors compare models and rates, obtain a key through Const Accounts, configure an OpenAI-compatible client, and inspect requests, credit balance, and paid usage. The user explicitly requested improvements across landing, Overview, Playground, Models & pricing, Endpoints, Credits, Settings, and Docs.
 
 ## Capabilities and constraints
 
 - Next.js App Router, React, Convex, Tailwind, and shared `@const/ui` primitives.
 - Supported routes and contracts come from `src/lib/api-contract.ts` and actual `src/app/v1` handlers. Do not advertise unsupported API formats.
 - The built-in catalog is the pricing source. Competitor prices and performance, uptime, or savings guarantees are not verified evidence.
-- Free requests consume a weekly token allowance. Paid requests use credits. Token usage may be estimated when provider usage is absent; copy must reflect this.
+- All managed model and utility requests use prepaid USD credits. Retired free variants are unavailable. QRIS payments use IDR at a server-configured rate shown before checkout; only verified payment completion adds credit. Token usage may be estimated when provider usage is absent; copy must reflect this.
 - Authentication, billing, account preferences, and destructive actions retain their authorization boundaries.
 - Playground is a current-session workspace. The user requested removal of saved chat history.
 

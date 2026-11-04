@@ -1,0 +1,88 @@
+// Run with Electron against the isolated local fixture, never production.
+const { app, BrowserWindow } = require("electron");
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+app.setPath("userData", process.argv[2]);
+async function main() {
+  await app.whenReady();
+  const win = new BrowserWindow({ show: false, width: 1440, height: 1100, webPreferences: { contextIsolation: true, sandbox: true, offscreen: true } });
+  const js = code => win.webContents.executeJavaScript(code);
+  const wait = async code => {
+    for (let i = 0; i < 100; i++) { if (await js(code)) return; await new Promise(resolve => setTimeout(resolve, 100)); }
+    throw new Error("Timed out: " + code);
+  };
+  const capture = async name => {
+    const directory = process.env.ROUTER_PAYMENT_SCREENSHOTS;
+    if (!directory) return;
+    await fs.mkdir(directory, { recursive: true });
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await fs.writeFile(path.join(directory, name + ".png"), (await win.webContents.capturePage()).toPNG());
+  };
+  const overflow = () => js(`document.documentElement.scrollWidth <= innerWidth && Array.from(document.querySelectorAll('main input, main button, main article')).every(el => el.getBoundingClientRect().right <= innerWidth + 1)`);
+  await win.loadURL("http://127.0.0.1:5192/credits");
+  await wait(`Boolean(document.querySelector('#credit-usd'))`);
+  assert.equal(await js(`document.querySelector('#credit-usd').value`), "10");
+  assert.equal(await js(`document.querySelector('button[type=submit]').disabled`), false);
+  assert.equal(await overflow(), true);
+  await capture("credits-desktop");
+  await js(`window.__setCredit = value => { const input = document.querySelector('#credit-usd'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); }; true`);
+  for (const invalid of ["0", "501", "1.001", "1e2"]) {
+    await js(`window.__setCredit('${invalid}')`);
+    await wait(`document.querySelector('button[type=submit]').disabled`);
+  }
+  await js(`window.__setCredit('12.50')`);
+  await wait(`!document.querySelector('button[type=submit]').disabled`);
+  assert.match(await js(`document.querySelector('#add-credit-heading').closest('section').innerText`), /212[.]500/);
+  await js(`Array.from(document.querySelectorAll('button')).find(el => el.textContent === '$25').click()`);
+  await wait(`document.querySelector('#credit-usd').value === '25'`);
+  assert.match(await js(`document.querySelector('#add-credit-heading').closest('section').innerText`), /425[.]000/);
+  await js(`document.querySelector('form').requestSubmit()`);
+  await wait(`document.body.innerText.includes('Your checkout is ready')`);
+  assert.equal(await js(`window.__routerFixture.mutations.filter(item => item.name === 'router/payments:createPayment').length`), 1);
+  assert.equal(await js(`window.__routerFixture.mutations.at(-1).args.creditCents`), 2500);
+  await js(`document.querySelector('form').requestSubmit()`);
+  assert.equal(await js(`window.__routerFixture.mutations.filter(item => item.name === 'router/payments:createPayment').length`), 1);
+  assert.equal(await js(`document.querySelector('a[href="https://pay.sumopod.com/pay/fixture"]').target`), "_blank");
+  await capture("credits-pending-desktop");
+  win.setSize(390, 1000);
+  await wait(`innerWidth === 390`);
+  assert.equal(await overflow(), true);
+  await capture("credits-mobile-overview");
+  await js(`document.querySelector('#add-credit-heading').scrollIntoView({ block: 'start' })`);
+  await capture("credits-mobile");
+  win.setSize(320, 900);
+  await wait(`innerWidth === 320`);
+  assert.equal(await overflow(), true);
+  await js(`document.querySelector('#add-credit-heading').scrollIntoView({ block: 'start' })`);
+  await capture("credits-mobile-320");
+  await js(`window.__routerFixture.setPaymentState('elapsed')`);
+  await wait(`document.body.innerText.includes('This checkout has expired')`);
+  assert.equal(await js(`document.querySelectorAll('a[href="https://pay.sumopod.com/pay/fixture"]').length`), 0);
+  await js(`document.querySelector('#add-credit-heading').closest('section').querySelector('[role=status]').scrollIntoView({ block: 'center' })`);
+  await capture("credits-expired-mobile");
+  await js(`window.__routerFixture.setPaymentState('failed')`);
+  await wait(`document.body.innerText.includes('This payment failed')`);
+  assert.equal(await js(`document.body.innerText.includes('Your checkout is ready')`), false);
+  await js(`window.__routerFixture.setPaymentState('completed')`);
+  await wait(`document.body.innerText.includes('Payment verified. Your credit has been added.')`);
+  await win.loadURL("http://127.0.0.1:5192/credits?state=checkout-error");
+  await wait(`Boolean(document.querySelector('#credit-usd'))`);
+  await js(`document.querySelector('form').requestSubmit()`);
+  await wait(`Boolean(document.querySelector('section [role=alert]'))`);
+  assert.equal(await overflow(), true);
+  await js(`document.querySelector('section [role=alert]').scrollIntoView({ block: 'center' })`);
+  await capture("credits-checkout-error-mobile");
+  await win.loadURL("http://127.0.0.1:5192/credits?state=unavailable");
+  await wait(`document.body.innerText.includes('QRIS payments are being configured')`);
+  assert.equal(await js(`document.querySelector('button[type=submit]').disabled`), true);
+  await js(`document.querySelector('#add-credit-heading').closest('section').querySelector('[role=status]').scrollIntoView({ block: 'center' })`);
+  await capture("credits-unavailable-mobile");
+  await win.loadURL("http://127.0.0.1:5192/models");
+  await wait(`document.body.innerText.includes('Models & pricing')`);
+  assert.equal(await js(`document.body.innerText.includes(':free') || document.body.innerText.includes('Weekly free allowance')`), false);
+  assert.equal(await overflow(), true);
+  console.log("PASS: QRIS summary, preset selection, checkout creation, pending link, disabled configuration, error recovery, and desktop/390px/320px layouts");
+  win.destroy();
+}
+main().then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });

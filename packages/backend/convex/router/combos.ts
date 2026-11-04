@@ -341,7 +341,7 @@ function validateTargets(
     )
   )
     throw new Error(
-      "Select up to 12 available Const chat models; only listed :free IDs are free.",
+      "Select up to 12 available Const chat models. Retired IDs are unavailable.",
     );
 }
 export const prepareCombo = mutation({

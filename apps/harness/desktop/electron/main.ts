@@ -1093,7 +1093,7 @@ app.whenReady().then(() => {
       if (res.ok) {
         const json: any = await res.json();
         if (json && Array.isArray(json.data) && json.data.length > 0) {
-          remoteModels = json.data.map((m: any) => {
+          remoteModels = json.data.filter((m: any) => !String(m.id).endsWith(":free")).map((m: any) => {
             const supportsThinking = Boolean(
               m.supports_thinking || m.supportsThinking || m.supports_reasoning
             );

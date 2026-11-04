@@ -9,7 +9,6 @@ import {
   keyUsageToday,
   dayStart,
 } from "./access";
-import { calculateQuotaState } from "./quotas";
 import { DEFAULT_SETTINGS } from "./preferences";
 import { getManagedModel, tokenCostNano, NANO_USD } from "./modelCatalog";
 
@@ -59,7 +58,7 @@ export const begin = mutation({
     requireGatewaySecret(args.secret);
     const { userId, key } = await resolveIdentity(ctx, args.rawApiKey);
     const model = getManagedModel(args.model);
-    if (!model) fail("Unknown model or unavailable free variant", 400);
+    if (!model) fail("Unknown or retired model. Select an ID from /v1/models.", 400);
     const spec = model!;
     const prompt = count(args.promptTokens);
     let output = count(args.maxOutputTokens);
@@ -107,34 +106,6 @@ export const begin = mutation({
       if (remaining <= prompt) fail("Daily API key limit reached", 429);
       output = Math.min(output, remaining - prompt);
     }
-    let periodStartAt: number | undefined;
-    if (spec.tier === "free") {
-      const doc = await ctx.db
-        .query("userQuotas")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique();
-      const state = calculateQuotaState(doc, now);
-      if (state.remainingTokens <= prompt)
-        fail(
-          "Weekly free token quota exceeded. Select a paid model or wait for reset.",
-          429,
-        );
-      output = Math.min(output, state.remainingTokens - prompt);
-      periodStartAt = state.periodStartAt;
-      const values = {
-        userId,
-        weeklyLimitTokens: state.weeklyLimitTokens,
-        usedTokens: state.usedTokens,
-        reservedTokens: state.reservedTokens + prompt + output,
-        usedImages: state.usedImages,
-        weeklyLimitImages: state.weeklyLimitImages,
-        periodStartAt,
-        periodEndAt: state.periodEndAt,
-        updatedAt: now,
-      };
-      if (doc) await ctx.db.patch(doc._id, values);
-      else await ctx.db.insert("userQuotas", { ...values, createdAt: now });
-    }
     const utilityCost =
       spec.category !== "llm"
         ? Math.ceil(
@@ -144,9 +115,7 @@ export const begin = mutation({
           )
         : 0;
     const reservedNanoUsd =
-      spec.tier === "free"
-        ? 0
-        : spec.category === "llm"
+      spec.category === "llm"
           ? tokenCostNano(args.model, prompt, output)
           : utilityCost;
     if (!Number.isSafeInteger(reservedNanoUsd) || reservedNanoUsd < 0)
@@ -189,7 +158,6 @@ export const begin = mutation({
       state: "pending",
       reservedTokens: prompt + output,
       reservedNanoUsd,
-      periodStartAt,
       keyPeriodStartAt: keyPeriod,
       pricing: {
         input: Number(spec.pricing?.input.replace("$", "") ?? 0) * 1000,

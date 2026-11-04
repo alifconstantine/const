@@ -10,7 +10,7 @@ export const id: Copy = {
   "footer.link.terms": "Ketentuan Layanan",
 
   "builds.unavailable":
-    "Daftar download belum dapat dimuat. Periksa halaman rilis atau build dari source.",
+    "Informasi unduhan belum dapat dimuat. Silakan coba lagi sebentar lagi.",
   "meta.title": "Const Harness — Workbench agen AI lokal untuk developer",
   "meta.description":
     "Workbench AI desktop untuk coding, riset, dan karya kreatif. Hubungkan proyek, pilih model, lalu gunakan subagen otonom, browser, dan review berkas dalam satu tempat.",
@@ -91,10 +91,10 @@ export const id: Copy = {
   "download.title": "Raih liftoff bersama Const Harness",
   "download.subtitle":
     "Workbench agenik modern untuk developer. Siap masuk ke alur kerja Anda.",
-  "download.primary": "Unduh untuk x64",
-  "download.secondary": "Unduh untuk ARM64",
+  "download.primary": "Unduh untuk Windows",
+  "download.secondary": "APK Android",
   "download.note":
-    "Windows, macOS, dan Linux · Pilih build di halaman download",
+    "Windows dan APK Android · macOS, Linux, dan iPhone segera hadir",
   "faq.title": "Pertanyaan yang sering diajukan",
   "faq.0.q": "Bagaimana cara memulai Const Harness?",
   "faq.0.a":
@@ -210,11 +210,40 @@ export const id: Copy = {
   "preview.schedule": "Pemeriksaan proyek harian",
   "preview.daily": "Setiap hari pukul 09.00",
   "preview.complete": "Eksekusi terakhir selesai",
+  "builds.notPublished": "Belum dipublikasikan",
+  "builds.windowsDescription":
+    "Workbench desktop untuk proyek lokal, alat kerja, dan agen AI.",
+  "builds.windowsX64": "Windows x64",
+  "builds.windowsArm64": "Windows ARM64",
+  "builds.x64Hint": "PC dengan prosesor Intel dan AMD",
+  "builds.arm64Hint": "Windows dengan prosesor ARM",
+  "builds.androidDescription":
+    "Akses workspace desktop dari ponsel. Unduh aplikasi Android langsung sebagai APK.",
+  "builds.androidApk": "APK Android",
+  "builds.apkHint": "Pasang langsung di ponsel Android",
+  "builds.archHelp": "Versi Windows mana yang saya perlukan?",
+  "builds.archHelpBody":
+    "Buka Pengaturan → Sistem → Tentang dan periksa Jenis sistem. Pilih x64 untuk prosesor Intel atau AMD, atau ARM64 untuk prosesor berbasis ARM.",
+  "builds.apkHelp": "Cara memasang APK",
+  "builds.apkStep1": "Unduh APK ke ponsel Android, lalu buka filenya.",
+  "builds.apkStep2":
+    "Jika diminta Android, izinkan browser atau pengelola file ini memasang aplikasi, lalu kembali ke APK.",
+  "builds.apkStep3":
+    "Selesaikan pemasangan, buka Harness, lalu hubungkan ke aplikasi desktop yang sedang berjalan.",
+  "builds.remoteRequirement":
+    "Android terhubung ke desktop. Biarkan Harness berjalan di komputer kamu.",
+  "builds.morePlatforms": "Platform lainnya",
+  "builds.browserTitle": "Workspace kamu, melalui browser",
+  "builds.browserDescription":
+    "Hubungkan ke desktop yang sedang berjalan dari ponsel, tablet, atau komputer lain.",
+  "builds.browserAction": "Buka workspace jarak jauh",
+  "builds.setupGuide": "Baca panduan penyiapan",
+  "builds.retry": "Cek kembali",
+  "builds.checking": "Memeriksa unduhan…",
   "builds.title": "Dapatkan Const Harness",
   "builds.subtitle":
-    "Pilih build desktop yang diterbitkan, atau build aplikasi dari source.",
-  "builds.empty":
-    "Belum ada binary desktop yang cocok di rilis terbaru. Anda dapat memeriksa semua rilis atau build dari source.",
+    "Pasang aplikasi Windows atau akses workspace dari mana saja melalui aplikasi Android.",
+  "builds.empty": "Installer belum dipublikasikan. Silakan cek kembali nanti.",
   "builds.releases": "Lihat semua rilis",
   "builds.source": "Build dari source",
   "builds.back": "Kembali ke beranda",
@@ -222,7 +251,7 @@ export const id: Copy = {
   "builds.all": "Semua build",
   "builds.tabDesktop": "Desktop",
   "builds.tabMobile": "Mobile",
-  "builds.soon": "Segera",
+  "builds.soon": "Segera hadir",
   "builds.downloading": "Mengunduh...",
   "preview.tagline": "Const Harness membuat pekerjaan lebih mudah.",
   "preview.inputPlaceholder": "Ketik pesan... (ketik / untuk perintah)",

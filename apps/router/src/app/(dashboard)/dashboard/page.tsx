@@ -7,7 +7,6 @@ import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { QueryBoundary } from "@/components/query-boundary";
 import { Button, ScrollArea, Skeleton, cn } from "@const/ui";
-import { calculateQuotaMetrics, type QuotaLike } from "@/lib/quota";
 import { formatUsd, type TimelinePoint } from "@/lib/router-analytics";
 import { ActivityChart } from "@/components/dashboard/activity-chart";
 import { QuickSetup } from "@/components/dashboard/quick-setup";
@@ -45,25 +44,18 @@ type RecentLog = {
 
 export function OverviewView({
   analytics,
-  quota,
+  wallet,
   logs,
   range = "7d",
   onRangeChange,
 }: {
   analytics?: Analytics;
-  quota?: QuotaLike;
+  wallet?: { availableUsd: number };
   logs?: RecentLog[];
   range?: string;
   onRangeChange?: (range: string) => void;
 }) {
-  const metrics = calculateQuotaMetrics(quota);
   const kpi = analytics?.kpi;
-  const freeRequests = analytics?.modelBreakdown
-    .filter((model) => model.tier === "free")
-    .reduce((sum, model) => sum + model.requests, 0);
-  const paidRequests = analytics?.modelBreakdown
-    .filter((model) => model.tier === "paid")
-    .reduce((sum, model) => sum + model.requests, 0);
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-12">
       <header className="flex flex-wrap items-start justify-between gap-5">
@@ -118,19 +110,17 @@ export function OverviewView({
             {
               label: "Requests",
               value: kpi?.totalRequests.toLocaleString(),
-              detail: kpi
-                ? `${freeRequests?.toLocaleString()} free · ${paidRequests?.toLocaleString()} paid`
-                : "Free and paid traffic",
+              detail: "All gateway requests",
             },
             {
-              label: "Free tokens",
-              value: kpi?.freeTokens.toLocaleString(),
-              detail: "Charged to weekly allowance",
+              label: "Total tokens",
+              value: kpi?.totalTokens.toLocaleString(),
+              detail: "Input and output tokens",
             },
             {
-              label: "Paid tokens",
-              value: kpi?.paidTokens.toLocaleString(),
-              detail: "Charged to credit balance",
+              label: "Success rate",
+              value: kpi ? `${kpi.successRate.toFixed(1)}%` : undefined,
+              detail: "Successful requests in this period",
             },
             {
               label: "Paid usage · USD",
@@ -195,52 +185,15 @@ export function OverviewView({
         </section>
         <section
           className="flex flex-col rounded-xl border border-border bg-card p-5 sm:p-6"
-          aria-label="Weekly free allowance"
+          aria-label="Credit balance"
         >
-          <h2 className="text-sm font-medium">Weekly free allowance</h2>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Shared by models with the <code>:free</code> suffix.
-          </p>
+          <h2 className="text-sm font-medium">Available credit</h2>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">One balance for every model and utility endpoint.</p>
           <div className="my-7">
-            {quota ? (
-              <p className="text-3xl font-medium tracking-tight tabular-nums">
-                {metrics.formattedRemaining}
-              </p>
-            ) : (
-              <Skeleton className="h-9 w-32" />
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              tokens remaining
-            </p>
+            {wallet ? <p className="break-words text-3xl font-medium tracking-tight tabular-nums">{formatUsd(wallet.availableUsd)}</p> : <Skeleton className="h-9 w-32" />}
+            <p className="mt-2 text-xs text-muted-foreground">Pay as you go · USD</p>
           </div>
-          <div
-            role="progressbar"
-            aria-label="Free tokens remaining"
-            aria-valuemin={0}
-            aria-valuemax={metrics.limitTokens}
-            aria-valuenow={quota ? metrics.remainingTokens : undefined}
-            className="h-1.5 overflow-hidden rounded-full bg-secondary"
-          >
-            <div
-              className={
-                metrics.isLow
-                  ? "h-full bg-amber-400"
-                  : "h-full bg-[var(--router-highlight)]"
-              }
-              style={{ width: quota ? `${metrics.percentRemaining}%` : "0%" }}
-            />
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {quota
-              ? `${metrics.formattedUsed} of ${metrics.formattedLimit} used · resets in ${metrics.resetsInText}`
-              : "Loading your allowance…"}
-          </p>
-          <Link
-            href="/models"
-            className="mt-6 inline-flex items-center justify-between gap-3 border-t border-border pt-4 text-xs font-medium hover:text-[var(--router-highlight)]"
-          >
-            Explore free models <ArrowRight className="size-4" />
-          </Link>
+          <Link href="/credits" className="mt-auto inline-flex min-h-11 items-center justify-between gap-3 text-xs font-medium hover:text-[var(--router-highlight)]">Add credit with QRIS <ArrowRight className="size-4" /></Link>
         </section>
       </div>
       <section aria-label="Usage by model" className="space-y-4">
@@ -391,8 +344,8 @@ function Overview() {
     api.router.logs.getDashboardAnalytics,
     isAuthenticated ? { timeRange: range } : "skip",
   );
-  const quota = useQuery(
-    api.router.quotas.getUserQuota,
+  const wallet = useQuery(
+    api.router.credits.getUserCredits,
     isAuthenticated ? {} : "skip",
   );
   const logs = useQuery(
@@ -402,7 +355,7 @@ function Overview() {
   return (
     <OverviewView
       analytics={analytics}
-      quota={quota}
+      wallet={wallet}
       logs={logs}
       range={range}
       onRangeChange={setRange}

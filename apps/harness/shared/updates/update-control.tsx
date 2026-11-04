@@ -24,6 +24,8 @@ export function UpdateControl({ client, labels: t, language, mobile = false, set
   const [open, setOpen] = useState(false);
   const id = useId();
   const mounted = useRef(false);
+  const isNew = Boolean(state?.release && compareVersions(state.release.version, state.installed) > 0);
+  useEffect(() => { if (!isNew) setOpen(false); }, [isNew]);
   useEffect(() => {
     let alive = true;
     mounted.current = true;
@@ -32,7 +34,8 @@ export function UpdateControl({ client, labels: t, language, mobile = false, set
     return () => { alive = false; mounted.current = false; unsubscribe(); };
   }, [client]);
   if (!state) return null;
-  const isNew = Boolean(state.release && compareVersions(state.release.version, state.installed) > 0);
+  // Checking/current/error alone is never evidence that an update exists.
+  if (!isNew) return null;
   const working = ["checking", "downloading", "installing"].includes(state.status);
   const status = state.status === "error" ? t[state.error === "network" ? "error" : state.error === "download" ? "downloadError" : state.error || "error"] : state.status === "idle" ? t.check : t[state.status];
   const run = (action: () => Promise<UpdateState>) => { void action().then(value => { if (mounted.current) setState(value); }).catch(() => { if (mounted.current) setState(previous => previous && ({ ...previous, status: "error", error: "network" })); }); };

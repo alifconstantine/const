@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { TopUp } from "@/components/dashboard/top-up";
 import Link from "next/link";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -35,12 +36,14 @@ export function CreditsView({
   loading,
   more,
   loadMore,
+  topUp,
 }: {
   wallet?: WalletData;
   transactions: Transaction[];
   loading?: boolean;
   more?: boolean;
   loadMore?: () => void;
+  topUp?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("all");
@@ -70,7 +73,7 @@ export function CreditsView({
         className="overflow-hidden rounded-xl border border-border bg-card"
         aria-label="Credit balance"
       >
-        <div className="grid gap-8 p-5 sm:p-6 lg:grid-cols-[1fr_1.2fr]">
+        <div className="grid gap-5 p-5 sm:gap-8 sm:p-6 lg:grid-cols-[1fr_1.2fr]">
           <div>
             <h2 className="text-sm text-muted-foreground">
               Available credit <span className="ml-2 text-xs">USD</span>
@@ -83,10 +86,10 @@ export function CreditsView({
               <Skeleton className="mt-4 h-10 w-52" />
             )}
             <p className="mt-3 text-xs leading-6 text-muted-foreground">
-              Ready to spend on paid models. No subscription required.
+              Ready to spend. No subscription required.
             </p>
           </div>
-          <dl className="grid grid-cols-2 gap-x-5 gap-y-7 border-t border-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-4 border-t border-border pt-5 sm:gap-y-7 sm:pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
             {[
               {
                 label: "Account balance",
@@ -118,7 +121,7 @@ export function CreditsView({
                     formatUsd(item.value)
                   )}
                 </dd>
-                <dd className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
+                <dd className="mt-1.5 hidden text-[11px] leading-5 text-muted-foreground sm:block">
                   {item.detail}
                 </dd>
               </div>
@@ -126,7 +129,7 @@ export function CreditsView({
           </dl>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-5 py-4 sm:px-6">
-          <p className="max-w-2xl text-xs leading-6 text-muted-foreground">
+          <p className="hidden max-w-2xl text-xs leading-6 text-muted-foreground sm:block">
             Reservations reduce available credit while a request runs. Once it
             finishes, actual usage is settled and the remaining reservation is
             released.
@@ -139,25 +142,7 @@ export function CreditsView({
           </Link>
         </div>
       </section>
-      <section
-        className="flex flex-wrap items-center justify-between gap-5 border-b border-border pb-7"
-        aria-label="Adding credit"
-      >
-        <div>
-          <h2 className="text-sm font-medium">
-            Adding credit is currently unavailable
-          </h2>
-          <p className="mt-2 text-xs leading-6 text-muted-foreground">
-            You can keep using models marked <code>:free</code> within your
-            weekly token allowance.
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm" className="gap-2">
-          <Link href="/models">
-            Browse free models <ArrowUpRight className="size-3.5" />
-          </Link>
-        </Button>
-      </section>
+      {topUp}
       <section className="space-y-5" aria-label="Transaction history">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-medium">Transaction history</h2>
@@ -332,7 +317,7 @@ export function CreditsView({
                 <p className="mx-auto mt-2 max-w-md text-xs leading-6 text-muted-foreground">
                   {hasFilters
                     ? "Adjust the filters or load earlier transactions to continue your search."
-                    : "Paid usage and account credit adjustments will appear here once they settle. Free model requests do not debit this balance."}
+                    : "Model usage, QRIS deposits, and account adjustments will appear here once they settle."}
                 </p>
                 {hasFilters && (
                   <Button
@@ -381,6 +366,7 @@ function ConnectedCredits() {
   return (
     <CreditsView
       wallet={wallet}
+      topUp={<TopUp />}
       transactions={txs.results}
       loading={
         txs.status === "LoadingFirstPage" || txs.status === "LoadingMore"

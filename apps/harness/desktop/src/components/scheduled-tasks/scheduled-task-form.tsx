@@ -14,8 +14,6 @@ import {
   Info,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
-import { useQuery } from "convex/react";
-import { api } from "@const/backend/_generated/api";
 import type { ScheduledTaskItem, ScheduledTaskSchedule, ScheduledTaskRunHistory } from "../../vite-env";
 import { CustomDropdown } from "./custom-dropdown";
 import { TimePicker } from "./time-picker";
@@ -150,7 +148,6 @@ export function ScheduledTaskForm({
   const mode = "full_access";
 
   // 3. Model Selector State (matching ChatCard)
-  const quota = useQuery(api.router.quotas.getUserQuota, {});
   const [models, setModels] = useState<ModelItem[]>([
     {
       id: "gemini-3.8-flash",
@@ -826,11 +823,6 @@ export function ScheduledTaskForm({
                       <div className="absolute bottom-full mb-2 right-0 w-72 bg-[#222222] border border-[#383838] rounded-xl shadow-2xl p-2 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                         <div className="px-2 py-1 flex items-center justify-between text-[11px] font-medium tracking-wider text-[#969696] border-b border-[#383838] mb-1">
                           <span className="uppercase tracking-wider">{t("workbench.models")}</span>
-                          {quota && (
-                            <span className="text-[10px] text-[#4ade80] font-sans tabular-nums">
-                              {t("workbench.tokensLeft").replace("{tokens}", formatTokenDisplay(quota.remainingTokens))}
-                            </span>
-                          )}
                         </div>
 
                         <ScrollArea className="max-h-56 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">

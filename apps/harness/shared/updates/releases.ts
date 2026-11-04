@@ -29,10 +29,15 @@ export function compareVersions(a: string, b: string): number {
   for (let i = 0; i < 3; i++) if (av[i] !== bv[i]) return av[i]! > bv[i]! ? 1 : -1;
   return 0;
 }
+/** Keep the already-published 0.0.2 tag readable; new releases use the canonical form. */
+export function releaseVersion(tag: unknown): string | undefined {
+  if (tag === "harness-v.0.0.2") return "0.0.2";
+  return typeof tag === "string" ? /^harness-v(\d{1,9}\.\d{1,9}\.\d{1,9})$/.exec(tag)?.[1] : undefined;
+}
 export function isReleaseAssetUrl(value: string, tag: string, name: string): boolean {
   try {
     const url = new URL(value);
-    return /^harness-v\d+\.\d+\.\d+$/.test(tag) && !/[\\/]/.test(name)
+    return Boolean(releaseVersion(tag)) && !/[\\/]/.test(name)
       && url.origin === "https://github.com" && !url.search && !url.hash && !url.username && !url.password
       && decodeURIComponent(url.pathname) === `/alifconstantine/const/releases/download/${tag}/${name}`;
   } catch { return false; }
@@ -43,8 +48,8 @@ export function selectRelease(data: unknown, target: UpdateTarget): AppRelease |
   const candidates: AppRelease[] = [];
   for (const item of data) {
     if (!item || item.draft || item.prerelease || typeof item.tag_name !== "string") continue;
-    const match = /^harness-v(\d{1,9}\.\d{1,9}\.\d{1,9})$/.exec(item.tag_name);
-    if (!match || !Array.isArray(item.assets)) continue;
+    const version = releaseVersion(item.tag_name);
+    if (!version || !Array.isArray(item.assets)) continue;
     const asset = item.assets.find((entry: any) => {
       if (!entry || typeof entry.name !== "string" || !/harness/i.test(entry.name) || /debug|unsigned/i.test(entry.name)
         || typeof entry.browser_download_url !== "string" || !isReleaseAssetUrl(entry.browser_download_url, item.tag_name, entry.name)
@@ -54,7 +59,7 @@ export function selectRelease(data: unknown, target: UpdateTarget): AppRelease |
       const extension = target.os === "windows" ? /\.exe$/i : target.os === "macos" ? /\.(dmg|pkg)$/i : /\.(AppImage|deb|rpm|pacman)$/i;
       return extension.test(entry.name) && new RegExp(`[-._]${target.arch === "arm64" ? "(?:arm64|aarch64)" : "(?:x64|x86_64|amd64)"}[.-]`, "i").test(entry.name);
     });
-    candidates.push({ version: match[1]!, tag: item.tag_name, date: typeof item.published_at === "string" ? item.published_at : "",
+    candidates.push({ version, tag: item.tag_name, date: typeof item.published_at === "string" ? item.published_at : "",
       notes: typeof item.body === "string" ? item.body.slice(0, 60_000) : "",
       asset: asset ? { name: asset.name, url: asset.browser_download_url, size: asset.size,
         sha256: typeof asset.digest === "string" && /^sha256:[a-f0-9]{64}$/i.test(asset.digest) ? asset.digest.slice(7).toLowerCase() : undefined } : undefined });
@@ -70,7 +75,7 @@ export async function fetchRelease(target: UpdateTarget, signal?: AbortSignal): 
   const data = await response.json();
   if (!data.release) return undefined;
   const item = data.release;
-  if (typeof item.version !== "string" || !/^\d{1,9}\.\d{1,9}\.\d{1,9}$/.test(item.version) || item.tag !== `harness-v${item.version}` || typeof item.notes !== "string") throw new Error("Invalid update feed");
+  if (typeof item.version !== "string" || !/^\d{1,9}\.\d{1,9}\.\d{1,9}$/.test(item.version) || releaseVersion(item.tag) !== item.version || typeof item.notes !== "string") throw new Error("Invalid update feed");
   let asset: ReleaseAsset | undefined;
   if (item.asset) {
     const file = item.asset;

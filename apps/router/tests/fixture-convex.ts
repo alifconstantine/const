@@ -26,9 +26,15 @@ export const fixtureCounters = {
   ranges: [] as string[],
   generationRequests: [] as unknown[],
   loadMore: 0,
+  setPaymentState: (status: string) => {
+    const payments = records["router/payments:listPayments"] as Array<Record<string, unknown>>;
+    records["router/payments:listPayments"] = payments.map(payment => ({ ...payment, status: status === "elapsed" ? "pending" : status, ...(status === "elapsed" ? { expiresAt: Date.now() - 60_000 } : {}) }));
+    update();
+  },
 };
 const records: Record<string, unknown> = {
-  "router/quotas:getUserQuota": quota,
+  "router/payments:getCheckoutConfig": { available: true, idrPerUsd: 17000, minCreditCents: 100, maxCreditCents: 50000 },
+  "router/payments:listPayments": [],
   "router/settings:getSettings": settings,
   "router/credits:getUserCredits": wallet,
   "router/credits:getCreditTransactions": transactions,
@@ -52,6 +58,7 @@ function read(ref: Parameters<typeof getFunctionName>[0], args?: unknown) {
       "Fixture query failure. Retry after removing ?state=error.",
     );
   if (state === "loading" && !name.startsWith("auth/")) return undefined;
+  if (state === "unavailable" && name === "router/payments:getCheckoutConfig") return { available: false, idrPerUsd: null, minCreditCents: 100, maxCreditCents: 50000 };
   return records[name] ?? empty;
 }
 export function useQuery(
@@ -86,6 +93,17 @@ export function useMutation(ref: Parameters<typeof getFunctionName>[0]) {
       records["router/settings:getSettings"] = args;
     update();
     return { success: true };
+  };
+}
+export function useAction(ref: Parameters<typeof getFunctionName>[0]) {
+  return async (args: { creditCents: number; requestId: string }) => {
+    const name = getFunctionName(ref);
+    fixtureCounters.mutations.push({ name, args });
+    if (new URLSearchParams(location.search).get("state") === "checkout-error") throw new Error("Synthetic checkout failure");
+    const orderId = "CONST-fixture-" + args.requestId;
+    records["router/payments:listPayments"] = [{ orderId, creditCents: args.creditCents, amountIdr: args.creditCents * 170, idrPerUsd: 17000, status: "pending", paymentLinkUrl: "https://pay.sumopod.com/pay/fixture", createdAt: Date.now(), expiresAt: Date.now() + 86400000 }];
+    update();
+    return { orderId };
   };
 }
 export function usePaginatedQuery(

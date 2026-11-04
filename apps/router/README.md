@@ -11,7 +11,7 @@
 - Log request, metrik penggunaan, kuota, dan catatan kredit.
 - Endpoint pencarian web, ekstraksi halaman, transkripsi audio, dan transkrip YouTube.
 
-Ketersediaan model, akses gratis/berbayar, dan saldo mengikuti katalog serta konfigurasi layanan. Halaman kredit/deposit bukan janji adanya metode pembayaran otomatis tertentu.
+Semua model dan utilitas memakai saldo prabayar USD. Halaman Credits/deposit mendukung isi saldo QRIS melalui SumoPod dalam rupiah dengan kurs yang ditampilkan sebelum checkout. Checkout aktif setelah konfigurasi server dan webhook lengkap; lihat [PAYMENTS.md](./PAYMENTS.md).
 
 ## API
 

@@ -157,7 +157,7 @@ export const routerTables = {
     .index("by_user", ["userId"])
     .index("by_user_slug", ["userId", "slug"]),
 
-  // 6. User Weekly Free Token Quotas (7M tokens/week for Const-managed models)
+  // Legacy quota records retained for historical/in-flight request settlement only.
   userQuotas: defineTable({
     userId: v.id("users"),
     weeklyLimitTokens: v.number(), // Default 7_000_000 (7M)
@@ -184,6 +184,28 @@ export const routerTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
+
+  routerPayments: defineTable({
+    userId: v.id("users"),
+    requestId: v.string(),
+    orderId: v.string(),
+    paymentId: v.optional(v.string()),
+    paymentLinkUrl: v.optional(v.string()),
+    creditCents: v.number(),
+    creditNanoUsd: v.number(),
+    amountIdr: v.number(),
+    idrPerUsd: v.number(),
+    feeIdr: v.optional(v.number()),
+    netAmountIdr: v.optional(v.number()),
+    status: v.union(v.literal("creating"), v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("expired")),
+    expiresAt: v.optional(v.number()),
+    paidAt: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_order", ["orderId"])
+    .index("by_payment", ["paymentId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_request", ["userId", "requestId"]),
 
   // 8. Deposit & Credit Transaction History
   creditTransactions: defineTable({

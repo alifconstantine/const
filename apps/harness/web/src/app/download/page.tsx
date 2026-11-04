@@ -1,4 +1,4 @@
-import { getDesktopBuilds } from "@/lib/releases";
+import { getPublishedBuilds } from "@/lib/releases";
 import { DownloadPage } from "@/components/DownloadPage";
 
 export default async function Page({
@@ -6,7 +6,7 @@ export default async function Page({
 }: {
   searchParams: Promise<{ arch?: string; os?: string }>;
 }) {
-  const [result, query] = await Promise.all([getDesktopBuilds(), searchParams]);
+  const [result, query] = await Promise.all([getPublishedBuilds(), searchParams]);
   return (
     <DownloadPage
       builds={result.builds}

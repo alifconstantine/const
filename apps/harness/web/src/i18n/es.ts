@@ -10,7 +10,7 @@ export const es: Copy = {
   "footer.link.terms": "Términos del servicio",
 
   "builds.unavailable":
-    "No se han podido cargar las descargas publicadas. Consulta las versiones o compila desde el código.",
+    "No se pudo cargar la información de descarga. Vuelve a intentarlo en unos instantes.",
   "meta.title": "Const Harness — Workbench agéntico local para desarrolladores",
   "meta.description":
     "Un entorno de IA de escritorio para código, investigación y creación. Conecta tu proyecto, elige un modelo y trabaja con subagentes autónomos, navegador y revisión de archivos en un solo lugar.",
@@ -91,10 +91,10 @@ export const es: Copy = {
   "download.title": "Despega con Const Harness",
   "download.subtitle":
     "El workbench agéntico moderno para desarrolladores. Listo para tu flujo de trabajo.",
-  "download.primary": "Descargar para x64",
-  "download.secondary": "Descargar para ARM64",
+  "download.primary": "Descargar para Windows",
+  "download.secondary": "APK de Android",
   "download.note":
-    "Windows, macOS y Linux · Elige tu versión en la página de descarga",
+    "Windows y APK de Android · macOS, Linux y iPhone próximamente",
   "faq.title": "Preguntas frecuentes",
   "faq.0.q": "¿Cómo empiezo con Const Harness?",
   "faq.0.a":
@@ -207,11 +207,42 @@ export const es: Copy = {
   "preview.schedule": "Comprobación diaria",
   "preview.daily": "Cada día a las 09:00",
   "preview.complete": "Última ejecución completada",
+  "builds.notPublished": "Aún no publicado",
+  "builds.windowsDescription":
+    "Tu espacio de trabajo para proyectos locales, herramientas y agentes de IA.",
+  "builds.windowsX64": "Windows x64",
+  "builds.windowsArm64": "Windows ARM64",
+  "builds.x64Hint": "PC con Intel y AMD",
+  "builds.arm64Hint": "Windows en ARM",
+  "builds.androidDescription":
+    "Lleva contigo tu espacio de trabajo. Descarga la aplicación Android directamente como APK.",
+  "builds.androidApk": "APK de Android",
+  "builds.apkHint": "Instala directamente en tu teléfono Android",
+  "builds.archHelp": "¿Qué versión de Windows necesito?",
+  "builds.archHelpBody":
+    "Abre Configuración → Sistema → Acerca de y revisa Tipo de sistema. Elige x64 para Intel o AMD, o ARM64 para procesadores basados en ARM.",
+  "builds.apkHelp": "Cómo instalar el APK",
+  "builds.apkStep1":
+    "Descarga el APK en tu teléfono Android y abre el archivo.",
+  "builds.apkStep2":
+    "Si Android lo solicita, permite que este navegador o gestor de archivos instale aplicaciones y vuelve al APK.",
+  "builds.apkStep3":
+    "Completa la instalación, abre Harness y vincula la aplicación de escritorio en ejecución.",
+  "builds.remoteRequirement":
+    "Android se conecta a tu escritorio. Mantén Harness abierto en tu ordenador.",
+  "builds.morePlatforms": "Más plataformas",
+  "builds.browserTitle": "Tu espacio de trabajo, desde el navegador",
+  "builds.browserDescription":
+    "Conéctate a tu escritorio en ejecución desde un teléfono, una tableta u otro ordenador.",
+  "builds.browserAction": "Abrir espacio de trabajo remoto",
+  "builds.setupGuide": "Leer la guía de configuración",
+  "builds.retry": "Volver a comprobar",
+  "builds.checking": "Comprobando descargas…",
   "builds.title": "Consigue Const Harness",
   "builds.subtitle":
-    "Elige una versión publicada o compila la aplicación desde el código.",
+    "Instala la aplicación para Windows o accede desde cualquier lugar con la aplicación Android.",
   "builds.empty":
-    "No hay un binario compatible en las publicaciones recientes. Consulta todas las versiones o compila desde el código.",
+    "Todavía no se han publicado los instaladores. Vuelve pronto.",
   "builds.releases": "Ver todas las versiones",
   "builds.source": "Compilar desde el código",
   "builds.back": "Volver al inicio",
@@ -219,7 +250,7 @@ export const es: Copy = {
   "builds.all": "Todas las versiones",
   "builds.tabDesktop": "Escritorio",
   "builds.tabMobile": "Móvil",
-  "builds.soon": "Pronto",
+  "builds.soon": "Próximamente",
   "builds.downloading": "Descargando...",
   "preview.tagline": "Const Harness facilita tu trabajo.",
   "preview.inputPlaceholder": "Escribe un mensaje... (escribe / para comandos)",

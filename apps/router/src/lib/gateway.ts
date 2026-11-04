@@ -254,7 +254,7 @@ export async function executeSingle(
   const spec = getManagedModel(modelId);
   if (!spec || spec.category !== "llm")
     throw new GatewayError(
-      "Unknown chat model or unavailable :free variant. Select an ID from /v1/models.",
+      "Unknown or retired chat model. Select an ID from /v1/models.",
     );
   const engine = engineConfig(),
     started = performance.now(),

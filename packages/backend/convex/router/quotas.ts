@@ -2,8 +2,8 @@ import { query, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { resolveIdentity } from "./access";
-export const WEEKLY_QUOTA_TOKENS = 7_000_000;
-export const WEEKLY_QUOTA_IMAGES = 20;
+export const WEEKLY_QUOTA_TOKENS = 0;
+export const WEEKLY_QUOTA_IMAGES = 0;
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 export function formatCountdown(ms: number) {
   const minutes = Math.max(0, Math.floor(ms / 60000));
@@ -27,24 +27,24 @@ export function calculateQuotaState(
         Math.floor((now - doc.periodStartAt) / WEEK_MS) * WEEK_MS
       : doc.periodStartAt;
   const used = expired ? 0 : doc.usedTokens;
-  const limit = doc?.weeklyLimitTokens ?? WEEKLY_QUOTA_TOKENS;
+  const limit = WEEKLY_QUOTA_TOKENS;
   const reserved = expired ? 0 : (doc?.reservedTokens ?? 0);
   const usedImages = expired ? 0 : (doc?.usedImages ?? 0);
-  const imageLimit = doc?.weeklyLimitImages ?? WEEKLY_QUOTA_IMAGES;
+  const imageLimit = WEEKLY_QUOTA_IMAGES;
   const remaining = Math.max(0, limit - used - reserved);
   return {
     weeklyLimitTokens: limit,
     usedTokens: used,
     reservedTokens: reserved,
     remainingTokens: remaining,
-    percentUsed: Math.min(100, (used / limit) * 100),
-    percentRemaining: (remaining / limit) * 100,
+    percentUsed: limit > 0 ? Math.min(100, (used / limit) * 100) : 0,
+    percentRemaining: limit > 0 ? (remaining / limit) * 100 : 0,
     weeklyLimitImages: imageLimit,
     usedImages,
     remainingImages: Math.max(0, imageLimit - usedImages),
     percentImagesRemaining: Math.max(
       0,
-      ((imageLimit - usedImages) / imageLimit) * 100,
+      imageLimit > 0 ? ((imageLimit - usedImages) / imageLimit) * 100 : 0,
     ),
     periodStartAt: start,
     periodEndAt: start + WEEK_MS,

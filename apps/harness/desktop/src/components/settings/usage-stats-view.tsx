@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation, t as translate } from "../../lib/i18n";
-import { WeeklyQuotaCard, type WeeklyQuota } from "./weekly-quota-card";
+import { CreditBalanceCard } from "./credit-balance-card";
 import { cn, toast, TooltipProvider, ScrollArea } from "@const/ui";
 import {
   RefreshCw,
@@ -23,7 +23,6 @@ import {
 } from "../ui/github-activity";
 
 export interface UsageStatsViewProps {
-  quota?: WeeklyQuota | null;
   activeModel?: string;
   user?: any;
 }
@@ -99,7 +98,6 @@ interface DonutModelItem {
 function UsageStatsInner({
   // i18n hook
 
-  quota,
   activeModel = "agy/gemini-3.8-flash-tiered",
 }: UsageStatsViewProps) {
   const { t, language } = useTranslation();
@@ -501,7 +499,7 @@ function UsageStatsInner({
           </button>
         </div>
 
-        <WeeklyQuotaCard quota={quota} />
+        <CreditBalanceCard />
 
         {/* ------------------------------------------------------------- */}
         {/* 5 KPI Metric Summary Cards (Strictly Real Data)               */}

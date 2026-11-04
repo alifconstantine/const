@@ -8,12 +8,12 @@ import { LandingNavbar } from "@/components/landing/LandingNavbar";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ParticleBackdrop } from "@/components/landing/ParticleBackdrop";
 import { CodeBlock, QUICKSTART_TABS } from "@/components/landing/CodeBlock";
-import { BUILTIN_MODELS, FREE_MODEL_IDS } from "@/lib/model-specs";
+import { BUILTIN_MODELS } from "@/lib/model-specs";
 import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
 import "./landing.css";
 
 const chatModels = BUILTIN_MODELS.filter(
-  (model) => model.category === "llm" && !model.id.endsWith(":free"),
+  (model) => model.category === "llm",
 );
 
 export default function HomePage() {
@@ -84,7 +84,7 @@ export default function HomePage() {
               <p>
                 Set <code>CONST_API_KEY</code> to your API key.
                 <br />
-                This request uses your free model allowance.
+                Add credit to your account before making a request.
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function HomePage() {
                 <code>POST /v1/chat/completions</code>
                 <div>
                   <span>model</span>
-                  <code>deepseek-v4.1-flash:free</code>
+                  <code>deepseek-v4.1-flash</code>
                 </div>
                 <div>
                   <span>model</span>
@@ -252,8 +252,8 @@ export default function HomePage() {
               The rate in plain sight.
             </h2>
             <p>
-              Published chat rates in USD per million tokens. Free variants use
-              the shared weekly allowance; standard IDs use your wallet balance.
+              Published chat rates in USD per million tokens. Every model uses
+              your wallet balance. Top up in rupiah with QRIS.
             </p>
           </div>
           <div id="pricing" className="router-model-table-wrap" role="region" aria-label="Chat model pricing" tabIndex={0}>
@@ -306,21 +306,9 @@ export default function HomePage() {
             </Link>
           </div>
           <div id="billing" className="router-allowance">
-            <h3>Start with the free allowance.</h3>
-            <div>
-              <p>
-                7 million tokens per 7-day period, shared across the available
-                free chat models. Use the exact <code>:free</code> ID to draw
-                from your allowance.
-              </p>
-              <div className="router-free-models">
-                {FREE_MODEL_IDS.map((id) => (
-                  <code key={id}>{id}</code>
-                ))}
-              </div>
-              <Link href="/docs#models-allowance" className="router-text-link">
-                Understand billing <ArrowRight size={16} />
-              </Link>
+            <h3>One balance. Every model.</h3>
+            <div><p>Add credit in USD and pay in rupiah through QRIS. See the exchange rate and total before checkout. Your balance updates after payment is verified.</p>
+              <Link href="/credits" className="router-text-link">Add credit <ArrowRight size={16} /></Link>
             </div>
           </div>
         </section>
@@ -359,7 +347,7 @@ export default function HomePage() {
           <div>
             {apiKeyAction("Start building")}
             <p>
-              Try a free model. Explore the API.
+              Add credit. Explore the API.
               <br />
               Build from there.
             </p>

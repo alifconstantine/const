@@ -9,7 +9,7 @@ import { BUILTIN_MODELS, type ModelSpec } from "@/lib/model-specs";
 import { Button, Input, toast, cn } from "@const/ui";
 import { Copy, Search, ArrowUpRight } from "lucide-react";
 import { QueryBoundary } from "@/components/query-boundary";
-import { calculateQuotaMetrics } from "@/lib/quota";
+import { formatUsd } from "@/lib/router-analytics";
 
 const categoryName = (category?: string) =>
   category === "llm"
@@ -30,11 +30,9 @@ export function ModelCatalog({
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [tier, setTier] = useState("all");
   const visible = models.filter(
     (model) =>
       (category === "all" || model.category === category) &&
-      (tier === "all" || model.tier === tier) &&
       `${model.modelId} ${model.name} ${model.providerName}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()),
@@ -51,16 +49,6 @@ export function ModelCatalog({
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{model.name}</span>
-        <span
-          className={cn(
-            "rounded px-1.5 py-0.5 text-[10px]",
-            model.tier === "free"
-              ? "bg-[#cfbd9c]/10 text-[var(--router-highlight)]"
-              : "bg-secondary text-muted-foreground",
-          )}
-        >
-          {model.tier === "free" ? "Free allowance" : "Paid"}
-        </span>
       </div>
       <button
         type="button"
@@ -117,16 +105,6 @@ export function ModelCatalog({
               </button>
             ))}
           </div>
-          <select
-            aria-label="Billing tier"
-            value={tier}
-            onChange={(event) => setTier(event.target.value)}
-            className="h-9 rounded-lg border border-border bg-card px-3 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <option value="all">All billing tiers</option>
-            <option value="free">Free allowance</option>
-            <option value="paid">Paid</option>
-          </select>
         </div>
       </div>
       <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
@@ -226,7 +204,7 @@ export function ModelCatalog({
               No models match these filters.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Try a different name, model type, or billing tier.
+              Try a different name or model type.
             </p>
             <Button
               variant="outline"
@@ -235,7 +213,6 @@ export function ModelCatalog({
               onClick={() => {
                 setSearch("");
                 setCategory("all");
-                setTier("all");
               }}
             >
               Clear filters
@@ -244,9 +221,7 @@ export function ModelCatalog({
         )}
       </div>
       <p className="max-w-3xl text-xs leading-6 text-muted-foreground">
-        Only IDs ending in <code>:free</code> use your weekly allowance. The
-        same model without that suffix is billed from your credit balance. A
-        dash means no rate is listed for that field.
+        All models are billed from your credit balance. A dash means no rate is listed for that field.
       </p>
     </div>
   );
@@ -254,11 +229,10 @@ export function ModelCatalog({
 
 function ConnectedCatalog() {
   const { isAuthenticated } = useRouterAuth();
-  const quota = useQuery(
-    api.router.quotas.getUserQuota,
+  const wallet = useQuery(
+    api.router.credits.getUserCredits,
     isAuthenticated ? {} : "skip",
   );
-  const metrics = calculateQuotaMetrics(quota);
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-12">
       <header className="flex flex-wrap items-start justify-between gap-5">
@@ -279,22 +253,9 @@ function ConnectedCatalog() {
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">
         <p className="text-sm">
-          {quota ? (
-            <>
-              <span className="font-medium tabular-nums text-[var(--router-highlight)]">
-                {metrics.formattedRemaining}
-              </span>{" "}
-              free tokens remaining
-            </>
-          ) : (
-            "Loading your free allowance…"
-          )}
+          {wallet ? formatUsd(wallet.availableUsd) + " available credit" : "Loading your balance…"}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {quota
-            ? `${metrics.formattedLimit} per week · resets in ${metrics.resetsInText}`
-            : "Free models share a weekly token allowance"}
-        </p>
+        <Link href="/credits" className="text-xs font-medium hover:underline">Add credit with QRIS</Link>
       </div>
       <ModelCatalog />
     </div>

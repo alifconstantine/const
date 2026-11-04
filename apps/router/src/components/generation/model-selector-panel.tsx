@@ -213,7 +213,7 @@ export function ModelSelectorPanel({
                       >
                         <div className="flex flex-col min-w-0 pr-2">
                           <span className="truncate text-sm sm:text-base font-medium">
-                            {m.name} {m.tier === "free" ? " · Free" : " · Paid"}
+                            {m.name}
                           </span>
                           <span
                             className={cn(

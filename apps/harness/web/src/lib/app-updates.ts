@@ -1,4 +1,4 @@
-import { GITHUB_RELEASES_API, isReleaseAssetUrl, selectRelease, updateDownloadUrl, type UpdateTarget } from "../../../shared/updates/releases";
+import { GITHUB_RELEASES_API, isReleaseAssetUrl, releaseVersion, selectRelease, updateDownloadUrl, type UpdateTarget } from "../../../shared/updates/releases";
 
 export const updateCors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
 interface Options { token?: string; fetcher?: typeof fetch }
@@ -37,7 +37,7 @@ export async function updateFeed(request: Request, options: Options = {}) {
 export async function updateDownload(request: Request, options: Options = {}) {
   const query = new URL(request.url).searchParams;
   const id = query.get("asset") || "", tag = query.get("tag") || "";
-  if (!/^\d{1,16}$/.test(id) || !Number.isSafeInteger(Number(id)) || !/^harness-v\d{1,9}\.\d{1,9}\.\d{1,9}$/.test(tag)) return failure(400);
+  if (!/^\d{1,16}$/.test(id) || !Number.isSafeInteger(Number(id)) || !releaseVersion(tag)) return failure(400);
   try {
     const data = await catalog(options);
     const release = data.find(item => item.tag_name === tag && !item.draft && !item.prerelease);

@@ -26,6 +26,8 @@ import type * as router_keys from "../router/keys.js";
 import type * as router_logs from "../router/logs.js";
 import type * as router_migrations from "../router/migrations.js";
 import type * as router_modelCatalog from "../router/modelCatalog.js";
+import type * as router_paymentContract from "../router/paymentContract.js";
+import type * as router_payments from "../router/payments.js";
 import type * as router_preferences from "../router/preferences.js";
 import type * as router_providers from "../router/providers.js";
 import type * as router_quotas from "../router/quotas.js";
@@ -65,6 +67,8 @@ declare const fullApi: ApiFromModules<{
   "router/logs": typeof router_logs;
   "router/migrations": typeof router_migrations;
   "router/modelCatalog": typeof router_modelCatalog;
+  "router/paymentContract": typeof router_paymentContract;
+  "router/payments": typeof router_payments;
   "router/preferences": typeof router_preferences;
   "router/providers": typeof router_providers;
   "router/quotas": typeof router_quotas;

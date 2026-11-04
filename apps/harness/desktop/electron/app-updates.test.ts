@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DesktopAppUpdates } from "./app-updates";
-import { compareVersions, isReleaseAssetUrl, selectRelease, RELEASES_API, updateDownloadUrl, type UpdatePreferences } from "../../shared/updates/releases";
+import { compareVersions, fetchRelease, isReleaseAssetUrl, releaseVersion, selectRelease, RELEASES_API, updateDownloadUrl, type UpdatePreferences } from "../../shared/updates/releases";
 import { updateFeed, updateDownload } from "../../web/src/lib/app-updates";
 
 const bytes = new TextEncoder().encode("test-only installer, never executed");
@@ -24,6 +24,23 @@ test("release selection isolates Harness, stable versions, architecture and trus
   assert.equal(isReleaseAssetUrl("https://user:secret@github.com/alifconstantine/const/releases/download/harness-v0.0.3/update.exe", "harness-v0.0.3", "update.exe"), false);
   assert.equal(isReleaseAssetUrl("https://github.com/alifconstantine/const/releases/download/harness-v0.0.3/../update.exe", "harness-v0.0.3", "update.exe"), false);
   assert.equal(selectRelease([release("0.0.3", { assets: [{ name: "update.exe", browser_download_url: "javascript:alert(1)", size: 10 }] })], { os: "windows", arch: "x64" })?.asset, undefined);
+});
+
+test("published legacy 0.0.2 tag survives selection, public feed, client validation and download relay", async t => {
+  const legacy = release("0.0.2");
+  legacy.tag_name = "harness-v.0.0.2";
+  legacy.assets = legacy.assets.map(asset => ({ ...asset, browser_download_url: asset.browser_download_url.replace("harness-v0.0.2", legacy.tag_name) }));
+  assert.equal(releaseVersion(legacy.tag_name), "0.0.2");
+  for (const invalid of ["harness-v.0.0.3", "harness-v..0.0.2", "v0.0.2", "harness-v.0.0.2-beta"]) assert.equal(releaseVersion(invalid), undefined);
+  assert.equal(selectRelease([legacy], { os: "windows", arch: "x64" })?.asset?.name, legacy.assets[0]!.name);
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = (async input => updateFeed(new Request(String(input)), { fetcher: (async () => Response.json([legacy])) as typeof fetch })) as typeof fetch;
+  const selected = await fetchRelease({ os: "windows", arch: "x64" });
+  assert.equal(selected?.tag, legacy.tag_name);
+  assert.equal(selected?.asset?.url, updateDownloadUrl(42, legacy.tag_name));
+  const download = await updateDownload(new Request(selected!.asset!.url), { fetcher: (async input => String(input).includes("/assets/") ? new Response(null, { status: 302, headers: { Location: "https://release-assets.githubusercontent.com/legacy-installer" } }) : Response.json([legacy])) as typeof fetch });
+  assert.equal(download.status, 302);
 });
 
 async function fixture(t: TestContext, corrupt = false, installed = "0.0.2") {

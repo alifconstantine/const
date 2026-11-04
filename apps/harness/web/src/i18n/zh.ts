@@ -9,8 +9,7 @@ export const zh: Copy = {
   "footer.link.privacy": "隐私政策",
   "footer.link.terms": "服务条款",
 
-  "builds.unavailable":
-    "无法加载已发布的下载文件。请查看发布页面或从源码构建。",
+  "builds.unavailable": "无法加载下载信息，请稍后重试。",
   "meta.title": "Const Harness — 面向开发者的本地优先 AI 智能体工作台",
   "meta.description":
     "面向编程、研究与创作的桌面 AI 工作台。连接项目、选择模型，并在同一个界面中使用自主子智能体、浏览器与文件审查。",
@@ -86,9 +85,9 @@ export const zh: Copy = {
   "getstarted.note": "模型可用性、配额与服务费用取决于配置和账户。",
   "download.title": "与 Const Harness 一起起飞",
   "download.subtitle": "面向开发者的现代智能体工作台，随时可以接入你的工作流。",
-  "download.primary": "下载 x64 版本",
-  "download.secondary": "下载 ARM64 版本",
-  "download.note": "Windows、macOS 和 Linux · 在下载页选择版本",
+  "download.primary": "下载 Windows 版",
+  "download.secondary": "Android APK",
+  "download.note": "Windows 和 Android APK · macOS、Linux 和 iPhone 即将推出",
   "faq.title": "常见问题",
   "faq.0.q": "如何开始使用 Const Harness？",
   "faq.0.a":
@@ -192,10 +191,36 @@ export const zh: Copy = {
   "preview.schedule": "每日项目检查",
   "preview.daily": "每天 09:00",
   "preview.complete": "上次运行已完成",
+  "builds.notPublished": "尚未发布",
+  "builds.windowsDescription": "用于本地项目、工具和 AI 智能体的桌面工作台。",
+  "builds.windowsX64": "Windows x64",
+  "builds.windowsArm64": "Windows ARM64",
+  "builds.x64Hint": "Intel 和 AMD 电脑",
+  "builds.arm64Hint": "ARM 版 Windows",
+  "builds.androidDescription":
+    "从手机访问桌面工作区。直接下载 Android APK 安装包。",
+  "builds.androidApk": "Android APK",
+  "builds.apkHint": "直接安装到 Android 手机上",
+  "builds.archHelp": "我应该选择哪个 Windows 版本？",
+  "builds.archHelpBody":
+    "打开“设置 → 系统 → 系统信息”，查看“系统类型”。Intel 或 AMD 处理器请选择 x64，ARM 处理器请选择 ARM64。",
+  "builds.apkHelp": "如何安装 APK",
+  "builds.apkStep1": "将 APK 下载到 Android 手机并打开文件。",
+  "builds.apkStep2":
+    "如果 Android 提示，请允许此浏览器或文件管理器安装应用，然后返回 APK。",
+  "builds.apkStep3": "完成安装后打开 Harness，与正在运行的桌面应用配对。",
+  "builds.remoteRequirement":
+    "Android 应用需要连接桌面。请保持电脑上的 Harness 运行。",
+  "builds.morePlatforms": "更多平台",
+  "builds.browserTitle": "通过浏览器访问工作区",
+  "builds.browserDescription": "从手机、平板或其他电脑连接正在运行的桌面。",
+  "builds.browserAction": "打开远程工作区",
+  "builds.setupGuide": "阅读设置指南",
+  "builds.retry": "重新检查",
+  "builds.checking": "正在检查下载…",
   "builds.title": "获取 Const Harness",
-  "builds.subtitle": "选择已发布的桌面版本，或从源码构建应用。",
-  "builds.empty":
-    "近期发布中暂无匹配的桌面安装包。可查看所有版本或从源码构建。",
+  "builds.subtitle": "安装 Windows 应用，或使用 Android 应用随时连接工作区。",
+  "builds.empty": "安装包尚未发布，请稍后再来查看。",
   "builds.releases": "查看所有版本",
   "builds.source": "从源码构建",
   "builds.back": "返回首页",

@@ -14,7 +14,7 @@ import { api } from "@const/backend/_generated/api";
 import { useTranslation } from "../../lib/i18n";
 import type { UserProfile } from "../sidebar";
 import { getUserInitials } from "../sidebar";
-import { WeeklyQuotaCard, type WeeklyQuota } from "./weekly-quota-card";
+import { CreditBalanceCard } from "./credit-balance-card";
 import { AvatarCropEditor, type AvatarSource } from "./avatar-crop-editor";
 import {
   SettingsRow,
@@ -25,14 +25,12 @@ import {
 
 export interface ProfileSettingsProps {
   user?: UserProfile | null;
-  quota?: WeeklyQuota | null;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
 }
 
 export function ProfileSettings({
   user,
-  quota,
   onSignOut,
   onSwitchAccount,
 }: ProfileSettingsProps) {
@@ -315,7 +313,7 @@ export function ProfileSettings({
           </button>
         </SettingsRow>
       </SettingsSection>
-      <WeeklyQuotaCard quota={quota} />
+      <CreditBalanceCard />
       {(onSwitchAccount || onSignOut) && (
         <div className="flex flex-wrap gap-2">
           {onSwitchAccount && (

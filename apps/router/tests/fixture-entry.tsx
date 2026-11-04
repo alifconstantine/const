@@ -14,6 +14,7 @@ import SettingsPage from "../src/app/(dashboard)/settings/page";
 import GenerationPage from "../src/app/(dashboard)/generation/page";
 import { usePathname } from "./fixture-navigation";
 import { analytics, logs, quota, transactions, wallet } from "./fixture-data";
+import { TopUp } from "../src/components/dashboard/top-up";
 import { fixtureCounters } from "./fixture-convex";
 import "../src/app/globals.css";
 
@@ -81,7 +82,7 @@ function Fixture() {
                 }
               : analytics
         }
-        quota={loading ? undefined : quota}
+        wallet={loading ? undefined : wallet}
         logs={loading ? undefined : empty ? [] : logs}
       />
     );
@@ -105,6 +106,7 @@ function Fixture() {
                   }
                 : wallet
           }
+          topUp={<TopUp />}
           transactions={empty || loading ? [] : transactions}
           loading={loading}
         />

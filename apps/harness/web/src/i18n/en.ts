@@ -9,7 +9,7 @@ export const en = {
   "footer.link.terms": "Terms of Service",
 
   "builds.unavailable":
-    "Published downloads could not be loaded. Check the releases page or build from source.",
+    "Download information could not be loaded. Please try again shortly.",
   "meta.title": "Const Harness — Local-first agentic workbench for developers",
   "meta.description":
     "A desktop AI workbench for code, research, and creative work. Connect your project, choose a model, and work with autonomous subagents, browser, and file review in one place.",
@@ -90,10 +90,10 @@ export const en = {
   "download.title": "Experience liftoff with Const Harness",
   "download.subtitle":
     "The modern agentic workbench for developers. Ready for your workflow.",
-  "download.primary": "Download for x64",
-  "download.secondary": "Download for ARM64",
+  "download.primary": "Download for Windows",
+  "download.secondary": "Android APK",
   "download.note":
-    "Windows, macOS, and Linux · Choose your build on the download page",
+    "Windows and Android APK · macOS, Linux, and iPhone coming soon",
   "faq.title": "Frequently asked questions",
   "faq.0.q": "How do I get started with Const Harness?",
   "faq.0.a":
@@ -207,11 +207,41 @@ export const en = {
   "preview.schedule": "Daily project check",
   "preview.daily": "Every day at 09:00",
   "preview.complete": "Last run completed",
+  "builds.notPublished": "Not published yet",
+  "builds.windowsDescription":
+    "Your desktop workbench for local projects, tools, and AI agents.",
+  "builds.windowsX64": "Windows x64",
+  "builds.windowsArm64": "Windows ARM64",
+  "builds.x64Hint": "Intel and AMD PCs",
+  "builds.arm64Hint": "Windows on ARM",
+  "builds.androidDescription":
+    "Keep your desktop workspace within reach. Download the Android app directly as an APK.",
+  "builds.androidApk": "Android APK",
+  "builds.apkHint": "Install directly on your Android phone",
+  "builds.archHelp": "Which Windows version do I need?",
+  "builds.archHelpBody":
+    "Open Settings → System → About and check System type. Choose x64 for Intel or AMD processors, or ARM64 for an ARM-based processor.",
+  "builds.apkHelp": "How to install the APK",
+  "builds.apkStep1":
+    "Download the APK to your Android phone and open the file.",
+  "builds.apkStep2":
+    "If Android asks, allow this browser or file manager to install apps, then return to the APK.",
+  "builds.apkStep3":
+    "Finish installation, open Harness, then pair with your running desktop app.",
+  "builds.remoteRequirement":
+    "Android connects to your desktop. Keep Harness running on your computer.",
+  "builds.morePlatforms": "More platforms",
+  "builds.browserTitle": "Your workspace, through a browser",
+  "builds.browserDescription":
+    "Connect to a running desktop from your phone, tablet, or another computer.",
+  "builds.browserAction": "Open remote workspace",
+  "builds.setupGuide": "Read the setup guide",
+  "builds.retry": "Check again",
+  "builds.checking": "Checking downloads…",
   "builds.title": "Get Const Harness",
   "builds.subtitle":
-    "Choose a published desktop build, or build the app from source.",
-  "builds.empty":
-    "No matching desktop binary is available in the recent releases. You can check all releases or build from source.",
+    "Install the Windows workbench or connect on the go with the Android app.",
+  "builds.empty": "Installers have not been published yet. Check back soon.",
   "builds.releases": "View all releases",
   "builds.source": "Build from source",
   "builds.back": "Back to home",
@@ -219,7 +249,7 @@ export const en = {
   "builds.all": "All builds",
   "builds.tabDesktop": "Desktop",
   "builds.tabMobile": "Mobile",
-  "builds.soon": "Soon",
+  "builds.soon": "Coming soon",
   "builds.downloading": "Downloading...",
   "preview.tagline": "Const Harness makes work easier.",
   "preview.inputPlaceholder": "Enter a message... (type / for commands)",

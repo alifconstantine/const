@@ -431,14 +431,22 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
   if (!llmProviders.some((p) => p.id === CONST_LLM_PROVIDER.id)) {
     llmProviders.unshift(CONST_LLM_PROVIDER);
   }
+  // Refresh the managed catalog so persisted retired free IDs cannot reappear.
+  const managedIds = new Set(CONST_ROUTER_LLM_MODELS.map(model => model.id));
+  llmProviders = llmProviders.map(provider => provider.id === CONST_LLM_PROVIDER.id ? {
+    ...provider,
+    models: [...CONST_ROUTER_LLM_MODELS, ...(Array.isArray(provider.models) ? provider.models : []).filter(model => model && typeof model.id === "string" && !model.id.endsWith(":free") && !managedIds.has(model.id))],
+  } : provider);
   const llmActiveProvider =
     localStorage.getItem(STORAGE_KEYS.LLM_ACTIVE_PROVIDER) || CONST_LLM_PROVIDER.id;
-  const llmActiveModel =
+  let llmActiveModel =
     localStorage.getItem(STORAGE_KEYS.LLM_ACTIVE_MODEL) ||
     localStorage.getItem("const_harness_active_model") ||
     llmProviders.find((p) => p.id === llmActiveProvider)?.models[0]?.id ||
     CONST_ROUTER_LLM_MODELS[0]?.id ||
     "";
+
+  if (llmActiveProvider === CONST_LLM_PROVIDER.id && llmActiveModel.endsWith(":free")) llmActiveModel = "";
 
   // Load Speech (Empty by default unless user adds one)
   let speechProviders: SpeechProvider[] = [];
@@ -726,6 +734,7 @@ export async function fetchRemoteModels(
 
     const models = rawList
       .filter((m) => m && (m.id || m.name))
+      .filter((m) => !/^https:\/\/router\.const\.web\.id(?:\/|$)/i.test(cleanUrl) || !String(m.id || m.name).endsWith(":free"))
       .map((m) => ({
         id: String(m.id || m.name),
         name: modelDisplayName(String(m.id || m.name), String(m.name || m.id)),

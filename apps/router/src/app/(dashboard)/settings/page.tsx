@@ -111,9 +111,9 @@ function Settings() {
               value={draft.defaultModel}
               onChange={(event) => change("defaultModel", event.target.value)}
             >
-              {(["free", "paid"] as const).map((tier) => (
+              {(["paid"] as const).map((tier) => (
                 <optgroup
-                  label={tier === "free" ? "Free models" : "Paid models"}
+                  label={"Models"}
                   key={tier}
                 >
                   {BUILTIN_MODELS.filter(
@@ -194,19 +194,6 @@ function Settings() {
           View usage logs
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
-      </SettingsSection>
-
-      <SettingsSection
-        title="Notifications"
-        description="Stay aware of your available free quota."
-      >
-        <SettingToggle
-          title="Low quota warning"
-          description="Show a sidebar warning when less than 15% of your weekly free token allowance remains."
-          checked={draft.notifyLowQuota}
-          disabled={disabled}
-          change={(value) => change("notifyLowQuota", value)}
-        />
       </SettingsSection>
 
       <SettingsSection

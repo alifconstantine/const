@@ -145,7 +145,7 @@ The finished interface uses open sections, fine dividers, and quiet bordered wor
 **Key Characteristics:**
 
 - Warm type on black and graphite surfaces.
-- Champagne for selection, focus, highlighted technical values, and the free-usage series.
+- Champagne for selection, focus, and highlighted technical values.
 - Manrope throughout the shared shell and public headings.
 - Dividers and tonal layering rather than decorative surface shadows.
 
@@ -155,7 +155,7 @@ This is a source-derived record of the finished build, not an independent claim 
 
 ### Primary
 
-Champagne is a restrained interaction and information accent. Public primary actions begin in warm white and become champagne on hover. Console primary actions use the semantic foreground as their fill, with contrasting dark ink. The free-usage series follows the highlight; the paid series uses a muted blue-gray.
+Champagne is a restrained interaction and information accent. Public primary actions begin in warm white and become champagne on hover. Console primary actions use the semantic foreground as their fill, with contrasting dark ink. Usage charts use restrained semantic accents; paid cost uses a muted blue-gray.
 
 ### Neutral
 
@@ -201,7 +201,7 @@ Main work areas use tonal layering and one-pixel borders. Public integration pan
 
 ## Shapes
 
-Public action controls have gently curved 6px corners and code panels have 10px corners, reduced to 8px on mobile. Console panels and common overridden controls use the app’s 0.75rem radius. The framework medium radius subtracts 2px from that base. Catalog search retains the shared input’s 1rem corners. Small tier tags use compact corners; shared badges and allowance tracks use fully rounded ends. There is no single forced radius for every component.
+Public action controls have gently curved 6px corners and code panels have 10px corners, reduced to 8px on mobile. Console panels and common overridden controls use the app’s 0.75rem radius. The framework medium radius subtracts 2px from that base. Catalog search retains the shared input’s 1rem corners. Shared badges use fully rounded ends. There is no single forced radius for every component.
 
 ## Components
 
@@ -219,7 +219,7 @@ The catalog search is 40px high, uses a card fill, and leaves 36px of left inset
 
 ### Chips
 
-Catalog categories are compact text controls with a secondary fill when selected. Tier labels are small informational tags: free allowance uses a champagne tint and highlight text, while paid uses a secondary fill with muted text. These are states and metadata, not general decorative accents.
+Catalog categories are compact text controls with a secondary fill when selected. All models use prepaid credit; no free-tier tags or allowance tracks are displayed. Credit forms use the console input and button vocabulary, present the USD-to-IDR quote before the checkout action, and show pending, paid, failed, and expired payment states.
 
 ### Navigation
 

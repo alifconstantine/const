@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { resolveIdentity } from "./access";
 import { NANO_USD } from "./modelCatalog";
+import { checkoutConfig } from "./paymentContract";
 
 export const getUserCredits = query({
   args: { rawApiKey: v.optional(v.string()) },
@@ -25,7 +26,7 @@ export const getUserCredits = query({
         (wallet?.totalSpentNanoUsd ??
           Math.round((wallet?.totalSpentUsd ?? 0) * NANO_USD)) / NANO_USD,
       isAuthenticated: true,
-      topUpAvailable: false,
+      topUpAvailable: checkoutConfig().available,
     };
   },
 });

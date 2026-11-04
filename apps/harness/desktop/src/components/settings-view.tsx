@@ -28,8 +28,6 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@const/backend/_generated/api";
 import { useKeyboardShortcuts, type ShortcutItem } from "../lib/shortcuts";
 import type { UserProfile } from "./sidebar";
 
@@ -356,8 +354,6 @@ export function SettingsView({
     }
   };
 
-  // Reactive account quota.
-  const quota = useQuery(api.router.quotas.getUserQuota, {});
 
   // Load native preferences on mount.
   useEffect(() => {
@@ -696,7 +692,6 @@ export function SettingsView({
             {activeTab === "profile" ? (
               <ProfileSettings
                 user={user}
-                quota={quota}
                 onSignOut={onSignOut}
                 onSwitchAccount={onSwitchAccount}
               />
@@ -1096,7 +1091,6 @@ export function SettingsView({
             ) : activeTab === "usage-stats" ? (
               /* Usage Stats Tab (matching user Image 1 & Image 2)          */
               <UsageStatsView
-                quota={quota}
                 activeModel={activeModel}
                 user={user}
               />
@@ -1152,7 +1146,6 @@ export function SettingsView({
             ) : activeTab === "model-settings" ? (
               /* Model Settings View (LLM, Speech, Image, Video)          */
               <ModelSettings
-                quota={quota}
                 onActiveModelChanged={(modelId) =>
                   handleSelectActiveModel(modelId)
                 }

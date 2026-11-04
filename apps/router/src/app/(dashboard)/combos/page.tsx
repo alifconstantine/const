@@ -104,7 +104,7 @@ export default function CombosPage() {
 
   // Stage 2 Builder State (Direct Model Selector)
   const [builderModelId, setBuilderModelId] = useState<string>(
-    "deepseek-v4.1-flash:free",
+    "deepseek-v4.1-flash",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -138,7 +138,7 @@ export default function CombosPage() {
     setContextLength(262144);
     setSystemMessage("");
     setSelectedModels([]); // Starts empty: user fills from scratch
-    setBuilderModelId("deepseek-v4.1-flash:free");
+    setBuilderModelId("deepseek-v4.1-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -159,7 +159,7 @@ export default function CombosPage() {
         priority: idx + 1,
       })),
     );
-    setBuilderModelId("deepseek-v4.1-flash:free");
+    setBuilderModelId("deepseek-v4.1-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -183,7 +183,7 @@ export default function CombosPage() {
     return BUILTIN_MODELS.filter((m) => m.category === "llm").map((m) => ({
       modelId: m.modelId,
       name: m.name,
-      desc: `${m.contextWindow} context • ${m.tier === "free" ? "Free Tier" : "Paid Plan"}`,
+      desc: `${m.contextWindow} context • Pay as you go`,
     }));
   }, []);
 

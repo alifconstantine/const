@@ -72,7 +72,7 @@ export const analytics = {
   }),
   modelBreakdown: [
     {
-      model: "deepseek-v4.1-flash:free",
+      model: "deepseek-v4.1-flash",
       tier: "free",
       requests: 826,
       tokens: 1_164_200,
@@ -98,7 +98,7 @@ export const analytics = {
 export const logs = [
   {
     _id: "fixture_log1",
-    model: "deepseek-v4.1-flash:free",
+    model: "deepseek-v4.1-flash",
     totalTokens: 4320,
     status: 200,
     createdAt: now - 120000,

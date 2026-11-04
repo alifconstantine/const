@@ -6,7 +6,7 @@ import { ConstLogoIcon } from "@const/ui";
 import { ArrowUpRight, Check, Copy } from "lucide-react";
 import { CodeBlock, QUICKSTART_TABS } from "@/components/landing/CodeBlock";
 import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
-import { BUILTIN_MODELS, FREE_MODEL_IDS } from "@/lib/model-specs";
+import { BUILTIN_MODELS, DEFAULT_MODEL } from "@/lib/model-specs";
 import "../landing.css";
 
 const groups = [
@@ -15,7 +15,7 @@ const groups = [
     items: [
       ["quickstart", "Quickstart"],
       ["authentication", "Authentication"],
-      ["models-allowance", "Models & allowance"],
+      ["models-allowance", "Models & billing"],
       ["sdks", "SDK configuration"],
       ["agents-setup", "Coding agents"],
     ],
@@ -236,7 +236,7 @@ export default function DocsPage() {
             <p>
               <Link href="/keys">Create an API key</Link>, save it as{" "}
               <code>CONST_API_KEY</code> in your server environment, and send a
-              request. This example uses a free model and explicitly requests a
+              request. Add credit before calling a model. This example requests a
               non-streaming response.
             </p>
             <CodeBlock tabs={QUICKSTART_TABS} />
@@ -262,31 +262,10 @@ export default function DocsPage() {
               authentication error.
             </p>
           </Section>
-          <Section id="models-allowance" title="Models & free allowance">
-            <p>
-              The default free chat allowance is 7 million tokens per 7-day
-              period, shared across the listed <code>:free</code> variants. The
-              dashboard shows your remaining allowance and next reset.
-            </p>
-            <div className="router-free-models">
-              {FREE_MODEL_IDS.map((id) => (
-                <code key={id}>{id}</code>
-              ))}
-            </div>
-            <div className="router-docs-callout">
-              <p>
-                <strong>The exact model ID determines billing.</strong>{" "}
-                <code>deepseek-v4.1-flash:free</code> uses the free allowance.{" "}
-                <code>deepseek-v4.1-flash</code> uses wallet credit. Adding{" "}
-                <code>:free</code> to an unlisted model does not make it free.
-              </p>
-            </div>
-            <p>
-              Paid model requests reserve credit before inference and settle
-              against recorded usage. See{" "}
-              <Link href="/models">the model catalog</Link> for input, cached
-              input, output, and utility rates.
-            </p>
+          <Section id="models-allowance" title="Models & billing">
+            <p>All models use prepaid USD credit. Choose a model from <Link href="/models">the catalog</Link> and use its exact ID. Retired model IDs are rejected.</p>
+            <p>Open <Link href="/credits">Credits</Link> to add balance with QRIS. Choose a USD amount and review the rupiah total and exchange rate before creating a checkout. The rate is fixed for that payment and gateway fees are covered by Const.</p>
+            <p>Credit is added after the payment provider confirms payment. Returning from checkout alone does not confirm payment. Unpaid links expire after 24 hours. Paid requests reserve credit before inference and settle against recorded usage.</p>
           </Section>
           <Section id="sdks" title="Configure your SDK">
             <p>
@@ -324,7 +303,7 @@ const client = new OpenAI({
               `Provider:  OpenAI compatible
 Base URL:  https://router.const.web.id/v1
 API key:   sk-const-live-YOUR_API_KEY
-Model ID:  deepseek-v4.1-flash:free`,
+Model ID:  deepseek-v4.1-flash`,
               "Provider settings",
             )}
             <p>
@@ -341,7 +320,7 @@ Model ID:  deepseek-v4.1-flash:free`,
             </p>
             {snippet(
               request("/v1/chat/completions", {
-                model: FREE_MODEL_IDS[0],
+                model: DEFAULT_MODEL,
                 messages: [
                   {
                     role: "system",
@@ -389,7 +368,7 @@ Model ID:  deepseek-v4.1-flash:free`,
             </p>
             {snippet(
               `stream = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
+    model="deepseek-v4.1-flash",
     messages=[{"role": "user", "content": "Explain a cache miss."}],
     stream=True,
 )
@@ -416,7 +395,7 @@ for chunk in stream:
             </p>
             {snippet(
               `response = client.chat.completions.create(
-    model="deepseek-v4.1-flash:free",
+    model="deepseek-v4.1-flash",
     messages=[{"role": "user", "content": "Review this locking strategy."}],
     reasoning_effort="high",
     stream=False,
@@ -440,7 +419,7 @@ for chunk in stream:
             </p>
             {snippet(
               request("/v1/chat/completions", {
-                model: FREE_MODEL_IDS[0],
+                model: DEFAULT_MODEL,
                 messages: [
                   {
                     role: "user",
@@ -459,7 +438,7 @@ for chunk in stream:
             </p>
             {snippet(
               request("/v1/chat/completions", {
-                model: FREE_MODEL_IDS[0],
+                model: DEFAULT_MODEL,
                 messages: [
                   {
                     role: "user",
@@ -478,7 +457,7 @@ for chunk in stream:
             <p>
               Replace the example URL with your accessible image. Media inputs
               can reserve a larger token budget than text, so check available
-              quota or credit first.
+              credit first.
             </p>
           </Section>
           <Section id="tools-json" title="Tool calls & JSON output">
@@ -490,7 +469,7 @@ for chunk in stream:
             </p>
             {snippet(
               request("/v1/chat/completions", {
-                model: FREE_MODEL_IDS[0],
+                model: DEFAULT_MODEL,
                 messages: [
                   {
                     role: "user",
@@ -625,7 +604,7 @@ for chunk in stream:
             )}
             <p>
               Before a stream is returned, the router can try the next model on
-              eligible quota, credit, capacity, timeout, or upstream errors.
+              eligible credit, capacity, timeout, or upstream errors.
               Fallback does not restart a stream that has already begun. The
               selected model and fallback count are returned in response
               headers.
@@ -665,8 +644,8 @@ for chunk in stream:
               UTC. Revoke a key to block further requests.
             </p>
             <p>
-              The gateway checks reservations against your key limit, free
-              allowance, and wallet before inference. A request can be rejected
+              The gateway checks reservations against your key limit
+              and wallet before inference. A request can be rejected
               when its reserved budget exceeds the remaining amount, even if the
               final response would have used fewer tokens.
             </p>
@@ -691,8 +670,8 @@ for chunk in stream:
                 ],
                 [
                   "402",
-                  "Insufficient credit or free allowance",
-                  "Check your credits, choose an eligible free model, or wait for the allowance to reset.",
+                  "Insufficient credit",
+                  "Add credit from the Credits page and retry.",
                 ],
                 [
                   "413",
@@ -739,8 +718,7 @@ for chunk in stream:
             <p>
               Credit is reserved before a request and reconciled after
               settlement. Interrupted requests can still include billable tokens
-              already processed. Free variants deduct token usage from your
-              allowance instead of wallet credit.
+              already processed. All model and utility requests use wallet credit.
             </p>
             <p>
               Review tokens, duration, status, and cost in{" "}

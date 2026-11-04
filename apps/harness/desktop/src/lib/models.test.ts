@@ -16,32 +16,12 @@ import {
   loadMultiModalConfig,
 } from "./models-config";
 
-test("catalog keeps exact free and paid IDs with distinct labels and no preset combos", () => {
-  const ids = ROUTER_DEFAULT_MODELS.map((model) => model.id);
-  assert.deepEqual(
-    ids.filter((id) => id.endsWith(":free")),
-    [
-      "deepseek-v4.1-flash:free",
-      "qwen-3.8-omni-flash:free",
-      "glm-5.3-flash:free",
-    ],
-  );
-  for (const free of ids.filter((id) => id.endsWith(":free"))) {
-    assert.ok(ids.includes(free.slice(0, -5)));
-    assert.ok(
-      ROUTER_DEFAULT_MODELS.find(
-        (model) => model.id === free,
-      )?.displayName.endsWith(":free"),
-    );
-    assert.equal(resolveModelId(free, ROUTER_DEFAULT_MODELS), free);
-    const label = ROUTER_DEFAULT_MODELS.find((model) => model.id === free)!.displayName;
-    assert.equal(resolveModelId(label, ROUTER_DEFAULT_MODELS), free);
-  }
-  assert.ok(!ids.some((id) => id.startsWith("combo/")));
-  assert.equal(
-    resolveModelId("deepseek-v4.1-flash", ROUTER_DEFAULT_MODELS),
-    "deepseek-v4.1-flash",
-  );
+test("catalog offers only paid model IDs and no preset combos", () => {
+  const ids = ROUTER_DEFAULT_MODELS.map(model => model.id);
+  assert.ok(ids.length > 0);
+  assert.deepEqual(ids.filter(id => id.endsWith(":free")), []);
+  assert.ok(!ids.some(id => id.startsWith("combo/")));
+  assert.ok(ids.includes("deepseek-v4.1-flash"));
 });
 
 test("same display names never collapse free/paid variants", () => {
@@ -66,7 +46,7 @@ test("same display names never collapse free/paid variants", () => {
   );
 });
 
-test("a free default is saved and sent to Electron with its suffix intact", async () => {
+test("retired free selection is retained for rejection and never converted silently to paid", async () => {
   const storage = new Map<string, string>();
   const saved: unknown[] = [];
   const events: Event[] = [];
@@ -96,8 +76,16 @@ test("a free default is saved and sent to Electron with its suffix intact", asyn
   });
   try {
     const config = loadMultiModalConfig().llm;
+    config.providers = config.providers.map(provider => provider.id === "const-router" ? {
+      ...provider,
+      models: [...provider.models, { id: "combo/my-coding", name: "My coding combo" }, { id: "glm-5.3-flash:free", name: "Retired" }],
+    } : provider);
     config.activeModelId = "deepseek-v4.1-flash:free";
     saveLlmConfig(config);
+    const reloaded = loadMultiModalConfig().llm;
+    assert.equal(reloaded.activeModelId, "");
+    assert.ok(reloaded.providers.find(provider => provider.id === "const-router")!.models.every(model => !model.id.endsWith(":free")));
+    assert.ok(reloaded.providers.find(provider => provider.id === "const-router")!.models.some(model => model.id === "combo/my-coding"));
     assert.equal(storage.get("const_llm_active_model"), config.activeModelId);
     assert.equal(
       storage.get("const_harness_active_model"),
@@ -127,7 +115,7 @@ test("a free default is saved and sent to Electron with its suffix intact", asyn
   }
 });
 
-test("model discovery retains both variants even when remote names are identical", async () => {
+test("Const discovery hides retired free variants from an older router response", async () => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
@@ -141,7 +129,6 @@ test("model discovery retains both variants even when remote names are identical
   try {
     const result = await fetchRemoteModels("https://router.const.web.id/v1");
     assert.deepEqual(result.models, [
-      { id: "deepseek-v4.1-flash:free", name: "DeepSeek:free" },
       { id: "deepseek-v4.1-flash", name: "DeepSeek" },
     ]);
   } finally {

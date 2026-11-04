@@ -62,13 +62,11 @@ import {
 } from "../../lib/models-config";
 
 export interface ModelSettingsProps {
-  quota?: any;
   initialCategory?: ModelCategory;
   onActiveModelChanged?: (modelId: string) => void;
 }
 
 export function ModelSettings({
-  quota: _quota,
   initialCategory = "llm",
   onActiveModelChanged,
 }: ModelSettingsProps) {

@@ -38,14 +38,14 @@ export interface ModelSpec {
 
 // Built-in models matching exactly what is managed by Const Gateway
 const CATALOG_MODELS: ModelSpec[] = [
-  // --- FREE TIER MODELS (Accessible in Free & Paid) ---
+  // --- STANDARD MODELS ---
   {
     id: "deepseek-v4.1-flash",
     name: "DeepSeek v4.1 Flash",
     modelId: "deepseek-v4.1-flash",
     provider: "const",
     providerName: "Const",
-    tier: "free",
+    tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
@@ -68,7 +68,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "qwen-3.8-omni-flash",
     provider: "const",
     providerName: "Const",
-    tier: "free",
+    tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
@@ -91,7 +91,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "glm-5.3-flash",
     provider: "const",
     providerName: "Const",
-    tier: "free",
+    tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
@@ -315,22 +315,8 @@ const CATALOG_MODELS: ModelSpec[] = [
   },
 ];
 
-export const FREE_MODEL_IDS = [
-  "deepseek-v4.1-flash:free",
-  "qwen-3.8-omni-flash:free",
-  "glm-5.3-flash:free",
-] as const;
-export const DEFAULT_MODEL = FREE_MODEL_IDS[0];
-export const BUILTIN_MODELS: ModelSpec[] = [
-  ...CATALOG_MODELS.filter((m) => m.tier === "free").map((m) => ({
-    ...m,
-    id: m.id + ":free",
-    name: m.name + ":free",
-    modelId: m.modelId + ":free",
-    pricing: { input: "$0", cache: "$0", output: "$0", unit: "/ 1M tokens" },
-  })),
-  ...CATALOG_MODELS.map((m) => ({ ...m, tier: "paid" as const })),
-];
+export const DEFAULT_MODEL = "deepseek-v4.1-flash";
+export const BUILTIN_MODELS: ModelSpec[] = CATALOG_MODELS.map((m) => ({ ...m, tier: "paid" }));
 const UPSTREAM_MODELS: Record<string, string> = {
   "deepseek-v4.1-flash": "atmo/alicn/deepseek-v4.1-flash-1017",
   "qwen-3.8-omni-flash": "atmo/alicn/qwen3.8-omni-flash",
@@ -353,7 +339,7 @@ export function normalizeConstModelName(id: string): string {
   const model = getManagedModel(id);
   if (!model)
     throw new Error("Unknown model '" + id + "'. Use GET /v1/models.");
-  return UPSTREAM_MODELS[model.modelId.replace(/:free$/, "")]!;
+  return UPSTREAM_MODELS[model.modelId]!;
 }
 export function findModelSpec(
   id: string,
@@ -378,7 +364,6 @@ export function tokenCostNano(
 ): number {
   const model = getManagedModel(modelId);
   if (!model) throw new Error("Unknown model");
-  if (model.tier === "free") return 0;
   const rate = (s?: string) => Number((s || "0").replace(/[^0-9.]/g, "")) || 0;
   return Math.ceil(
     (Math.max(0, promptTokens - cachedTokens) * rate(model.pricing?.input) +

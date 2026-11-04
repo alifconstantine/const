@@ -2118,63 +2118,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-footer-masthead span:last-child {
   color: var(--ch-accent);
 }
-.ch-download-page {
-  padding-top: 150px;
-  min-height: 85vh;
-  padding-bottom: 100px;
-}
-.ch-download-page .ch-title {
-  max-width: 800px;
-  margin-inline: auto;
-}
-.ch-download-builds {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 60px;
-}
-.ch-download-filters {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 32px;
-  flex-wrap: wrap;
-}
-.ch-download-builds:has(> :only-child) {
-  grid-template-columns: minmax(0, 600px);
-  justify-content: center;
-}
-.ch-download-build .ch-button span {
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.ch-download-build {
-  border: 1px solid var(--ch-line);
-  border-radius: 18px;
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.ch-download-build h2 {
-  font-size: 24px;
-  margin: 0;
-  font-weight: 500;
-}
-.ch-download-build p {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--ch-ink-muted);
-  margin: 0;
-}
-.ch-download-build pre {
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--ch-surface-muted);
-  font: 12px/1.6 var(--font-mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 @media (min-width: 1600px) {
   .ch-capability {
     gap: 100px;
@@ -2468,9 +2411,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
     padding-top: 30px;
     font-size: 12.4vw;
   }
-  .ch-download-builds {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 @media (max-width: 380px) {
   .ch-header-cta {
@@ -2613,16 +2553,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   .ch-download-cta-actions a {
     justify-content: center;
     min-height: 44px;
-  }
-  .ch-download-list-page main {
-    padding: 108px 20px 72px;
-  }
-  .ch-download-list-page button {
-    min-height: 44px;
-  }
-  .ch-download-list-page pre {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 }
 @media (max-width: 480px) {

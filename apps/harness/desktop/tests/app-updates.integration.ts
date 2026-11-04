@@ -11,6 +11,23 @@ async function run() {
   const screenshot = async (name: string) => { const directory = process.env.CONST_UPDATE_UI_SCREENSHOTS; if (!directory) return; await mkdir(directory, { recursive: true }); await new Promise(resolve => setTimeout(resolve, 300)); await writeFile(path.join(directory, name + ".png"), (await win.webContents.capturePage()).toPNG()); };
   await win.loadURL(process.argv[3]!);
   await wait(`Boolean(window.__updates && document.querySelector('[data-app-update-trigger]'))`);
+  await js(`window.__availableRelease = window.__updates.emit({}).release`);
+  for (const mobile of [false, true]) {
+    await js(`window.__updates.setMobile(${mobile})`);
+    for (const patch of [
+      `{ status: 'idle', release: undefined }`,
+      `{ status: 'checking', release: undefined }`,
+      `{ status: 'error', release: undefined, error: 'network' }`,
+      `{ status: 'current', release: { ...window.__availableRelease, version: '0.0.2' } }`,
+      `{ status: 'current', release: { ...window.__availableRelease, version: '0.0.1' } }`,
+    ]) {
+      await js(`window.__updates.emit(${patch})`);
+      await wait(`!document.querySelector('[data-app-update-trigger]')`);
+    }
+    await js(`window.__updates.emit({ status: 'available', release: window.__availableRelease, error: undefined })`);
+    await wait(`Boolean(document.querySelector('[data-app-update-trigger]'))`);
+  }
+  await js(`window.__updates.setMobile(false)`);
   await js(`document.querySelector('[data-app-update-trigger]').click()`);
   await wait(`Boolean(document.querySelector('[data-app-update-panel]'))`);
   assert.equal(await js(`document.querySelector('[data-update-notes]').innerText.includes('##')`), false);
@@ -47,7 +64,9 @@ async function run() {
   await wait(`document.querySelector('[data-app-update-panel]').innerText.includes('Pasang pembaruan')`);
   await js(`Array.from(document.querySelectorAll('[data-app-update-panel] button')).find(button => button.textContent === 'Pasang pembaruan').click()`);
   assert.equal(await js(`window.__updates.installs()`), 1);
-  console.log("PASS: update UI — notes, download progress, ready/busy states, Android install, mobile layout, and five languages");
+  await js(`window.__updates.emit({ status: 'current', release: { ...window.__availableRelease, version: '0.0.2' } })`);
+  await wait(`!document.querySelector('[data-app-update-trigger]') && !document.querySelector('[data-app-update-panel]')`);
+  console.log("PASS: update UI — hidden without newer releases on desktop/mobile, notes, download progress, ready/busy states, Android install, mobile layout, and five languages");
   win.destroy();
 }
 run().then(() => app.exit(0)).catch(error => { console.error(error); app.exit(1); });

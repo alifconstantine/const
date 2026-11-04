@@ -1,6 +1,5 @@
 "use client";
 import { Languages } from "lucide-react";
-import { GitHubIcon } from "./GitHubIcon";
 import { useI18n } from "@/context/I18nContext";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { LINKS } from "@/lib/links";
@@ -29,7 +28,6 @@ export function Footer() {
         [t("nav.start"), "/docs/getting-started"],
         [t("footer.link.models"), "/docs/models"],
         [t("footer.link.data"), "/docs/privacy-and-data"],
-        [t("footer.link.issues"), LINKS.issues],
       ],
     },
     {
@@ -45,9 +43,6 @@ export function Footer() {
     {
       heading: t("footer.col.company"),
       links: [
-        [t("footer.link.source"), LINKS.repository],
-        [t("footer.link.releases"), LINKS.releases],
-        [t("footer.link.changelog"), LINKS.changelog],
         [t("footer.link.privacy"), "/privacy-policy"],
         [t("footer.link.terms"), "/terms-of-service"],
       ],
@@ -99,14 +94,6 @@ export function Footer() {
               ))}
             </select>
             <ThemeToggle />
-            <a
-              href={LINKS.repository}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-            >
-              <GitHubIcon size={19} />
-            </a>
           </div>
         </div>
         <div className="ch-footer-masthead" aria-label="Const Harness">
