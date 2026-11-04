@@ -154,8 +154,8 @@ export default function HomePage() {
                   Not a migration.
                 </h3>
                 <p>
-                  Move between DeepSeek, GPT, Gemini, Qwen, GLM,
-                  MiniMax, and Grok using the same chat endpoint. Compare the
+                  Move between Claude, GPT, Gemini, DeepSeek, Qwen, GLM,
+                  MiniMax, Kimi, and Grok using the same chat endpoint. Compare the
                   fit for each task without rebuilding your integration.
                 </p>
                 <Link href="#models" className="router-text-link">
@@ -210,7 +210,7 @@ export default function HomePage() {
                   </li>
                   <li>
                     <span>Fallback</span>
-                    <code>qwen-3.8-omni-flash</code>
+                    <code>qwen-3.8-27b</code>
                   </li>
                   <li>
                     <span>Fallback</span>

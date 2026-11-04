@@ -255,3 +255,65 @@ describe("tool result context budgets", () => {
     expect(compacted[3]).toBe(history[3]);
   });
 });
+
+
+describe("prefix cache stability, token caps, and vision resilience", () => {
+  it("keeps a shared static prefix at character 0 across distinct isolated workspaces and custom prompts", () => {
+    const promptA = buildConstSystemPrompt(
+      "/tmp/session_alpha",
+      "This task has an isolated working directory: /tmp/session_alpha",
+      CONST_DEFAULT_TOOLS,
+    );
+    const promptB = buildConstSystemPrompt(
+      "/tmp/session_bravo",
+      "This task has an isolated working directory: /tmp/session_bravo",
+      CONST_DEFAULT_TOOLS,
+    );
+    const markerIndexA = promptA.indexOf("# WORKSPACE & EXECUTION ENVIRONMENT");
+    const markerIndexB = promptB.indexOf("# WORKSPACE & EXECUTION ENVIRONMENT");
+    expect(markerIndexA).toBeGreaterThan(2000);
+    expect(markerIndexA).toBe(markerIndexB);
+    expect(promptA.slice(0, markerIndexA)).toBe(promptB.slice(0, markerIndexB));
+  });
+
+  it("sends only max_tokens on Const Router and clamps to per-model output token caps", async () => {
+    const { requests, run } = fixture(() => ({ delta: { content: "Clamped." } }), {
+      model: "kimi-k3",
+      maxOutputTokens: 128_000,
+    });
+    await run("Check cap");
+    const body = requests[0] as any;
+    expect(body.max_tokens).toBe(32_000);
+    expect(body.max_completion_tokens).toBeUndefined();
+  });
+
+  it("does not strip image attachments when upstream returns a transient HTTP 502 gateway error", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls += 1;
+      return new Response("<html>502 Bad Gateway</html>", { status: 502 });
+    }));
+    const agent = createConstAgent({
+      model: "deepseek-v4.1-flash",
+      baseUrl: "http://fixture.invalid/v1",
+      apiKey: "",
+      workspacePath: workspace,
+      sessionKind: "companion",
+      maxTurns: 2,
+      mode: "full_access",
+    });
+    const userMessages: any[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Inspect this screenshot" },
+          { type: "image_url", image_url: { url: "data:image/png;base64,aW1hZ2U=" } },
+        ],
+      },
+    ];
+    await expect(agent.run(userMessages, () => {})).rejects.toThrow(/502/);
+    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(userMessages[0].content)).toBe(true);
+    expect(userMessages[0].content.some((p: any) => p.type === "image_url")).toBe(true);
+  });
+});

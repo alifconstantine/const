@@ -33,8 +33,28 @@ describe("chat stream completion", () => {
     await consumeChatStream(stream('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}'), chunk => chunks.push(chunk), signal());
     expect(chunks[0].choices[0].delta.content).toBe("ok");
   });
-  it("surfaces provider errors instead of swallowing them", async () => {
-    await expect(consumeChatStream(stream('data: {"error":{"message":"timeout"}}\n\n'), () => {}, signal())).rejects.toThrow("timeout");
+  it("surfaces provider errors and structured error codes instead of swallowing them", async () => {
+    await expect(
+      consumeChatStream(
+        stream('data: {"error":{"code":"capacity_saturated","message":"timeout"}}\n\n'),
+        () => {},
+        signal(),
+      ),
+    ).rejects.toThrow("[capacity_saturated] timeout");
+  });
+  it("aborts keep-alive-only stalls at firstTokenMs without waiting for totalMs", async () => {
+    let heartbeat: ReturnType<typeof setInterval>;
+    const cancel = vi.fn(() => clearInterval(heartbeat));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        heartbeat = setInterval(() => controller.enqueue(bytes.encode(": keep-alive\n\n")), 2);
+      },
+      cancel,
+    });
+    await expect(consumeChatStream(body, () => {}, signal(), 50, 5_000, 20)).rejects.toThrow(
+      "waiting for first token",
+    );
+    expect(cancel).toHaveBeenCalledOnce();
   });
   it("finishes at DONE even if a provider leaves the socket open", async () => {
     const cancel = vi.fn();

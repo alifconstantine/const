@@ -191,14 +191,19 @@ export function SettingsView({
       !saved ||
       saved === "Const" ||
       saved === "gemini-3.6-flash" ||
-      saved === "gemini-3.7-flash" ||
-      saved === "qwen-3.8-27b"
+      saved === "gemini-3.7-flash"
     )
       return "gemini-3.8-flash";
     if (saved === "Gemini 3.8 Flash") return "gemini-3.8-flash";
     if (saved === "GLM 5.3 Flash") return "glm-5.3-flash";
-    if (saved === "Deepseek v4.1 Flash") return "deepseek-v4.1-flash";
-    if (saved === "Qwen 3.8 Omni Flash") return "qwen-3.8-omni-flash";
+    if (saved === "Deepseek v4.1 Flash" || saved === "DeepSeek v4.1 Flash")
+      return "deepseek-v4.1-flash";
+    if (saved === "Qwen 3.8 Omni Flash" || saved === "qwen-3.8-omni-flash")
+      return "qwen-3.8-27b";
+    if (saved === "minimax-m3") return "minimax-m3.1-flash";
+    if (saved === "claude-sonnet-4.6") return "claude-sonnet-5.5";
+    if (saved === "claude-opus-4.7") return "claude-opus-5.5";
+    if (saved === "kimi-k2.8-preview") return "kimi-k3.1-pro";
     if (saved === "GPT 6 Luna") return "gpt-6-luna";
     return saved;
   });

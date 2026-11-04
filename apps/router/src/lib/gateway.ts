@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
-import { getManagedModel, normalizeConstModelName } from "./model-specs";
+import {
+  getManagedModel,
+  getModelMaxOutputTokens,
+  normalizeConstModelName,
+} from "./model-specs";
 import {
   SseUsageParser,
   generateRequestId,
@@ -273,11 +277,15 @@ export async function executeSingle(
     (m) =>
       Array.isArray(m.content) && m.content.some((p: any) => p.type !== "text"),
   );
+  const maxAllowedOutput = getModelMaxOutputTokens(modelId);
+  const requestedOutput = Math.min(
+    body.max_completion_tokens ?? body.max_tokens ?? 1024,
+    maxAllowedOutput,
+  );
   const promptBudget = hasMedia
     ? Math.max(
         estimatedInput,
-        (spec.contextLength ?? 1000000) -
-          (body.max_completion_tokens ?? body.max_tokens ?? 1024),
+        (spec.contextLength ?? 1000000) - requestedOutput,
       )
     : estimatedInput;
   const ticket = await reserve(
@@ -286,7 +294,7 @@ export async function executeSingle(
     modelId,
     requestedModel,
     promptBudget,
-    body.max_completion_tokens ?? body.max_tokens ?? 1024,
+    requestedOutput,
     comboName,
   );
   const prompt = body.messages
@@ -296,6 +304,11 @@ export async function executeSingle(
   const configuredTimeout = Number(process.env.ROUTER_UPSTREAM_TIMEOUT_MS);
   const timeoutMs = Number.isFinite(configuredTimeout) && configuredTimeout >= 30_000
     ? Math.min(configuredTimeout, 900_000) : 600_000;
+  const configuredTtftTimeout = Number(process.env.ROUTER_FIRST_TOKEN_TIMEOUT_MS);
+  const firstTokenTimeoutMs =
+    Number.isFinite(configuredTtftTimeout) && configuredTtftTimeout >= 100
+      ? Math.min(configuredTtftTimeout, timeoutMs)
+      : Math.min(90_000, timeoutMs);
   const upstreamController = new AbortController();
   const signal = AbortSignal.any([req.signal, upstreamController.signal, AbortSignal.timeout(timeoutMs)]);
   const stream = body.stream ?? auth.settings.enableStreaming;
@@ -345,7 +358,19 @@ export async function executeSingle(
   }
   const headers = { ...CORS_HEADERS, "X-Const-Request-Id": requestId };
   if (!response.ok || !response.body) {
-    await response.body?.cancel();
+    let upstreamReason = "Upstream model failed";
+    try {
+      const rawText = await response.text();
+      if (rawText) {
+        const parsed = JSON.parse(rawText);
+        const msg = parsed?.error?.message ?? parsed?.message;
+        if (typeof msg === "string" && msg.trim()) {
+          upstreamReason = msg.trim().slice(0, 300);
+        }
+      }
+    } catch {
+      await response.body?.cancel().catch(() => {});
+    }
     await settle(
       auth,
       ticket,
@@ -356,7 +381,7 @@ export async function executeSingle(
         status: response.status >= 400 ? response.status : 502,
         durationMs: performance.now() - started,
         usageEstimated: false,
-        errorMessage: "Upstream model failed",
+        errorMessage: upstreamReason,
       },
       req,
       prompt,
@@ -420,12 +445,16 @@ export async function executeSingle(
     reader = response.body.getReader(),
     encoder = new TextEncoder();
   let closed = false;
-  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let pendingRead: Promise<ReadableStreamReadResult<Uint8Array>> | null = null;
   const finish = async (status: number, errorMessage?: string) => {
     if (closed) return;
     closed = true;
-    clearInterval(heartbeat);
     parser.finish();
+    const resolvedStatus = parser.hasError
+      ? (parser.errorStatus ?? 502)
+      : status;
+    const resolvedError =
+      errorMessage ?? (parser.hasError ? parser.errorMessage ?? "Upstream stream error" : undefined);
     await settle(
       auth,
       ticket,
@@ -439,49 +468,122 @@ export async function executeSingle(
           ? parser.completionTokens
           : estimateTokens(parser.outputText),
         cachedTokens: parser.cachedTokens,
-        status: parser.hasError ? 502 : status,
+        status: resolvedStatus,
         durationMs: performance.now() - started,
         ttftMs:
           parser.firstTokenAt === undefined
             ? undefined
             : parser.firstTokenAt - started,
         usageEstimated: !parser.hasUsage,
-        errorMessage,
+        errorMessage: resolvedError,
       },
       req,
       prompt,
     );
   };
   const output = new ReadableStream<Uint8Array>({
-    start(controller) {
-      heartbeat = setInterval(() => {
-        if (!closed) {
-          try {
-            controller.enqueue(encoder.encode(": keep-alive\n\n"));
-          } catch {}
-        }
-      }, 10000);
-    },
     async pull(controller) {
       try {
-        const { done, value } = await reader.read();
-        if (done) {
-          parser.finish();
-          if (!parser.hasTerminal && !parser.hasError) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: { message: "Upstream stream ended before completion. Retry or select another model.", code: "incomplete_stream" } })}\n\n`));
-            await finish(502, "Upstream stream ended before completion");
-          } else await finish(parser.hasError ? 502 : 200);
-          controller.close();
+        while (true) {
+          if (!pendingRead) pendingRead = reader.read();
+          const waitingForFirstToken =
+            parser.firstTokenAt === undefined &&
+            !parser.hasTerminal &&
+            !parser.hasError;
+          const ttftRemainingMs = waitingForFirstToken
+            ? Math.max(0, started + firstTokenTimeoutMs - performance.now())
+            : Infinity;
+          if (ttftRemainingMs === 0) {
+            pendingRead.catch(() => {});
+            pendingRead = null;
+            upstreamController.abort();
+            await reader.cancel().catch(() => {});
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  error: {
+                    message:
+                      "Upstream model timed out before first token. Retry or select another model.",
+                    code: "upstream_ttft_timeout",
+                  },
+                })}\n\n`,
+              ),
+            );
+            await finish(504, "Upstream timed out before first token");
+            controller.close();
+            return;
+          }
+
+          const sliceMs = Math.min(10_000, ttftRemainingMs);
+          let sliceTimer: ReturnType<typeof setTimeout> | undefined;
+          const outcome = await Promise.race([
+            pendingRead.then((res) => ({ kind: "read" as const, res })),
+            new Promise<{ kind: "tick" }>((resolve) => {
+              sliceTimer = setTimeout(
+                () => resolve({ kind: "tick" }),
+                sliceMs,
+              );
+            }),
+          ]);
+          if (sliceTimer) clearTimeout(sliceTimer);
+
+          if (outcome.kind === "tick") {
+            if (
+              waitingForFirstToken &&
+              performance.now() - started >= firstTokenTimeoutMs
+            ) {
+              continue;
+            }
+            if (parser.isAtEventBoundary) {
+              controller.enqueue(encoder.encode(": keep-alive\n\n"));
+              return;
+            }
+            continue;
+          }
+
+          pendingRead = null;
+          const { done, value } = outcome.res;
+          if (done) {
+            parser.finish();
+            if (parser.hasError) {
+              await finish(
+                parser.errorStatus ?? 502,
+                parser.errorMessage ?? "Upstream stream error",
+              );
+            } else if (!parser.hasTerminal) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    error: {
+                      message:
+                        "Upstream stream ended before completion. Retry or select another model.",
+                      code: "incomplete_stream",
+                    },
+                  })}\n\n`,
+                ),
+              );
+              await finish(502, "Upstream stream ended before completion");
+            } else {
+              await finish(200);
+            }
+            controller.close();
+            return;
+          }
+          parser.push(value);
+          controller.enqueue(value);
           return;
         }
-        parser.push(value);
-        controller.enqueue(value);
       } catch (error) {
+        pendingRead = null;
         try {
-          const isClientAbort = req.signal.aborted || upstreamController.signal.aborted;
+          const isClientAbort = req.signal.aborted;
           await finish(
             isClientAbort ? 499 : signal.aborted ? 504 : 502,
-            isClientAbort ? "Stream stopped by client" : signal.aborted ? "Upstream stream timed out" : "Stream interrupted",
+            isClientAbort
+              ? "Stream stopped by client"
+              : signal.aborted
+                ? "Upstream stream timed out"
+                : "Stream interrupted",
           );
         } finally {
           controller.error(error);
@@ -490,6 +592,8 @@ export async function executeSingle(
       }
     },
     async cancel(reason) {
+      pendingRead?.catch(() => {});
+      pendingRead = null;
       upstreamController.abort();
       await reader.cancel(reason).catch(() => {});
       await finish(499, "Stream stopped by client");

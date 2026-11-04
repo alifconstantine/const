@@ -12,7 +12,12 @@ import {
   cn,
 } from "@const/ui";
 import { Search, Check, X, Layers } from "lucide-react";
-import { BUILTIN_MODELS, type ModelSpec } from "@/lib/model-specs";
+import {
+  BUILTIN_MODELS,
+  effectiveModelPricing,
+  isPromoActive,
+  type ModelSpec,
+} from "@/lib/model-specs";
 
 interface ModelSelectorPanelProps {
   open: boolean;
@@ -57,9 +62,22 @@ export function ModelSelectorPanel({
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.modelId.toLowerCase().includes(q) ||
-        (m.providerName && m.providerName.toLowerCase().includes(q)),
+        (m.providerName && m.providerName.toLowerCase().includes(q)) ||
+        (m.vendorName && m.vendorName.toLowerCase().includes(q)) ||
+        (m.vendor && m.vendor.toLowerCase().includes(q)),
     );
   }, [standardModels, searchQuery]);
+
+  const groupedStandardModels = useMemo(() => {
+    const groups = new Map<string, ModelSpec[]>();
+    for (const m of filteredStandardModels) {
+      const label = m.vendorName || m.providerName || "Standard Models";
+      const list = groups.get(label);
+      if (list) list.push(m);
+      else groups.set(label, [m]);
+    }
+    return [...groups.entries()];
+  }, [filteredStandardModels]);
 
   const totalCount = filteredCombos.length + filteredStandardModels.length;
 
@@ -97,7 +115,7 @@ export function ModelSelectorPanel({
               aria-label="Search models or combos"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search models or combos..."
+              placeholder="Search Claude, OpenAI, Gemini, Qwen, or combos..."
               className="pl-9 h-10 rounded-xl text-sm font-sans border-border/80 bg-background text-foreground placeholder:text-muted-foreground"
               autoFocus
             />
@@ -185,15 +203,20 @@ export function ModelSelectorPanel({
                 </div>
               )}
 
-              {/* Free & paid models Section */}
-              {filteredStandardModels.length > 0 && (
-                <div className="space-y-1">
-                  <div className="px-3 py-1 text-xs font-medium text-muted-foreground">
-                    Standard Models
+              {/* Grouped by Provider */}
+              {groupedStandardModels.map(([groupLabel, items]) => (
+                <div key={groupLabel} className="space-y-1">
+                  <div className="px-3 py-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                    <span>{groupLabel}</span>
+                    <span className="text-[10px] font-normal opacity-75">
+                      {items.length} {items.length === 1 ? "model" : "models"}
+                    </span>
                   </div>
-                  {filteredStandardModels.map((m) => {
+                  {items.map((m) => {
                     const isSelected =
                       m.modelId === selectedModelId || m.id === selectedModelId;
+                    const active = effectiveModelPricing(m) ?? m.pricing;
+                    const promoActive = isPromoActive(m) && m.promo;
 
                     return (
                       <button
@@ -212,9 +235,16 @@ export function ModelSelectorPanel({
                         )}
                       >
                         <div className="flex flex-col min-w-0 pr-2">
-                          <span className="truncate text-sm sm:text-base font-medium">
-                            {m.name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm sm:text-base font-medium">
+                              {m.name}
+                            </span>
+                            {promoActive && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                -{m.promo!.totalPercentOff}%
+                              </span>
+                            )}
+                          </div>
                           <span
                             className={cn(
                               "text-xs truncate font-mono mt-0.5",
@@ -223,7 +253,10 @@ export function ModelSelectorPanel({
                                 : "text-muted-foreground",
                             )}
                           >
-                            {m.providerName} • {m.modelId}
+                            {m.modelId}
+                            {active?.input && active?.output
+                              ? ` · ${active.input}/${active.output}`
+                              : ""}
                           </span>
                         </div>
                         {isSelected && (
@@ -233,7 +266,7 @@ export function ModelSelectorPanel({
                     );
                   })}
                 </div>
-              )}
+              ))}
             </div>
           )}
         </ScrollArea>

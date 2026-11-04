@@ -7,8 +7,9 @@ export function getModelContextLimit(modelId?: string, explicit?: number | strin
   const model = ROUTER_DEFAULT_MODELS.find(model => model.id === modelId || model.displayName === modelId);
   if (model?.contextWindow) return model.contextWindow;
   const id = (modelId ?? "").toLowerCase().trim();
-  if (id.includes("luna") || id === "combo/auto" || id === "combo/fast") return 272_000;
-  if (id.includes("claude")) return 200_000;
+  if (id.includes("luna") || id.includes("astra") || id === "combo/auto" || id === "combo/fast") return 272_000;
+  if (id.includes("gpt-6.1") || id.includes("grok-4.7")) return 500_000;
+  if (id.includes("claude-3") || id.includes("claude-4")) return 200_000;
   if (id.includes("gpt-4") || id.includes("gpt-3.5")) return 128_000;
   return 1_000_000;
 }

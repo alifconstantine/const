@@ -104,7 +104,12 @@ export function summarizeTelemetry(telemetry?: ChatTelemetry) {
   const inputTokens = sum(billed, "promptTokens");
   const cachedInputTokens = sum(billed, "cacheReadTokens");
   const cacheWriteTokens = sum(billed, "cacheWriteTokens");
-  const generationMs = sum(generated, "durationMs");
+  const generationMs = generated.reduce((n, r) => {
+    const duration = Number(r.durationMs ?? 0);
+    const ttft = Number(r.ttftMs ?? 0);
+    const decodeMs = ttft > 0 && ttft < duration ? duration - ttft : duration;
+    return n + decodeMs;
+  }, 0);
   const tools = Object.values(telemetry?.tools ?? {});
   return {
     modelRequests: main.length,

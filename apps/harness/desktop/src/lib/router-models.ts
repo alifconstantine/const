@@ -18,7 +18,7 @@ export const ROUTER_DEFAULT_MODELS = BUILTIN_MODELS.filter(
     ? ["low", "medium", "high", "xhigh", "max"]
     : undefined,
   defaultThinkingLevel: "medium",
-  maxOutputTokens: 128000,
+  maxOutputTokens: model.maxOutputLength || 128000,
   contextWindow: model.contextLength || 1000000,
   inputTypes: model.inputTypes,
 }));

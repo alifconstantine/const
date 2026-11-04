@@ -13,7 +13,12 @@ export const getSettings = query({
       .unique();
     return saved
       ? {
-          defaultModel: saved.defaultModel.endsWith(":free") ? DEFAULT_SETTINGS.defaultModel : saved.defaultModel,
+          defaultModel:
+            saved.defaultModel.endsWith(":free") ||
+            (!saved.defaultModel.startsWith("combo/") &&
+              getManagedModel(saved.defaultModel)?.category !== "llm")
+              ? DEFAULT_SETTINGS.defaultModel
+              : saved.defaultModel,
           defaultTemperature: saved.defaultTemperature,
           enableStreaming: saved.enableStreaming,
           logPayloads: saved.logPayloads,

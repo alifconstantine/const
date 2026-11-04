@@ -8,8 +8,17 @@ export class SseUsageParser {
   outputText = "";
   hasUsage = false;
   hasError = false;
+  errorMessage?: string;
+  errorCode?: string;
+  errorStatus?: number;
   hasTerminal = false;
   firstTokenAt?: number;
+
+  /** True when no partial SSE frame is buffered (safe to inject a keep-alive comment). */
+  get isAtEventBoundary(): boolean {
+    return this.buffer.length === 0;
+  }
+
   push(chunk: Uint8Array) {
     this.buffer += this.decoder.decode(chunk, { stream: true });
     this.drain();
@@ -35,10 +44,52 @@ export class SseUsageParser {
       .map((line) => line.slice(5).trimStart())
       .join("\n");
     if (!data) return;
-    if (data === "[DONE]") { this.hasTerminal = true; return; }
+    if (data === "[DONE]") {
+      this.hasTerminal = true;
+      return;
+    }
     try {
       const json = JSON.parse(data);
-      if (json.error) this.hasError = true;
+      if (json.error) {
+        this.hasError = true;
+        const errObj =
+          typeof json.error === "object" && json.error !== null
+            ? json.error
+            : { message: String(json.error) };
+        if (typeof errObj.message === "string" && errObj.message.trim()) {
+          this.errorMessage = errObj.message.trim();
+        }
+        const code =
+          typeof errObj.code === "string"
+            ? errObj.code
+            : typeof errObj.type === "string"
+              ? errObj.type
+              : undefined;
+        if (code) this.errorCode = code;
+        if (
+          errObj.status === 429 ||
+          errObj.code === 429 ||
+          code === "capacity_saturated" ||
+          code === "rate_limit_exceeded" ||
+          /saturated|rate.?limit|too many requests/i.test(
+            this.errorMessage ?? "",
+          )
+        ) {
+          this.errorStatus = 429;
+        } else if (
+          errObj.status === 504 ||
+          code === "upstream_ttft_timeout" ||
+          /timed? out/i.test(this.errorMessage ?? "")
+        ) {
+          this.errorStatus = 504;
+        } else if (
+          typeof errObj.status === "number" &&
+          errObj.status >= 400 &&
+          errObj.status < 600
+        ) {
+          this.errorStatus = errObj.status;
+        }
+      }
       const usage = json.usage;
       if (
         usage &&
@@ -60,7 +111,9 @@ export class SseUsageParser {
           (typeof delta.content === "string" ? delta.content : "") +
           (typeof delta.reasoning_content === "string"
             ? delta.reasoning_content
-            : typeof delta.reasoning === "string" ? delta.reasoning : "");
+            : typeof delta.reasoning === "string"
+              ? delta.reasoning
+              : "");
         if (text || delta.tool_calls?.length)
           this.firstTokenAt ??= performance.now();
         this.outputText +=

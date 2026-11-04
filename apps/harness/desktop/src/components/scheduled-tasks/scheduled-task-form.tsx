@@ -22,6 +22,7 @@ import { CustomRepeatModal, type CustomRepeatConfig } from "./custom-repeat-moda
 import { SegmentedToggle } from "./segmented-toggle";
 import { ScheduledTaskHistoryContent } from "./scheduled-task-history";
 import { useTranslation } from "../../lib/i18n";
+import { ROUTER_DEFAULT_MODELS } from "../../lib/router-models";
 
 export interface ScheduledTaskFormData {
   name: string;
@@ -148,47 +149,15 @@ export function ScheduledTaskForm({
   const mode = "full_access";
 
   // 3. Model Selector State (matching ChatCard)
-  const [models, setModels] = useState<ModelItem[]>([
-    {
-      id: "gemini-3.8-flash",
-      name: "Gemini 3.8 Flash",
-      desc: "Advanced frontier thinking & max depth",
+  const [models, setModels] = useState<ModelItem[]>(() => [
+    ...ROUTER_DEFAULT_MODELS.map((m) => ({
+      id: m.id,
+      name: m.displayName,
+      desc: `${m.providerName} · ${Math.round((m.contextWindow || 1_000_000) / 1000)}K context`,
       provider: "const",
       providerName: "Const",
-      supportsThinking: true,
-    },
-    {
-      id: "glm-5.3-flash",
-      name: "GLM 5.3 Flash",
-      desc: "Ultra-fast response model optimized for real-time coding and execution",
-      provider: "const",
-      providerName: "Const",
-      supportsThinking: true,
-    },
-    {
-      id: "deepseek-v4.1-flash",
-      name: "Deepseek v4.1 Flash",
-      desc: "High-performance MoE reasoning model specializing in algorithmic coding",
-      provider: "const",
-      providerName: "Const",
-      supportsThinking: true,
-    },
-    {
-      id: "qwen-3.8-omni-flash",
-      name: "Qwen 3.8 Omni Flash",
-      desc: "Native omni-modal foundation model strong across multilingual tasks and code",
-      provider: "const",
-      providerName: "Const",
-      supportsThinking: true,
-    },
-    {
-      id: "gpt-6-luna",
-      name: "GPT 6 Luna",
-      desc: "Frontier reasoning powerhouse with nuanced writing and problem solving",
-      provider: "const",
-      providerName: "Const",
-      supportsThinking: true,
-    },
+      supportsThinking: m.supportsThinking,
+    })),
     {
       id: "combo/auto",
       name: "combo/auto",
@@ -222,11 +191,13 @@ export function ScheduledTaskForm({
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     const saved = initialValues?.model || localStorage.getItem("const_harness_active_model");
     if (!saved || saved === "Const") return "Gemini 3.8 Flash";
-    if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
-    if (saved === "glm-5.3-flash") return "GLM 5.3 Flash";
-    if (saved === "deepseek-v4.1-flash") return "Deepseek v4.1 Flash";
-    if (saved === "qwen-3.8-omni-flash") return "Qwen 3.8 Omni Flash";
-    if (saved === "gpt-6-luna") return "GPT 6 Luna";
+    if (saved === "qwen-3.8-omni-flash" || saved === "Qwen 3.8 Omni Flash") return "Qwen 3.8 27B";
+    if (saved === "minimax-m3") return "MiniMax M3.1 Flash";
+    if (saved === "claude-sonnet-4.6") return "Claude Sonnet 5.5";
+    if (saved === "claude-opus-4.7") return "Claude Opus 5.5";
+    if (saved === "kimi-k2.8-preview") return "Kimi K3.1 Pro";
+    const found = ROUTER_DEFAULT_MODELS.find((m) => m.id === saved || m.displayName === saved);
+    if (found) return found.displayName;
     return saved;
   });
   const [isModelOpen, setIsModelOpen] = useState(false);

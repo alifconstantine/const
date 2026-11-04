@@ -278,6 +278,19 @@ function loadUserConfig(): UserConfig {
         !merged.activeModel
       ) {
         merged.activeModel = "gemini-3.8-flash";
+      } else if (
+        merged.activeModel === "qwen-3.8-omni-flash" ||
+        merged.activeModel === "Qwen 3.8 Omni Flash"
+      ) {
+        merged.activeModel = "qwen-3.8-27b";
+      } else if (merged.activeModel === "minimax-m3") {
+        merged.activeModel = "minimax-m3.1-flash";
+      } else if (merged.activeModel === "claude-sonnet-4.6") {
+        merged.activeModel = "claude-sonnet-5.5";
+      } else if (merged.activeModel === "claude-opus-4.7") {
+        merged.activeModel = "claude-opus-5.5";
+      } else if (merged.activeModel === "kimi-k2.8-preview") {
+        merged.activeModel = "kimi-k3.1-pro";
       }
 
       // Ensure native Const provider points to router.const.web.id
@@ -1114,6 +1127,7 @@ app.whenReady().then(() => {
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
               contextWindow: getModelContextLimit(m.id, m.context_length ?? m.contextLength ?? m.context_window ?? m.contextWindow),
+              inputTypes: m.input_modalities || m.input_types || m.inputTypes,
             };
           });
         }

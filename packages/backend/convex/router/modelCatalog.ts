@@ -5,11 +5,33 @@ export const DEFAULT_OUTPUT_TYPES = ["text"];
 
 export type ThinkingLevel = "low" | "medium" | "high" | "xhigh" | "max";
 
+export type ModelVendor =
+  | "anthropic"
+  | "openai"
+  | "google"
+  | "deepseek"
+  | "qwen"
+  | "zhipu"
+  | "minimax"
+  | "moonshot"
+  | "xai"
+  | "const";
+
 export interface ModelPricing {
   input: string;
   cache?: string;
   output: string;
   unit?: string;
+}
+
+export interface ModelPromo {
+  /** Additional limited-time discount on top of Const's 40%-off-official standard rate */
+  extraPercentOff: number;
+  /** Combined total percentage discount vs official vendor rate */
+  totalPercentOff: number;
+  label: string;
+  endsAt?: string;
+  pricing: ModelPricing;
 }
 
 export interface ModelSpec {
@@ -18,16 +40,22 @@ export interface ModelSpec {
   modelId: string;
   provider: "const" | "byok" | "combo";
   providerName: string;
+  vendor?: ModelVendor;
+  vendorName?: string;
   providerDocId?: string;
   supportsThinking: boolean;
   thinkingDefault?: ThinkingLevel;
   pricing?: ModelPricing;
+  officialPricing?: ModelPricing;
+  standardPricing?: ModelPricing;
+  promo?: ModelPromo;
   isCombo?: boolean;
   comboSlug?: string;
   modelsCount?: number;
   description?: string;
   contextLength?: number;
   contextWindow?: string;
+  maxOutputLength?: number;
   maxOutputTokens?: string;
   category?: "llm" | "stt" | "search" | "image";
   endpoint?: string;
@@ -36,53 +64,73 @@ export interface ModelSpec {
   outputTypes?: string[];
 }
 
-// Built-in models matching exactly what is managed by Const Gateway
+export const LIMITED_PROMO_ENDS_AT = "2026-12-05T00:00:00.000Z";
+
+function rateTokens(input: string, output: string, cache?: string): ModelPricing {
+  return {
+    input,
+    cache: cache ?? input,
+    output,
+    unit: "/ 1M tokens",
+  };
+}
+
+function buildPromo(
+  extraPercentOff: number,
+  totalPercentOff: number,
+  input: string,
+  output: string,
+  cache: string,
+  endsAt = LIMITED_PROMO_ENDS_AT,
+): ModelPromo {
+  return {
+    extraPercentOff,
+    totalPercentOff,
+    label: `Limited -${extraPercentOff}%`,
+    endsAt,
+    pricing: rateTokens(input, output, cache),
+  };
+}
+
+export function isPromoActive(model: ModelSpec, now = Date.now()): boolean {
+  if (!model.promo) return false;
+  if (!model.promo.endsAt) return true;
+  const endsAtMs = Date.parse(model.promo.endsAt);
+  return Number.isFinite(endsAtMs) && now < endsAtMs;
+}
+
+export function effectiveModelPricing(
+  model: ModelSpec,
+  now = Date.now(),
+): ModelPricing | undefined {
+  if (isPromoActive(model, now)) return model.promo!.pricing;
+  return model.standardPricing ?? model.pricing;
+}
+
+// Built-in models matching exactly what is managed by Const Gateway (<= 3 months old, >= Aug 2026)
 const CATALOG_MODELS: ModelSpec[] = [
-  // --- STANDARD MODELS ---
+  // --- FAST / DAILY CODING MODELS ---
   {
     id: "deepseek-v4.1-flash",
     name: "DeepSeek v4.1 Flash",
     modelId: "deepseek-v4.1-flash",
     provider: "const",
     providerName: "Const",
+    vendor: "deepseek",
+    vendorName: "DeepSeek",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
     contextWindow: "1M",
+    maxOutputLength: 128000,
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.0125",
-      cache: "$0.0125",
-      output: "$0.060",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$0.150", "$0.600", "$0.015"),
+    standardPricing: rateTokens("$0.090", "$0.360", "$0.0135"),
+    promo: buildPromo(10, 46, "$0.081", "$0.324", "$0.012"),
     inputTypes: ["text", "image"],
-    outputTypes: ["text"],
-  },
-  {
-    id: "qwen-3.8-omni-flash",
-    name: "Qwen 3.8 Omni Flash",
-    modelId: "qwen-3.8-omni-flash",
-    provider: "const",
-    providerName: "Const",
-    tier: "paid",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.0125",
-      cache: "$0.0125",
-      output: "$0.055",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image", "audio", "video"],
     outputTypes: ["text"],
   },
   {
@@ -91,69 +139,21 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "glm-5.3-flash",
     provider: "const",
     providerName: "Const",
+    vendor: "zhipu",
+    vendorName: "GLM (Z.ai)",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
     contextWindow: "1M",
-    maxOutputTokens: "128K",
+    maxOutputLength: 48000,
+    maxOutputTokens: "48K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.0125",
-      cache: "$0.0125",
-      output: "$0.055",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image", "video"],
-    outputTypes: ["text"],
-  },
-
-  // --- PAID PLAN FRONTIER & REASONING MODELS ---
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    modelId: "gemini-3.8-flash",
-    provider: "const",
-    providerName: "Const",
-    tier: "paid",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.020",
-      cache: "$0.020",
-      output: "$0.080",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text", "image", "audio", "video"],
-    outputTypes: ["text"],
-  },
-  {
-    id: "glm-5.3",
-    name: "GLM 5.3",
-    modelId: "glm-5.3",
-    provider: "const",
-    providerName: "Const",
-    tier: "paid",
-    category: "llm",
-    endpoint: "/v1/chat/completions",
-    contextLength: 1000000,
-    contextWindow: "1M",
-    maxOutputTokens: "128K",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-    pricing: {
-      input: "$0.035",
-      cache: "$0.035",
-      output: "$0.110",
-      unit: "/ 1M tokens",
-    },
-    inputTypes: ["text"],
+    officialPricing: rateTokens("$0.150", "$0.500", "$0.015"),
+    standardPricing: rateTokens("$0.090", "$0.300", "$0.0135"),
+    promo: buildPromo(25, 55, "$0.0675", "$0.225", "$0.010"),
+    inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
   {
@@ -162,21 +162,138 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "minimax-m3.1-flash",
     provider: "const",
     providerName: "Const",
+    vendor: "minimax",
+    vendorName: "MiniMax",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
     contextWindow: "1M",
+    maxOutputLength: 128000,
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.035",
-      cache: "$0.035",
-      output: "$0.135",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$0.150", "$0.600", "$0.015"),
+    standardPricing: rateTokens("$0.090", "$0.360", "$0.0135"),
+    promo: buildPromo(20, 52, "$0.072", "$0.288", "$0.011"),
     inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "qwen-3.8-27b",
+    name: "Qwen 3.8 27B",
+    modelId: "qwen-3.8-27b",
+    provider: "const",
+    providerName: "Const",
+    vendor: "qwen",
+    vendorName: "Qwen",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$0.500", "$3.000", "$0.050"),
+    standardPricing: rateTokens("$0.300", "$1.800", "$0.045"),
+    promo: buildPromo(50, 70, "$0.150", "$0.900", "$0.0225"),
+    inputTypes: ["text", "image", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    modelId: "gemini-3.8-flash",
+    provider: "const",
+    providerName: "Const",
+    vendor: "google",
+    vendorName: "Google",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 65536,
+    maxOutputTokens: "64K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$0.750", "$3.750", "$0.075"),
+    standardPricing: rateTokens("$0.450", "$2.250", "$0.0675"),
+    promo: buildPromo(40, 64, "$0.270", "$1.350", "$0.0405"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "claude-haiku-5.5",
+    name: "Claude Haiku 5.5",
+    modelId: "claude-haiku-5.5",
+    provider: "const",
+    providerName: "Const",
+    vendor: "anthropic",
+    vendorName: "Claude",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$0.100", "$0.500", "$0.010"),
+    standardPricing: rateTokens("$0.060", "$0.300", "$0.009"),
+    promo: buildPromo(25, 55, "$0.045", "$0.225", "$0.007"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    modelId: "gpt-6-luna",
+    provider: "const",
+    providerName: "Const",
+    vendor: "openai",
+    vendorName: "OpenAI",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 272000,
+    contextWindow: "272K",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$0.100", "$0.500", "$0.010"),
+    standardPricing: rateTokens("$0.060", "$0.300", "$0.009"),
+    promo: buildPromo(50, 70, "$0.030", "$0.150", "$0.0045"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+
+  // --- FRONTIER & REASONING MODELS ---
+  {
+    id: "deepseek-v4-pro",
+    name: "DeepSeek v4 Pro",
+    modelId: "deepseek-v4-pro",
+    provider: "const",
+    providerName: "Const",
+    vendor: "deepseek",
+    vendorName: "DeepSeek",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$0.660", "$1.980", "$0.066"),
+    standardPricing: rateTokens("$0.396", "$1.188", "$0.060"),
+    promo: buildPromo(50, 70, "$0.198", "$0.594", "$0.030"),
+    inputTypes: ["text"],
     outputTypes: ["text"],
   },
   {
@@ -185,20 +302,226 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "qwen-3.8-max",
     provider: "const",
     providerName: "Const",
+    vendor: "qwen",
+    vendorName: "Qwen",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 1000000,
     contextWindow: "1M",
+    maxOutputLength: 128000,
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.050",
-      cache: "$0.050",
-      output: "$0.150",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
+    promo: buildPromo(50, 70, "$0.600", "$1.800", "$0.090"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "qwen-3.8-2.4t-a95b",
+    name: "Qwen 3.8 2.4T A95B",
+    modelId: "qwen-3.8-2.4t-a95b",
+    provider: "const",
+    providerName: "Const",
+    vendor: "qwen",
+    vendorName: "Qwen",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
+    promo: buildPromo(60, 76, "$0.480", "$1.440", "$0.072"),
+    inputTypes: ["text"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "glm-5.3",
+    name: "GLM 5.3",
+    modelId: "glm-5.3",
+    provider: "const",
+    providerName: "Const",
+    vendor: "zhipu",
+    vendorName: "GLM (Z.ai)",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$1.400", "$4.400", "$0.140"),
+    standardPricing: rateTokens("$0.840", "$2.640", "$0.126"),
+    promo: buildPromo(40, 64, "$0.504", "$1.584", "$0.076"),
+    inputTypes: ["text"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "kimi-k3.1-pro",
+    name: "Kimi K3.1 Pro",
+    modelId: "kimi-k3.1-pro",
+    provider: "const",
+    providerName: "Const",
+    vendor: "moonshot",
+    vendorName: "Kimi (Moonshot)",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 32000,
+    maxOutputTokens: "32K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
+    promo: buildPromo(25, 55, "$0.900", "$4.500", "$0.135"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "kimi-k3",
+    name: "Kimi K3",
+    modelId: "kimi-k3",
+    provider: "const",
+    providerName: "Const",
+    vendor: "moonshot",
+    vendorName: "Kimi (Moonshot)",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 32000,
+    maxOutputTokens: "32K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$3.000", "$15.000", "$0.300"),
+    standardPricing: rateTokens("$1.800", "$9.000", "$0.270"),
+    promo: buildPromo(30, 58, "$1.260", "$6.300", "$0.189"),
+    inputTypes: ["text", "image", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gemini-4-argon",
+    name: "Gemini 4 Argon",
+    modelId: "gemini-4-argon",
+    provider: "const",
+    providerName: "Const",
+    vendor: "google",
+    vendorName: "Google",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 65536,
+    maxOutputTokens: "64K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$2.000", "$12.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$7.200", "$0.180"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "claude-sonnet-5.5",
+    name: "Claude Sonnet 5.5",
+    modelId: "claude-sonnet-5.5",
+    provider: "const",
+    providerName: "Const",
+    vendor: "anthropic",
+    vendorName: "Claude",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
+    promo: buildPromo(30, 58, "$0.840", "$4.200", "$0.126"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "claude-opus-5.5",
+    name: "Claude Opus 5.5",
+    modelId: "claude-opus-5.5",
+    provider: "const",
+    providerName: "Const",
+    vendor: "anthropic",
+    vendorName: "Claude",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$4.000", "$20.000", "$0.400"),
+    standardPricing: rateTokens("$2.400", "$12.000", "$0.360"),
+    promo: buildPromo(35, 61, "$1.560", "$7.800", "$0.234"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "claude-fable-5.1",
+    name: "Claude Fable 5.1",
+    modelId: "claude-fable-5.1",
+    provider: "const",
+    providerName: "Const",
+    vendor: "anthropic",
+    vendorName: "Claude",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$10.000", "$50.000", "$1.000"),
+    standardPricing: rateTokens("$6.000", "$30.000", "$0.900"),
+    promo: buildPromo(20, 52, "$4.800", "$24.000", "$0.720"),
+    inputTypes: ["text", "image"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "gpt-6.1-terra",
+    name: "GPT 6.1 Terra",
+    modelId: "gpt-6.1-terra",
+    provider: "const",
+    providerName: "Const",
+    vendor: "openai",
+    vendorName: "OpenAI",
+    tier: "paid",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 500000,
+    contextWindow: "500K",
+    maxOutputLength: 128000,
+    maxOutputTokens: "128K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    officialPricing: rateTokens("$1.000", "$5.000", "$0.100"),
+    standardPricing: rateTokens("$0.600", "$3.000", "$0.090"),
+    promo: buildPromo(50, 70, "$0.300", "$1.500", "$0.045"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -208,20 +531,20 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "gpt-6.1-sol",
     provider: "const",
     providerName: "Const",
+    vendor: "openai",
+    vendorName: "OpenAI",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 500000,
     contextWindow: "500K",
+    maxOutputLength: 128000,
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.240",
-      cache: "$0.050",
-      output: "$1.200",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
+    promo: buildPromo(50, 70, "$0.600", "$3.000", "$0.090"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -231,20 +554,20 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "gpt-6-astra",
     provider: "const",
     providerName: "Const",
+    vendor: "openai",
+    vendorName: "OpenAI",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 272000,
     contextWindow: "272K",
+    maxOutputLength: 128000,
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.450",
-      cache: "$0.090",
-      output: "$2.200",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$10.000", "$50.000", "$1.000"),
+    standardPricing: rateTokens("$6.000", "$30.000", "$0.900"),
+    promo: buildPromo(60, 76, "$2.400", "$12.000", "$0.360"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -254,20 +577,19 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "grok-4.7",
     provider: "const",
     providerName: "Const",
+    vendor: "xai",
+    vendorName: "Grok (xAI)",
     tier: "paid",
     category: "llm",
     endpoint: "/v1/chat/completions",
     contextLength: 500000,
     contextWindow: "500K",
-    maxOutputTokens: "128K",
+    maxOutputLength: 65536,
+    maxOutputTokens: "64K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    pricing: {
-      input: "$0.140",
-      cache: "$0.035",
-      output: "$0.450",
-      unit: "/ 1M tokens",
-    },
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
+    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
     inputTypes: ["text"],
     outputTypes: ["text"],
   },
@@ -279,6 +601,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "whisper-large-v3-turbo",
     provider: "const",
     providerName: "Const",
+    vendor: "const",
+    vendorName: "Const",
     category: "stt",
     endpoint: "/v1/audio/transcriptions",
     supportsThinking: false,
@@ -299,6 +623,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     modelId: "const-search",
     provider: "const",
     providerName: "Const",
+    vendor: "const",
+    vendorName: "Const",
     category: "search",
     endpoint: "/v1/search",
     supportsThinking: false,
@@ -316,31 +642,55 @@ const CATALOG_MODELS: ModelSpec[] = [
 ];
 
 export const DEFAULT_MODEL = "deepseek-v4.1-flash";
-export const BUILTIN_MODELS: ModelSpec[] = CATALOG_MODELS.map((m) => ({ ...m, tier: "paid" }));
+export const BUILTIN_MODELS: ModelSpec[] = CATALOG_MODELS.map((m) => ({
+  ...m,
+  tier: "paid",
+  pricing: effectiveModelPricing(m) ?? m.pricing,
+}));
+
 const UPSTREAM_MODELS: Record<string, string> = {
-  "deepseek-v4.1-flash": "atmo/alicn/deepseek-v4.1-flash-1017",
-  "qwen-3.8-omni-flash": "atmo/alicn/qwen3.8-omni-flash",
-  "glm-5.3-flash": "atmo/zai/glm-5.3-flash",
-  "gemini-3.8-flash": "Gemini 3.8 Flash",
-  "glm-5.3": "atmo/zai/glm-5.3",
-  "minimax-m3.1-flash": "atmo/cb/minimax-m3.1-flash",
-  "qwen-3.8-max": "atmo/alicn/qwen3.8-max-0902",
+  "deepseek-v4.1-flash": "atmo/ali/deepseek-v4.1-flash",
+  "deepseek-v4-pro": "atmo/ali/deepseek-v4-pro-0813",
+  "glm-5.3-flash": "atmo/cbcn/glm-5.3-flash",
+  "glm-5.3": "atmo/ali/glm-5.3",
+  "minimax-m3.1-flash": "atmo/cbcn/minimax-m3.1-flash",
+  "qwen-3.8-27b": "atmo/ali/qwen3.8-27b",
+  "qwen-3.8-max": "atmo/ali/qwen3.8-max-0902",
+  "qwen-3.8-2.4t-a95b": "atmo/ali/qwen3.8-2.4t-a95b",
+  "kimi-k3.1-pro": "atmo/cbcn/kimi-k3.1-pro",
+  "kimi-k3": "atmo/cbcn/kimi-k3",
+  "gemini-3.8-flash": "atmo/ag/gemini-3.8-flash-high",
+  "gemini-4-argon": "atmo/ag/gemini-4-argon",
+  "claude-haiku-5.5": "atmo/cc/claude-haiku-5-5",
+  "claude-sonnet-5.5": "atmo/cc/claude-sonnet-5-5",
+  "claude-opus-5.5": "atmo/cc/claude-opus-5-5",
+  "claude-fable-5.1": "atmo/cc/claude-fable-5-1",
+  "gpt-6-luna": "atmo/cx/gpt-6-luna",
+  "gpt-6.1-terra": "atmo/cx/gpt-6.1-terra",
   "gpt-6.1-sol": "atmo/cx/gpt-6.1-sol",
   "gpt-6-astra": "atmo/cx/gpt-6-astra",
   "grok-4.7": "atmo/grok/grok-4.7",
   "whisper-large-v3-turbo": "Whisper Large v3 Turbo",
   "const-search": "Const Search",
 };
+
 // Only canonical, explicitly listed IDs can execute. Never strip an arbitrary :free suffix.
 export function getManagedModel(id: string): ModelSpec | undefined {
   return BUILTIN_MODELS.find((m) => m.modelId === id);
 }
+
+export function getModelMaxOutputTokens(id: string): number {
+  const model = getManagedModel(id);
+  return model?.maxOutputLength ?? 128000;
+}
+
 export function normalizeConstModelName(id: string): string {
   const model = getManagedModel(id);
   if (!model)
     throw new Error("Unknown model '" + id + "'. Use GET /v1/models.");
   return UPSTREAM_MODELS[model.modelId]!;
 }
+
 export function findModelSpec(
   id: string,
   customModels: ModelSpec[] = [],
@@ -349,27 +699,49 @@ export function findModelSpec(
     (m) => m.modelId === id || m.id === id,
   );
 }
+
 export function isBuiltinModel(
   id: string,
   _customModels: ModelSpec[] = [],
 ): boolean {
   return Boolean(getManagedModel(id));
 }
+
 export const NANO_USD = 1_000_000_000;
+
+export function parseUsdRate(s?: string): number {
+  return Number((s || "0").replace(/[^0-9.]/g, "")) || 0;
+}
+
+export function modelRatesNanoPerToken(model: ModelSpec, now = Date.now()) {
+  const pricing = effectiveModelPricing(model, now);
+  const inputUsdPerMillion = parseUsdRate(pricing?.input);
+  const outputUsdPerMillion = parseUsdRate(pricing?.output);
+  const cacheUsdPerMillion = pricing?.cache && pricing.cache !== "-"
+    ? parseUsdRate(pricing.cache)
+    : inputUsdPerMillion;
+  return {
+    input: inputUsdPerMillion * 1000,
+    output: outputUsdPerMillion * 1000,
+    cache: cacheUsdPerMillion * 1000,
+    unit: inputUsdPerMillion * NANO_USD,
+  };
+}
+
 export function tokenCostNano(
   modelId: string,
   promptTokens: number,
   completionTokens: number,
   cachedTokens = 0,
+  now = Date.now(),
 ): number {
   const model = getManagedModel(modelId);
   if (!model) throw new Error("Unknown model");
-  const rate = (s?: string) => Number((s || "0").replace(/[^0-9.]/g, "")) || 0;
+  const rates = modelRatesNanoPerToken(model, now);
   return Math.ceil(
-    (Math.max(0, promptTokens - cachedTokens) * rate(model.pricing?.input) +
-      cachedTokens * rate(model.pricing?.cache || model.pricing?.input) +
-      completionTokens * rate(model.pricing?.output)) *
-      1000,
+    Math.max(0, promptTokens - cachedTokens) * rates.input +
+      cachedTokens * rates.cache +
+      completionTokens * rates.output,
   );
 }
 

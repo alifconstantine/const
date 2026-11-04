@@ -19,10 +19,21 @@ test("multiple model rounds accumulate; a repeated snapshot replaces instead of 
   assert.equal(summary.totalTokens, 3300);
   assert.equal(summary.modelRequests, 2);
   assert.equal(summary.llmDurationMs, 2000);
-  assert.equal(summary.tokPerSec, 150);
+  assert.equal(summary.tokPerSec, 187.5);
   assert.equal(summary.ttftSeconds, 0.2);
   assert.equal(summary.uncachedInputTokens, 1400);
   assert.equal(summary.cacheHitRate, 1600 / 3000 * 100);
+});
+
+test("tokPerSec measures post-TTFT decode throughput instead of upstream queue wait", () => {
+  const queued = reduceTelemetry(undefined, {
+    ...usage("queued", 1000, 100),
+    durationMs: 60_000,
+    ttftMs: 58_000,
+  });
+  const summary = summarizeTelemetry(queued);
+  assert.equal(summary.ttftSeconds, 58);
+  assert.equal(summary.tokPerSec, 50);
 });
 
 test("separate conversations cannot contaminate usage or context; a snapshot can shrink", () => {

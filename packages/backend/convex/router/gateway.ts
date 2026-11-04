@@ -10,7 +10,13 @@ import {
   dayStart,
 } from "./access";
 import { DEFAULT_SETTINGS } from "./preferences";
-import { getManagedModel, tokenCostNano, NANO_USD } from "./modelCatalog";
+import {
+  getManagedModel,
+  getModelMaxOutputTokens,
+  modelRatesNanoPerToken,
+  tokenCostNano,
+  NANO_USD,
+} from "./modelCatalog";
 
 function fail(message: string, status: number): never {
   throw new ConvexError({ message, status });
@@ -62,6 +68,9 @@ export const begin = mutation({
     const spec = model!;
     const prompt = count(args.promptTokens);
     let output = count(args.maxOutputTokens);
+    if (spec.category === "llm") {
+      output = Math.min(output, getModelMaxOutputTokens(args.model));
+    }
     if (prompt + output > (spec.contextLength ?? 1_000_000))
       fail("Request exceeds model context window", 400);
     const existing = await ctx.db
@@ -106,17 +115,14 @@ export const begin = mutation({
       if (remaining <= prompt) fail("Daily API key limit reached", 429);
       output = Math.min(output, remaining - prompt);
     }
+    const rates = modelRatesNanoPerToken(spec, now);
     const utilityCost =
       spec.category !== "llm"
-        ? Math.ceil(
-            Number(spec.pricing?.input.replace("$", "") ?? 0) *
-              (args.units ?? 1) *
-              NANO_USD,
-          )
+        ? Math.ceil((args.units ?? 1) * rates.unit)
         : 0;
     const reservedNanoUsd =
       spec.category === "llm"
-          ? tokenCostNano(args.model, prompt, output)
+          ? tokenCostNano(args.model, prompt, output, 0, now)
           : utilityCost;
     if (!Number.isSafeInteger(reservedNanoUsd) || reservedNanoUsd < 0)
       fail("Invalid reservation", 400);
@@ -159,25 +165,14 @@ export const begin = mutation({
       reservedTokens: prompt + output,
       reservedNanoUsd,
       keyPeriodStartAt: keyPeriod,
-      pricing: {
-        input: Number(spec.pricing?.input.replace("$", "") ?? 0) * 1000,
-        output:
-          Number(spec.pricing?.output.replace(/[^0-9.]/g, "") ?? 0) * 1000,
-        cache:
-          Number(
-            spec.pricing?.cache?.replace(/[^0-9.]/g, "") ||
-              spec.pricing?.input.replace("$", "") ||
-              0,
-          ) * 1000,
-        unit: Number(spec.pricing?.input.replace("$", "") ?? 0) * NANO_USD,
-      },
+      pricing: rates,
       settings: {
         logPayloads: settings.logPayloads,
         anonymizeTelemetry: settings.anonymizeTelemetry,
       },
       createdAt: now,
     });
-    await ctx.scheduler.runAfter(240_000, internal.router.gateway.expire, {
+    await ctx.scheduler.runAfter(930_000, internal.router.gateway.expire, {
       id,
     });
     return { id, maxOutputTokens: output, tier: spec.tier ?? "paid" };
@@ -314,6 +309,10 @@ async function finalize(
   const key = request.apiKeyId ? await ctx.db.get(request.apiKeyId) : null;
   const keyName = key?.name ?? "Account session";
   const duration = Math.max(1, result.durationMs);
+  const decodeDuration =
+    result.ttftMs !== undefined && result.ttftMs > 0 && result.ttftMs < duration
+      ? duration - result.ttftMs
+      : duration;
   await ctx.db.insert("routerLogs", {
     userId: request.userId,
     apiKeyId: request.apiKeyId,
@@ -342,7 +341,7 @@ async function finalize(
     errorMessage: result.errorMessage?.slice(0, 500),
     durationMs: duration,
     ttftMs: result.ttftMs,
-    tokensPerSecond: (output * 1000) / duration,
+    tokensPerSecond: (output * 1000) / Math.max(1, decodeDuration),
     usageEstimated: result.usageEstimated,
     ip: request.settings.anonymizeTelemetry ? undefined : result.ip,
     userAgent: request.settings.anonymizeTelemetry

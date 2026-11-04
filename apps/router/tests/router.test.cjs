@@ -314,12 +314,14 @@ const result = (id, extra = {}) => ({
 });
 test("catalog has no free variants and every chat model has a nonzero rate", () => {
   assert.equal(catalog.BUILTIN_MODELS.filter(m => m.tier === "free").length, 0);
+  const llmModels = catalog.BUILTIN_MODELS.filter(m => m.category === "llm");
+  assert.equal(llmModels.length, 21);
   for (const model of catalog.BUILTIN_MODELS) {
     assert.equal(model.tier, "paid");
     assert.equal(catalog.getManagedModel(model.modelId + ":free"), undefined);
     if (model.category === "llm") assert(catalog.tokenCostNano(model.modelId, 20, 5) > 0);
   }
-  assert.equal(catalog.normalizeConstModelName(standard), "atmo/alicn/deepseek-v4.1-flash-1017");
+  assert.equal(catalog.normalizeConstModelName(standard), "atmo/ali/deepseek-v4.1-flash");
 });
 
 test("unauthenticated, revoked, and expired credentials never call the engine", async () => {
@@ -374,8 +376,10 @@ test("paid request uses actual cached price, settles once, and releases reservat
   assert.equal((await db.query("creditTransactions").collect()).length, 1);
 });
 for (const [model, upstream, expectedCostNano] of [
-  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 10040],
-  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 18560],
+  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 24960],
+  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 99840],
+  ["claude-sonnet-5.5", "atmo/cc/claude-sonnet-5-5", 34944],
+  ["minimax-m3.1-flash", "atmo/cbcn/minimax-m3.1-flash", 2636],
 ]) {
   for (const mode of ["API JSON", "API streaming", "playground SSO"]) {
     test(`${model} routes and bills correctly through ${mode}`, async () => {
@@ -421,11 +425,21 @@ test("zero-balance paid requests never reach the engine", async () => {
   assert.equal(fetches, 0);
 });
 
-test("retired Claude models are absent from discovery and cannot execute", async () => {
+test("retired models are absent from discovery and cannot execute while active Claude 5.5 models are listed", async () => {
   const response = await models.GET(new NextRequest("http://localhost/v1/models"));
   const discovered = (await response.json()).data;
-  assert(!discovered.some((model) => /claude/i.test(model.id)));
-  for (const model of ["claude-sonnet-5.5", "claude-opus-5.5"]) {
+  assert(discovered.some((model) => model.id === "claude-sonnet-5.5" && model.vendor === "anthropic"));
+  assert(discovered.some((model) => model.id === "claude-opus-5.5" && model.vendor === "anthropic"));
+  assert(discovered.some((model) => model.id === "minimax-m3.1-flash" && model.vendor === "minimax"));
+  assert(discovered.some((model) => model.id === "qwen-3.8-27b" && model.vendor === "qwen"));
+  for (const model of [
+    "claude-sonnet-4.6",
+    "claude-opus-4.7",
+    "qwen-3.8-omni-flash",
+    "kimi-k2.8-preview",
+    "minimax-m3",
+  ]) {
+    assert(!discovered.some((entry) => entry.id === model));
     assert.equal(catalog.getManagedModel(model), undefined);
     assert.equal((await chat.POST(request(body(model)))).status, 400);
     await assert.rejects(gateway.begin.handler(ctx, ticketArgs(model)));
@@ -1104,4 +1118,104 @@ test('hiding an invoice does not stop verified completion or create duplicate cr
   assert.equal(hidden[0].status, 'completed');
   assert.equal(hidden[0].amountIdr, order.amountIdr);
   assert.equal((await db.query('creditTransactions').collect()).filter(tx => tx.type === 'deposit').length, 1);
+});
+
+test('promo pricing automatically reverts to 40%-off-official standard pricing after promo endsAt', () => {
+  const duringPromo = Date.parse('2026-11-10T00:00:00.000Z');
+  const afterPromo = Date.parse('2027-01-01T00:00:00.000Z');
+  const sol = catalog.getManagedModel('gpt-6.1-sol');
+  assert.equal(catalog.isPromoActive(sol, duringPromo), true);
+  assert.equal(catalog.isPromoActive(sol, afterPromo), false);
+  // Promo: $0.600 in / $3.000 out / $0.090 cache -> 16*600 + 4*90 + 5*3000 = 24,960 nanoUSD
+  assert.equal(catalog.tokenCostNano('gpt-6.1-sol', 20, 5, 4, duringPromo), 24960);
+  // Standard (40% off official $2/$10): $1.200 in / $6.000 out / $0.180 cache -> 16*1200 + 4*180 + 5*6000 = 49,920 nanoUSD
+  assert.equal(catalog.tokenCostNano('gpt-6.1-sol', 20, 5, 4, afterPromo), 49920);
+});
+
+test('per-model maxOutputTokens caps clamp oversized max_tokens before forwarding upstream', async () => {
+  for (const [modelId, expectedCap] of [
+    ['kimi-k3', 32000],
+    ['glm-5.3-flash', 48000],
+    ['gemini-3.8-flash', 65536],
+  ]) {
+    const res = await chat.POST(request({ ...body(modelId), max_tokens: 128000 }));
+    assert.equal(res.status, 200);
+    assert.equal(lastPayload.max_tokens, expectedCap);
+  }
+});
+
+test('upstream first-token TTFT timeout aborts keep-alive-only stalls without charging wallet', async () => {
+  const prevTimeout = process.env.ROUTER_FIRST_TOKEN_TIMEOUT_MS;
+  process.env.ROUTER_FIRST_TOKEN_TIMEOUT_MS = '120';
+  let heartbeatTimer;
+  global.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          heartbeatTimer = setInterval(() => {
+            try {
+              controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
+            } catch {}
+          }, 5);
+        },
+        cancel() {
+          clearInterval(heartbeatTimer);
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    );
+  try {
+    const response = await chat.POST(request({ ...body(), stream: true }));
+    const text = await response.text();
+    assert.match(text, /upstream_ttft_timeout/);
+    assert.equal(logs()[0].status, 504);
+    const wallet = await db.get('wallet');
+    assert.equal(wallet.balanceNanoUsd, 1e9);
+    assert.equal(wallet.reservedNanoUsd, 0);
+  } finally {
+    clearInterval(heartbeatTimer);
+    if (prevTimeout === undefined) delete process.env.ROUTER_FIRST_TOKEN_TIMEOUT_MS;
+    else process.env.ROUTER_FIRST_TOKEN_TIMEOUT_MS = prevTimeout;
+  }
+});
+
+test('combo fails over to secondary target when primary emits HTTP 200 keep-alive then capacity_saturated SSE error', async () => {
+  db.seed('routerCombos', 'combo_failover', {
+    userId: 'u1',
+    name: 'Resilient',
+    slug: 'resilient',
+    status: 'active',
+    strategy: 'priority',
+    contextLength: 100000,
+    models: [
+      { modelId: 'deepseek-v4.1-flash', providerId: 'const', providerName: 'Const', priority: 1 },
+      { modelId: 'glm-5.3-flash', providerId: 'const', providerName: 'Const', priority: 2 },
+    ],
+  });
+  const engineFetch = global.fetch;
+  let callIndex = 0;
+  global.fetch = async (url, init) => {
+    callIndex += 1;
+    if (callIndex === 1) {
+      return new Response(
+        ': keep-alive\n\ndata: {"error":{"code":"capacity_saturated","message":"All upstream accounts busy"}}\n\n',
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
+    }
+    return engineFetch(url, init);
+  };
+  const response = await chat.POST(request({ ...body('combo/resilient'), stream: true }));
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  assert.match(text, /OK/);
+  assert.equal(callIndex, 2);
+  assert.equal(response.headers.get('X-Const-Combo-Selected-Model'), 'glm-5.3-flash');
+  assert.equal(response.headers.get('X-Const-Combo-Fallbacks'), '1');
+  assert.equal(logs().length, 2);
+  assert.equal(logs()[0].resolvedModel, 'deepseek-v4.1-flash');
+  assert.equal(logs()[0].status, 429);
+  assert.equal(logs()[1].resolvedModel, 'glm-5.3-flash');
+  assert.equal(logs()[1].status, 200);
+  assert.equal((await db.get('wallet')).balanceNanoUsd, 1e9 - catalog.tokenCostNano('glm-5.3-flash', 20, 5, 4));
+  assert.equal((await db.get('wallet')).reservedNanoUsd, 0);
 });

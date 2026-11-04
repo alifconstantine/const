@@ -484,9 +484,8 @@ export function buildConstSystemPrompt(workspacePath: string, customPrompt?: str
     // ignore skills scan error
   }
 
-  const basePrompt = `You are Const Agent, an expert coding and software engineering assistant operating inside Const Harness. Help users investigate, explain, and implement software according to their request.
-
-Current working directory: ${normalizedCwd}
+  // Place static invariant guidance BEFORE per-workspace/session fields so LLM KV prefix caching hits across sessions.
+  const staticCorePrompt = `You are Const Agent, an expert coding and software engineering assistant operating inside Const Harness. Help users investigate, explain, and implement software according to their request.
 
 ${LANGUAGE_GUIDANCE}
 
@@ -505,15 +504,13 @@ CONTINUATION & ERROR RECOVERY:
 - Read tool results and exit codes. After a failed edit, inspect the latest file before retrying. Change the approach when an operation fails; do not repeat identical failing arguments.
 - Verify outcomes before reporting success. Explain blockers and incomplete work clearly.
 - Keep explanations concise and report relevant changes and verification. Create commits only when requested.
-\nRESPONSE PRESENTATION:
-${RESPONSE_PRESENTATION_GUIDANCE}
-${workspaceMemory ? `\n${workspaceMemory}` : ""}${projectContext ? `\n<project_context>${projectContext}</project_context>` : ""}${skillsPrompt}`;
 
-  if (customPrompt) {
-    return `${customPrompt}\n\n---\n# WORKSPACE TOOLS & EXECUTION ENVIRONMENT\n${basePrompt}`;
-  }
+RESPONSE PRESENTATION:
+${RESPONSE_PRESENTATION_GUIDANCE}`;
 
-  return basePrompt;
+  const workspaceSection = `\n\n# WORKSPACE & EXECUTION ENVIRONMENT\nCurrent working directory: ${normalizedCwd}${customPrompt ? `\n\n${customPrompt}` : ""}${workspaceMemory ? `\n${workspaceMemory}` : ""}${projectContext ? `\n<project_context>${projectContext}</project_context>` : ""}${skillsPrompt}`;
+
+  return `${staticCorePrompt}${workspaceSection}`;
 }
 
 export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {
@@ -553,9 +550,7 @@ export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: str
     // ignore skills scan error
   }
 
-  const basePrompt = `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
-
-Current learning workspace directory: ${normalizedCwd}
+  const staticCorePrompt = `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
 
 ${LANGUAGE_GUIDANCE}
 
@@ -615,13 +610,11 @@ PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
    - SEQUENTIAL & DEDUPLICATED ACTIONS: Browser operations mutate live DOM and are strictly sequential. Never call duplicate clicks, multiple snapshots, or repeated help requests in the same step.
    - CONTINUATION & MULTI-TURN PROTOCOL: When the student sends "continue", "lanjutkan", or asks to proceed, inspect the entire conversation history including prior tool outputs and build upon existing findings without restarting from scratch.
 5. Error Recovery:
-   - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}${skillsPrompt}`;
+   - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.`;
 
-  if (customPrompt) {
-    return `${customPrompt}\n\n---\n# WORKSPACE TOOLS & EXECUTION ENVIRONMENT\n${basePrompt}`;
-  }
+  const workspaceSection = `\n\n# WORKSPACE & EXECUTION ENVIRONMENT\nCurrent learning workspace directory: ${normalizedCwd}${customPrompt ? `\n\n${customPrompt}` : ""}${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}${skillsPrompt}`;
 
-  return basePrompt;
+  return `${staticCorePrompt}${workspaceSection}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1048,18 +1041,24 @@ export class ConstAgent {
         });
 
         // Dynamic Max Output Tokens:
-        // - Built-in Gemini / Const models have 128K max output (128,000)
+        // - Clamp to known per-model output token caps (e.g. 32K Kimi, 48K GLM Flash, 64K Gemini/Grok, 128K frontier)
         // - Custom endpoints or unspecified models default to 64K (65,536)
         const DEFAULT_MAX_OUTPUT_TOKENS = 65536; // 64K
+        const knownModel = DEFAULT_MODELS.find((m) => m.id === this.config.model);
+        const modelMaxOutputCap = knownModel?.maxOutputTokens;
         const modelLower = (this.config.model || "").toLowerCase();
         const is128kModel =
-          modelLower.includes("gemini") ||
           modelLower.startsWith("const") ||
           modelLower.includes("combo/");
-        const resolvedMaxTokens =
+        const requestedMaxTokens =
           this.config.maxOutputTokens ??
           this.config.maxTokens ??
+          modelMaxOutputCap ??
           (is128kModel ? 128000 : DEFAULT_MAX_OUTPUT_TOKENS);
+        const resolvedMaxTokens = modelMaxOutputCap
+          ? Math.min(requestedMaxTokens, modelMaxOutputCap)
+          : requestedMaxTokens;
+        const useMaxCompletionTokensOnly = endpoint.includes("api.openai.com");
 
         if (signal.aborted || this._isCancelled) {
           throw new Error("User cancelled agent execution.");
@@ -1082,8 +1081,9 @@ export class ConstAgent {
               ...(activeTools && activeTools.length > 0 ? { parallel_tool_calls: false } : {}),
               stream: true,
               stream_options: { include_usage: true },
-              max_tokens: resolvedMaxTokens,
-              max_completion_tokens: resolvedMaxTokens,
+              ...(useMaxCompletionTokensOnly
+                ? { max_completion_tokens: resolvedMaxTokens }
+                : { max_tokens: resolvedMaxTokens }),
               ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
                 ? {
                     reasoning: this.config.thinkingLevel,
@@ -1117,6 +1117,14 @@ export class ConstAgent {
             }
           } catch {}
 
+          const modelSupportsImages =
+            (this.config.inputTypes ?? knownModel?.inputTypes)?.includes("image") ?? true;
+          const explicitVisionRejection =
+            !modelSupportsImages ||
+            /image_url|image input|vision|multimodal|modality|Playground|browser session|chrome-headless-shell|Executable doesn't exist/i.test(
+              rawErr,
+            );
+
           if (
             cleanMessage.includes("<!DOCTYPE") ||
             cleanMessage.includes("<html") ||
@@ -1134,8 +1142,7 @@ export class ConstAgent {
           if (
             msgWithImages &&
             Array.isArray(msgWithImages.content) &&
-            (response.status === 502 || cleanMessage.includes("Playground") || cleanMessage.includes("502") || cleanMessage.includes("gateway") ||
-              (msgWithImages.toolObservationId && /image|vision|multimodal|modality/i.test(cleanMessage)))
+            explicitVisionRejection
           ) {
             const textParts = msgWithImages.content
               .filter((p: any) => p.type === "text")
@@ -1240,13 +1247,14 @@ export class ConstAgent {
           }
 
           const errMsg = streamErr?.message || "";
+          const modelSupportsImages =
+            (this.config.inputTypes ?? knownModel?.inputTypes)?.includes("image") ?? true;
           const isVisionError =
+            !modelSupportsImages ||
             errMsg.includes("Playground") ||
             errMsg.includes("browser session") ||
-            errMsg.includes("502") ||
-            errMsg.includes("bad_gateway") ||
             errMsg.includes("image_url") ||
-            errMsg.includes("modality") ||
+            /image input|vision|multimodal|modality/i.test(errMsg) ||
             errMsg.includes("chrome-headless-shell") ||
             errMsg.includes("Executable doesn't exist");
 
