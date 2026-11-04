@@ -375,10 +375,10 @@ declare global {
       } | null>;
       getSideReceipts?: (sideChatId: string) => Promise<Record<string, "queued" | "consumed" | "plan_updated" | "expired">>;
       registerSideChat?: (payload: { sideChatId: string; parentConversationId: string }) => Promise<{ success: boolean }>;
-      abortAgent: (conversationId?: string) => Promise<boolean>;
+      abortAgent: (conversationId: string) => Promise<boolean>;
       updateMode?: (payload: {
         mode: "request_review" | "ask_before_changes" | "full_access";
-        conversationId?: string;
+        conversationId: string;
       }) => Promise<{ success: boolean; updated?: boolean; pending?: boolean }>;
       respondApproval?: (payload: {
         conversationId: string;
@@ -389,7 +389,7 @@ declare global {
       getRunningSessions?: () => Promise<string[]>;
       onSessionStarted?: (callback: (data: { conversationId: string; runId?: string; startedAt?: number }) => void) => () => void;
       onSessionEnded?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
-      rollbackFile: (record: FileMutationRecord) => Promise<{
+      rollbackFile: (record: FileMutationRecord, conversationId: string) => Promise<{
         success: boolean;
         message?: string;
         targetFile?: string;
@@ -485,20 +485,21 @@ declare global {
           cols?: number;
           rows?: number;
         }) => Promise<{ success: boolean; id?: string; cwd?: string; error?: string }>;
-        write: (options: { id: string; data: string }) => Promise<boolean>;
-        destroy: (id: string) => Promise<boolean>;
-        onData: (callback: (data: { id: string; data: string }) => void) => () => void;
-        onExit: (callback: (data: { id: string; code: number | null }) => void) => () => void;
+        write: (options: { id: string; data: string; conversationId: string }) => Promise<boolean>;
+        destroy: (id: string, conversationId: string) => Promise<boolean>;
+        onData: (callback: (data: { id: string; data: string; conversationId?: string }) => void) => () => void;
+        onExit: (callback: (data: { id: string; code: number | null; conversationId?: string }) => void) => () => void;
       };
       answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
-      listBackgroundTasks?: (conversationId?: string) => Promise<BackgroundTaskItem[]>;
-      killBackgroundTask?: (taskId: string, conversationId?: string) => Promise<boolean>;
-      getBackgroundTaskLogs?: (taskId: string) => Promise<string[]>;
-      killSubAgent?: (agentId: string) => Promise<boolean>;
+      listBackgroundTasks?: (conversationId: string) => Promise<BackgroundTaskItem[]>;
+      killBackgroundTask?: (taskId: string, conversationId: string) => Promise<boolean>;
+      getBackgroundTaskLogs?: (taskId: string, conversationId: string) => Promise<string[]>;
+      killSubAgent?: (agentId: string, conversationId: string) => Promise<boolean>;
       onBackgroundTaskEvent?: (
         callback: (event: {
           type: "output" | "status";
           taskId: string;
+          conversationId?: string;
           data?: string;
           status?: string;
           code?: number | null;

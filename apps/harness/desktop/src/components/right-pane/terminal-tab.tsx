@@ -63,18 +63,18 @@ export function TerminalTab({ tab }: TerminalTabProps) {
 
     // 1. Hook up user keyboard input to Electron IPC
     const onDataDisposable = term.onData((data) => {
-      window.electron?.terminal?.write({ id: tab.id, data });
+      window.electron?.terminal?.write({ id: tab.id, data, conversationId: tab.conversationId! });
     });
 
     // 2. Hook up output from backend shell to xterm
     const cleanupOnData = window.electron?.terminal?.onData((payload) => {
-      if (payload.id === tab.id) {
+      if (payload.id === tab.id && payload.conversationId === tab.conversationId) {
         term.write(payload.data);
       }
     });
 
     const cleanupOnExit = window.electron?.terminal?.onExit((payload) => {
-      if (payload.id === tab.id) {
+      if (payload.id === tab.id && payload.conversationId === tab.conversationId) {
         term.writeln(`\r\n\x1b[90m[Process exited with code ${payload.code}]\x1b[0m`);
       }
     });
@@ -87,7 +87,7 @@ export function TerminalTab({ tab }: TerminalTabProps) {
       conversationId: tab.conversationId,
       cols: term.cols,
       rows: term.rows,
-    });
+    }).catch(error => { if (termRef.current === term) term.writeln(String(error)); });
 
     // Handle container resizing smoothly with ResizeObserver
     const resizeObserver = new ResizeObserver(() => {
@@ -116,7 +116,7 @@ export function TerminalTab({ tab }: TerminalTabProps) {
       termRef.current = null;
       fitAddonRef.current = null;
     };
-  }, [tab.id, tab.cwd]);
+  }, [tab.id, tab.cwd, tab.conversationId, tab.project]);
 
   return (
     <div

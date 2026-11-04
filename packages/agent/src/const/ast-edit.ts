@@ -13,6 +13,7 @@ export interface AstEditOptions {
   ops: AstEditOp[];
   paths: string[];
   dryRun?: boolean;
+  beforeWrite?: (file: string, content: string) => Promise<void>;
 }
 
 export interface AstEditFileResult {
@@ -75,6 +76,7 @@ export async function executeAstEdit(
 
       let content = await fs.readFile(filePath, "utf-8");
       const original = content;
+      if (!dryRun) await options.beforeWrite?.(filePath, original);
       let fileReplacements = 0;
 
       for (const op of ops) {

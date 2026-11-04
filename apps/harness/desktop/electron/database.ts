@@ -432,6 +432,20 @@ export class ConversationDatabase {
     return path.join(this.brainDir, conversationId, ".system_generated", "logs", "events.jsonl");
   }
 
+  /** Recover only host-logged mutation records, never a renderer-supplied file path. */
+  public findMutation(conversationId: string, mutationId: string): import("@const/agent").FileMutationRecord | undefined {
+    if (!/^[a-zA-Z0-9_-]{1,200}$/.test(conversationId)) return undefined;
+    const file = this.transcriptPath(conversationId);
+    if (!fs.existsSync(file)) return undefined;
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      let event;
+      try { event = JSON.parse(line); } catch { continue; /* An interrupted final append is not a mutation. */ }
+      if (event.type === "file_mutation" && event.record?.id === mutationId && event.record.conversationId === conversationId) return event.record;
+    }
+    return undefined;
+  }
+
   public flushTranscriptEvents(conversationId?: string): Promise<void> {
     return this.transcriptWriter.flush(conversationId ? this.transcriptPath(conversationId) : undefined);
   }

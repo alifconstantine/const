@@ -481,7 +481,7 @@ export function SideChatTab({
     });
     const hydrateRun = async () => {
       const snapshot = await window.electron?.getSessionSnapshot?.(sideChatId, { hydrate: true });
-      if (disposed || !snapshot?.runId) return;
+      if (disposed || snapshot?.conversationId !== sideChatId || !snapshot.runId) return;
       activeRunIdRef.current = snapshot.runId;
       if (Array.isArray(snapshot.__remoteLive?.messages)) commitMessages(normalizeUiMessages(snapshot.__remoteLive.messages));
       setIsExecuting(true);

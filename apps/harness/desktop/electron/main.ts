@@ -26,6 +26,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import {
   createConstAgent,
   rollbackFileMutation,
+  getMutationHistory,
+  killProcessTree,
   globalTaskManager,
   globalSubAgentManager,
   registerGlobalBrowserToolHandler,
@@ -40,6 +42,8 @@ import {
   extractPdfText,
   extractDocumentText,
 } from "@const/agent";
+import { TaskWorkspaces } from "./task-workspaces";
+import { requireConversationId, updateSessionMode } from "./session-ownership";
 import { ConversationDatabase, type ConversationRecord } from "./database";
 import {
   startLoopbackAuthServer,
@@ -104,6 +108,7 @@ app.on("before-quit", () => { void remoteDaemon.stop(false); });
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
 const harnessHomeDir = path.join(constHomeDir, "harness");
+const taskWorkspaces = new TaskWorkspaces(harnessHomeDir);
 const constProjectsDir = path.join(harnessHomeDir, "projects");
 const constBrainDir = path.join(harnessHomeDir, "brain");
 const constConversationsDir = path.join(harnessHomeDir, "conversations");
@@ -462,7 +467,7 @@ function restoreSavedRemoteSession() {
   } catch { clearRemoteState(); }
 }
 
-const activeTerminals = new Map<string, { process: ChildProcess; cwd: string }>();
+const activeTerminals = new Map<string, { process: ChildProcess; cwd: string; conversationId: string }>();
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
@@ -1298,6 +1303,15 @@ app.whenReady().then(() => {
     sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
+  const pendingStarts = new Map<string, { controller: AbortController; mode?: "request_review" | "ask_before_changes" | "full_access" }>();
+  app.once("before-quit", () => {
+    for (const pending of pendingStarts.values()) pending.controller.abort();
+    for (const session of activeSessions.values()) session.agent.abort();
+    for (const task of globalTaskManager.listAllTasks()) globalTaskManager.killTask(task.id, task.conversationId);
+    for (const terminal of activeTerminals.values()) if (terminal.process.pid) killProcessTree(terminal.process.pid);
+    activeTerminals.clear();
+    globalSubAgentManager.clearSubAgents();
+  });
   const appUpdates = new DesktopAppUpdates({
     version: app.getVersion(),
     target: { os: process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux", arch: process.arch },
@@ -1305,7 +1319,7 @@ app.whenReady().then(() => {
     preferences: () => { const config = loadUserConfig(); return { autoCheck: config.autoCheckUpdates !== false, autoDownload: config.autoDownloadUpdates !== false }; },
     savePreferences: value => { saveUserConfig({ autoCheckUpdates: value.autoCheck, autoDownloadUpdates: value.autoDownload }); },
     emit: state => { for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send("app-update:changed", state); },
-    busy: () => activeSessions.size > 0 || globalTaskManager.listTasks().some(task => task.status === "running") || globalSubAgentManager.listSubAgents().some(agent => agent.status === "running"),
+    busy: () => pendingStarts.size > 0 || activeSessions.size > 0 || globalTaskManager.listAllTasks().some(task => task.status === "running") || globalSubAgentManager.listAllSubAgents().some(agent => agent.status === "running"),
     openExternal: url => shell.openExternal(url), openInstaller: file => shell.openPath(file), quit: () => app.quit(),
   });
   for (const [channel, action] of Object.entries({
@@ -1549,22 +1563,23 @@ app.whenReady().then(() => {
   );
 
   handleDesktopIpc("tasks:list", async (_event, conversationId?: string) => {
-    return globalTaskManager.listTasks(conversationId);
+    return globalTaskManager.listTasks(requireConversationId(conversationId));
   });
 
   handleDesktopIpc("tasks:kill", async (_event, taskId: string, conversationId?: string) => {
-    return globalTaskManager.killTask(taskId, conversationId);
+    return globalTaskManager.killTask(taskId, requireConversationId(conversationId));
   });
 
-  handleDesktopIpc("tasks:get-output", async (_event, taskId: string) => {
-    const task = globalTaskManager.getTask(taskId);
+  handleDesktopIpc("tasks:get-output", async (_event, taskId: string, conversationId: string) => {
+    const task = globalTaskManager.getTask(taskId, requireConversationId(conversationId));
     return task ? task.logs : [];
   });
 
-  handleDesktopIpc("subagents:kill", async (_event, agentId: string) => {
-    const killed = globalSubAgentManager.killSubAgent(agentId);
+  handleDesktopIpc("subagents:kill", async (_event, agentId: string, conversationId: string) => {
+    const owner = requireConversationId(conversationId);
+    const killed = globalSubAgentManager.killSubAgent(agentId, undefined, owner);
     if (killed && win && !win.isDestroyed()) {
-      const agent = globalSubAgentManager.getSubAgent(agentId);
+      const agent = globalSubAgentManager.getSubAgent(agentId, owner);
       sendDesktopEvent(win.webContents, "agent:stream-event", {
         type: "subagent_killed",
         conversationId: agent?.conversationId,
@@ -1610,15 +1625,18 @@ app.whenReady().then(() => {
         apiKey = payload.authToken || lastAuthToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
       }
 
-      const convoId = payload.conversationId || `session_${Date.now()}`;
+      const convoId = requireConversationId(payload.conversationId || `session_${Date.now()}`);
       if (payload.sessionKind === "companion") {
         if (!payload.parentConversationId || !/^(side_conversation_|side_chat_)/.test(convoId) || /^(side_conversation_|side_chat_)/.test(payload.parentConversationId)) return { success: false, error: "Invalid side chat parent." };
         const existingParent = sideParents.get(convoId);
         if (existingParent && existingParent !== payload.parentConversationId) return { success: false, error: "Side chat belongs to another conversation." };
         sideParents.set(convoId, payload.parentConversationId);
       }
-      if (activeSessions.has(convoId)) return { success: false, alreadyRunning: true };
+      if (activeSessions.has(convoId) || pendingStarts.has(convoId)) return { success: false, alreadyRunning: true };
       const runId = randomUUID();
+      const startup = { controller: new AbortController(), mode: payload.mode };
+      pendingStarts.set(convoId, startup);
+      try {
 
       // Project vs Outside of Project Scoping
       let targetWorkspace: string;
@@ -1627,8 +1645,8 @@ app.whenReady().then(() => {
         payload.workspacePath !== "Outside Project" &&
         fs.existsSync(payload.workspacePath)
       ) {
-        // Run natively inside selected project directory
-        targetWorkspace = path.resolve(payload.workspacePath);
+        // Each task gets its own persistent project checkout.
+        targetWorkspace = await taskWorkspaces.resolve(payload.workspacePath, payload.sessionKind === "companion" ? payload.parentConversationId! : convoId);
       } else {
         // Outside Project: run inside dedicated session directory under defaultProjectLocation or ~/.const/brain/<convoId>
         const defaultLoc = config.defaultProjectLocation;
@@ -1642,6 +1660,10 @@ app.whenReady().then(() => {
         }
       }
 
+      startup.controller.signal.throwIfAborted();
+      if (mcpShuttingDown) throw new Error("Desktop is shutting down");
+      payload.mode = startup.mode;
+
       // Assemble personalization systemPrompt from user configuration
       const personalizationParts: string[] = [];
       if (config.personalizationWorkRole?.trim()) {
@@ -1650,7 +1672,8 @@ app.whenReady().then(() => {
       if (config.personalizationCustomInstructions?.trim()) {
         personalizationParts.push(`User Custom Instructions:\n${config.personalizationCustomInstructions.trim()}`);
       }
-      const systemPrompt = personalizationParts.length > 0 ? personalizationParts.join("\n\n") : undefined;
+      personalizationParts.push(`This task has an isolated working directory: ${targetWorkspace}. Create and edit deliverables here. The project path in older messages is a source reference, not the output directory. Link actual files in this working directory when reporting results.`);
+      const systemPrompt = personalizationParts.join("\n\n");
 
       const agent = createConstAgent({
         preset: "harness",
@@ -1659,6 +1682,8 @@ app.whenReady().then(() => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
+        sourceProjectPath: payload.workspacePath,
+        isolateWorkspace: true,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
@@ -1726,6 +1751,7 @@ app.whenReady().then(() => {
       };
       if (appUpdates.getState().status === "installing") return { success: false, error: updateStrings(loadUserConfig().language || "en").installing };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
+      pendingStarts.delete(convoId);
       const savedHistory = payload.sessionKind === "companion"
         ? conversationDb.getConversation(payload.parentConversationId!)?.sideConversations?.find(side => side.id === convoId)?.messages
         : conversationDb.getConversation(convoId)?.messages;
@@ -1862,6 +1888,11 @@ app.whenReady().then(() => {
         remoteLive.delete(convoId);
         finishSession(agentSession);
       }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      } finally {
+        if (pendingStarts.get(convoId) === startup) pendingStarts.delete(convoId);
+      }
     };
   handleDesktopIpc("agent:send-message", (_event, payload: Parameters<typeof runAgent>[0]) => runAgent(payload));
 
@@ -1884,9 +1915,7 @@ app.whenReady().then(() => {
           : undefined;
 
       let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
-      if (!safeConvoId && activeSessions.size === 1) {
-        targetSession = activeSessions.values().next().value;
-      }
+      requireConversationId(safeConvoId);
 
       if (targetSession) {
         if (payload.sourceSideChatId) {
@@ -2056,7 +2085,10 @@ app.whenReady().then(() => {
         ? targetConvoId.trim()
         : undefined;
 
-    // Terminate any active background tasks scoped to this conversation (or all if un-scoped)
+    requireConversationId(safeConvoId);
+    pendingStarts.get(safeConvoId!)?.controller.abort();
+    pendingStarts.delete(safeConvoId!);
+    // Terminate only resources owned by the requested conversation.
     try {
       const tasks = globalTaskManager.listTasks(safeConvoId);
       for (const t of tasks) {
@@ -2081,10 +2113,7 @@ app.whenReady().then(() => {
       }, safeConvoId);
     } catch {}
 
-    let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
-    if (!safeConvoId && activeSessions.size === 1) {
-      targetSession = activeSessions.values().next().value;
-    }
+    const targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
 
     // Abort the agent session but DO NOT prematurely call finishSession(targetSession).
     // The finally block in agent:send-message will cleanly call finishSession when the agent run unwinds,
@@ -2142,25 +2171,9 @@ app.whenReady().then(() => {
       payload: { mode: "request_review" | "ask_before_changes" | "full_access"; conversationId?: string }
     ) => {
       const { mode, conversationId } = payload;
-      let targetSession = conversationId ? activeSessions.get(conversationId) : undefined;
-      if (!targetSession && activeSessions.size === 1) {
-        targetSession = activeSessions.values().next().value;
-      }
-
-      let updated = false;
-      if (targetSession && targetSession.agent && typeof targetSession.agent.updateMode === "function") {
-        targetSession.agent.updateMode(mode);
-        (targetSession as any).mode = mode;
-        updated = true;
-      }
-
-      for (const [id, s] of activeSessions.entries()) {
-        if ((!conversationId || id === conversationId) && s.agent && typeof s.agent.updateMode === "function") {
-          s.agent.updateMode(mode);
-          (s as any).mode = mode;
-          updated = true;
-        }
-      }
+      const updated = updateSessionMode(activeSessions, requireConversationId(conversationId), mode);
+      const pending = pendingStarts.get(conversationId!);
+      if (pending) pending.mode = mode;
 
       if (conversationId) {
         try {
@@ -2307,11 +2320,18 @@ app.whenReady().then(() => {
   // Rollback file mutation handler
   handleDesktopIpc(
     "agent:rollback-file",
-    async (_event, payload: { record: FileMutationRecord }) => {
+    async (_event, payload: { record: FileMutationRecord; conversationId: string }) => {
       if (!payload?.record) {
         return { success: false, message: "No mutation record provided" };
       }
-      return await rollbackFileMutation(payload.record);
+      const owner = requireConversationId(payload.conversationId);
+      const known = getMutationHistory({ conversationId: owner, includeRolledBack: true }).find(record => record.id === payload.record.id)
+        || conversationDb.findMutation(owner, payload.record.id);
+      if (!known) return { success: false, message: "Mutation does not belong to this conversation or is no longer available" };
+      if (known.rolledBack) return { success: true, message: "Mutation already rolled back" };
+      const result = await rollbackFileMutation(known);
+      if (result.success) known.rolledBack = true;
+      return result;
     }
   );
 
@@ -2322,7 +2342,7 @@ app.whenReady().then(() => {
       const project = options?.project;
       const convoId = options?.conversationId || `session_${Date.now()}`;
       if (project && project !== "Outside Project" && fs.existsSync(project)) {
-        return path.resolve(project);
+        return await taskWorkspaces.resolve(project, requireConversationId(options?.conversationId));
       }
       const config = loadUserConfig();
       const defaultLoc = config.defaultProjectLocation;
@@ -2671,7 +2691,7 @@ app.whenReady().then(() => {
 
       let targetWorkspace: string;
       if (task.workspacePath && fs.existsSync(task.workspacePath)) {
-        targetWorkspace = path.resolve(task.workspacePath);
+        targetWorkspace = await taskWorkspaces.resolve(task.workspacePath, convoId);
       } else {
         targetWorkspace = path.join(constBrainDir, convoId);
         if (!fs.existsSync(targetWorkspace)) {
@@ -2692,6 +2712,8 @@ app.whenReady().then(() => {
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
+        sourceProjectPath: task.workspacePath,
+        isolateWorkspace: true,
         mode: "full_access",
         thinkingLevel: "medium",
         maxTurns: 200,
@@ -2832,30 +2854,24 @@ app.whenReady().then(() => {
       }
     ) => {
       const { id } = options;
-      if (activeTerminals.has(id)) {
-        return { success: true, id };
-      }
-
-      let targetCwd = options.cwd;
-      if (!targetCwd || targetCwd === "Outside Project") {
-        if (options.project && options.project !== "Outside Project" && fs.existsSync(options.project)) {
-          targetCwd = path.resolve(options.project);
-        } else {
-          const convoId = options.conversationId || `session_${Date.now()}`;
-          targetCwd = path.join(constBrainDir, convoId);
+      const owner = requireConversationId(options.conversationId);
+      let targetCwd: string;
+      if (options.project && options.project !== "Outside Project") {
+        targetCwd = await taskWorkspaces.resolve(options.project, owner);
+        if (options.cwd && path.resolve(options.cwd) !== path.resolve(options.project)) {
+          const relative = path.relative(targetCwd, path.resolve(options.cwd));
+          if (relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative)) targetCwd = options.cwd;
         }
+      } else {
+        const defaultLoc = loadUserConfig().defaultProjectLocation;
+        targetCwd = defaultLoc && fs.existsSync(defaultLoc) ? path.join(defaultLoc, owner) : path.join(constBrainDir, owner);
+        fs.mkdirSync(targetCwd, { recursive: true });
       }
-
-      if (targetCwd && !fs.existsSync(targetCwd)) {
-        try {
-          fs.mkdirSync(targetCwd, { recursive: true });
-        } catch (err) {
-          console.error("Failed to create target directory for terminal:", targetCwd, err);
-        }
-      }
-
-      if (!targetCwd || !fs.existsSync(targetCwd)) {
-        targetCwd = os.homedir();
+      if (mcpShuttingDown) throw new Error("Desktop is shutting down");
+      const existing = activeTerminals.get(id);
+      if (existing) {
+        if (existing.conversationId !== owner) throw new Error("Terminal belongs to another conversation");
+        return { success: true, id, cwd: existing.cwd };
       }
 
       const defaultShell =
@@ -2881,6 +2897,7 @@ app.whenReady().then(() => {
       try {
         const proc = spawn(cmd, args, {
           cwd: targetCwd,
+          windowsHide: true,
           env: {
             ...process.env,
             TERM: "xterm-256color",
@@ -2891,7 +2908,7 @@ app.whenReady().then(() => {
           stdio: ["pipe", "pipe", "pipe"],
         });
 
-        activeTerminals.set(id, { process: proc, cwd: targetCwd });
+        activeTerminals.set(id, { process: proc, cwd: targetCwd, conversationId: owner });
 
         proc.stdout?.on("data", (chunk: Buffer) => {
           const str = chunk.toString("utf-8");
@@ -2903,33 +2920,33 @@ app.whenReady().then(() => {
             try { proc.stdin?.write("\x1b]11;rgb:1010/1010/1010\x1b\\"); } catch {}
           }
           if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, data: str });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: str });
           }
         });
 
         proc.stderr?.on("data", (chunk: Buffer) => {
           if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, data: chunk.toString("utf-8") });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: chunk.toString("utf-8") });
           }
         });
 
         proc.on("exit", (code) => {
-          activeTerminals.delete(id);
+          if (activeTerminals.get(id)?.process === proc) activeTerminals.delete(id);
           if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:exit", { id, code });
+            sendDesktopEvent(win.webContents, "terminal:exit", { id, conversationId: owner, code });
           }
         });
 
         proc.on("error", (err) => {
           console.error(`[Terminal ${id}] Process error:`, err);
-          activeTerminals.delete(id);
+          if (activeTerminals.get(id)?.process === proc) activeTerminals.delete(id);
           if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
-            sendDesktopEvent(win.webContents, "terminal:exit", { id, code: 1 });
+            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
+            sendDesktopEvent(win.webContents, "terminal:exit", { id, conversationId: owner, code: 1 });
           }
         });
 
-        return { success: true, id };
+        return { success: true, id, cwd: targetCwd };
       } catch (err: any) {
         console.error(`[Terminal ${id}] Spawn failed:`, err);
         return { success: false, error: err.message };
@@ -2939,8 +2956,10 @@ app.whenReady().then(() => {
 
   handleDesktopIpc(
     "terminal:write",
-    async (_event, options: { id: string; data: string }) => {
+    async (_event, options: { id: string; data: string; conversationId: string }) => {
+      const owner = requireConversationId(options.conversationId);
       const term = activeTerminals.get(options.id);
+      if (term?.conversationId !== owner) return false;
       if (term && term.process.stdin && !term.process.stdin.destroyed) {
         term.process.stdin.write(options.data);
         return true;
@@ -2949,13 +2968,14 @@ app.whenReady().then(() => {
     }
   );
 
-  handleDesktopIpc("terminal:destroy", async (_event, id: string) => {
+  handleDesktopIpc("terminal:destroy", async (_event, id: string, conversationId: string) => {
     const term = activeTerminals.get(id);
+    if (term?.conversationId !== requireConversationId(conversationId)) return false;
     if (term) {
       try {
-        term.process.kill();
+        if (term.process.pid) killProcessTree(term.process.pid);
       } catch {}
-      activeTerminals.delete(id);
+      if (activeTerminals.get(id) === term) activeTerminals.delete(id);
       return true;
     }
     return false;
@@ -3115,7 +3135,7 @@ app.on("window-all-closed", () => {
   scheduledTasksManager?.stop();
   for (const [, term] of activeTerminals) {
     try {
-      term.process.kill();
+      if (term.process.pid) killProcessTree(term.process.pid);
     } catch {}
   }
   activeTerminals.clear();

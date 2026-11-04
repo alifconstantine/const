@@ -5,6 +5,23 @@ import os from "node:os";
 import path from "node:path";
 import { ConversationDatabase } from "./database";
 
+test("undo recovery reads only a mutation logged by its owning conversation", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-remote-db-"));
+  const database = new ConversationDatabase(dir);
+  try {
+    database.appendTranscriptEvent("a", { type: "file_mutation", record: { id: "mutation-a", conversationId: "a", absolutePath: path.join(dir, "a.txt"), newContent: "A" } });
+    await database.flushTranscriptEvents("a");
+    assert.equal(database.findMutation("a", "mutation-a")?.newContent, "A");
+    assert.equal(database.findMutation("b", "mutation-a"), undefined);
+    assert.equal(database.findMutation("../a", "mutation-a"), undefined);
+  } finally {
+    await database.closeTranscriptEvents();
+    (database as any).db.close();
+    assert.equal(path.dirname(path.resolve(dir)), path.resolve(os.tmpdir()));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("remote sidebar summaries omit transcripts, preserve flags, and search message bodies literally", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-remote-db-"));
   const database = new ConversationDatabase(dir);

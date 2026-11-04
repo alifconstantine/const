@@ -934,20 +934,22 @@ export class SubAgentManager {
    */
   public async waitForSubAgent(
     idOrName: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationId = "default"
   ): Promise<SubAgentItem | undefined> {
-    const resolved = this.getSubAgent(idOrName);
+    const resolved = this.getSubAgent(idOrName, conversationId);
     if (!resolved) return undefined;
     const promise = this.executionPromises.get(resolved.id);
     if (promise) {
       if (signal) {
-        await Promise.race([
-          promise.catch(() => {}),
-          new Promise<void>((resolve) => {
-            if (signal.aborted) return resolve();
-            signal.addEventListener("abort", () => resolve(), { once: true });
-          }),
-        ]);
+        let onAbort: () => void = () => {};
+        try {
+          await Promise.race([promise.catch(() => {}), new Promise<void>(resolve => {
+            onAbort = resolve;
+            signal.addEventListener("abort", onAbort, { once: true });
+            if (signal.aborted) resolve();
+          })]);
+        } finally { signal.removeEventListener("abort", onAbort); }
       } else {
         try {
           await promise;
@@ -1008,7 +1010,7 @@ export class SubAgentManager {
       };
 
       const unsubscribe = this.subscribe((ev) => {
-        if (options.conversationId && ev.agent.conversationId !== options.conversationId) {
+        if (ev.agent.conversationId !== (options.conversationId || "default")) {
           return;
         }
         if (
@@ -1153,6 +1155,8 @@ export class SubAgentManager {
           contextWindow: !item.model || item.model === context.parentConfig.model ? context.parentConfig.contextWindow : undefined,
           thinkingLevel: item.thinkingLevel || context.parentConfig.thinkingLevel,
           workspacePath: context.workspacePath,
+          sourceProjectPath: context.parentConfig.sourceProjectPath,
+          isolateWorkspace: context.parentConfig.isolateWorkspace,
           conversationId,
           parentAgentId: item.name || item.id,
           taskDepth: childDepth,
@@ -1391,11 +1395,11 @@ export class SubAgentManager {
   /**
    * Retrieves a subagent by ID or unique handle name.
    */
-  public getSubAgent(idOrName: string, conversationId?: string): SubAgentItem | undefined {
+  public getSubAgent(idOrName: string, conversationId = "default"): SubAgentItem | undefined {
     const trimmed = idOrName.trim();
     const direct = this.subagents.get(trimmed);
     if (direct) {
-      if (conversationId && direct.conversationId !== conversationId) {
+      if (direct.conversationId !== conversationId) {
         return undefined;
       }
       return direct;
@@ -1403,7 +1407,7 @@ export class SubAgentManager {
 
     const lower = trimmed.toLowerCase();
     const candidates = Array.from(this.subagents.values()).filter(
-      (a) => !conversationId || a.conversationId === conversationId
+      (a) => a.conversationId === conversationId
     );
     return candidates.find((a) => a.id === trimmed || a.name?.toLowerCase() === lower);
   }
@@ -1411,9 +1415,10 @@ export class SubAgentManager {
   /**
    * Lists active and recent subagents, optionally scoped to a specific conversation.
    */
-  public listSubAgents(conversationId?: string): SubAgentItem[] {
+  public listAllSubAgents(): SubAgentItem[] { return Array.from(this.subagents.values()); }
+
+  public listSubAgents(conversationId = "default"): SubAgentItem[] {
     const all = Array.from(this.subagents.values());
-    if (!conversationId) return all;
     return all.filter((a) => a.conversationId === conversationId);
   }
 
@@ -1458,13 +1463,13 @@ export class SubAgentManager {
    */
   public killAllRunningSubAgents(
     onKilled?: (agentId: string) => void,
-    conversationId?: string
+    conversationId = "default"
   ): number {
     let killedCount = 0;
     for (const [id, item] of this.subagents.entries()) {
       if (
         item.status === "running" &&
-        (!conversationId || item.conversationId === conversationId)
+        item.conversationId === conversationId
       ) {
         const child = this.childAgents.get(id);
         if (child) {
@@ -1497,13 +1502,14 @@ export class SubAgentManager {
    * Clear subagents from memory (testing/reset).
    */
   public clearSubAgents(conversationId?: string): void {
-    this.killAllRunningSubAgents(undefined, conversationId);
     if (!conversationId) {
+      for (const owner of new Set(this.listAllSubAgents().map(agent => agent.conversationId))) this.killAllRunningSubAgents(undefined, owner);
       this.subagents.clear();
       this.executionPromises.clear();
       this.sessionTakenNames.clear();
       return;
     }
+    this.killAllRunningSubAgents(undefined, conversationId);
     for (const [id, item] of this.subagents.entries()) {
       if (item.conversationId === conversationId) {
         this.subagents.delete(id);
@@ -1653,7 +1659,7 @@ export async function executeSpawnAgent(
     if (foregroundAgents.length > 0) {
       await Promise.all(
         foregroundAgents.map((s) =>
-          globalSubAgentManager.waitForSubAgent(s.item.id, callbacks?.signal)
+          globalSubAgentManager.waitForSubAgent(s.item.id, callbacks?.signal, conversationId)
         )
       );
     }
@@ -1666,7 +1672,7 @@ export async function executeSpawnAgent(
           `<task-result id="${s.item.id}" name="${s.item.name || s.item.id}" agent="${s.item.role}" status="running" duration="0s">\n<notice>Subagent '${s.item.name || s.item.id}' is running in the background. Call 'wait' (or 'agent_status' with agent_id='${s.item.id}') to collect its result when ready.</notice>\n</task-result>`
         );
       } else {
-        const settled = globalSubAgentManager.getSubAgent(s.item.id) || s.item;
+        const settled = globalSubAgentManager.getSubAgent(s.item.id, conversationId) || s.item;
         const durationSec = Math.round(
           ((settled.endTime || Date.now()) - settled.startTime) / 1000
         );
@@ -1895,7 +1901,7 @@ export function executeKillAgent(
   const trimmed = agentId.trim();
   if (trimmed.toLowerCase() === "all" || trimmed === "*") {
     const count = globalSubAgentManager.killAllRunningSubAgents((id) => {
-      const ag = globalSubAgentManager.getSubAgent(id);
+      const ag = globalSubAgentManager.getSubAgent(id, conversationId);
       onKilled?.(id, ag);
     }, conversationId);
     return {

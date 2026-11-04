@@ -8,6 +8,7 @@ import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
 import { FilePreviewTab } from "./file-preview-tab";
 import { BrowserTab } from "./browser-tab";
+import { PersistentBrowserStack } from "./persistent-browser-stack";
 import { SubagentTab } from "./subagent-tab";
 import { SideChatTab } from "./side-chat-tab";
 import { TrajectoryTab } from "./trajectory-tab";
@@ -23,7 +24,7 @@ interface RightPaneProps {
   minWidth?: number;
   onWidthChange: (width: number) => void;
   tabs: RightPaneTab[];
-  backgroundBrowserTabs?: RightPaneTab[];
+  browserTabs?: RightPaneTab[];
   activeTabId: string | null;
   isOpeningNewTab: boolean;
   onSelectTab: (tabId: string) => void;
@@ -40,7 +41,7 @@ interface RightPaneProps {
   onOpenTrajectory?: (conversationIdOrPath: string) => void;
   onOpenBrowser?: (url: string) => void;
   conversations?: ConversationItem[];
-  onStopTask?: (taskId: string) => void;
+  onStopTask?: (taskId: string, conversationId?: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onSelectElementForChat?: (element: BrowserSelectedElement) => void;
   onDraggingChange?: (isDragging: boolean) => void;
@@ -62,7 +63,7 @@ export const RightPane = memo(function RightPane({
   minWidth = 300,
   onWidthChange,
   tabs,
-  backgroundBrowserTabs = [],
+  browserTabs = [],
   activeTabId,
   isOpeningNewTab,
   onSelectTab,
@@ -102,9 +103,9 @@ export const RightPane = memo(function RightPane({
   const renderTabContent = (tab: RightPaneTab) => {
     switch (tab.type) {
       case "terminal":
-        return <TerminalTab tab={tab} />;
+        return <TerminalTab tab={{ ...tab, conversationId: tab.conversationId || parentConversationId }} />;
       case "task_output":
-        return <TaskOutputTab tab={tab} onStopTask={onStopTask} />;
+        return <TaskOutputTab tab={{ ...tab, conversationId: tab.conversationId || parentConversationId }} onStopTask={onStopTask} />;
       case "review":
         return (
           <ReviewTab
@@ -126,7 +127,7 @@ export const RightPane = memo(function RightPane({
             source={sources.find(source => tab.sourceId
               ? source.id === tab.sourceId && (!source.path || !tab.filePath || source.path === tab.filePath)
               : source.path && source.path === tab.filePath)}
-            workspacePath={workspacePath}
+            workspacePath={tab.cwd || workspacePath}
             onOpenFilePreview={onOpenFilePreview}
             onOpenBrowser={onOpenBrowser}
             onUpdateTab={onUpdateTab}
@@ -220,9 +221,10 @@ export const RightPane = memo(function RightPane({
           />
         ) : null}
 
-        {[...tabs, ...backgroundBrowserTabs.filter(background => !tabs.some(tab => tab.id === background.id))].map((tab) => {
+        <PersistentBrowserStack tabs={browserTabs} activeTabId={isOpeningNewTab ? null : activeTabId}
+          foregroundIds={new Set(tabs.map(tab => tab.id))} renderContent={renderTabContent} />
+        {tabs.filter(tab => tab.type !== "browser").map((tab) => {
           const isTabActive = !isOpeningNewTab && tab.id === activeTabId && tabs.some(item => item.id === tab.id);
-          const isBrowser = tab.type === "browser";
           return (
             <div
               key={tab.id}
@@ -234,15 +236,11 @@ export const RightPane = memo(function RightPane({
               className={`w-full h-full min-h-0 ${
                 isTabActive
                   ? "flex flex-col flex-1 relative z-10"
-                  : isBrowser
-                  ? "flex flex-col absolute inset-0 opacity-0 pointer-events-none -z-10"
                   : "hidden"
               }`}
               style={
                 isTabActive
                   ? { display: "flex" }
-                  : isBrowser
-                  ? { display: "flex", visibility: "hidden" }
                   : { display: "none" }
               }
             >

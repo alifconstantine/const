@@ -1,4 +1,7 @@
 import fs from "node:fs/promises";
+import { withFileLock, isRealWorkspacePath } from "./file-lock.js";
+import { ownsListeningPort } from "./service-readiness.js";
+import { createHash } from "node:crypto";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -78,6 +81,7 @@ export function getGlobalComputerToolHandler(): ComputerToolHandler | null {
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
   stepIndex?: number;
+  workspaceRoot?: string;
   conversationId?: string;
   onFileMutation?: (record: FileMutationRecord) => void;
   onTodoUpdate?: (todos: TodoItem[]) => void;
@@ -4917,6 +4921,7 @@ export interface ActiveBackgroundTask {
 export type BackgroundTaskListener = (event: {
   type: "output" | "status";
   taskId: string;
+  conversationId?: string;
   data?: string;
   status?: "running" | "completed" | "failed" | "killed";
   code?: number | null;
@@ -4930,7 +4935,9 @@ export class BackgroundProcessManager {
     options?.signal?.throwIfAborted();
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const shellCfg = getShellConfig();
-    const child = spawn(shellCfg.shell, [...shellCfg.args, command], {
+    // Stage stdin only after the owner and abort handler exist. An immediate stop
+    // must not race a shell that has already started launching descendants.
+    const child = spawn(shellCfg.shell, shellCfg.type === "powershell" ? [...shellCfg.args, "-"] : [], {
       cwd,
       windowsHide: true,
       detached: process.platform !== "win32",
@@ -5015,65 +5022,55 @@ export class BackgroundProcessManager {
     this.tasks.set(taskId, task);
     options?.signal?.addEventListener("abort", onAbort, { once: true });
     if (options?.signal?.aborted) onAbort();
+    child.stdin?.on("error", (error) => {
+      if (task.status === "running") appendLog(`[Process input error: ${error.message}]`);
+    });
+    setImmediate(() => {
+      if (task.status === "running" && !options?.signal?.aborted) child.stdin?.end(command + "\n\n");
+    });
     return task;
   }
 
   public async waitForReady(
     taskId: string,
-    readyCfg?: ServiceReady
+    readyCfg?: ServiceReady,
+    conversationId?: string
   ): Promise<{ ready: boolean; port?: number; error?: string }> {
-    const task = this.tasks.get(taskId);
+    const task = this.getTask(taskId, conversationId);
     if (!task) return { ready: false, error: "Task not found" };
 
-    const timeoutMs = (readyCfg?.timeout || 20) * 1000;
-    const startTime = Date.now();
-    const targetHost = readyCfg?.host || "127.0.0.1";
-
-    while (Date.now() - startTime < timeoutMs) {
-      if (task.status !== "running") {
-        return {
-          ready: false,
-          error: task.logs.slice(-5).join("\n") || "Process failed to start",
-        };
-      }
-
-      // Check port readiness if specified or detected
-      const probePort = readyCfg?.port || task.port;
-      if (probePort) {
-        const isOpen = await checkPortOpen(probePort, targetHost, 300);
-        if (isOpen && task.status === "running") {
-          task.port = probePort;
-          return { ready: true, port: probePort };
+    const timeoutMs = Math.max(0, readyCfg?.timeout ?? 20) * 1000;
+    const deadline = Date.now() + timeoutMs;
+    const pattern = readyCfg?.log ? new RegExp(readyCfg.log, "i") : undefined;
+    while (Date.now() < deadline) {
+      if (task.status !== "running") return { ready: false, error: task.logs.slice(-5).join("\n") || "Process stopped before readiness" };
+      const output = task.logs.slice(1);
+      const logReady = pattern ? output.some(line => pattern.test(line)) : true;
+      const port = readyCfg?.port || task.port;
+      if (port && logReady && task.pid) {
+        try {
+          if (await ownsListeningPort(task.pid, port) && task.status === "running") {
+            task.port = port;
+            return { ready: true, port };
+          }
+        } catch (error) {
+          return { ready: false, error: `Cannot verify service ownership: ${error instanceof Error ? error.message : String(error)}` };
         }
+      } else if (!port && logReady && (pattern || output.some(line => /ready in|compiled successfully|server running at|listening on/i.test(line)))) {
+        return { ready: true };
       }
-
-      // Check log pattern if specified
-      if (readyCfg?.log) {
-        const regex = new RegExp(readyCfg.log, "i");
-        if (task.logs.some((l) => regex.test(l))) {
-          return { ready: true, port: task.port };
-        }
-      }
-
-      // Auto-detect dev server ready phrases
-      const isAutoReady = task.logs.some((l) =>
-        /(?:ready in|Local:\s+http|vite\s+v\d+|compiled successfully|server running at|listening on)/i.test(l)
-      );
-      if (isAutoReady) {
-        return { ready: true, port: task.port };
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, Math.max(0, deadline - Date.now()))));
     }
+    return { ready: false, port: task.port, error: "Service readiness timed out; no owned listening socket or required ready log was verified" };
+  }
 
-    return { ready: task.status === "running", port: task.port };
+  /** Administrative inventory for shutdown and diagnostics; never exposed as a session operation. */
+  public listAllTasks(): BackgroundTaskItem[] {
+    return [...new Set([...this.tasks.values()].map(task => task.conversationId))].flatMap(owner => this.listTasks(owner));
   }
 
   public listTasks(conversationId?: string): BackgroundTaskItem[] {
-    let all = Array.from(this.tasks.values());
-    if (conversationId) {
-      all = all.filter((t) => t.conversationId === conversationId);
-    }
+    const all = Array.from(this.tasks.values()).filter(t => t.conversationId === conversationId);
     return all.map((t) => ({
       id: t.id,
       name: t.name,
@@ -5090,7 +5087,7 @@ export class BackgroundProcessManager {
   public getTask(taskIdOrName: string, conversationId?: string): ActiveBackgroundTask | undefined {
     const direct = this.tasks.get(taskIdOrName);
     if (direct) {
-      if (conversationId && direct.conversationId !== conversationId) {
+      if (direct.conversationId !== conversationId) {
         return undefined;
       }
       return direct;
@@ -5099,7 +5096,7 @@ export class BackgroundProcessManager {
     const matches = Array.from(this.tasks.values()).reverse().filter((t) => {
       const match = t.id === taskIdOrName || (t.name && t.name.toLowerCase() === lower);
       if (!match) return false;
-      if (conversationId && t.conversationId !== conversationId) return false;
+      if (t.conversationId !== conversationId) return false;
       return true;
     });
     return matches.find((task) => task.status === "running") || matches[0];
@@ -5134,6 +5131,7 @@ export class BackgroundProcessManager {
   }
 
   private emit(event: Parameters<BackgroundTaskListener>[0]) {
+    event = { ...event, conversationId: this.tasks.get(event.taskId)?.conversationId };
     for (const listener of this.listeners) {
       try {
         listener(event);
@@ -5633,8 +5631,29 @@ function notifyFileMutation(
   record: FileMutationRecord,
   options?: ExecuteToolOptions
 ): void {
+  record.conversationId = options?.conversationId || options?.parentConfig?.conversationId;
+  record.workspaceRoot = options?.workspaceRoot;
+  const target = record.absolutePath || record.filePath;
+  if (target && typeof record.newContent === "string") rememberVersion(target, record.newContent, options);
   recordMutation(record);
   options?.onFileMutation?.(record);
+}
+
+const readVersions = new Map<string, string>();
+function versionKey(file: string, options?: ExecuteToolOptions): string {
+  const absolute = path.resolve(file);
+  return `${options?.conversationId || options?.parentConfig?.conversationId || ""}\0${process.platform === "win32" ? absolute.toLowerCase() : absolute}`;
+}
+function rememberVersion(file: string, content: string, options?: ExecuteToolOptions): void {
+  readVersions.set(versionKey(file, options), createHash("sha256").update(content).digest("hex"));
+  if (readVersions.size > 10_000) readVersions.delete(readVersions.keys().next().value!);
+}
+function assertReadVersion(file: string, content: string, options: ExecuteToolOptions): void {
+  if (!options.conversationId && !options.parentConfig?.conversationId) return;
+  const expected = readVersions.get(versionKey(file, options));
+  if (expected !== createHash("sha256").update(content).digest("hex")) {
+    throw new Error(`File conflict: read '${file}' again before changing it; its current version has not been inspected by this conversation.`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -5642,6 +5661,16 @@ function notifyFileMutation(
 // ---------------------------------------------------------------------------
 
 export async function executeNativeTool(
+  toolName: string, args: Record<string, any>, workspacePath: string,
+  optionsOrSignal?: AbortSignal | ExecuteToolOptions,
+): Promise<ToolExecutionResult> {
+  const name = normalizeToolName(toolName);
+  const mutates = new Set(["write", "writefile", "edit", "editfile", "replaceinfile", "applypatch", "patch", "astedit"]);
+  const execute = () => executeNativeToolUnlocked(toolName, args, workspacePath, optionsOrSignal);
+  return mutates.has(name) ? withFileLock(workspacePath, execute) : execute();
+}
+
+async function executeNativeToolUnlocked(
   toolName: string,
   args: Record<string, any>,
   workspacePath: string,
@@ -5652,6 +5681,21 @@ export async function executeNativeTool(
       optionsOrSignal instanceof AbortSignal
         ? { signal: optionsOrSignal }
         : optionsOrSignal || {};
+    options.workspaceRoot = workspacePath;
+    const source = options.parentConfig?.sourceProjectPath;
+    if (options.parentConfig?.isolateWorkspace && source && source !== "Outside Project") {
+      args = { ...args };
+      const normalizedSource = path.resolve(source);
+      const sourceForms = [normalizedSource, normalizedSource.replace(/\\/g, "/"), normalizedSource.replace(/\//g, "\\")];
+      for (const key of ["path", "file_path", "file", "cwd", "working_directory", "workdir", "directory", "command", "cmd", "script"]) {
+        if (typeof args[key] !== "string") continue;
+        for (const from of new Set(sourceForms)) {
+          const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          args[key] = args[key].replace(new RegExp(`${escaped}(?=$|[\\\\/\\s'";)|&])`, process.platform === "win32" ? "gi" : "g"), () => workspacePath.replace(/\\/g, "/"));
+        }
+      }
+    }
+    const memoryWorkspacePath = options.parentConfig?.isolateWorkspace && source && source !== "Outside Project" ? source : workspacePath;
     const signal = options.signal;
 
     if (signal?.aborted) {
@@ -5664,6 +5708,12 @@ export async function executeNativeTool(
       return await handler(toolName, args, signal);
     }
     const normalizedTool = normalizeToolName(toolName);
+    if (options.parentConfig?.isolateWorkspace && ["write", "writefile", "edit", "editfile", "replaceinfile", "applypatch", "patch", "mkdir", "makedir", "createdirectory"].includes(normalizedTool)) {
+      const rawPath = extractPathArg(args);
+      if (rawPath && !await isRealWorkspacePath(resolveSafePath(rawPath, workspacePath), workspacePath)) {
+        return { result: "File mutation target is outside this task's isolated workspace", isError: true };
+      }
+    }
     const capability = normalizedTool.startsWith("browser") ? "browser-use" : normalizedTool.startsWith("computer") ? "computer-use" : undefined;
     if (capability && options.parentConfig?.nativeCapabilityEnabled?.(capability) === false)
       return { result: "This capability is disabled in Plugins.", isError: true };
@@ -5829,6 +5879,7 @@ export async function executeNativeTool(
 
         // 4. Regular Text & Code Files with Progressive Truncation Metadata
         const content = await fs.readFile(filePath, "utf-8");
+        rememberVersion(filePath, content, options);
         const lines = content.split(/\r?\n/);
 
         // Handle offset & limit (1-indexed)
@@ -5919,6 +5970,7 @@ export async function executeNativeTool(
         }
       }
 
+      if (previousContent !== null) assertReadVersion(filePath, previousContent, options);
       await fs.writeFile(filePath, content, "utf-8");
 
       const displayPath = path.isAbsolute(rawPath)
@@ -5994,6 +6046,7 @@ export async function executeNativeTool(
       }
 
       const fileText = await fs.readFile(filePath, "utf-8");
+      assertReadVersion(filePath, fileText, options);
 
       const editDisplayPath = path.isAbsolute(rawPath)
         ? filePath
@@ -6067,6 +6120,7 @@ export async function executeNativeTool(
 
       const rawCwd = args.cwd || args.working_directory || args.workdir || args.path;
       const targetCwd = rawCwd ? resolveSafePath(rawCwd, workspacePath) : workspacePath;
+      if (options.parentConfig?.isolateWorkspace && !await isRealWorkspacePath(targetCwd, workspacePath)) return { result: "Command working directory is outside this task workspace", isError: true };
       const executionCwd = fsSync.existsSync(targetCwd) && fsSync.statSync(targetCwd).isDirectory()
         ? targetCwd
         : workspacePath;
@@ -6109,13 +6163,13 @@ export async function executeNativeTool(
 
         // If readiness criteria requested OR auto-detected dev server, wait for network/log readiness
         if (readyCfg || isDevServer) {
-          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
+          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg, effectiveConvoId);
           const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
 
-          if (!waitResult.ready && bgTask.status !== "running") {
+          if (!waitResult.ready) {
             const errLogs = bgTask.logs.slice(-6).join("\n");
             return {
-              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService stopped before becoming ready:\n${errLogs}\n</error>\n</task-result>`,
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService did not become ready: ${waitResult.error || "Unknown readiness failure"}\n${errLogs}\n</error>\n</task-result>`,
               isError: true,
             };
           }
@@ -6433,7 +6487,7 @@ export async function executeNativeTool(
         };
       }
 
-      const interception = checkBashInterception(cmd);
+      const interception = checkBashInterception(cmd, "powershell");
       if (interception.intercepted) {
         return {
           result: interception.message || "Command intercepted by security or workflow policy.",
@@ -6443,6 +6497,7 @@ export async function executeNativeTool(
 
       const rawCwd = args.cwd || args.working_directory || args.workdir || args.path;
       const targetCwd = rawCwd ? resolveSafePath(rawCwd, workspacePath) : workspacePath;
+      if (options.parentConfig?.isolateWorkspace && !await isRealWorkspacePath(targetCwd, workspacePath)) return { result: "Command working directory is outside this task workspace", isError: true };
       const executionCwd = fsSync.existsSync(targetCwd) && fsSync.statSync(targetCwd).isDirectory()
         ? targetCwd
         : workspacePath;
@@ -6495,13 +6550,13 @@ export async function executeNativeTool(
         });
 
         if (readyCfg || isDevServer) {
-          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
+          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg, effectiveConvoId);
           const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
 
-          if (!waitResult.ready && bgTask.status !== "running") {
+          if (!waitResult.ready) {
             const errLogs = bgTask.logs.slice(-6).join("\n");
             return {
-              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService stopped before becoming ready:\n${errLogs}\n</error>\n</task-result>`,
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="${bgTask.status}" duration="${durationSec}s">\n<error>\nService did not become ready: ${waitResult.error || "Unknown readiness failure"}\n${errLogs}\n</error>\n</task-result>`,
               isError: true,
             };
           }
@@ -6690,6 +6745,7 @@ export async function executeNativeTool(
       }
 
       const originalContent = await fs.readFile(filePath, "utf-8");
+      assertReadVersion(filePath, originalContent, options);
       const { success, resultText, error } = applyLooseUnifiedDiff(originalContent, patchContent);
 
       if (!success || resultText === undefined) {
@@ -7234,7 +7290,7 @@ export async function executeNativeTool(
     ) {
       try {
         const cp = await createCheckpoint(
-          { name: typeof args.name === "string" ? args.name : undefined },
+          { name: typeof args.name === "string" ? args.name : undefined, conversationId: options.conversationId || options.parentConfig?.conversationId },
           workspacePath,
           signal
         );
@@ -7261,6 +7317,7 @@ export async function executeNativeTool(
       try {
         const res = await restoreCheckpoint(
           {
+            conversationId: options.conversationId || options.parentConfig?.conversationId,
             checkpointId:
               (typeof args.checkpoint_id === "string" ? args.checkpoint_id : undefined) ||
               (typeof args.id === "string" ? args.id : undefined),
@@ -7303,7 +7360,8 @@ export async function executeNativeTool(
 
         const res = await executeRollbackMutation(
           { filePath, steps, mutationId },
-          workspacePath
+          workspacePath,
+          options.conversationId || options.parentConfig?.conversationId
         );
         return {
           result: res.message,
@@ -7561,7 +7619,7 @@ export async function executeNativeTool(
             },
           ]
         : [];
-      const retainRes = await executeRetain(items, workspacePath);
+      const retainRes = await executeRetain(items, memoryWorkspacePath);
       return {
         result: retainRes.message,
         isError: !retainRes.success,
@@ -7573,7 +7631,7 @@ export async function executeNativeTool(
     // -----------------------------------------------------------------------
     if (normalizedTool === "recall" || normalizedTool === "searchmemory") {
       const query = String(args.query || args.prompt || "").trim();
-      const recallRes = await executeRecall(query, workspacePath, {
+      const recallRes = await executeRecall(query, memoryWorkspacePath, {
         scope: args.scope,
         limit: typeof args.limit === "number" ? args.limit : 10,
       });
@@ -7588,7 +7646,7 @@ export async function executeNativeTool(
     // -----------------------------------------------------------------------
     if (normalizedTool === "reflect" || normalizedTool === "reflectmemory") {
       const query = String(args.query || args.prompt || "").trim();
-      const reflectRes = await executeReflect(query, workspacePath, args.context);
+      const reflectRes = await executeReflect(query, memoryWorkspacePath, args.context);
       return {
         result: reflectRes.formatted,
         isError: false,
@@ -7647,6 +7705,10 @@ export async function executeNativeTool(
           ops: rawOps,
           paths: rawPaths,
           dryRun: args.dry_run === true,
+          beforeWrite: async (file, content) => {
+            if (options.parentConfig?.isolateWorkspace && !await isRealWorkspacePath(file, workspacePath)) throw new Error("AST edit target is outside this task workspace");
+            assertReadVersion(file, content, options);
+          },
         },
         workspacePath,
         signal

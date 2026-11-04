@@ -19,6 +19,7 @@ window.electron = {
   getModels: async () => [{ id: "fixture-model", name: "Fixture", provider: "custom" }],
   getRunningSessions: async () => [],
   getSideReceipts: async () => ({}),
+  // An unrelated parent's snapshot must never hydrate this side conversation.
   getSessionSnapshot: async () => parentSnapshot,
   onAgentEvent: (callback: (event: any) => void) => { listeners.add(callback); return () => listeners.delete(callback); },
   onSessionStarted: (callback: (event: any) => void) => { started.add(callback); return () => started.delete(callback); },

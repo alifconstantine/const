@@ -11,6 +11,10 @@ async function main() {
     const fromVite = createRequire(require.resolve('vite/package.json'));
     const entry = path.join(temp, 'browser-tests.cjs');
     await fromVite('esbuild').build({
+      entryPoints: [path.join(root, 'tests/browser-isolation.fixture.tsx')],
+      bundle: true, platform: 'browser', format: 'iife', outfile: path.join(temp, 'browser-isolation.js'),
+    });
+    await fromVite('esbuild').build({
       entryPoints: [path.join(root, 'tests/browser.integration.ts')],
       bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: entry,
     });

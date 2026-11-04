@@ -26,6 +26,23 @@ test("retaining guests across chat switches keeps object identity and removes cl
   assert.equal(switched[0], retained[0]);
   assert.deepEqual(switched.map(tab => tab.id), ["a-tab", "b-tab"]);
   assert.deepEqual(retainBrowserTabs(switched, [], "a").map(tab => tab.id), ["b-tab"]);
+  assert.deepEqual(retainBrowserTabs(switched, a.tabs, "a").map(tab => tab.id), ["a-tab", "b-tab"]);
+});
+
+test("task output, undo, terminals and subagent controls preserve their explicit owner through the bridge", async () => {
+  const calls: unknown[][] = [];
+  const api = createDesktopBridge({ async invoke(...args: unknown[]) { calls.push(args); return true; }, send() {}, on() {}, removeListener() {} }, { setZoomFactor() {}, getZoomFactor: () => 1 }, { getPathForFile: () => "" });
+  await api.getBackgroundTaskLogs("job-b", "b");
+  await api.killBackgroundTask("job-b", "b");
+  await api.killSubAgent("worker-b", "b");
+  await api.rollbackFile({ id: "mutation-b" }, "b");
+  await api.terminal.write({ id: "terminal-b", data: "pwd\n", conversationId: "b" });
+  await api.terminal.destroy("terminal-b", "b");
+  assert.deepEqual(calls, [
+    ["tasks:get-output", "job-b", "b"], ["tasks:kill", "job-b", "b"], ["subagents:kill", "worker-b", "b"],
+    ["agent:rollback-file", { record: { id: "mutation-b" }, conversationId: "b" }],
+    ["terminal:write", { id: "terminal-b", data: "pwd\n", conversationId: "b" }], ["terminal:destroy", "terminal-b", "b"],
+  ]);
 });
 
 test("an explicit new-tab request never reuses another existing tab", () => {

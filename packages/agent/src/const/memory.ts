@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { withFileLock } from "./file-lock.js";
+import { randomUUID } from "node:crypto";
 
 export interface MemoryItem {
   id: string;
@@ -71,15 +73,24 @@ async function loadMemoriesJson(filePath: string): Promise<MemoryItem[]> {
     if (!fsSync.existsSync(filePath)) return [];
     const text = await fs.readFile(filePath, "utf-8");
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+    if (!Array.isArray(parsed)) throw new Error(`Invalid memory index: ${filePath}`);
+    return parsed;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
   }
 }
 
 async function saveMemoriesJson(filePath: string, items: MemoryItem[]): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(items, null, 2), "utf-8");
+  await atomicWrite(filePath, JSON.stringify(items, null, 2));
+}
+
+async function atomicWrite(file: string, content: string): Promise<void> {
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  try { await fs.writeFile(temporary, content, "utf8"); await fs.rename(temporary, file); }
+  finally { await fs.rm(temporary, { force: true }); }
 }
 
 /**
@@ -157,8 +168,7 @@ export async function readMemoryFile(filePath: string): Promise<string> {
  * Save / update memory markdown file content.
  */
 export async function saveMemoryFile(filePath: string, content: string): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, content, "utf-8");
+  await withFileLock(path.dirname(filePath), () => atomicWrite(filePath, content));
 }
 
 /**
@@ -185,6 +195,17 @@ export async function executeRetain(
   items: RetainInputItem[],
   workspacePath: string
 ): Promise<{ success: boolean; count: number; message: string; files: string[] }> {
+  const directories = [...new Set(items.map(item => item.scope === "global"
+    ? getGlobalMemoryDir() : getWorkspaceMemoryDir(workspacePath)))].sort();
+  const retain = (index: number): ReturnType<typeof executeRetain> => index === directories.length
+    ? retainUnlocked(items, workspacePath)
+    : withFileLock(directories[index]!, () => retain(index + 1));
+  return retain(0);
+}
+
+async function retainUnlocked(
+  items: RetainInputItem[], workspacePath: string,
+): ReturnType<typeof executeRetain> {
   if (!items || items.length === 0) {
     return { success: false, count: 0, message: "No memory items provided to retain.", files: [] };
   }
@@ -246,13 +267,13 @@ export async function executeRetain(
 
       const headerTitle = item.context || item.title || item.topic || "Note";
       mdEntry = `${existingContent.trimEnd()}\n\n### [${timestampHeader}] ${headerTitle}\n${item.content.trim()}\n`;
-      await fs.writeFile(mdPath, mdEntry, "utf-8");
+      await atomicWrite(mdPath, mdEntry);
     } else {
       // Dedicated topic markdown file (e.g. user-java-learning-goal.md)
       const docTitle = item.title || item.topic || mdFilename.replace(/\.md$/, "");
       const contextLine = item.context ? `> Context: ${item.context}\n\n` : "";
       mdEntry = `# ${docTitle}\n\n* Updated: ${timestampHeader} (${dateStr})\n\n${contextLine}${item.content.trim()}\n`;
-      await fs.writeFile(mdPath, mdEntry, "utf-8");
+      await atomicWrite(mdPath, mdEntry);
     }
 
     if (scope === "global") {

@@ -753,7 +753,7 @@ export function AuthenticatedContent({
   const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState<boolean>(false);
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
   const [retainedBrowsers, setRetainedBrowsers] = useState<RightPaneTab[]>([]);
-  const backgroundBrowserTabs = useMemo(() => retainedBrowsers.filter(tab => tab.conversationId !== conversationId), [retainedBrowsers, conversationId]);
+
   useEffect(() => {
     setRetainedBrowsers(previous => retainBrowserTabs(previous, rightPaneTabs, conversationId));
   }, [rightPaneTabs, conversationId]);
@@ -994,7 +994,7 @@ export function AuthenticatedContent({
           ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
           : "outside";
 
-      const initialTabId = `bottom_terminal_${Date.now()}`;
+      const initialTabId = `bottom_terminal_${crypto.randomUUID()}`;
       const newTab: RightPaneTab = {
         id: initialTabId,
         type: "terminal",
@@ -1035,6 +1035,7 @@ export function AuthenticatedContent({
         });
       } catch {}
     }
+    if (conversationIdRef.current !== conversationId) return;
     const baseTitle =
       currentProject && currentProject !== "Outside Project"
         ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
@@ -1046,7 +1047,7 @@ export function AuthenticatedContent({
     const title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
 
     const newTab: RightPaneTab = {
-      id: `bottom_terminal_${Date.now()}`,
+      id: `bottom_terminal_${crypto.randomUUID()}`,
       type: "terminal",
       title,
       cwd: resolvedCwd,
@@ -1072,12 +1073,12 @@ export function AuthenticatedContent({
 
   const handleClearBottomTerminal = useCallback((tabId: string) => {
     if (window.electron?.terminal?.write) {
-      window.electron.terminal.write({ id: tabId, data: "\x0c" });
+      window.electron.terminal.write({ id: tabId, data: "\x0c", conversationId });
     }
-  }, []);
+  }, [conversationId]);
 
   const handleCloseBottomTab = useCallback((tabId: string) => {
-    window.electron?.terminal?.destroy(tabId);
+    window.electron?.terminal?.destroy(tabId, conversationId);
     setBottomPanelTabs((prev) => {
       const remaining = prev.filter((t) => t.id !== tabId);
       if (remaining.length === 0) {
@@ -1088,7 +1089,7 @@ export function AuthenticatedContent({
       }
       return remaining;
     });
-  }, [activeBottomTabId]);
+  }, [activeBottomTabId, conversationId]);
 
   const handleMouseDownRightResize = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1137,7 +1138,7 @@ export function AuthenticatedContent({
     };
     void refresh();
     const unsubscribe = window.electron?.onBackgroundTaskEvent?.(event => {
-      if (event.type !== "output") void refresh();
+      if (event.conversationId === conversationId && event.type !== "output") void refresh();
     });
     return () => { disposed = true; unsubscribe?.(); };
   }, [conversationId]);
@@ -1155,6 +1156,7 @@ export function AuthenticatedContent({
       title: task.command.length > 20 ? task.command.slice(0, 20) + "..." : task.command,
       type: "task_output",
       taskId: task.id,
+      conversationId: task.conversationId || conversationId,
       command: task.command,
     };
     setRightPaneTabs((prev) => [...prev, newTab]);
@@ -1162,10 +1164,10 @@ export function AuthenticatedContent({
     setIsRightSidebarOpen(true);
   };
 
-  const handleStopBackgroundTask = async (taskId: string) => {
+  const handleStopBackgroundTask = async (taskId: string, ownerId = conversationId) => {
     if (window.electron?.killBackgroundTask) {
       try {
-        const stopped = await window.electron.killBackgroundTask(taskId, conversationId);
+        const stopped = await window.electron.killBackgroundTask(taskId, ownerId);
         if (!stopped) toast.error(t("common.failed"));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("common.failed"));
@@ -1315,6 +1317,10 @@ export function AuthenticatedContent({
       const count = rightPaneTabs.filter((t) => t.type === type).length;
       title = count === 0 ? "Side chat" : `Side chat ${count + 1}`;
     } else if (type === "directory") {
+      if (window.electron?.resolveWorkspacePath) {
+        try { resolvedCwd = await window.electron.resolveWorkspacePath({ project: currentProject, conversationId }); }
+        catch (error) { toast.error(error instanceof Error ? error.message : t("common.failed")); return; }
+      }
       const baseTitle =
         currentProject && currentProject !== "Outside Project"
           ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Direktori"
@@ -1329,6 +1335,7 @@ export function AuthenticatedContent({
       title = count === 0 ? "Browser" : `Browser ${count + 1}`;
     }
 
+    if (conversationIdRef.current !== conversationId) return;
     const newTab: RightPaneTab = {
       id: `${type}_${Date.now()}`,
       type,
@@ -1406,7 +1413,7 @@ export function AuthenticatedContent({
     const tabIndex = rightPaneTabs.findIndex((t) => t.id === tabId);
     const tabToClose = rightPaneTabs.find((t) => t.id === tabId);
     if (tabToClose && tabToClose.type === "terminal") {
-      window.electron?.terminal?.destroy(tabId);
+      window.electron?.terminal?.destroy(tabId, conversationId);
     }
     const nextTabs = rightPaneTabs.filter((t) => t.id !== tabId);
     setRightPaneTabs(nextTabs);
@@ -1883,7 +1890,8 @@ export function AuthenticatedContent({
 
   const handleKillSubAgent = async (agentId: string) => {
     if (window.electron?.killSubAgent) {
-      await window.electron.killSubAgent(agentId);
+      const killed = await window.electron.killSubAgent(agentId, conversationId);
+      if (!killed) { toast.error(t("common.failed")); return; }
     }
     setConversationSubAgents((prev) => {
       const next = new Map(prev);
@@ -2130,14 +2138,17 @@ export function AuthenticatedContent({
       let revertedCount = 0;
       for (const rec of [...mutationsToRevert].reverse()) {
         try {
-          const res = await window.electron.rollbackFile(rec);
-          if (res?.success) revertedCount++;
-        } catch {}
+          const res = await window.electron.rollbackFile(rec, conversationId);
+          if (!res?.success) { toast.error(res?.message || t("common.failed")); return; }
+          revertedCount++;
+        } catch (error) { toast.error(error instanceof Error ? error.message : t("common.failed")); return; }
       }
       if (revertedCount > 0) {
         toast.info(t("toast.revertedFiles").replace("{count}", String(revertedCount)));
       }
     }
+
+    if (conversationIdRef.current !== conversationId) return;
 
     // 3. Truncate conversation history: preserve history strictly before messageIdx
     const targetMsg = messages[messageIdx];
@@ -3429,84 +3440,46 @@ export function AuthenticatedContent({
   };
   handleSendMessageRef.current = handleSendMessage;
 
+  const markRolledBackMutations = useCallback((ownerId: string, ids: Set<string>) => {
+    const stored = loadConversations().find(item => item.id === ownerId);
+    const visible = conversationIdRef.current === ownerId;
+    const source = visible ? messagesRef.current : activeSessionMessagesRef.current.get(ownerId) || stored?.messages || [];
+    const next = source.map(msg => ({ ...msg, mutations: msg.mutations?.map((mutation: FileMutationRecord) =>
+      ids.has(mutation.id) ? { ...mutation, rolledBack: true } : mutation) }));
+    if (visible) { messagesRef.current = next; setMessages(next); }
+    if (activeSessionMessagesRef.current.has(ownerId)) activeSessionMessagesRef.current.set(ownerId, next);
+    if (stored) saveConversation({ ...stored, messages: next, updatedAt: Date.now() });
+    setConversations(loadConversations());
+  }, []);
+
   const handleRollback = useCallback(async (record: FileMutationRecord) => {
     if (record.rolledBack) return;
-    if (!window.electron?.rollbackFile) {
-      toast.error(t("toast.rollbackDesktopOnly"));
-      return;
-    }
+    if (!window.electron?.rollbackFile) { toast.error(t("toast.rollbackDesktopOnly")); return; }
     try {
-      const res = await window.electron.rollbackFile(record);
-      if (res.success) {
-        toast.success(res.message || t("toast.revertedFile").replace("{file}", record.targetFile));
-        setMessages((prev) => {
-          const next = prev.map((msg) => ({
-            ...msg,
-            mutations: msg.mutations?.map((m) =>
-              m.id === record.id ? { ...m, rolledBack: true } : m
-            ),
-          }));
-          const stored = loadConversations();
-          const target = stored.find((c) => c.id === conversationId);
-          if (target) {
-            target.messages = next;
-            target.updatedAt = Date.now();
-            saveConversation(target);
-            setConversations(loadConversations());
-          }
-          return next;
-        });
-      } else {
-        toast.error(res.message || `Failed to rollback ${record.targetFile}`);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Rollback error");
-    }
-  }, [t, conversationId]);
+      const res = await window.electron.rollbackFile(record, conversationId);
+      if (!res.success) { toast.error(res.message || t("common.failed")); return; }
+      markRolledBackMutations(conversationId, new Set([record.id]));
+      toast.success(res.message || t("toast.revertedFile").replace("{file}", record.targetFile));
+    } catch (error) { toast.error(error instanceof Error ? error.message : t("common.failed")); }
+  }, [t, conversationId, markRolledBackMutations]);
 
   const handleRollbackAll = useCallback(async (records: FileMutationRecord[]) => {
-    if (!window.electron?.rollbackFile) {
-      toast.error(t("toast.rollbackDesktopOnly"));
-      return;
-    }
-    const unrolled = records.filter((r) => !r.rolledBack);
-    if (unrolled.length === 0) {
-      toast.info(t("toast.allReverted"));
-      return;
-    }
-    let successCount = 0;
-    const revertedIds = new Set<string>();
+    if (!window.electron?.rollbackFile) { toast.error(t("toast.rollbackDesktopOnly")); return; }
+    const unrolled = records.filter(record => !record.rolledBack);
+    if (!unrolled.length) { toast.info(t("toast.allReverted")); return; }
+    const reverted = new Set<string>();
     for (const record of [...unrolled].reverse()) {
       try {
-        const res = await window.electron.rollbackFile(record);
-        if (res.success) {
-          successCount++;
-          revertedIds.add(record.id);
-        }
-      } catch {}
+        const res = await window.electron.rollbackFile(record, conversationId);
+        if (!res.success) { toast.error(res.message || t("common.failed")); break; }
+        reverted.add(record.id);
+      } catch (error) { toast.error(error instanceof Error ? error.message : t("common.failed")); break; }
     }
-    if (successCount > 0) {
-      toast.success(t("toast.revertedFiles").replace("{count}", String(successCount)));
-      setMessages((prev) => {
-        const next = prev.map((msg) => ({
-          ...msg,
-          mutations: msg.mutations?.map((m) =>
-            revertedIds.has(m.id) ? { ...m, rolledBack: true } : m
-          ),
-        }));
-        const stored = loadConversations();
-        const target = stored.find((c) => c.id === conversationId);
-        if (target) {
-          target.messages = next;
-          target.updatedAt = Date.now();
-          saveConversation(target);
-          setConversations(loadConversations());
-        }
-        return next;
-      });
+    if (reverted.size) {
+      markRolledBackMutations(conversationId, reverted);
+      toast.success(t("toast.revertedFiles").replace("{count}", String(reverted.size)));
     }
-  }, [t, conversationId]);
-
+  }, [t, conversationId, markRolledBackMutations]);
 
   const handleIntelligenceSubmitMessage = useCallback((prompt: string) => {
     const model = activeModelItemRef.current;
@@ -4859,7 +4832,7 @@ export function AuthenticatedContent({
                   onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
                   onDraggingChange={setIsDraggingRightSidebar}
                   tabs={rightPaneTabs}
-                  backgroundBrowserTabs={backgroundBrowserTabs}
+                  browserTabs={retainedBrowsers}
                   activeTabId={activeRightPaneTabId}
                   isOpeningNewTab={isOpeningNewTab}
                   onSelectTab={handleSelectRightPaneTab}

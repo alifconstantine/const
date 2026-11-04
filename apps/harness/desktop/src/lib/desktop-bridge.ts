@@ -136,7 +136,7 @@ export function createDesktopBridge(
       sideChatId: string;
       parentConversationId: string;
     }) => ipcRenderer.invoke("agent:register-side-chat", payload),
-    abortAgent: (conversationId?: string) =>
+    abortAgent: (conversationId: string) =>
       ipcRenderer.invoke("agent:abort", conversationId),
     updateMode: (payload: {
       mode: "request_review" | "ask_before_changes" | "full_access";
@@ -170,8 +170,8 @@ export function createDesktopBridge(
       ipcRenderer.on("agent:session-ended", handler);
       return () => ipcRenderer.removeListener("agent:session-ended", handler);
     },
-    rollbackFile: (record: any) =>
-      ipcRenderer.invoke("agent:rollback-file", { record }),
+    rollbackFile: (record: any, conversationId: string) =>
+      ipcRenderer.invoke("agent:rollback-file", { record, conversationId }),
     getModels: () => ipcRenderer.invoke("agent:get-models"),
     getConfig: () => ipcRenderer.invoke("config:get"),
     saveConfig: (config: any) => ipcRenderer.invoke("config:save", config),
@@ -283,16 +283,16 @@ export function createDesktopBridge(
         cols?: number;
         rows?: number;
       }) => ipcRenderer.invoke("terminal:create", options),
-      write: (options: { id: string; data: string }) =>
+      write: (options: { id: string; data: string; conversationId: string }) =>
         ipcRenderer.invoke("terminal:write", options),
-      destroy: (id: string) => ipcRenderer.invoke("terminal:destroy", id),
-      onData: (callback: (data: { id: string; data: string }) => void) => {
+      destroy: (id: string, conversationId: string) => ipcRenderer.invoke("terminal:destroy", id, conversationId),
+      onData: (callback: (data: { id: string; data: string; conversationId?: string }) => void) => {
         const handler = (_event: any, payload: any) => callback(payload);
         ipcRenderer.on("terminal:data", handler);
         return () => ipcRenderer.removeListener("terminal:data", handler);
       },
       onExit: (
-        callback: (data: { id: string; code: number | null }) => void,
+        callback: (data: { id: string; code: number | null; conversationId?: string }) => void,
       ) => {
         const handler = (_event: any, payload: any) => callback(payload);
         ipcRenderer.on("terminal:exit", handler);
@@ -301,14 +301,14 @@ export function createDesktopBridge(
     },
     answerQuestion: (toolCallId: string, answer: any) =>
       ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
-    listBackgroundTasks: (conversationId?: string) =>
+    listBackgroundTasks: (conversationId: string) =>
       ipcRenderer.invoke("tasks:list", conversationId),
-    killBackgroundTask: (taskId: string, conversationId?: string) =>
+    killBackgroundTask: (taskId: string, conversationId: string) =>
       ipcRenderer.invoke("tasks:kill", taskId, conversationId),
-    getBackgroundTaskLogs: (taskId: string) =>
-      ipcRenderer.invoke("tasks:get-output", taskId),
-    killSubAgent: (agentId: string) =>
-      ipcRenderer.invoke("subagents:kill", agentId),
+    getBackgroundTaskLogs: (taskId: string, conversationId: string) =>
+      ipcRenderer.invoke("tasks:get-output", taskId, conversationId),
+    killSubAgent: (agentId: string, conversationId: string) =>
+      ipcRenderer.invoke("subagents:kill", agentId, conversationId),
     onBackgroundTaskEvent: (callback: (event: any) => void) => {
       const handler = (_event: any, payload: any) => callback(payload);
       ipcRenderer.on("task:event", handler);

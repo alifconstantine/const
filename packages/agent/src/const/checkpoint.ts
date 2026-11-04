@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { withFileLock } from "./file-lock.js";
 import {
   rollbackFileMutation,
   rollbackMultipleMutations,
@@ -10,6 +11,16 @@ import {
 } from "./mutation-ledger.js";
 
 const execFileAsync = promisify(execFile);
+
+export function executeRollbackMutation(...args: Parameters<typeof rollbackUnlocked>): ReturnType<typeof rollbackUnlocked> {
+  return withFileLock(args[1] || process.cwd(), () => rollbackUnlocked(...args));
+}
+export function createCheckpoint(...args: Parameters<typeof checkpointUnlocked>): ReturnType<typeof checkpointUnlocked> {
+  return withFileLock(args[1] || process.cwd(), () => checkpointUnlocked(...args));
+}
+export function restoreCheckpoint(...args: Parameters<typeof restoreUnlocked>): ReturnType<typeof restoreUnlocked> {
+  return withFileLock(args[1] || process.cwd(), () => restoreUnlocked(...args));
+}
 
 export interface FileSnapshot {
   filePath: string;
@@ -23,6 +34,7 @@ export interface CheckpointItem {
   name?: string;
   timestamp: number;
   workspaceRoot: string;
+  conversationId?: string;
   mutationLedgerIndex: number;
   gitRef?: string;
   snapshots: FileSnapshot[];
@@ -74,8 +86,10 @@ export function recordMutation(record: FileMutationRecord): void {
 export function getMutationHistory(filter?: {
   filePath?: string;
   includeRolledBack?: boolean;
+  conversationId?: string;
 }): FileMutationRecord[] {
   let list = [...mutationHistory];
+  if (filter && "conversationId" in filter) list = list.filter(m => m.conversationId === filter.conversationId);
   if (filter?.filePath) {
     const targetNorm = path.resolve(filter.filePath).toLowerCase();
     list = list.filter((m) => {
@@ -120,18 +134,20 @@ export function listCheckpoints(): CheckpointItem[] {
  * If mutation_id is specified, reverts that specific mutation.
  * Otherwise, reverts the latest `steps` (default 1) mutations.
  */
-export async function executeRollbackMutation(
+async function rollbackUnlocked(
   options: {
     filePath?: string;
     steps?: number;
     mutationId?: string;
   },
-  workspaceRoot: string = process.cwd()
+  workspaceRoot: string = process.cwd(),
+  conversationId?: string
 ): Promise<RollbackResult> {
   const steps = Math.max(1, options.steps ?? 1);
+  const owned = mutationHistory.filter(m => ownsMutation(m, workspaceRoot, conversationId));
 
   if (options.mutationId) {
-    const target = mutationHistory.find((m) => m.id === options.mutationId);
+    const target = owned.find((m) => m.id === options.mutationId);
     if (!target) {
       return {
         success: false,
@@ -150,7 +166,7 @@ export async function executeRollbackMutation(
     }
 
     const res = await rollbackFileMutation(target);
-    target.rolledBack = true;
+    if (res.success) target.rolledBack = true;
     const targetFile = target.targetFile || target.filePath || "file";
 
     return {
@@ -180,7 +196,7 @@ export async function executeRollbackMutation(
       : path.resolve(workspaceRoot, options.filePath);
     const targetNorm = resolvedTarget.toLowerCase();
 
-    candidates = mutationHistory.filter((m) => {
+    candidates = owned.filter((m) => {
       if (m.rolledBack) return false;
       const p = m.absolutePath || m.filePath || m.targetFile;
       if (!p) return false;
@@ -197,7 +213,7 @@ export async function executeRollbackMutation(
       };
     }
   } else {
-    candidates = mutationHistory.filter((m) => !m.rolledBack);
+    candidates = owned.filter((m) => !m.rolledBack);
     if (candidates.length === 0) {
       return {
         success: false,
@@ -249,8 +265,8 @@ export async function executeRollbackMutation(
 /**
  * Creates a checkpoint snapshot of the workspace.
  */
-export async function createCheckpoint(
-  options: { name?: string },
+async function checkpointUnlocked(
+  options: { name?: string; conversationId?: string },
   workspaceRoot: string = process.cwd(),
   signal?: AbortSignal
 ): Promise<CheckpointItem> {
@@ -302,7 +318,7 @@ export async function createCheckpoint(
   const filesToSnapshot = new Set<string>();
 
   // Collect files touched in recent mutations
-  for (const m of mutationHistory) {
+  for (const m of mutationHistory.filter(m => ownsMutation(m, workspaceRoot, options.conversationId))) {
     const p = m.absolutePath || m.filePath || m.targetFile;
     if (p) {
       const full = path.isAbsolute(p) ? p : path.resolve(workspaceRoot, p);
@@ -356,7 +372,8 @@ export async function createCheckpoint(
     id: checkpointId,
     name: options.name?.trim() || undefined,
     timestamp,
-    workspaceRoot,
+    workspaceRoot: path.resolve(workspaceRoot),
+    conversationId: options.conversationId,
     mutationLedgerIndex: mutationHistory.length,
     gitRef,
     snapshots,
@@ -369,12 +386,13 @@ export async function createCheckpoint(
 /**
  * Restores the workspace back to a previously created checkpoint.
  */
-export async function restoreCheckpoint(
-  options: { checkpointId?: string },
+async function restoreUnlocked(
+  options: { checkpointId?: string; conversationId?: string },
   workspaceRoot: string = process.cwd(),
   signal?: AbortSignal
 ): Promise<RestoreCheckpointResult> {
-  if (checkpoints.length === 0) {
+  const ownedCheckpoints = checkpoints.filter(cp => cp.workspaceRoot === path.resolve(workspaceRoot) && cp.conversationId === options.conversationId);
+  if (ownedCheckpoints.length === 0) {
     return {
       success: false,
       checkpointId: "",
@@ -387,9 +405,9 @@ export async function restoreCheckpoint(
 
   let targetCp: CheckpointItem | undefined;
   if (options.checkpointId) {
-    targetCp = checkpoints.find((cp) => cp.id === options.checkpointId);
+    targetCp = ownedCheckpoints.find((cp) => cp.id === options.checkpointId);
     if (!targetCp) {
-      const available = checkpoints.map((c) => `${c.id}${c.name ? ` (${c.name})` : ""}`).join(", ");
+      const available = ownedCheckpoints.map((c) => `${c.id}${c.name ? ` (${c.name})` : ""}`).join(", ");
       return {
         success: false,
         checkpointId: options.checkpointId,
@@ -401,7 +419,7 @@ export async function restoreCheckpoint(
     }
   } else {
     // Default to the latest checkpoint
-    targetCp = checkpoints[checkpoints.length - 1];
+    targetCp = ownedCheckpoints[ownedCheckpoints.length - 1];
   }
 
   if (!targetCp) {
@@ -420,54 +438,46 @@ export async function restoreCheckpoint(
   // 1. Rollback all mutations recorded AFTER this checkpoint was created
   const mutationsAfter = mutationHistory
     .slice(targetCp.mutationLedgerIndex)
-    .filter((m) => !m.rolledBack);
+    .filter((m) => !m.rolledBack && ownsMutation(m, workspaceRoot, options.conversationId));
 
   const rollbackResults = await rollbackMultipleMutations(mutationsAfter);
   for (const rec of mutationsAfter) {
+    const result = rollbackResults.find(item => item.id === rec.id);
+    if (!result?.success) continue;
     rec.rolledBack = true;
-    const targetFile = rec.targetFile || rec.filePath || path.basename(rec.absolutePath || "file");
-    restoredFilesSet.add(targetFile);
+    restoredFilesSet.add(rec.targetFile || rec.filePath || rec.absolutePath || rec.id);
   }
-
-  // 2. Restore file snapshots (handles any untracked or non-ledger modifications)
-  for (const snap of targetCp.snapshots) {
-    try {
-      if (snap.exists && snap.content !== null) {
-        await fs.mkdir(path.dirname(snap.filePath), { recursive: true });
-        await fs.writeFile(snap.filePath, snap.content, "utf-8");
-        restoredFilesSet.add(snap.relativePath || path.basename(snap.filePath));
-      } else if (!snap.exists) {
-        if (fsSync.existsSync(snap.filePath)) {
-          await fs.unlink(snap.filePath);
-          restoredFilesSet.add(snap.relativePath || path.basename(snap.filePath));
-        }
-      }
-    } catch {}
-  }
-
-  // 3. If gitRef was created via stash, try git restore if applicable
-  if (targetCp.gitRef) {
-    try {
-      // Check if stash commit can be applied cleanly
-      await execFileAsync("git", ["stash", "apply", "--quiet", targetCp.gitRef], {
-        cwd: workspaceRoot,
-        signal,
-      });
-    } catch {
-      // If stash apply had conflicts or failed, individual file snapshots already restored disk content
-    }
+  // Untracked changes have no owner: never overwrite them through a Git stash or snapshot.
+  const conflicts = rollbackResults.filter(result => !result.success);
+  for (const snapshot of targetCp.snapshots) {
+    signal?.throwIfAborted();
+    let current: string | null = null;
+    try { current = await fs.readFile(snapshot.filePath, "utf8"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    if (current !== snapshot.content) conflicts.push({
+      id: snapshot.filePath, success: false,
+      message: `Untracked changes in '${snapshot.filePath}' were preserved; they have no owned mutation to restore safely.`,
+    });
   }
 
   const restoredFilesList = Array.from(restoredFilesSet);
   const cpLabel = targetCp.name ? `'${targetCp.name}' (${targetCp.id})` : targetCp.id;
 
   return {
-    success: true,
+    success: conflicts.length === 0,
     checkpointId: targetCp.id,
     checkpointName: targetCp.name,
     revertedMutationsCount: rollbackResults.filter((r) => r.success).length,
     restoredFilesCount: restoredFilesList.length,
     restoredFiles: restoredFilesList,
-    message: `Workspace restored successfully to checkpoint ${cpLabel}. Reverted ${mutationsAfter.length} mutation(s) across ${restoredFilesList.length} file(s).`,
+    message: conflicts.length ? `Checkpoint restore stopped on conflicts: ${conflicts.map(item => item.message).join("; ")}` : `Tracked workspace mutations restored successfully to checkpoint ${cpLabel}. Reverted ${mutationsAfter.length} mutation(s) across ${restoredFilesList.length} file(s).`,
   };
+}
+
+function ownsMutation(record: FileMutationRecord, workspaceRoot: string, conversationId?: string): boolean {
+  if (record.conversationId !== conversationId) return false;
+  const file = record.absolutePath || record.filePath || record.targetFile;
+  if (!file) return false;
+  const relative = path.relative(path.resolve(workspaceRoot), path.resolve(workspaceRoot, file));
+  return relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative);
 }

@@ -73,12 +73,17 @@ const REDIRECTION_RULES: Array<{
  * Inspects a shell command before execution.
  * Returns interception guidance if the command is unsafe or better served by a dedicated tool.
  */
-export function checkBashInterception(command: string): BashInterceptionResult {
+export function checkBashInterception(command: string, shell: "bash" | "powershell" = "bash"): BashInterceptionResult {
   if (!command || !command.trim()) {
     return { intercepted: false, isSafetyBlock: false };
   }
 
   const trimmed = command.trim();
+
+  if (hasDetachedShellCommand(trimmed, shell)) return {
+    intercepted: true, isSafetyBlock: false, suggestedTool: "bash",
+    message: "Run the process in the foreground with async: true on the shell tool. Shell '&', nohup, disown, Start-Process and Start-Job bypass task ownership and cancellation.",
+  };
 
   // 1. Check catastrophic patterns
   for (const item of CATASTROPHIC_PATTERNS) {
@@ -109,4 +114,20 @@ export function checkBashInterception(command: string): BashInterceptionResult {
   }
 
   return { intercepted: false, isSafetyBlock: false };
+}
+
+function hasDetachedShellCommand(command: string, shell: "bash" | "powershell"): boolean {
+  let quote = "";
+  let visible = "";
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i]!;
+    if (char === "\\" && quote !== "'") { i++; continue; }
+    if (quote) { if (char === quote) quote = ""; continue; }
+    if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
+    if (char === "&" && command[i - 1] !== ">" && command[i - 1] !== "&" && command[i + 1] !== "&" && command[i + 1] !== ">") {
+      if (shell !== "powershell" || !/(?:^|[;|\n(])\s*$/.test(command.slice(0, i))) return true;
+    }
+    visible += char;
+  }
+  return /\b(?:nohup|disown|Start-Process|Start-Job|Start-ThreadJob)\b/i.test(visible);
 }

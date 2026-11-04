@@ -279,6 +279,8 @@ export interface AgentConfig {
   deferNativeTools?: boolean;
   systemPrompt?: string;
   workspacePath?: string;
+  sourceProjectPath?: string;
+  isolateWorkspace?: boolean;
   learnId?: string;
   conversationId?: string;
   parentAgentId?: string;

@@ -433,7 +433,7 @@ export function scanInstalledSkills(workspacePath?: string): Skill[] {
   return resolveSkillRegistry(workspacePath).skills.filter((skill) => skill.isEnabled);
 }
 
-export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string, tools: readonly NativeToolDefinition[] = CONST_DEFAULT_TOOLS): string {
+export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string, tools: readonly NativeToolDefinition[] = CONST_DEFAULT_TOOLS, memoryWorkspacePath = workspacePath): string {
   const normalizedCwd = workspacePath.replace(/\\/g, "/");
 
   // Check for project context files
@@ -462,7 +462,7 @@ export function buildConstSystemPrompt(workspacePath: string, customPrompt?: str
   // Check for workspace memory (MEMORY.md)
   let workspaceMemory = "";
   try {
-    const memoryFile = path.join(workspacePath, ".const", "memory", "MEMORY.md");
+    const memoryFile = path.join(memoryWorkspacePath, ".const", "memory", "MEMORY.md");
     if (fs.existsSync(memoryFile)) {
       const memRaw = fs.readFileSync(memoryFile, "utf-8").trim();
       if (memRaw) {
@@ -963,7 +963,7 @@ export class ConstAgent {
           ? `You are the user's side chat companion. Answer questions directly using the supplied parent task snapshot and side chat history. The parent task may still be running. State when information is unavailable or may have changed. Do not claim to have changed files, sent instructions, or updated the parent task. The user can explicitly send an instruction to the main task through the interface.\n\n${LANGUAGE_GUIDANCE}\n\n${this.config.systemPrompt || ""}`
           : this.config.preset === "learn"
             ? buildLearnSystemPrompt(workspacePath, this.config.systemPrompt)
-            : buildConstSystemPrompt(workspacePath, this.config.systemPrompt, activeTools);
+            : buildConstSystemPrompt(workspacePath, this.config.systemPrompt, activeTools, this.config.isolateWorkspace && this.config.sourceProjectPath && this.config.sourceProjectPath !== "Outside Project" ? this.config.sourceProjectPath : workspacePath);
 
         const turnInstructions: string[] = [];
         const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === "user" && !message.toolObservationId);
@@ -1940,9 +1940,9 @@ export class ConstAgent {
           }
 
           const allowOutsideWorkspace =
-            this.config.mode === "full_access" ||
+            !this.config.isolateWorkspace && (this.config.mode === "full_access" ||
             isAlreadyAllowed ||
-            approvedThisTurn;
+            approvedThisTurn);
 
           const isTaskTool = isSubAgentToolName(tc.function.name);
           const isExplicitBackground = Boolean(
@@ -2126,7 +2126,7 @@ export class ConstAgent {
 
           await Promise.all(
             spawnedParallelAgents.map((item) =>
-              globalSubAgentManager.waitForSubAgent(item.agentId)
+              globalSubAgentManager.waitForSubAgent(item.agentId, signal, this.config.conversationId)
             )
           );
 
@@ -2136,7 +2136,7 @@ export class ConstAgent {
 
           // Finalize task result envelopes for each subagent in conversationHistory AND emit updated tool_result for UI
           for (const item of spawnedParallelAgents) {
-            const agent = globalSubAgentManager.getSubAgent(item.agentId);
+            const agent = globalSubAgentManager.getSubAgent(item.agentId, this.config.conversationId);
             if (agent) {
               const durationSec = Math.round(
                 ((agent.endTime || Date.now()) - agent.startTime) / 1000

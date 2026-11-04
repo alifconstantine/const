@@ -24,8 +24,13 @@ async function main() {
       if (!ready) await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!ready) throw new Error("Side chat fixture server did not start");
-    const browser = process.env.CHROME_BIN || "chromium";
-    const { stdout } = await promisify(execFile)(browser, ["--headless", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", `--user-data-dir=${temp}`, "--virtual-time-budget=7000", "--dump-dom", url], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const browser = process.env.CHROME_BIN || require("electron");
+    const args = process.env.CHROME_BIN
+      ? ["--headless", "--no-first-run", "--no-default-browser-check", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", `--user-data-dir=${temp}`, "--virtual-time-budget=7000", "--dump-dom", url]
+      : [path.join(root, "tests/side-chat.electron.cjs"), temp, url];
+    const { stdout } = await promisify(execFile)(browser, args, { env, windowsHide: true, timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
     const match = stdout.match(/<output id="fixture-result">([^<]+)<\/output>/);
     assert.ok(match, "fixture did not complete");
     const result = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));

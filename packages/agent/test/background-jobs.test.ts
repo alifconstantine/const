@@ -19,19 +19,19 @@ describe("Background Jobs & Service Supervision", () => {
     testHome = fs.mkdtempSync(path.join(os.tmpdir(), "const-background-test-"));
     vi.spyOn(os, "homedir").mockReturnValue(testHome);
     // Terminate any running tasks before each test
-    for (const t of globalTaskManager.listTasks()) {
-      globalTaskManager.killTask(t.id);
+    for (const t of globalTaskManager.listAllTasks()) {
+      globalTaskManager.killTask(t.id, t.conversationId);
     }
   });
 
   afterEach(async () => {
     const closed: Promise<unknown>[] = [];
-    for (const t of globalTaskManager.listTasks()) {
-      const task = globalTaskManager.getTask(t.id)!;
+    for (const t of globalTaskManager.listAllTasks()) {
+      const task = globalTaskManager.getTask(t.id, t.conversationId)!;
       if (task.child && task.child.exitCode === null && task.child.signalCode === null) {
         closed.push(once(task.child, "close"));
       }
-      globalTaskManager.killTask(t.id);
+      globalTaskManager.killTask(t.id, t.conversationId);
     }
     await Promise.all(closed);
     vi.restoreAllMocks();
@@ -80,7 +80,7 @@ describe("Background Jobs & Service Supervision", () => {
 
     it("does not expose unowned jobs to a scoped session and prefers the current named job", () => {
       const old = globalTaskManager.startTask('node -e "setInterval(() => {}, 1000)"', process.cwd(), { name: "restarted", conversationId: "restart" });
-      globalTaskManager.killTask(old.id);
+      globalTaskManager.killTask(old.id, "restart");
       const current = globalTaskManager.startTask('node -e "setInterval(() => {}, 1000)"', process.cwd(), { name: "restarted", conversationId: "restart" });
       const unowned = globalTaskManager.startTask('node -e "setInterval(() => {}, 1000)"', process.cwd());
       expect(globalTaskManager.getTask("restarted", "restart")?.id).toBe(current.id);
@@ -93,7 +93,7 @@ describe("Background Jobs & Service Supervision", () => {
       const controller = new AbortController();
       const task = globalTaskManager.startTask('node -e "setInterval(() => {}, 1000)"', process.cwd(), { conversationId: "same-chat", signal: controller.signal });
       const sibling = globalTaskManager.startTask('node -e "setInterval(() => {}, 1000)"', process.cwd(), { conversationId: "same-chat" });
-      const ready = globalTaskManager.waitForReady(task.id, { log: "NEVER_READY", timeout: 5 });
+      const ready = globalTaskManager.waitForReady(task.id, { log: "NEVER_READY", timeout: 5 }, "same-chat");
       controller.abort();
       expect(task.status).toBe("killed");
       expect(sibling.status).toBe("running");
@@ -260,7 +260,7 @@ describe("Background Jobs & Service Supervision", () => {
       const taskId = match![1];
 
       // Wait for output
-      await expect.poll(() => globalTaskManager.getTask(taskId)?.logs.some((line) => line.includes("BG_WORKER_ALIVE")), { timeout: 5000 }).toBe(true);
+      await expect.poll(() => globalTaskManager.getTask(taskId, "session_main")?.logs.some((line) => line.includes("BG_WORKER_ALIVE")), { timeout: 5000 }).toBe(true);
 
       // 1. manage_task list with other conversationId should be empty
       const listOther = await executeNativeTool(

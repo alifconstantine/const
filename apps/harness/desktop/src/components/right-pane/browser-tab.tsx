@@ -1,3 +1,4 @@
+import { browserPartition } from "../../lib/browser-session";
 import { useRemoteRuntime } from "../../lib/remote-runtime";
 import { RemoteBrowserViewport } from "./remote-browser-viewport";
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -1084,7 +1085,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           {remote ? <RemoteBrowserViewport conversationId={tab.conversationId} tabId={tab.id} url={initialUrlRef.current || currentUrl} webviewRef={webviewRef} /> : <webview
             ref={webviewRef}
             src={initialUrlRef.current || currentUrl}
-            partition="persist:const_browser"
+            partition={browserPartition(tab.conversationId)}
             allowpopups={false}
             webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
             className="w-full h-full border-none block flex-1"

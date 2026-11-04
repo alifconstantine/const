@@ -21,6 +21,9 @@ export function openBrowserPane(
 
 /** Keep each owner's webviews mounted while replacing only that owner's tab list. */
 export function retainBrowserTabs(retained: RightPaneTab[], tabs: RightPaneTab[], conversationId: string): RightPaneTab[] {
-  return [...retained.filter(tab => tab.conversationId !== conversationId),
-    ...tabs.filter(tab => tab.type === "browser").map(tab => ({ ...tab, conversationId }))];
+  const current = new Map(tabs.filter(tab => tab.type === "browser").map(tab => [tab.id, { ...tab, conversationId }]));
+  const next = retained.flatMap(tab => tab.conversationId !== conversationId ? [tab]
+    : current.has(tab.id) ? [current.get(tab.id)!] : []);
+  const existing = new Set(next.map(tab => tab.id));
+  return [...next, ...[...current.values()].filter(tab => !existing.has(tab.id))];
 }

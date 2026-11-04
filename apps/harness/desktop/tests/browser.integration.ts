@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { unlink } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { app, BrowserWindow, nativeImage, session, webContents } from "electron";
 import { BrowserController, HELP_REQUEST_TTL_MS } from "../electron/browser-controller";
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "../electron/browser/guest-policy";
@@ -408,6 +410,43 @@ async function run() {
     const result = await help;
     assert.equal(result.isError, true);
     assert.equal(driver.getControl().requested, false);
+  });
+  await check("four React browser guests survive chat switches and isolate same-origin storage", async () => {
+    await host.webContents.executeJavaScript(await readFile(path.join(process.argv[2]!, "browser-isolation.js"), "utf8"));
+    await host.webContents.executeJavaScript(`window.__renderIsolation(['d','b','a','c'], 'a', ${JSON.stringify(origin)})`);
+    const readGuests = () => host.webContents.executeJavaScript(`['a','b','c','d'].map(id => document.getElementById('isolation-'+id).getWebContentsId())`) as Promise<number[]>;
+    let ids: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      try { ids = await readGuests(); if (ids.length === 4 && ids.every(Boolean)) break; } catch { /* Attach is asynchronous. */ }
+      await delay(25);
+    }
+    assert.equal(ids.length, 4);
+    const guests = ids.map(id => webContents.fromId(id)!);
+    for (const [index, contents] of guests.entries()) {
+      if (contents.isLoading()) await once(contents, "did-finish-load");
+      assert.equal(await contents.executeJavaScript(`localStorage.getItem('isolation-owner')`), null);
+      await contents.executeJavaScript(`localStorage.setItem('isolation-owner', '${index}');document.cookie='owner=${index};path=/'`);
+    }
+    const pending = guests[0]!.executeJavaScript(`new Promise(resolve => setTimeout(() => resolve(localStorage.getItem('isolation-owner')), 300))`);
+    for (const active of ["b", "c", "d", "a"]) {
+      await host.webContents.executeJavaScript(`window.__renderIsolation(['c','a','d','b'], '${active}', ${JSON.stringify(origin)})`);
+      assert.deepEqual(await readGuests(), ids);
+    }
+    assert.equal(await pending, "0");
+    for (const [index, contents] of guests.entries()) {
+      assert.equal(contents.isDestroyed(), false);
+      assert.equal(await contents.executeJavaScript(`localStorage.getItem('isolation-owner')`), String(index));
+      assert.equal(await contents.executeJavaScript(`document.cookie`), `owner=${index}`);
+    }
+    const background = guests[3]!;
+    assert.equal(await background.executeJavaScript(`Promise.race([new Promise(resolve => requestAnimationFrame(() => resolve('frame'))), new Promise(resolve => setTimeout(() => resolve('timeout'), 1500))])`), "frame");
+    const backgroundDriver = new BrowserController();
+    backgroundDriver.inSession("d", () => backgroundDriver.registerWebview("background-d", background.id));
+    const shot = await backgroundDriver.inSession("d", () => backgroundDriver.screenshot({ annotate: false, format: "png" }));
+    assert.ok(shot.width > 0 && shot.base64.length > 100);
+    await unlink(shot.filePath);
+    backgroundDriver.inSession("d", () => backgroundDriver.unregisterWebview("background-d", background.id));
+    await host.webContents.executeJavaScript(`window.__unmountIsolation()`);
   });
   host.destroy();
   console.log(`Browser integration: ${passed} checks passed on Electron ${process.versions.electron}.`);

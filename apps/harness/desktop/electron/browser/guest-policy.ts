@@ -1,6 +1,7 @@
-import type { Session, WebContents } from "electron";
+import { session, type Session, type WebContents } from "electron";
+import { isBrowserPartition } from "../../src/lib/browser-session";
+export { BROWSER_PARTITION } from "../../src/lib/browser-session";
 
-export const BROWSER_PARTITION = "persist:const_browser";
 type NavigationCheck = (url: string) => void;
 const ALLOWED_PERMISSIONS = new Set(["clipboard-write", "clipboard-sanitized-write", "fullscreen"]);
 
@@ -36,7 +37,8 @@ export function applyBrowserContentsPolicy(contents: WebContents, assertNavigati
   contents.on("will-attach-webview", (event, preferences, params) => {
     try {
       assertNavigation(params.src || "");
-      if (params.partition !== BROWSER_PARTITION) throw new Error("Unexpected browser partition");
+      if (!isBrowserPartition(params.partition || "")) throw new Error("Unexpected browser partition");
+      applyBrowserSessionPolicy(session.fromPartition(params.partition!), assertNavigation);
     } catch {
       event.preventDefault();
       return;

@@ -6,7 +6,7 @@ import { ScrollArea, toast } from "@const/ui";
 
 interface TaskOutputTabProps {
   tab: RightPaneTab;
-  onStopTask?: (taskId: string) => void | Promise<void>;
+  onStopTask?: (taskId: string, conversationId?: string) => void | Promise<void>;
 }
 
 export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
@@ -20,16 +20,16 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
     let disposed = false;
     setLogs([]);
     setIsRunning(false);
-    if (window.electron?.getBackgroundTaskLogs && taskId) {
-      window.electron.getBackgroundTaskLogs(taskId).then((initialLogs) => {
+    if (window.electron?.getBackgroundTaskLogs && taskId && tab.conversationId) {
+      window.electron.getBackgroundTaskLogs(taskId, tab.conversationId!).then((initialLogs) => {
         if (!disposed && initialLogs && initialLogs.length > 0) {
           setLogs(initialLogs);
         }
       }).catch(() => {});
     }
 
-    if (window.electron?.listBackgroundTasks) {
-      window.electron.listBackgroundTasks().then((tasks) => {
+    if (window.electron?.listBackgroundTasks && tab.conversationId) {
+      window.electron.listBackgroundTasks(tab.conversationId).then((tasks) => {
         const found = tasks.find((t) => t.id === taskId);
         if (!disposed && found) {
           setIsRunning(found.status === "running");
@@ -39,7 +39,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
 
     if (window.electron?.onBackgroundTaskEvent) {
       const unsubscribe = window.electron.onBackgroundTaskEvent((event) => {
-        if (event.taskId === taskId) {
+        if (event.taskId === taskId && event.conversationId === tab.conversationId) {
           if (event.type === "output" && event.data !== undefined) {
             setLogs((prev) => {
               const next = [...prev, event.data!];
@@ -55,7 +55,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
       return () => { disposed = true; unsubscribe(); };
     }
     return () => { disposed = true; };
-  }, [taskId]);
+  }, [taskId, tab.conversationId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -65,8 +65,8 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
 
   const handleStop = async () => {
     try {
-      if (onStopTask) await onStopTask(taskId);
-      else if (await window.electron?.killBackgroundTask?.(taskId)) setIsRunning(false);
+      if (onStopTask) await onStopTask(taskId, tab.conversationId);
+      else if (tab.conversationId && await window.electron?.killBackgroundTask?.(taskId, tab.conversationId)) setIsRunning(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
     }

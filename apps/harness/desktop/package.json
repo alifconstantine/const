@@ -23,6 +23,7 @@
     "test:side-chat": "node scripts/test-side-chat.cjs",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "node scripts/test-browser.cjs",
+    "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/task-workspaces.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && node scripts/test-browser.cjs",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
     "test:intelligence-ui:live": "tsx tests/intelligence-ui.live.ts",
