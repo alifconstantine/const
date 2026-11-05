@@ -88,6 +88,9 @@ if (longMenus) {
   });
 }
 const tasks: any[] = [];
+const terminalCreates: any[] = [];
+let heldTerminalOwner: string | undefined;
+let releaseTerminalDirectory: ((cwd: string) => void) | undefined;
 const activityFixture = new URLSearchParams(location.search).has("activity");
 const previewImage = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="720" height="480"><rect width="720" height="480" fill="#eae7dd"/><rect x="50" y="50" width="620" height="380" rx="20" fill="#292d34"/><circle cx="550" cy="160" r="55" fill="#d9bd74"/><path d="M90 370L270 150 440 370Z" fill="#899e8d"/><path d="M290 370L430 220 590 370Z" fill="#647b77"/><text x="88" y="106" fill="#eee" font-family="sans-serif" font-size="24">REFERENCE / 01</text></svg>')}`;
 const backgroundJobs: any[] = activityFixture ? [
@@ -324,7 +327,20 @@ api = createDesktopBridge(
         return { controller: "user", requested: false };
       if (channel === "workspace:read-directory")
         return args[0] ? [] : [{ name: "mobile-picked", path: "mobile-picked", isDirectory: true, size: 0, lastModified: Date.now() }];
-      if (channel === "workspace:resolve-path") return "D:/Projects/Const";
+      if (channel === "workspace:resolve-path") {
+        const options = args[0];
+        if (options?.purpose === "terminal") {
+          if (options.conversationId === heldTerminalOwner) return new Promise<string>(resolve => { releaseTerminalDirectory = resolve; });
+          if (options.project && options.project !== "Outside Project") return options.project;
+          return "D:/Projects/Const";
+        }
+        return "D:/Projects/Const";
+      }
+      if (channel === "terminal:create") {
+        terminalCreates.push(args[0]);
+        return { success: true, id: args[0].id, cwd: args[0].cwd, replay: `\r\n${args[0].cwd}> `, sequence: 0 };
+      }
+      if (["terminal:write", "terminal:resize", "terminal:destroy"].includes(channel)) return true;
       if (channel === "workspace:list-files") return [];
       if (channel === "remote:get-status")
         return remoteStatus;
@@ -346,6 +362,9 @@ api = createDesktopBridge(
 window.electron = api;
 (window as any).__remoteFixture = {
   clipboardWrites,
+  terminalCreates,
+  holdTerminalDirectory(owner: string) { heldTerminalOwner = owner; },
+  releaseTerminalDirectory(cwd: string) { heldTerminalOwner = undefined; releaseTerminalDirectory?.(cwd); releaseTerminalDirectory = undefined; },
   fileReads,
   completeProgress() { completeProgress?.(); },
   killedJobs,

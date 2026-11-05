@@ -7,12 +7,35 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { normalizeUiMessages } from "../../../apps/harness/desktop/src/lib/conversation-store";
+import { DEFAULT_MODELS } from "../src/const/models.js";
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ioAAAAASUVORK5CYII=";
 const image = { data: png, mimeType: "image/png", scale: 0.5 };
 afterEach(() => vi.unstubAllGlobals());
 
 describe("visual tool observations", () => {
+  it("honors every built-in chat model's declared image capability without mutating uploaded media", async () => {
+    let payload: any;
+    vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
+      payload = JSON.parse(String(init.body));
+      return new Response('data: {"choices":[{"delta":{"content":"Checked input capability."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+    }));
+    const nativeContent = [{ type: "text" as const, text: "Inspect this image" }, { type: "image_url" as const, image_url: { url: `data:image/png;base64,${png}` } }];
+    const models = DEFAULT_MODELS.filter(model => !model.id.startsWith("combo/"));
+    expect(models).toHaveLength(21);
+    for (const model of models) {
+      const history: AgentMessage[] = [{ role: "user", content: nativeContent }];
+      await createConstAgent({ model: model.id, baseUrl: "http://fixture.invalid/v1", apiKey: "", tools: [], maxTurns: 1 }).run(history, () => {});
+      const content = payload.messages.find((message: any) => message.role === "user").content;
+      if (model.inputTypes?.includes("image")) expect(content).toEqual(nativeContent);
+      else {
+        expect(JSON.stringify(content)).not.toContain("data:image/");
+        expect(JSON.stringify(content)).toContain(UNAVAILABLE_TOOL_VISION);
+      }
+      expect(history[0]!.content).toBe(nativeContent);
+    }
+  });
+
   it("keeps synthetic image observations out of user chat bubbles", () => {
     const history: AgentMessage[] = [
       { role: "user", content: "Inspect the app" },
@@ -68,6 +91,15 @@ describe("visual tool observations", () => {
     expect(JSON.stringify(requests[2].messages)).not.toContain("data:image/png;base64,");
     expect(JSON.stringify(requests[3].messages)).not.toContain("data:image/png;base64,");
     expect(JSON.stringify(requests[3].messages)).toContain(UNAVAILABLE_TOOL_VISION);
+  });
+
+  it("does not misreport a malformed image as missing model vision or retry without the upload", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ error: { message: "Invalid image_url: corrupt image data" } }), { status: 400 }));
+    vi.stubGlobal("fetch", fetch);
+    const history: AgentMessage[] = [{ role: "user", content: [{ type: "image_url", image_url: { url: `data:image/png;base64,${png}` } }] }];
+    await expect(createConstAgent({ model: "deepseek-v4.1-flash", baseUrl: "http://fixture.invalid/v1", apiKey: "", tools: [] }).run(history, () => {})).rejects.toThrow("corrupt image data");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(history)).toContain(png);
   });
 
   it("delivers a computer image to the next model request after all batch tool responses", async () => {

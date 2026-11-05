@@ -130,6 +130,18 @@ export function generateRequestId() {
 export function estimateTokens(text: string) {
   return Math.ceil(new TextEncoder().encode(text).length / 3);
 }
+/** Media encodings are transport bytes, not model text tokens. Never use this
+ * projection as the provider payload; it is only for text context estimates. */
+export function textContextMessages<T extends { content?: unknown }>(messages: T[]) {
+  return messages.map((message) => ({
+    ...message,
+    content: Array.isArray(message.content)
+      ? message.content.map((part: any) =>
+          part?.type === "text" ? part : { type: part?.type },
+        )
+      : message.content,
+  }));
+}
 export function estimateMessagesTokens(messages: Array<{ content?: unknown }>) {
   return messages.reduce(
     (sum, message) =>

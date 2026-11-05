@@ -1,5 +1,11 @@
 # Audit isolasi sesi desktop — 4 November 2026
 
+> Pembaruan 5 November 2026: pengguna mengklarifikasi bahwa agent harus bekerja
+> langsung di folder project yang dipilih, dan direktori internal per chat untuk
+> log/metadata. Kebijakan checkout otomatis pada laporan historis ini sudah
+> diganti. Lihat [audit folder kerja terbaru](workspace-terminal-audit-2026-11-05.md)
+> untuk implementasi akhir, perlindungan konflik file, dan hasil pengujian.
+
 Audit awal membaca database dan empat log terbaru, menelusuri desktop serta runtime `packages/agent`, membandingkan implementasi jobs di `D:/Code/Clone/deepseek-harness`, dan menjalankan reproduksi lokal. Bagian temuan awal di bawah merekam kondisi sebelum perbaikan; nomor baris source merujuk versi tersebut. Hasil implementasi dan audit ulang dicatat pada bagian terakhir. Data aplikasi dibaca tanpa mengubah percakapan atau hasil pekerjaan pengguna; reproduksi file menggunakan direktori sementara.
 
 ## Kesimpulan

@@ -511,6 +511,8 @@ export const id: TranslationDictionary = {
     hidePanel: "Sembunyikan panel",
   },
   bottomPanel: {
+    terminalExited: "[Proses berakhir dengan kode {code}]",
+    terminalStartFailed: "Terminal gagal dimulai: {error}",
     terminal: "Terminal",
     newTerminal: "Terminal Baru",
     closePanel: "Tutup panel",

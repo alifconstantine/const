@@ -3,18 +3,29 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import type { RightPaneTab } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface TerminalTabProps {
   tab: RightPaneTab;
+  onReady?: (cwd: string) => void;
 }
 
-export function TerminalTab({ tab }: TerminalTabProps) {
+export function TerminalTab({ tab, onReady }: TerminalTabProps) {
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  const { t } = useTranslation();
+  const translateRef = useRef(t);
+  translateRef.current = t;
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let disposed = false;
+    let ready = false;
+    let lastSequence = 0;
+    let queuedOutput: Array<{ data: string; sequence?: number }> = [];
 
     // Create xterm instance with clean aesthetic matching Image 1
     const term = new Terminal({
@@ -63,19 +74,30 @@ export function TerminalTab({ tab }: TerminalTabProps) {
 
     // 1. Hook up user keyboard input to Electron IPC
     const onDataDisposable = term.onData((data) => {
-      window.electron?.terminal?.write({ id: tab.id, data, conversationId: tab.conversationId! });
+      if (ready) void window.electron?.terminal?.write({ id: tab.id, data, conversationId: tab.conversationId! }).catch(() => {});
     });
+    const resize = () => {
+      if (ready) void window.electron?.terminal?.resize({ id: tab.id, cols: term.cols, rows: term.rows, conversationId: tab.conversationId! }).catch(() => {});
+    };
+    const onResizeDisposable = term.onResize(resize);
 
     // 2. Hook up output from backend shell to xterm
+    const writeOutput = (payload: { data: string; sequence?: number }) => {
+      if (payload.sequence !== undefined && payload.sequence <= lastSequence) return;
+      term.write(payload.data);
+      if (payload.sequence !== undefined) lastSequence = payload.sequence;
+    };
     const cleanupOnData = window.electron?.terminal?.onData((payload) => {
       if (payload.id === tab.id && payload.conversationId === tab.conversationId) {
-        term.write(payload.data);
+        if (ready) writeOutput(payload);
+        else queuedOutput.push(payload);
       }
     });
 
     const cleanupOnExit = window.electron?.terminal?.onExit((payload) => {
       if (payload.id === tab.id && payload.conversationId === tab.conversationId) {
-        term.writeln(`\r\n\x1b[90m[Process exited with code ${payload.code}]\x1b[0m`);
+        ready = false;
+        term.writeln(`\r\n\x1b[90m${translateRef.current("bottomPanel.terminalExited").replace("{code}", String(payload.code))}\x1b[0m`);
       }
     });
 
@@ -87,7 +109,23 @@ export function TerminalTab({ tab }: TerminalTabProps) {
       conversationId: tab.conversationId,
       cols: term.cols,
       rows: term.rows,
-    }).catch(error => { if (termRef.current === term) term.writeln(String(error)); });
+    }).then(result => {
+      if (disposed) return;
+      if (!result?.success) {
+        term.writeln(translateRef.current("bottomPanel.terminalStartFailed").replace("{error}", result?.error || ""));
+        return;
+      }
+      if (result.replay) term.write(result.replay);
+      lastSequence = result.sequence ?? 0;
+      for (const payload of queuedOutput) writeOutput(payload);
+      queuedOutput = [];
+      ready = true;
+      if (result.cwd) onReadyRef.current?.(result.cwd);
+      try { fitAddon.fit(); } catch {}
+      resize();
+    }).catch(error => {
+      if (!disposed) term.writeln(translateRef.current("bottomPanel.terminalStartFailed").replace("{error}", String(error)));
+    });
 
     // Handle container resizing smoothly with ResizeObserver
     const resizeObserver = new ResizeObserver(() => {
@@ -107,8 +145,10 @@ export function TerminalTab({ tab }: TerminalTabProps) {
     }, 150);
 
     return () => {
+      disposed = true;
       clearTimeout(focusTimer);
       onDataDisposable.dispose();
+      onResizeDisposable.dispose();
       cleanupOnData?.();
       cleanupOnExit?.();
       resizeObserver.disconnect();

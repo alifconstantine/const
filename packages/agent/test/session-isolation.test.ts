@@ -5,7 +5,7 @@ import path from "node:path";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { BackgroundProcessManager, executeNativeTool } from "../src/const/tools.js";
-import { recordMutation, executeRollbackMutation, clearMutationHistory, clearCheckpoints, createCheckpoint, restoreCheckpoint } from "../src/const/checkpoint.js";
+import { recordMutation, getMutationHistory, executeRollbackMutation, clearMutationHistory, clearCheckpoints, createCheckpoint, restoreCheckpoint } from "../src/const/checkpoint.js";
 import { rollbackFileMutation } from "../src/const/mutation-ledger.js";
 import { executeRetain } from "../src/const/memory.js";
 import { checkBashInterception } from "../src/const/bash-interceptor.js";
@@ -66,6 +66,42 @@ test("a stale read cannot authorize a full rewrite after another conversation ed
   expect(await fs.readFile(file, "utf8")).toBe("B");
 });
 
+test("four conversations write their requested subfolders directly into one project and retain their own undo history", async () => {
+  const owners = ["a", "b", "c", "d"];
+  const results = await Promise.all(owners.map(conversationId => executeNativeTool("write", {
+    path: `site-${conversationId}/index.html`, content: conversationId,
+  }, root, { conversationId })));
+  expect(results.every(result => !result.isError)).toBe(true);
+  for (const owner of owners) {
+    expect(await fs.readFile(path.join(root, `site-${owner}/index.html`), "utf8")).toBe(owner);
+    const mutations = getMutationHistory({ conversationId: owner });
+    expect(mutations).toHaveLength(1);
+    expect(mutations[0]?.workspaceRoot).toBe(root);
+    expect(mutations[0]?.absolutePath).toBe(path.join(root, `site-${owner}/index.html`));
+  }
+  expect((await executeRollbackMutation({}, root, "a")).success).toBe(true);
+  await expect(fs.stat(path.join(root, "site-a/index.html"))).rejects.toMatchObject({ code: "ENOENT" });
+  for (const owner of owners.slice(1)) expect(await fs.readFile(path.join(root, `site-${owner}/index.html`), "utf8")).toBe(owner);
+});
+
+test("concurrent creates of the same project file have one winner and stale concurrent edits cannot overwrite it", async () => {
+  const owners = ["a", "b", "c", "d"];
+  const file = path.join(root, "shared.txt");
+  const creates = await Promise.all(owners.map(conversationId => executeNativeTool("write", {
+    path: "shared.txt", content: `created by ${conversationId}`,
+  }, root, { conversationId })));
+  expect(creates.filter(result => !result.isError)).toHaveLength(1);
+  expect(creates.filter(result => result.isError).every(result => String(result.result).includes("File conflict"))).toBe(true);
+  const original = await fs.readFile(file, "utf8");
+  await Promise.all(owners.map(conversationId => executeNativeTool("read", { path: "shared.txt" }, root, { conversationId })));
+  const edits = await Promise.all(owners.map(conversationId => executeNativeTool("edit", {
+    path: "shared.txt", old_content: original, new_content: `edited by ${conversationId}`,
+  }, root, { conversationId })));
+  expect(edits.filter(result => !result.isError)).toHaveLength(1);
+  expect(edits.filter(result => result.isError).every(result => String(result.result).includes("File conflict"))).toBe(true);
+  expect(await fs.readFile(file, "utf8")).toMatch(/^edited by [abcd]$/);
+});
+
 test("checkpoint conflicts remain failures and never overwrite manual edits", async () => {
   await executeNativeTool("write", { path: "shared.txt", content: "baseline" }, root, { conversationId: "a" });
   const checkpoint = await createCheckpoint({ conversationId: "a" }, root);
@@ -96,6 +132,31 @@ test("omitting a subagent owner cannot list or cancel agents belonging to other 
   expect(globalSubAgentManager.killSubAgent(agent.id)).toBe(false);
   expect(globalSubAgentManager.killAllRunningSubAgents()).toBe(0);
   expect(agent.status).toBe("running");
+});
+
+test("four same-named jobs keep separate output and stopping one owner's job leaves the other three running", async () => {
+  const manager = new BackgroundProcessManager();
+  const tasks = ["a", "b", "c", "d"].map(conversationId => manager.startTask(
+    `node -e "console.log('JOB_${conversationId}');setInterval(()=>{},1000)"`, root,
+    { conversationId, name: "website-server" },
+  ));
+  try {
+    await expect.poll(() => tasks.every(task => task.logs.some(line => line.includes(`JOB_${task.conversationId}`))), { timeout: 5000 }).toBe(true);
+    for (const task of tasks) {
+      const owner = task.conversationId!;
+      expect(manager.listTasks(owner).map(item => item.id)).toEqual([task.id]);
+      expect(manager.getTask("website-server", owner)?.id).toBe(task.id);
+      expect(task.logs.some(line => /JOB_/.test(line) && !line.includes(`JOB_${owner}`))).toBe(false);
+    }
+    expect(manager.killTask(tasks[1]!.id, "a")).toBe(false);
+    expect(manager.killTask("website-server", "a")).toBe(true);
+    expect(tasks[0]!.status).toBe("killed");
+    expect(tasks.slice(1).every(task => task.status === "running")).toBe(true);
+  } finally {
+    const closed = tasks.filter(task => task.child && task.child.exitCode === null && task.child.signalCode === null).map(task => once(task.child!, "close"));
+    for (const task of tasks) manager.killTask(task.id, task.conversationId);
+    await Promise.all(closed);
+  }
 });
 
 test("four concurrent retains preserve every entry in both shared memory files", async () => {

@@ -18,12 +18,13 @@
     "test:remote": "tsx --test electron/remote*.test.ts src/lib/remote-desktop-transport.test.ts src/lib/remote-storage.test.ts",
     "test:remote:ui": "node scripts/test-remote-workspace.cjs",
     "test:startup": "node scripts/test-startup.cjs",
+    "test:terminal": "tsx --test electron/terminal-sessions.test.ts electron/terminal-directory.test.ts src/lib/terminal-location.test.ts",
     "test:remote:preview": "vite --config tests/remote-workspace.vite.ts",
     "test:telemetry": "tsx --test src/lib/chat-telemetry.test.ts electron/chat-telemetry.test.ts",
     "test:side-chat": "node scripts/test-side-chat.cjs",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "node scripts/test-browser.cjs",
-    "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/task-workspaces.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && node scripts/test-browser.cjs",
+    "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/working-directories.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && node scripts/test-browser.cjs",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
     "test:intelligence-ui:live": "tsx tests/intelligence-ui.live.ts",
@@ -62,6 +63,7 @@
     "marked": "18.0.5",
     "mermaid": "^12.2.0",
     "motion": "^13.4.4",
+    "node-pty": "1.1.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -101,6 +103,7 @@
       "dist-electron/**/*",
       "build/**/*"
     ],
+    "asarUnpack": ["node_modules/node-pty/**"],
     "extraResources": [
       {
         "from": "build",

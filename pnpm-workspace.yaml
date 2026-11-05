@@ -11,6 +11,7 @@ allowBuilds:
   core-js: false
   electron-winstaller: true
   esbuild: true
+  node-pty: true
   protobufjs: true
 minimumReleaseAgeExclude:
   - '@modelcontextprotocol/ext-apps@2.0.4'

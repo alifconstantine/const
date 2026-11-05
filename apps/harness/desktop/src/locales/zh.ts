@@ -511,6 +511,8 @@ export const zh: TranslationDictionary = {
     hidePanel: "隐藏面板",
   },
   bottomPanel: {
+    terminalExited: "[进程已退出，退出代码为 {code}]",
+    terminalStartFailed: "无法启动终端：{error}",
     terminal: "终端",
     newTerminal: "新建终端",
     closePanel: "关闭面板",

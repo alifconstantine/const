@@ -7,7 +7,7 @@ import {
   type GatewayAuth,
   type ChatBody,
 } from "./gateway";
-import { SseUsageParser } from "./telemetry";
+import { SseUsageParser, textContextMessages } from "./telemetry";
 
 async function drainFailedStream(reader: ReadableStreamDefaultReader<Uint8Array>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -48,7 +48,7 @@ export async function executeComboChat(
       ? [{ role: "system", content: combo.systemMessage }, ...body.messages]
       : body.messages;
     if (
-      new TextEncoder().encode(JSON.stringify(messages)).length >
+      new TextEncoder().encode(JSON.stringify(textContextMessages(messages))).length >
       combo.contextLength * 3
     )
       throw new GatewayError(

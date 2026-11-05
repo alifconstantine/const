@@ -251,6 +251,61 @@ const body = (model = standard) => ({
 const logs = () =>
   [...db.rows.values()].filter((r) => r.__table === "routerLogs");
 
+test("large screenshot encodings do not consume the model's text context reservation", async () => {
+  const image = "data:image/png;base64," + "A".repeat(1_300_000);
+  const messages = [{ role: "user", content: [
+    { type: "text", text: "Verify the completed website." },
+    { type: "image_url", image_url: { url: image } },
+  ] }];
+  const response = await chat.POST(request({ ...body(), messages }));
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.deepEqual(lastPayload.messages, messages);
+  assert.equal(fetches, 1);
+  assert.equal(logs()[0].promptTokens, 20);
+});
+
+test("native upload and tool-observation images at the reported sizes reach the provider unchanged", async () => {
+  const upload = "data:image/png;base64," + "A".repeat(1_640_984);
+  const screenshot = "data:image/png;base64," + "A".repeat(1_982_944);
+  const messages = [
+    { role: "user", content: [{ type: "text", text: "Inspect this uploaded image." }, { type: "image_url", image_url: { url: upload } }] },
+    { role: "assistant", content: null, tool_calls: [{ id: "screen", type: "function", function: { name: "read", arguments: '{"path":"sheet.png"}' } }] },
+    { role: "tool", tool_call_id: "screen", content: "Image attached as a visual tool observation." },
+    { role: "user", content: [{ type: "text", text: "Visual tool observation." }, { type: "image_url", image_url: { url: screenshot } }] },
+  ];
+  const response = await chat.POST(request({ ...body(), messages }));
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.deepEqual(lastPayload.messages, messages);
+  assert.equal(fetches, 1);
+});
+
+test("media requests still reject text that exceeds the context reservation", async () => {
+  const response = await chat.POST(request({ ...body(), messages: [{ role: "user", content: [
+    { type: "text", text: "x".repeat(1_000_001) },
+    { type: "image_url", image_url: { url: "https://example.com/screenshot.png" } },
+  ] }] }));
+  assert.equal(response.status, 400);
+  assert.equal(fetches, 0);
+});
+
+test("combo context limits exclude screenshot encoding and forward the intact image", async () => {
+  db.seed("routerCombos", "combo", {
+    userId: "u1", name: "Vision", slug: "vision", status: "active", strategy: "priority", contextLength: 10000,
+    models: [{ modelId: standard, providerId: "const", providerName: "Const", priority: 1 }],
+  });
+  const image = "data:image/png;base64," + "A".repeat(1_300_000);
+  const input = { ...body("combo/vision"), messages: [{ role: "user", content: [
+    { type: "text", text: "Verify the website" },
+    { type: "image_url", image_url: { url: image } },
+  ] }] };
+  const response = await chat.POST(request(input));
+  assert.equal(response.status, 200, await response.clone().text());
+  await response.text();
+  assert.deepEqual(lastPayload.messages, input.messages);
+  const tooLong = await chat.POST(request({ ...input, messages: [{ role: "user", content: "x".repeat(30_001) }] }));
+  assert.equal(tooLong.status, 400);
+});
+
 test("tool serialization flags reach the engine and reject invalid values", async () => {
   const response = await chat.POST(
     request({ ...body(), parallel_tool_calls: false }),

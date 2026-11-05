@@ -1,4 +1,5 @@
 import { openBrowserPane, retainBrowserTabs } from "./lib/browser-pane-state";
+import { terminalFolderTitle, updateTerminalLocation } from "./lib/terminal-location";
 import { useRemoteRuntime } from "./lib/remote-runtime";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
@@ -986,78 +987,60 @@ export function AuthenticatedContent({
     setIsOpeningNewTab(false);
   }, []);
 
-  const handleToggleBottomPanel = useCallback(() => {
+  const pendingTerminalOpenRef = useRef(new Set<string>());
+  const handleToggleBottomPanel = useCallback(async () => {
+    const owner = conversationId;
     if (!isBottomPanelOpenRef.current && bottomPanelTabsRef.current.length === 0) {
-      const initialCwd = currentProject === "Outside Project" ? undefined : currentProject;
-      const baseTitle =
-        currentProject && currentProject !== "Outside Project"
-          ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
-          : "outside";
-
-      const initialTabId = `bottom_terminal_${crypto.randomUUID()}`;
-      const newTab: RightPaneTab = {
-        id: initialTabId,
-        type: "terminal",
-        title: baseTitle,
-        cwd: initialCwd,
-        project: currentProject,
-        conversationId,
-      };
-      setBottomPanelTabs([newTab]);
-      setActiveBottomTabId(initialTabId);
-      setIsBottomPanelOpen(true);
-
-      if (window.electron?.resolveWorkspacePath && currentProject) {
-        window.electron.resolveWorkspacePath({
-          project: currentProject,
-          conversationId,
-        }).then((resolvedCwd) => {
-          if (resolvedCwd && resolvedCwd !== initialCwd) {
-            setBottomPanelTabs((prev) =>
-              prev.map((tab) => (tab.id === initialTabId ? { ...tab, cwd: resolvedCwd } : tab))
-            );
-          }
-        }).catch(() => {});
-      }
+      if (pendingTerminalOpenRef.current.has(owner)) return;
+      pendingTerminalOpenRef.current.add(owner);
+      try {
+        const cwd = window.electron?.resolveWorkspacePath
+          ? await window.electron.resolveWorkspacePath({ project: currentProject, conversationId: owner, purpose: "terminal" })
+          : currentProject === "Outside Project" ? undefined : currentProject;
+        if (conversationIdRef.current !== owner) return;
+        const newTab: RightPaneTab = {
+          id: `bottom_terminal_${crypto.randomUUID()}`, type: "terminal",
+          title: terminalFolderTitle(cwd, currentProject) || t("bottomPanel.terminal"),
+          cwd, project: currentProject, conversationId: owner,
+        };
+        setBottomPanelTabs([newTab]);
+        setActiveBottomTabId(newTab.id);
+        setIsBottomPanelOpen(true);
+      } catch (error) {
+        if (conversationIdRef.current === owner) toast.error(error instanceof Error ? error.message : t("common.failed"));
+      } finally { pendingTerminalOpenRef.current.delete(owner); }
       return;
     }
-
     setIsBottomPanelOpen((prev) => !prev);
-  }, [currentProject, conversationId]);
+  }, [currentProject, conversationId, t]);
 
   const handleNewBottomTab = useCallback(async () => {
-    let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
-    if (window.electron?.resolveWorkspacePath) {
-      try {
-        resolvedCwd = await window.electron.resolveWorkspacePath({
-          project: currentProject,
-          conversationId,
-        });
-      } catch {}
+    let cwd = currentProject === "Outside Project" ? undefined : currentProject;
+    try {
+      if (window.electron?.resolveWorkspacePath) cwd = await window.electron.resolveWorkspacePath({
+        project: currentProject, conversationId, purpose: "terminal",
+      });
+    } catch (error) {
+      if (conversationIdRef.current === conversationId) toast.error(error instanceof Error ? error.message : t("common.failed"));
+      return;
     }
     if (conversationIdRef.current !== conversationId) return;
-    const baseTitle =
-      currentProject && currentProject !== "Outside Project"
-        ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
-        : "outside";
-
-    const countWithBase = bottomPanelTabsRef.current.filter(
-      (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
-    ).length;
-    const title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
-
+    const baseTitle = terminalFolderTitle(cwd, currentProject) || t("bottomPanel.terminal");
+    const count = bottomPanelTabsRef.current.filter(tab => tab.type === "terminal" && (tab.title === baseTitle || tab.title.startsWith(baseTitle + " ("))).length;
     const newTab: RightPaneTab = {
-      id: `bottom_terminal_${crypto.randomUUID()}`,
-      type: "terminal",
-      title,
-      cwd: resolvedCwd,
-      project: currentProject,
-      conversationId,
+      id: `bottom_terminal_${crypto.randomUUID()}`, type: "terminal",
+      title: count === 0 ? baseTitle : `${baseTitle} (${count + 1})`,
+      cwd, project: currentProject, conversationId,
     };
     setBottomPanelTabs((prev) => [...prev, newTab]);
     setActiveBottomTabId(newTab.id);
     setIsBottomPanelOpen(true);
-  }, [currentProject, conversationId]);
+  }, [currentProject, conversationId, t]);
+
+  const handleBottomTerminalReady = useCallback((id: string, owner: string, cwd: string) => {
+    if (conversationIdRef.current !== owner) return;
+    setBottomPanelTabs(tabs => updateTerminalLocation(tabs, id, owner, cwd));
+  }, []);
 
   const handleReorderBottomTabs = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
@@ -1298,18 +1281,16 @@ export function AuthenticatedContent({
           resolvedCwd = await window.electron.resolveWorkspacePath({
             project: currentProject,
             conversationId,
+            purpose: "terminal",
           });
-        } catch {}
+        } catch (error) {
+          if (conversationIdRef.current === conversationId) toast.error(error instanceof Error ? error.message : t("common.failed"));
+          return;
+        }
       }
-      const baseTitle =
-        currentProject !== "Outside Project"
-          ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
-          : "outside";
-
-      const countWithBase = rightPaneTabs.filter(
-        (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
-      ).length;
-      title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
+      const baseTitle = terminalFolderTitle(resolvedCwd, currentProject) || t("bottomPanel.terminal");
+      const count = rightPaneTabs.filter(tab => tab.type === "terminal" && (tab.title === baseTitle || tab.title.startsWith(baseTitle + " ("))).length;
+      title = count === 0 ? baseTitle : `${baseTitle} (${count + 1})`;
     } else if (type === "review") {
       const count = rightPaneTabs.filter((t) => t.type === type).length;
       title = count === 0 ? "Review" : `Review (${count + 1})`;
@@ -1337,7 +1318,7 @@ export function AuthenticatedContent({
 
     if (conversationIdRef.current !== conversationId) return;
     const newTab: RightPaneTab = {
-      id: `${type}_${Date.now()}`,
+      id: `${type}_${crypto.randomUUID()}`,
       type,
       title,
       url: type === "browser" ? "https://www.google.com" : undefined,
@@ -4763,6 +4744,7 @@ export function AuthenticatedContent({
                     onNewTab={handleNewBottomTab}
                     onReorderTabs={handleReorderBottomTabs}
                     onClearTerminal={handleClearBottomTerminal}
+                    onTerminalReady={handleBottomTerminalReady}
                     onClose={() => setIsBottomPanelOpen(false)}
                     onDraggingChange={setIsDraggingBottomPanel}
                   />

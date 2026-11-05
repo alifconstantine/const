@@ -454,7 +454,7 @@ declare global {
       ) => Promise<{ content?: string; truncated?: boolean; error?: string; isDirectory?: boolean }>;
       openPath?: (targetPath: string) => Promise<boolean>;
       showInFolder?: (targetPath: string) => Promise<boolean>;
-      resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
+      resolveWorkspacePath?: (options?: { project?: string; conversationId?: string; purpose?: "terminal"; cwd?: string }) => Promise<string>;
       onConversationsChanged?: (callback: (data: { conversationId?: string; remoteMessages?: any[]; remoteConversation?: import("./lib/conversation-store").ConversationItem; uiOnly?: boolean }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;
@@ -484,10 +484,11 @@ declare global {
           shell?: string;
           cols?: number;
           rows?: number;
-        }) => Promise<{ success: boolean; id?: string; cwd?: string; error?: string }>;
+        }) => Promise<{ success: boolean; id?: string; cwd?: string; error?: string; replay?: string; sequence?: number }>;
         write: (options: { id: string; data: string; conversationId: string }) => Promise<boolean>;
+        resize: (options: { id: string; cols: number; rows: number; conversationId: string }) => Promise<boolean>;
         destroy: (id: string, conversationId: string) => Promise<boolean>;
-        onData: (callback: (data: { id: string; data: string; conversationId?: string }) => void) => () => void;
+        onData: (callback: (data: { id: string; data: string; conversationId?: string; sequence?: number }) => void) => () => void;
         onExit: (callback: (data: { id: string; code: number | null; conversationId?: string }) => void) => () => void;
       };
       answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;

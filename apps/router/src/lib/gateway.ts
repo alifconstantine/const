@@ -12,6 +12,7 @@ import {
   generateRequestId,
   estimateMessagesTokens,
   estimateTokens,
+  textContextMessages,
 } from "./telemetry";
 
 export const CORS_HEADERS = {
@@ -263,11 +264,14 @@ export async function executeSingle(
   const engine = engineConfig(),
     started = performance.now(),
     requestId = generateRequestId();
-  // Text byte length is a conservative reservation; images reserve their full context budget.
+  // Keep the conservative text-byte reservation, but exclude encoded media.
+  // Base64 is transport data: the provider decodes it before tokenizing. Media
+  // already reserves the full remaining context budget below. Counting its
+  // encoding as text falsely rejects ordinary screenshots at ~750 KB.
   const estimatedInput =
     new TextEncoder().encode(
       JSON.stringify({
-        messages: body.messages,
+        messages: textContextMessages(body.messages),
         tools: body.tools,
         response_format: body.response_format,
       }),

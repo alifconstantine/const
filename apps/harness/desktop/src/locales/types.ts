@@ -497,6 +497,8 @@ export interface TranslationDictionary {
     hidePanel: string;
   };
   bottomPanel: {
+    terminalExited: string;
+    terminalStartFailed: string;
     terminal: string;
     newTerminal: string;
     closePanel: string;

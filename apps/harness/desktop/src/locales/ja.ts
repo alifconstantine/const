@@ -511,6 +511,8 @@ export const ja: TranslationDictionary = {
     hidePanel: "パネルを隠す",
   },
   bottomPanel: {
+    terminalExited: "[プロセスがコード {code} で終了しました]",
+    terminalStartFailed: "ターミナルを起動できませんでした: {error}",
     terminal: "ターミナル",
     newTerminal: "新しいターミナル",
     closePanel: "パネルを閉じる",

@@ -1,4 +1,4 @@
-import { isPermanentQuotaResponse } from "./model-retry.js";
+import { isContextWindowError, isPermanentQuotaResponse, isUnsupportedImageError } from "./model-retry.js";
 import { RESPONSE_PRESENTATION_GUIDANCE } from "./prompt-guidance.js";
 import { consumeChatStream, abortableDelay } from "./chat-stream.js";
 
@@ -34,7 +34,7 @@ import {
 import { trackLlmRequest } from "./request-telemetry.js";
 import { DEFAULT_MODELS } from "./models.js";
 import { getToolActionKind, normalizeToolName } from "./tool-policy.js";
-import { appendToolObservations, disableToolObservationImages, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
+import { appendToolObservations, disableToolObservationImages, imageContentForModel, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 import { buildToolGuidance, LANGUAGE_GUIDANCE, TASK_SCOPE_GUIDANCE, promptFileExcerpt, RESPONSE_RECOVERY_GUIDANCE, TRUNCATED_RESPONSE_GUIDANCE } from "./prompt-guidance.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
@@ -328,7 +328,7 @@ export function compactHistoryForContext(
   return messages.map((m, index) => {
     // Every result of the newest tool batch must reach the model at least once,
     // including batches larger than preserveRecentCount.
-    if (m.role === "tool" && index > latestAssistantIndex) return m;
+    if ((m.role === "tool" || m.toolObservationId) && index > latestAssistantIndex) return m;
     if (index >= cutoffIndex && m.role === "tool" && typeof m.content === "string" && m.content.length > 16_000 &&
         ["read", "readfile", "bash", "powershell", "pwsh", "exec", "terminal", "sh", "runcommand", "runterminal"].includes(normalizeToolName(m.name ?? ""))) {
       return { ...m, content: `${m.content.slice(0, 10_000)}\n\n[Previously observed tool output: ${m.content.length} characters; middle omitted. Read or search the source again for omitted details.]\n\n${m.content.slice(-6_000)}` };
@@ -839,18 +839,21 @@ export class ConstAgent {
     const deadline = timeoutMs > 0 ? setTimeout(() => { deadlineReached = true; this.abortController?.abort(); }, timeoutMs) : undefined;
 
     const conversationHistory: AgentMessage[] = [...messages];
+    const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find(model => model.id === this.config.model)?.inputTypes;
+    const modelSupportsImages = !modelInputTypes || modelInputTypes.includes("image");
     const loadedNativePlugins = new Set<NativeCapability>();
     let toolVisionUnavailable = false;
     let currentTurn = 0;
     const runId = `llm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     let requestSequence = 0;
     let activeRequest: ReturnType<typeof trackLlmRequest> | undefined;
+    let contextRecoveryAttempted = false;
     let contextSystemPrompt = "";
     let contextTools: any[] = [];
     const emitContext = () => {
       const breakdown = calculateContextBreakdown({
         systemPrompt: contextSystemPrompt, tools: contextTools,
-        messages: compactHistoryForContext(conversationHistory),
+        messages: compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4),
       });
       onEvent({ type: "context_update", model: this.config.model, updatedAt: Date.now(), systemPromptTokens: breakdown.systemTokens,
         toolsTokens: breakdown.toolsTokens, messagesTokens: breakdown.messageTokens,
@@ -861,6 +864,12 @@ export class ConstAgent {
     let consecutiveDraftCutoffs = 0;
     let recoveryInstruction = "";
     let consecutiveEmptyRetries = 0;
+    const recoverContext = (error: string): boolean => {
+      if (contextRecoveryAttempted || !isContextWindowError(error)) return false;
+      contextRecoveryAttempted = true;
+      onEvent({ type: "status", status: "thinking", message: "Model context limit reached. Reducing older context and the output reservation before retrying..." });
+      return true;
+    };
     const MAX_EMPTY_RETRIES = this.config.sessionKind === "companion" ? 1 : 2;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
@@ -974,7 +983,7 @@ export class ConstAgent {
 
         contextSystemPrompt = systemPrompt;
         contextTools = requestTools;
-        const historyForContext = compactHistoryForContext(conversationHistory);
+        const historyForContext = compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4);
         // Request-only reminders preserve the stable prefix and never become human instructions in stored history.
         const requestHistory: AgentMessage[] = [...historyForContext, ...(turnInstructions.length ? [{ role: "system" as const, content: turnInstructions.join("\n\n") }] : [])];
 
@@ -986,7 +995,7 @@ export class ConstAgent {
           ...requestHistory.map((m, mIdx) => {
             const item: Record<string, any> = {
               role: m.role,
-              content: m.content ?? "",
+              content: imageContentForModel(m.content ?? "", modelSupportsImages && !toolVisionUnavailable),
             };
             if (m.role === "assistant" && m.thinking) {
               item.reasoning_content = m.thinking;
@@ -1055,9 +1064,13 @@ export class ConstAgent {
           this.config.maxTokens ??
           modelMaxOutputCap ??
           (is128kModel ? 128000 : DEFAULT_MAX_OUTPUT_TOKENS);
-        const resolvedMaxTokens = modelMaxOutputCap
+        const cappedMaxTokens = modelMaxOutputCap
           ? Math.min(requestedMaxTokens, modelMaxOutputCap)
           : requestedMaxTokens;
+        // Output shares the model's window with input. Leave a margin for the
+        // heuristic's error; provider-side overflow gets one smaller retry.
+        const remainingOutputTokens = Math.max(1, resolvedContextWindow - Math.ceil(breakdown.totalHeuristicTokens * 1.2) - 1024);
+        const resolvedMaxTokens = Math.min(cappedMaxTokens, remainingOutputTokens, contextRecoveryAttempted ? 8192 : Infinity);
         const useMaxCompletionTokensOnly = endpoint.includes("api.openai.com");
 
         if (signal.aborted || this._isCancelled) {
@@ -1117,13 +1130,13 @@ export class ConstAgent {
             }
           } catch {}
 
-          const modelSupportsImages =
-            (this.config.inputTypes ?? knownModel?.inputTypes)?.includes("image") ?? true;
-          const explicitVisionRejection =
-            !modelSupportsImages ||
-            /image_url|image input|vision|multimodal|modality|Playground|browser session|chrome-headless-shell|Executable doesn't exist/i.test(
-              rawErr,
-            );
+          if (recoverContext(cleanMessage)) {
+            request.finish("failed");
+            currentTurn--;
+            continue;
+          }
+
+          const explicitVisionRejection = !modelSupportsImages || isUnsupportedImageError(cleanMessage);
 
           if (
             cleanMessage.includes("<!DOCTYPE") ||
@@ -1239,6 +1252,10 @@ export class ConstAgent {
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
           }
+          if (recoverContext(streamErr?.message || "")) {
+            currentTurn--;
+            continue;
+          }
           if (turnThinking && !turnContent) {
             if (consecutivePlanningTurns >= 1) throw streamErr;
             consecutivePlanningTurns++;
@@ -1247,16 +1264,7 @@ export class ConstAgent {
           }
 
           const errMsg = streamErr?.message || "";
-          const modelSupportsImages =
-            (this.config.inputTypes ?? knownModel?.inputTypes)?.includes("image") ?? true;
-          const isVisionError =
-            !modelSupportsImages ||
-            errMsg.includes("Playground") ||
-            errMsg.includes("browser session") ||
-            errMsg.includes("image_url") ||
-            /image input|vision|multimodal|modality/i.test(errMsg) ||
-            errMsg.includes("chrome-headless-shell") ||
-            errMsg.includes("Executable doesn't exist");
+          const isVisionError = !modelSupportsImages || isUnsupportedImageError(errMsg);
 
           const msgWithImages = [...conversationHistory].reverse().find(
             (m) => Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
@@ -1315,6 +1323,10 @@ export class ConstAgent {
         }
 
         request.finish("completed");
+        // A successful request closes this recovery attempt. A later tool image
+        // can independently overflow, while repeated rejection of one request
+        // still stops after a single smaller retry.
+        contextRecoveryAttempted = false;
 
         if (turnFinishReason === "length" && toolCallsMap.size) {
           toolCallsMap.clear();
@@ -2121,8 +2133,7 @@ export class ConstAgent {
           }
         }
 
-        const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find(model => model.id === this.config.model)?.inputTypes;
-        appendToolObservations(conversationHistory, toolObservations, !toolVisionUnavailable && (!modelInputTypes || modelInputTypes.includes("image")));
+        appendToolObservations(conversationHistory, toolObservations, !toolVisionUnavailable && modelSupportsImages);
 
         // If multiple subagents were spawned in parallel, wait for all of them to complete
         if (spawnedParallelAgents.length > 0) {

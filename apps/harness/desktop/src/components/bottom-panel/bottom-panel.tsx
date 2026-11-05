@@ -23,6 +23,7 @@ interface BottomPanelProps {
   onClose: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
   onClearTerminal?: (tabId: string) => void;
+  onTerminalReady?: (tabId: string, conversationId: string, cwd: string) => void;
   onDraggingChange?: (isDragging: boolean) => void;
 }
 
@@ -37,6 +38,7 @@ export function BottomPanel({
   onClose,
   onReorderTabs,
   onClearTerminal,
+  onTerminalReady,
   onDraggingChange,
 }: BottomPanelProps) {
   const { t } = useTranslation();
@@ -206,7 +208,7 @@ export function BottomPanel({
                 )}
 
                 <SquareTerminal className="w-3.5 h-3.5 shrink-0 opacity-80 pointer-events-none" />
-                <span className="truncate max-w-[140px] pointer-events-none">{tab.title || "Terminal"}</span>
+                <span className="truncate max-w-[220px] pointer-events-none">{tab.title || t("bottomPanel.terminal")}</span>
                 <button
                   type="button"
                   draggable={false}
@@ -304,7 +306,7 @@ export function BottomPanel({
               )}
               style={isActive ? { display: "flex" } : { display: "none" }}
             >
-              <TerminalTab tab={tab} />
+              <TerminalTab tab={tab} onReady={cwd => { if (tab.conversationId) onTerminalReady?.(tab.id, tab.conversationId, cwd); }} />
             </div>
           );
         })}

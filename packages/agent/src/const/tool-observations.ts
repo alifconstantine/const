@@ -8,7 +8,14 @@ export interface ToolObservation {
 
 const MAX_OBSERVATION_IMAGES = 2;
 const MAX_IMAGE_BASE64_LENGTH = 4 * 1024 * 1024;
-export const UNAVAILABLE_TOOL_VISION = "Visual observation unavailable to this model/provider. Do not infer screen contents or claim visual verification. Use accessible UI evidence; if it is insufficient, report that the outcome is unverified.";
+export const UNAVAILABLE_TOOL_VISION = "Image input is unavailable to this model/provider. Tell the user that you cannot view the supplied image. Do not infer its contents or claim visual verification. Use available text or accessible UI evidence; if it is insufficient, report that the outcome is unverified.";
+
+/** Uploads and tool images use the same native media parts. Only a known
+ * text-only model or explicit provider rejection disables them for a request. */
+export function imageContentForModel(content: AgentMessage["content"], supportsImages: boolean): AgentMessage["content"] {
+  if (supportsImages || !Array.isArray(content)) return content;
+  return content.map(part => part.type === "image_url" ? { type: "text", text: UNAVAILABLE_TOOL_VISION } : part);
+}
 
 export function disableToolObservationImages(history: AgentMessage[]): void {
   for (const message of history) {

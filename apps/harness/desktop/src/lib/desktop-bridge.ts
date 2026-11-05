@@ -228,6 +228,8 @@ export function createDesktopBridge(
     resolveWorkspacePath: (options?: {
       project?: string;
       conversationId?: string;
+      purpose?: "terminal";
+      cwd?: string;
     }) => ipcRenderer.invoke("workspace:resolve-path", options),
     openPath: (targetPath: string) =>
       ipcRenderer.invoke("shell:open-path", targetPath),
@@ -285,8 +287,10 @@ export function createDesktopBridge(
       }) => ipcRenderer.invoke("terminal:create", options),
       write: (options: { id: string; data: string; conversationId: string }) =>
         ipcRenderer.invoke("terminal:write", options),
+      resize: (options: { id: string; cols: number; rows: number; conversationId: string }) =>
+        ipcRenderer.invoke("terminal:resize", options),
       destroy: (id: string, conversationId: string) => ipcRenderer.invoke("terminal:destroy", id, conversationId),
-      onData: (callback: (data: { id: string; data: string; conversationId?: string }) => void) => {
+      onData: (callback: (data: { id: string; data: string; conversationId?: string; sequence?: number }) => void) => {
         const handler = (_event: any, payload: any) => callback(payload);
         ipcRenderer.on("terminal:data", handler);
         return () => ipcRenderer.removeListener("terminal:data", handler);

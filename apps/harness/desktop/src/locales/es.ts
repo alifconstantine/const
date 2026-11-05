@@ -511,6 +511,8 @@ export const es: TranslationDictionary = {
     hidePanel: "Ocultar panel",
   },
   bottomPanel: {
+    terminalExited: "[El proceso finalizó con el código {code}]",
+    terminalStartFailed: "No se pudo iniciar la terminal: {error}",
     terminal: "Terminal",
     newTerminal: "Nueva Terminal",
     closePanel: "Cerrar panel",

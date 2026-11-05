@@ -60,6 +60,7 @@ export const desktopChannels = [
   "memory:save-config",
   "terminal:create",
   "terminal:write",
+  "terminal:resize",
   "terminal:destroy",
   "agent:answer-question",
   "tasks:list",

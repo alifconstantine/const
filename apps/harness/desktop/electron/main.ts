@@ -22,7 +22,8 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { spawn, type ChildProcess } from "node:child_process";
+import { TerminalSessions } from "./terminal-sessions";
+import { resolveTerminalDirectory } from "./terminal-directory";
 import {
   createConstAgent,
   rollbackFileMutation,
@@ -42,7 +43,7 @@ import {
   extractPdfText,
   extractDocumentText,
 } from "@const/agent";
-import { TaskWorkspaces } from "./task-workspaces";
+import { WorkingDirectories, workingDirectoryInstructions } from "./working-directories";
 import { requireConversationId, updateSessionMode } from "./session-ownership";
 import { ConversationDatabase, type ConversationRecord } from "./database";
 import {
@@ -108,7 +109,7 @@ app.on("before-quit", () => { void remoteDaemon.stop(false); });
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
 const harnessHomeDir = path.join(constHomeDir, "harness");
-const taskWorkspaces = new TaskWorkspaces(harnessHomeDir);
+const workingDirectories = new WorkingDirectories(harnessHomeDir);
 const constProjectsDir = path.join(harnessHomeDir, "projects");
 const constBrainDir = path.join(harnessHomeDir, "brain");
 const constConversationsDir = path.join(harnessHomeDir, "conversations");
@@ -480,7 +481,34 @@ function restoreSavedRemoteSession() {
   } catch { clearRemoteState(); }
 }
 
-const activeTerminals = new Map<string, { process: ChildProcess; cwd: string; conversationId: string }>();
+const terminalSessions = new TerminalSessions({
+  data: (payload) => { if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "terminal:data", payload); },
+  exit: (payload) => { if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "terminal:exit", payload); },
+}, undefined, terminal => {
+  // Unix shells must release their whole job group; ConPTY owns Windows tree cleanup.
+  try { if (process.platform !== "win32") killProcessTree(terminal.pid); }
+  finally { terminal.kill(); }
+});
+
+async function resolveConversationWorkspace(options?: { project?: string; conversationId?: string }) {
+  const owner = requireConversationId(options?.conversationId);
+  const conversation = conversationDb.getConversation(owner);
+  const project = options?.project || conversation?.project;
+  if (conversation?.project && options?.project) {
+    const canonical = (value: string) => value === "Outside Project" ? value : fs.realpathSync(value);
+    if (canonical(conversation.project) !== canonical(options.project)) throw new Error("Workspace project does not match this conversation");
+  }
+  const root = await workingDirectories.resolve(project, owner, loadUserConfig().defaultProjectLocation);
+  return { root, project: project && project !== "Outside Project" ? project : undefined, owner };
+}
+
+async function terminalWorkingDirectory(options: { project?: string; conversationId?: string; cwd?: string }) {
+  const workspace = await resolveConversationWorkspace(options);
+  return resolveTerminalDirectory({
+    workspaceRoot: workspace.root, project: workspace.project, cwd: options.cwd,
+    legacyWorkspace: options.cwd && workspace.project ? await workingDirectories.legacy(workspace.project, workspace.owner) : undefined,
+  });
+}
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
@@ -1322,8 +1350,7 @@ app.whenReady().then(() => {
     for (const pending of pendingStarts.values()) pending.controller.abort();
     for (const session of activeSessions.values()) session.agent.abort();
     for (const task of globalTaskManager.listAllTasks()) globalTaskManager.killTask(task.id, task.conversationId);
-    for (const terminal of activeTerminals.values()) if (terminal.process.pid) killProcessTree(terminal.process.pid);
-    activeTerminals.clear();
+    terminalSessions.destroyAll();
     globalSubAgentManager.clearSubAgents();
   });
   const appUpdates = new DesktopAppUpdates({
@@ -1652,27 +1679,12 @@ app.whenReady().then(() => {
       pendingStarts.set(convoId, startup);
       try {
 
-      // Project vs Outside of Project Scoping
-      let targetWorkspace: string;
-      if (
-        payload.workspacePath &&
-        payload.workspacePath !== "Outside Project" &&
-        fs.existsSync(payload.workspacePath)
-      ) {
-        // Each task gets its own persistent project checkout.
-        targetWorkspace = await taskWorkspaces.resolve(payload.workspacePath, payload.sessionKind === "companion" ? payload.parentConversationId! : convoId);
-      } else {
-        // Outside Project: run inside dedicated session directory under defaultProjectLocation or ~/.const/brain/<convoId>
-        const defaultLoc = config.defaultProjectLocation;
-        if (defaultLoc && fs.existsSync(defaultLoc)) {
-          targetWorkspace = path.join(defaultLoc, convoId);
-        } else {
-          targetWorkspace = path.join(constBrainDir, convoId);
-        }
-        if (!fs.existsSync(targetWorkspace)) {
-          fs.mkdirSync(targetWorkspace, { recursive: true });
-        }
-      }
+      const workspace = await resolveConversationWorkspace({
+        project: payload.workspacePath,
+        conversationId: payload.sessionKind === "companion" ? payload.parentConversationId! : convoId,
+      });
+      const targetWorkspace = workspace.root;
+      payload.workspacePath = workspace.project || "Outside Project";
 
       startup.controller.signal.throwIfAborted();
       if (mcpShuttingDown) throw new Error("Desktop is shutting down");
@@ -1686,7 +1698,7 @@ app.whenReady().then(() => {
       if (config.personalizationCustomInstructions?.trim()) {
         personalizationParts.push(`User Custom Instructions:\n${config.personalizationCustomInstructions.trim()}`);
       }
-      personalizationParts.push(`This task has an isolated working directory: ${targetWorkspace}. Create and edit deliverables here. The project path in older messages is a source reference, not the output directory. Link actual files in this working directory when reporting results.`);
+      personalizationParts.push(workingDirectoryInstructions(targetWorkspace, path.join(constBrainDir, convoId)));
       const systemPrompt = personalizationParts.join("\n\n");
 
       const agent = createConstAgent({
@@ -1696,8 +1708,6 @@ app.whenReady().then(() => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
-        sourceProjectPath: payload.workspacePath,
-        isolateWorkspace: true,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
@@ -2352,25 +2362,9 @@ app.whenReady().then(() => {
   // Workspace directory resolution
   handleDesktopIpc(
     "workspace:resolve-path",
-    async (_event, options?: { project?: string; conversationId?: string }) => {
-      const project = options?.project;
-      const convoId = options?.conversationId || `session_${Date.now()}`;
-      if (project && project !== "Outside Project" && fs.existsSync(project)) {
-        return await taskWorkspaces.resolve(project, requireConversationId(options?.conversationId));
-      }
-      const config = loadUserConfig();
-      const defaultLoc = config.defaultProjectLocation;
-      const outsideDir = defaultLoc && fs.existsSync(defaultLoc)
-        ? path.join(defaultLoc, convoId)
-        : path.join(constBrainDir, convoId);
-      if (!fs.existsSync(outsideDir)) {
-        try {
-          fs.mkdirSync(outsideDir, { recursive: true });
-        } catch (err) {
-          console.error("Failed to create outside brain directory:", outsideDir, err);
-        }
-      }
-      return outsideDir;
+    async (_event, options?: { project?: string; conversationId?: string; purpose?: "terminal"; cwd?: string }) => {
+      if (options?.purpose === "terminal") return terminalWorkingDirectory(options);
+      return (await resolveConversationWorkspace(options)).root;
     }
   );
 
@@ -2703,15 +2697,7 @@ app.whenReady().then(() => {
           "const-local-dev-key";
       }
 
-      let targetWorkspace: string;
-      if (task.workspacePath && fs.existsSync(task.workspacePath)) {
-        targetWorkspace = await taskWorkspaces.resolve(task.workspacePath, convoId);
-      } else {
-        targetWorkspace = path.join(constBrainDir, convoId);
-        if (!fs.existsSync(targetWorkspace)) {
-          fs.mkdirSync(targetWorkspace, { recursive: true });
-        }
-      }
+      const targetWorkspace = await workingDirectories.resolve(task.workspacePath, convoId, config.defaultProjectLocation);
 
       // Scheduled tasks run autonomously in the background with full access
       const agent = createConstAgent({
@@ -2726,8 +2712,7 @@ app.whenReady().then(() => {
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
-        sourceProjectPath: task.workspacePath,
-        isolateWorkspace: true,
+        systemPrompt: workingDirectoryInstructions(targetWorkspace, path.join(constBrainDir, convoId)),
         mode: "full_access",
         thinkingLevel: "medium",
         maxTurns: 200,
@@ -2869,98 +2854,11 @@ app.whenReady().then(() => {
     ) => {
       const { id } = options;
       const owner = requireConversationId(options.conversationId);
-      let targetCwd: string;
-      if (options.project && options.project !== "Outside Project") {
-        targetCwd = await taskWorkspaces.resolve(options.project, owner);
-        if (options.cwd && path.resolve(options.cwd) !== path.resolve(options.project)) {
-          const relative = path.relative(targetCwd, path.resolve(options.cwd));
-          if (relative !== ".." && !relative.startsWith(".." + path.sep) && !path.isAbsolute(relative)) targetCwd = options.cwd;
-        }
-      } else {
-        const defaultLoc = loadUserConfig().defaultProjectLocation;
-        targetCwd = defaultLoc && fs.existsSync(defaultLoc) ? path.join(defaultLoc, owner) : path.join(constBrainDir, owner);
-        fs.mkdirSync(targetCwd, { recursive: true });
-      }
       if (mcpShuttingDown) throw new Error("Desktop is shutting down");
-      const existing = activeTerminals.get(id);
-      if (existing) {
-        if (existing.conversationId !== owner) throw new Error("Terminal belongs to another conversation");
-        return { success: true, id, cwd: existing.cwd };
-      }
-
-      const defaultShell =
-        process.platform === "win32"
-          ? process.env.COMSPEC || "powershell.exe"
-          : process.env.SHELL || "/bin/bash";
-      const shellPath = options.shell || defaultShell;
-
-      let cmd = shellPath;
-      let args: string[] = [];
-
-      if (process.platform === "linux") {
-        cmd = "script";
-        args = ["-q", "-f", "-c", `env TERM=xterm-256color COLORTERM=truecolor ${shellPath}`, "/dev/null"];
-      } else if (process.platform === "win32") {
-        cmd = shellPath;
-        args = [];
-      } else {
-        cmd = shellPath;
-        args = ["-i"];
-      }
-
       try {
-        const proc = spawn(cmd, args, {
-          cwd: targetCwd,
-          windowsHide: true,
-          env: {
-            ...process.env,
-            TERM: "xterm-256color",
-            COLORTERM: "truecolor",
-            COLUMNS: String(options.cols || 80),
-            LINES: String(options.rows || 24),
-          },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-
-        activeTerminals.set(id, { process: proc, cwd: targetCwd, conversationId: owner });
-
-        proc.stdout?.on("data", (chunk: Buffer) => {
-          const str = chunk.toString("utf-8");
-          // Instant auto-response to shell terminal capability probes (e.g. fish) so prompt appears without delay
-          if (str.includes("\x1b[0c") || str.includes("\x1b[c")) {
-            try { proc.stdin?.write("\x1b[?1;2c"); } catch {}
-          }
-          if (str.includes("11;?")) {
-            try { proc.stdin?.write("\x1b]11;rgb:1010/1010/1010\x1b\\"); } catch {}
-          }
-          if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: str });
-          }
-        });
-
-        proc.stderr?.on("data", (chunk: Buffer) => {
-          if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: chunk.toString("utf-8") });
-          }
-        });
-
-        proc.on("exit", (code) => {
-          if (activeTerminals.get(id)?.process === proc) activeTerminals.delete(id);
-          if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:exit", { id, conversationId: owner, code });
-          }
-        });
-
-        proc.on("error", (err) => {
-          console.error(`[Terminal ${id}] Process error:`, err);
-          if (activeTerminals.get(id)?.process === proc) activeTerminals.delete(id);
-          if (win && !win.isDestroyed()) {
-            sendDesktopEvent(win.webContents, "terminal:data", { id, conversationId: owner, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
-            sendDesktopEvent(win.webContents, "terminal:exit", { id, conversationId: owner, code: 1 });
-          }
-        });
-
-        return { success: true, id, cwd: targetCwd };
+        const targetCwd = await terminalWorkingDirectory(options);
+        if (mcpShuttingDown) throw new Error("Desktop is shutting down");
+        return await terminalSessions.create({ ...options, conversationId: owner, cwd: targetCwd });
       } catch (err: any) {
         console.error(`[Terminal ${id}] Spawn failed:`, err);
         return { success: false, error: err.message };
@@ -2968,32 +2866,17 @@ app.whenReady().then(() => {
     }
   );
 
-  handleDesktopIpc(
-    "terminal:write",
-    async (_event, options: { id: string; data: string; conversationId: string }) => {
-      const owner = requireConversationId(options.conversationId);
-      const term = activeTerminals.get(options.id);
-      if (term?.conversationId !== owner) return false;
-      if (term && term.process.stdin && !term.process.stdin.destroyed) {
-        term.process.stdin.write(options.data);
-        return true;
-      }
-      return false;
-    }
+  handleDesktopIpc("terminal:write", async (_event, options: { id: string; data: string; conversationId: string }) =>
+    terminalSessions.write({ ...options, conversationId: requireConversationId(options.conversationId) })
   );
 
-  handleDesktopIpc("terminal:destroy", async (_event, id: string, conversationId: string) => {
-    const term = activeTerminals.get(id);
-    if (term?.conversationId !== requireConversationId(conversationId)) return false;
-    if (term) {
-      try {
-        if (term.process.pid) killProcessTree(term.process.pid);
-      } catch {}
-      if (activeTerminals.get(id) === term) activeTerminals.delete(id);
-      return true;
-    }
-    return false;
-  });
+  handleDesktopIpc("terminal:resize", async (_event, options: { id: string; cols: number; rows: number; conversationId: string }) =>
+    terminalSessions.resize({ ...options, conversationId: requireConversationId(options.conversationId) })
+  );
+
+  handleDesktopIpc("terminal:destroy", async (_event, id: string, conversationId: string) =>
+    terminalSessions.destroy(id, requireConversationId(conversationId))
+  );
 
   // ---------------------------------------------------------------------------
   // Browser Control IPC Handlers (OpenBot / oh-my-pi architecture)
@@ -3147,12 +3030,7 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   stopLoopbackAuthServer();
   scheduledTasksManager?.stop();
-  for (const [, term] of activeTerminals) {
-    try {
-      if (term.process.pid) killProcessTree(term.process.pid);
-    } catch {}
-  }
-  activeTerminals.clear();
+  terminalSessions.destroyAll();
   if (process.platform !== "darwin") {
     app.quit();
   }

@@ -3,6 +3,7 @@ import { MessageSquare, Globe } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { OpenTabView } from "./open-tab-view";
 import { TerminalTab } from "./terminal-tab";
+import { terminalFolderTitle } from "../../lib/terminal-location";
 import { TaskOutputTab } from "./task-output-tab";
 import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
@@ -103,7 +104,9 @@ export const RightPane = memo(function RightPane({
   const renderTabContent = (tab: RightPaneTab) => {
     switch (tab.type) {
       case "terminal":
-        return <TerminalTab tab={{ ...tab, conversationId: tab.conversationId || parentConversationId }} />;
+        return <TerminalTab tab={{ ...tab, conversationId: tab.conversationId || parentConversationId }} onReady={cwd => {
+          if (cwd !== tab.cwd) onUpdateTab?.(tab.id, { cwd, title: terminalFolderTitle(cwd, tab.project) || tab.title });
+        }} />;
       case "task_output":
         return <TaskOutputTab tab={{ ...tab, conversationId: tab.conversationId || parentConversationId }} onStopTask={onStopTask} />;
       case "review":

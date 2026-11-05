@@ -22,7 +22,7 @@ export default defineConfig({
             reportCompressedSize: false,
             // Keep ws's optional native addons inside its guarded Node require().
             // Bundling them creates eager Vite error stubs and crashes Electron.
-            rollupOptions: { external: ["ws"] },
+            rollupOptions: { external: ["ws", "node-pty"] },
           },
           resolve: {
             alias: [
