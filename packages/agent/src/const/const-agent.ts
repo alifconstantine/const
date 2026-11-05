@@ -1,4 +1,5 @@
 import { isContextWindowError, isPermanentQuotaResponse, isUnsupportedImageError } from "./model-retry.js";
+import { fitRequestHistory } from "./request-history.js";
 import { RESPONSE_PRESENTATION_GUIDANCE } from "./prompt-guidance.js";
 import { consumeChatStream, abortableDelay } from "./chat-stream.js";
 
@@ -853,7 +854,7 @@ export class ConstAgent {
     const emitContext = () => {
       const breakdown = calculateContextBreakdown({
         systemPrompt: contextSystemPrompt, tools: contextTools,
-        messages: compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4),
+        messages: fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4)),
       });
       onEvent({ type: "context_update", model: this.config.model, updatedAt: Date.now(), systemPromptTokens: breakdown.systemTokens,
         toolsTokens: breakdown.toolsTokens, messagesTokens: breakdown.messageTokens,
@@ -983,7 +984,7 @@ export class ConstAgent {
 
         contextSystemPrompt = systemPrompt;
         contextTools = requestTools;
-        const historyForContext = compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4);
+        const historyForContext = fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4));
         // Request-only reminders preserve the stable prefix and never become human instructions in stored history.
         const requestHistory: AgentMessage[] = [...historyForContext, ...(turnInstructions.length ? [{ role: "system" as const, content: turnInstructions.join("\n\n") }] : [])];
 
