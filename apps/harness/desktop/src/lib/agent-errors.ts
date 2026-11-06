@@ -2,14 +2,23 @@ export interface AgentFailure {
   error?: string;
   aborted?: boolean;
   errorReported?: boolean;
+  category?: string;
+  errorCategory?: string;
+  outcome?: string;
+}
+
+export function isAgentCancellation(result: AgentFailure): boolean {
+  if (result.aborted || result.outcome === "cancelled") return true;
+  const category = result.category ?? result.errorCategory;
+  if (category !== undefined) return category === "cancelled";
+  return /cancelled|abort/i.test(result.error ?? "");
 }
 
 export function shouldNotifyAgentFailure(result: AgentFailure): boolean {
   return Boolean(
     result.error &&
-    !result.aborted &&
-    !result.errorReported &&
-    !/cancelled|abort/i.test(result.error),
+    !isAgentCancellation(result) &&
+    !result.errorReported,
   );
 }
 

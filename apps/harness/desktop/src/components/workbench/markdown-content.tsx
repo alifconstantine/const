@@ -185,7 +185,7 @@ const TokenRenderer = React.memo(function TokenRenderer({
       if (lang === "mermaid") {
         return <React.Suspense fallback={<pre className="whitespace-pre-wrap">{code.text}</pre>}><MermaidBlock code={code.text} isStreaming={isStreaming} /></React.Suspense>;
       }
-      return <CodeBlock code={code.text} language={code.lang || "text"} />;
+      return <CodeBlock code={code.text} language={code.lang || "text"} isStreaming={isStreaming} />;
     }
 
     case "list": {
@@ -314,17 +314,17 @@ function TableBlock({ header, rows, align }: { header: Tokens.TableCell[]; rows:
   return <ResponseTable columns={header.map((cell) => cell.text)} rows={rows.map((row) => row.map((cell) => cell.text))} align={align} renderCell={(value) => <InlineRenderer text={value} />} />;
 }
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
+function CodeBlock({ code, language, isStreaming = false }: { code: string; language: string; isStreaming?: boolean }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   const highlighted = useMemo(() => {
-    if (code.length > 100_000) return escapeHtml(code);
+    if (isStreaming || code.length > 100_000) return escapeHtml(code);
     const aliases: Record<string, string> = { javascript: "js", typescript: "ts", python: "py", shell: "sh", plaintext: "text" };
     const tag = language.toLowerCase().split(/[\s:{]/)[0] || "text";
     return sanitizeHighlightedCode(highlightCodeToHtmlLines(code, aliases[tag] || tag).join("\n"), code);
-  }, [code, language]);
+  }, [code, language, isStreaming]);
 
   const handleCopy = async () => {
     try {

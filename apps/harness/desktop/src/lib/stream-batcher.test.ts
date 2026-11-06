@@ -23,6 +23,8 @@ test("delta batches preserve text, ordering and structural barriers", t => {
   for (const token of ["one", " ", "two"]) batcher.forward({ type: "token", token, remoteSequence: events.length });
   assert.equal(events.length, 0);
   t.mock.timers.tick(16);
+  assert.equal(events.length, 0);
+  t.mock.timers.tick(18);
   assert.equal(events[0].token, "one two");
   batcher.forward({ type: "thinking", thinking: "reason" });
   batcher.forward({ type: "thinking", thinking: "ing" });
@@ -52,7 +54,7 @@ test("run and conversation boundaries never merge and final flush delivers the l
   assert.equal(events.length, 3);
 });
 
-test("a synthetic 1000-delta burst becomes 63 deliveries without losing content", t => {
+test("a 1000-delta burst stays near 30 deliveries per second without losing content", t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const events: any[] = [];
   const batcher = createStreamBatcher(event => events.push(event));
@@ -61,6 +63,26 @@ test("a synthetic 1000-delta burst becomes 63 deliveries without losing content"
     t.mock.timers.tick(1);
   }
   batcher.flush();
-  assert.equal(events.length, 63);
+  assert.ok(events.length >= 29 && events.length <= 32, `Unexpected frame cadence: ${events.length}`);
   assert.equal(events.map(event => event.token).join(""), Array.from({ length: 1000 }, (_, index) => `${index},`).join(""));
+});
+
+test("renderer pressure delays deltas but never completion or error barriers", t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const events: any[] = [];
+  let delay = 150;
+  const batcher = createStreamBatcher(event => events.push(event), () => delay);
+  batcher.forward({ type: "thinking", thinking: "one" });
+  t.mock.timers.tick(100);
+  assert.equal(events.length, 0);
+  batcher.forward({ type: "thinking", thinking: " two" });
+  batcher.forward({ type: "error", error: "failure" });
+  assert.deepEqual(events.map(event => event.type), ["thinking", "error"]);
+  assert.equal(events[0].thinking, "one two");
+  delay = 34;
+  batcher.forward({ type: "token", token: "answer" });
+  t.mock.timers.tick(34);
+  assert.equal(events[2].token, "answer");
+  batcher.forward({ type: "done" });
+  assert.equal(events[3].type, "done");
 });

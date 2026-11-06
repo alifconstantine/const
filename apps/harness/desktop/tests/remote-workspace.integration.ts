@@ -44,6 +44,26 @@ async function run() {
   await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
   await waitFor('document.body.innerText.includes("Audit the remote workspace.")');
 
+  await check("failed and cancelled sessions never trigger completion sound or success notifications; language changes apply", async () => {
+    await js(`window.__remoteFixture.beginNotificationProbe(); localStorage.setItem('const_harness_sound_alerts','true'); localStorage.setItem('const_harness_task_notifications','true');
+      window.__remoteFixture.emit('agent:session-ended',{conversationId:'notification-test',runId:'failed',outcome:'failed',errorCategory:'payload'});`);
+    await waitFor(`window.__remoteFixture.notificationProbe.requests.length === 1`);
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.requests[0].title`), 'Task stopped with an error');
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.sounds`), 0);
+    await js(`window.__remoteFixture.emit('agent:session-ended',{conversationId:'notification-test',runId:'cancelled',outcome:'cancelled'});
+      window.__remoteFixture.emit('agent:session-ended',{conversationId:'notification-test',runId:'legacy'});`);
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.requests.length`), 1);
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.sounds`), 0);
+    await js(`dispatchEvent(new CustomEvent('const-language-changed',{detail:'id'}))`);
+    await delay(150);
+    await js(`window.__remoteFixture.emit('agent:session-ended',{conversationId:'notification-test',runId:'completed',outcome:'completed'});`);
+    await waitFor(`window.__remoteFixture.notificationProbe.requests.length === 2`);
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.requests[1].title`), 'Tugas selesai');
+    assert.equal(await js(`window.__remoteFixture.notificationProbe.sounds`), 1);
+    await js(`window.__remoteFixture.endNotificationProbe(); dispatchEvent(new CustomEvent('const-language-changed',{detail:'en'}))`);
+    await delay(150);
+  });
+
   await check("terminal folder labels and late resolutions remain attached to their own chat", async () => {
     await js(`window.electron.saveConversation({id:'terminal-chat-b',title:'Terminal workspace B',project:'/workspace/const',createdAt:Date.now(),updatedAt:Date.now(),messages:[]})`);
     await js(`window.__remoteFixture.emit('conversations:changed',{conversationId:'terminal-chat-b'}); window.__remoteFixture.holdTerminalDirectory('preview-chat')`);
@@ -474,6 +494,7 @@ async function run() {
   await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
   await waitFor('Boolean(document.querySelector("[data-workbench-activity]"))');
   await check("Activity replaces the browser shortcut and groups progress, jobs, agents, changes and sources", async () => {
+    assert.equal(await js(`document.querySelector('[data-activity-section=progress] > button').innerText.includes('1/2')`), true, 'Canonical Todo must survive a later malformed failed call');
     assert.deepEqual(await js(`Array.from(document.querySelectorAll('[data-activity-section]')).map(section => section.dataset.activitySection)`), ['progress','jobs','agents','changes','sources']);
     await capture('activity-desktop-dark');
     await js(`document.querySelector('[data-activity-section=changes] > button').click(); document.querySelector('[data-activity-section=sources] > button').click()`);

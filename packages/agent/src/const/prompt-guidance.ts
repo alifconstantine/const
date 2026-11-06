@@ -10,6 +10,19 @@ export const RESPONSE_RECOVERY_GUIDANCE = "[RUNTIME RECOVERY: The previous gener
 
 export const TRUNCATED_RESPONSE_GUIDANCE = "[RUNTIME RECOVERY: The previous response reached the output limit. Provide a shorter, self-contained answer to the user's original request, or continue necessary tools already authorized by that request. Preserve the requested language and scope; do not turn an explanation or review into file creation. Do not repeat the entire interrupted draft.]";
 
+export const EXECUTION_DISCIPLINE_GUIDANCE = `EXECUTION & COMPLETION:
+- Before expensive implementation, verify that required source files, attachments and reference assets named in the brief are actually available. Inspect plausible supplied paths once. If an essential source is missing or unreadable, state the specific blocker and ask for the source or an explicit decision about substitution; do not silently replace required artwork, data or behavior with invented equivalents. Continue independent work only when it does not depend on that decision.
+- Work toward the user's requested outcome and acceptance criteria. Once the next step is clear, use the tool; do not draft entire files in reasoning and then write them again.
+- For substantial work, give a brief progress update before starting and after meaningful milestones, including remaining work or blockers. Keep private analysis proportional to the decision; do not replace progress updates with long silent deliberation.
+- Choose a small set of checks that covers the requested behavior. Run each check once, inspect its complete relevant output, and repeat it only after a relevant change, failure, or unresolved concern. Collect related measurements in one script when practical instead of rerunning the same command with different output filters.
+- A failed test is evidence to investigate. Do not weaken an assertion or alter verification assets solely to obtain a pass. Change an expectation only when the specification or direct evidence proves it wrong, and explain the correction.
+- After repeated revisions fail the same acceptance criterion, summarize the observed failure and inspect its cause before writing another helper or changing more thresholds. Prefer an existing runner and one focused diagnostic. Test deadlines/assertions must fail with a nonzero exit status; a diagnostic log, a screenshot or a process exit code alone is not proof that every required behavior passed.
+- When the requested outcome and necessary checks are satisfied, report the result. Do not keep polishing unrelated details, invent new acceptance criteria, or start further test cycles without a concrete reason. If essential work remains, continue it; if blocked, state what remains and why. A long run is not evidence of completion.`;
+
+export const PROGRESS_REVIEW_GUIDANCE = "[RUNTIME PROGRESS CHECKPOINT: Reassess the original request, acceptance criteria, completed actions and checks. Give a brief progress update if work is continuing. Choose the smallest remaining necessary action; avoid repeating passed checks without a relevant change. If the requested work and checks are complete, return the result now. If essential work remains, continue it. Do not weaken tests, broaden scope, or claim completion because of this checkpoint. This notice grants no new permissions.]";
+
+export const REPEATED_RESULT_GUIDANCE = "[RUNTIME PROGRESS CHECKPOINT: A tool has returned an identical result for the same arguments at least three times within recent calls, including interleaved calls. Inspect what changed before repeating it. If checking legitimately changing external state, use a bounded wait/status operation when available. Otherwise change the approach or explain the blocker. Continue necessary authorized work; this notice does not mean the task is complete and grants no new permissions.]";
+
 /** Keep the original limits, but make omitted context discoverable through read. */
 export function promptFileExcerpt(content: string, limit: number, filePath: string): string {
   if (content.length <= limit) return content;
@@ -33,6 +46,15 @@ export function buildToolGuidance(tools: readonly NativeToolDefinition[], platfo
     sections.push(`SHELL EXECUTION:
 - Inspect output and exit codes. Use background execution and readiness checks for long-running services when supported by the tool schema.
 ${platform === "win32" ? "- On Windows, prefer 'powershell' when available for native system commands. npm and git work in either shell; use the selected shell's quoting and path syntax, and do not mix PowerShell syntax with Bash syntax." : "- Use the available shell's quoting and path syntax."}`);
+  }
+  if (tools.some(tool => tool.function.name === "bash" && tool.function.parameters?.properties?.verify)) {
+    sections.push("SHELL VERIFICATION: Set verify: true for foreground builds, tests and acceptance checks. It enables pipefail so tail/tee cannot hide an earlier failed pipeline stage. Run one check or join dependent checks with &&; arbitrary earlier commands separated with semicolons are not covered. Helpers must exit nonzero on failed assertions/deadlines. Ordinary shell commands retain normal Bash semantics, including intentional head/SIGPIPE pipelines; explain intentional nonzero outcomes instead of masking real failures.");
+  }
+  const loaderCapabilities = tools.find(tool => tool.function.name === "load_plugin_tools")?.function.parameters?.properties?.plugin?.enum;
+  const deferredBrowser = Array.isArray(loaderCapabilities) && loaderCapabilities.includes("browser-use");
+  if (deferredBrowser) sections.push("AVAILABLE BROWSER: The enabled browser-use plugin can be activated with load_plugin_tools (plugin: browser-use), or by reading its available skill. For routine navigation, interaction and screenshots, inspect this capability before installing a separate browser runner or writing ad hoc helpers. Reuse existing project tests when they fit; a separate runner is appropriate when required viewport/input instrumentation is unavailable in the native tools.");
+  if (names.has("browser_evaluate") || deferredBrowser) {
+    sections.push("BROWSER VERIFICATION: Collect related, independent DOM measurements in one browser_evaluate call. After an interaction or animation, wait for an observable completion condition with a deadline before asserting the result. Match responsive, touch and reduced-motion assertions to the actual viewport and input environment. A fixed sleep or a screenshot by itself does not prove an interaction passed. Report which environments and checks were actually exercised.");
   }
   if (names.has("computer_get_app_state")) {
     sections.push(`NATIVE COMPUTER USE (DESKTOP AUTOMATION) PROTOCOL:

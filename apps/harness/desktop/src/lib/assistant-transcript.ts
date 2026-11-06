@@ -1,4 +1,5 @@
 import type { TraceStep } from "../vite-env";
+import { latestTodoState } from "./activity-state";
 
 /** A model response followed by tools is public progress, not the final answer. */
 export function archiveAssistantCommentary<T extends { content?: string; traceSteps?: TraceStep[] }>(
@@ -16,7 +17,8 @@ export function archiveAssistantCommentary<T extends { content?: string; traceSt
 /** Reconstruct progress → calls/results → final answer for continuation prompts. */
 export function serializeAssistantTranscript(message: {
   content?: string; thinking?: string; timestamp?: number; traceSteps?: TraceStep[];
-  toolCalls?: Array<{ id: string; name: string; args?: any; result?: any }>;
+  toolCalls?: Array<{ id: string; name: string; args?: any; result?: any; isError?: boolean }>;
+  todos?: unknown;
 }): any[] {
   const calls = message.toolCalls || [];
   const seen = new Set<string>();
@@ -34,6 +36,7 @@ export function serializeAssistantTranscript(message: {
     commentary = "";
     thinking = undefined;
     messages.push({ role: "tool", tool_call_id: id, name: call.name,
+      isError: call.isError,
       content: typeof call.result === "string" ? call.result : call.result == null ? "" : JSON.stringify(call.result) });
   };
   for (const step of message.traceSteps || []) {
@@ -46,5 +49,11 @@ export function serializeAssistantTranscript(message: {
   calls.forEach(addTool);
   if (commentary) messages.push({ role: "assistant", content: commentary });
   if (message.content) messages.push({ role: "assistant", content: message.content, ...(thinking ? { thinking } : {}) });
+  const todos = latestTodoState([{ ...message, role: "assistant" }]);
+  const lastAssistant = [...messages].reverse().find(entry => entry.role === "assistant");
+  if (todos) {
+    if (lastAssistant) lastAssistant.todos = todos;
+    else messages.push({ role: "assistant", content: "", todos });
+  }
   return messages;
 }

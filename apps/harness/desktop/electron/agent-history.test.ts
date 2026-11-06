@@ -4,8 +4,33 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ConversationDatabase } from "./database";
-import { selectAgentAutosaveMessages } from "./agent-history";
+import { mergeCanonicalTodoState, selectAgentAutosaveMessages } from "./agent-history";
 import { AgentSessionRegistry } from "./agent-sessions";
+
+test("host canonical Todo survives stale renderer saves, SQLite reopen and failure without losing rich traces", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-plan-history-"));
+  let database = new ConversationDatabase(dir);
+  const open = [{ content: "Verify", status: "pending" }];
+  const rich = [{ id: "user", role: "user", content: "Build" }, { role: "assistant", content: "Failure", durationMs: 500,
+    traceSteps: [{ id: "read", type: "tool", name: "read", result: "evidence" }], todos: open }];
+  const host = [{ id: "user", role: "user", content: "Build" }, { role: "assistant", content: "", todos: [] }];
+  try {
+    const merged = selectAgentAutosaveMessages(rich, host);
+    assert.deepEqual(merged[1]?.todos, []);
+    assert.deepEqual(merged[1]?.traceSteps, rich[1]?.traceSteps);
+    assert.deepEqual(rich[1]?.todos, open);
+    assert.deepEqual(mergeCanonicalTodoState(rich, host)[1]?.todos, []);
+    database.saveConversation({ id: "plan", title: "Plan", project: dir, createdAt: 1, updatedAt: 1, messages: merged });
+    (database as any).db.close(); database = new ConversationDatabase(dir);
+    assert.deepEqual(database.getConversation("plan")!.messages[1]?.todos, []);
+    const different = [{ id: "other", role: "user", content: "Different task" }, { role: "assistant", content: "", todos: [] }];
+    assert.equal(mergeCanonicalTodoState(rich, different), rich);
+    const newer = [...rich, { id: "next", role: "user", content: "Next task" }];
+    assert.equal(mergeCanonicalTodoState(newer, host), newer);
+  } finally {
+    (database as any).db.close(); fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("cancelled run autosave retains renderer traces and duration after reopening", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "const-history-"));

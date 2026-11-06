@@ -61,6 +61,12 @@ export function SmoothCollapse({
   children: React.ReactNode;
   className?: string;
 }) {
+  const [present, setPresent] = useState(isOpen);
+  useEffect(() => {
+    if (isOpen) { setPresent(true); return; }
+    const timer = setTimeout(() => setPresent(false), 220);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
   return (
     <div
       style={{
@@ -73,16 +79,21 @@ export function SmoothCollapse({
       }}
       className={className}
     >
-      <div className="overflow-hidden min-h-0">{children}</div>
+      <div className="overflow-hidden min-h-0">{(isOpen || present) ? children : null}</div>
     </div>
   );
 }
 
+const EMPTY_TOOLS: TraceToolCall[] = [];
+const EMPTY_STEPS: TraceStep[] = [];
+const EMPTY_MUTATIONS: FileMutationRecord[] = [];
+const TRACE_PAGE_SIZE = 60;
+
 export function ExecutionTrace({
   thinking,
-  toolCalls = [],
-  traceSteps = [],
-  mutations = [],
+  toolCalls = EMPTY_TOOLS,
+  traceSteps = EMPTY_STEPS,
+  mutations = EMPTY_MUTATIONS,
   isExecuting = false,
   durationMs,
   showMutationsSummary = false,
@@ -99,6 +110,7 @@ export function ExecutionTrace({
   const { t } = useTranslation();
   // Default: Open while executing to view progress live; automatically closed when worked/finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
+  const [visibleCount, setVisibleCount] = useState(TRACE_PAGE_SIZE);
   const wasExecutingRef = useRef(isExecuting);
 
   useEffect(() => {
@@ -155,6 +167,7 @@ export function ExecutionTrace({
     }
     return onlyDraft ? [...result, ...traceSteps] : result;
   }, [traceSteps, thinking, toolCalls, durationMs]);
+  const firstVisible = Math.max(0, steps.length - visibleCount);
 
   const hasContent = steps.length > 0 || mutations.length > 0 || isExecuting;
   if (!hasContent) return null;
@@ -201,7 +214,11 @@ export function ExecutionTrace({
       {/* Trace Body with Smooth Collapse */}
       <SmoothCollapse isOpen={isMainOpen}>
         <div data-working-process aria-hidden={!isMainOpen} inert={!isMainOpen} className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
-          {steps.map((step, idx) => {
+          {firstVisible > 0 && <button type="button" className="w-fit py-2 text-xs text-[#969696] hover:text-[#d4d4d4]" onClick={() => setVisibleCount(count => count + TRACE_PAGE_SIZE)}>
+            {t("workbench.showEarlierActivity", { count: String(firstVisible) })}
+          </button>}
+          {steps.slice(firstVisible).map((step, visibleIdx) => {
+            const idx = firstVisible + visibleIdx;
             if (step.type === "commentary") {
               return <div key={step.id} data-process-commentary className="py-2 select-text">
                 <MarkdownContent content={step.content || ""} isStreaming={step.isStreaming}
@@ -385,7 +402,7 @@ export function ExecutionTrace({
 // Header: "? Asked 2 questions ⌄"
 // Body: Bold question + muted answer
 // ---------------------------------------------------------------------------
-function AskedQuestionsTraceItem({ step }: { step: TraceStep | TraceToolCall }) {
+const AskedQuestionsTraceItem = React.memo(function AskedQuestionsTraceItem({ step }: { step: TraceStep | TraceToolCall }) {
   const [isOpen, setIsOpen] = useState(true);
 
   let rawQuestions: any[] = [];
@@ -464,14 +481,16 @@ function AskedQuestionsTraceItem({ step }: { step: TraceStep | TraceToolCall }) 
       </SmoothCollapse>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Thought Item: Clean minimalist layout exactly matching user reference image
 // Header: "Thought for 7s ⌄"
 // Body: Bold title + muted text (#888888), NO cards, NO borders, NO extra boxes
 // ---------------------------------------------------------------------------
-function ThoughtItem({
+const THINKING_MARKDOWN_CLASS = "text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1";
+
+const ThoughtItem = React.memo(function ThoughtItem({
   thinking,
   isExecuting,
   durationMs,
@@ -488,10 +507,16 @@ function ThoughtItem({
   // 1. Auto open when thinking starts, and auto close when thinking completes
   const [isOpen, setIsOpen] = useState(Boolean(isExecuting));
   const prevExecutingRef = useRef(Boolean(isExecuting));
+  const [showFullThinking, setShowFullThinking] = useState(false);
+  const [thinkingSnapshot, setThinkingSnapshot] = useState("");
+  const livePreview = Boolean(isExecuting && !showFullThinking);
+  const displayedThinking = isExecuting && showFullThinking ? thinkingSnapshot : thinking;
 
   useEffect(() => {
     if (isExecuting && !prevExecutingRef.current) {
       setIsOpen(true);
+      setShowFullThinking(false);
+      setThinkingSnapshot("");
     } else if (!isExecuting && prevExecutingRef.current) {
       setIsOpen(false);
     }
@@ -530,10 +555,11 @@ function ThoughtItem({
   }, []);
 
   useEffect(() => {
-    checkScroll();
-  }, [thinking, isOpen, checkScroll]);
+    if (isOpen && !livePreview) checkScroll();
+  }, [displayedThinking, isOpen, livePreview, checkScroll]);
 
   useEffect(() => {
+    if (!isOpen || livePreview) return;
     const el = viewportRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => checkScroll());
@@ -542,7 +568,7 @@ function ThoughtItem({
       ro.observe(el.firstElementChild);
     }
     return () => ro.disconnect();
-  }, [checkScroll, isOpen]);
+  }, [checkScroll, isOpen, livePreview]);
 
   const maskStyle = useMemo(() => {
     if (!canScrollDown && !canScrollUp) return undefined;
@@ -588,29 +614,27 @@ function ThoughtItem({
 
       <SmoothCollapse isOpen={isOpen}>
         <div className="relative pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
-          {/* Scroll area bounded max height with fade matching Image 1 */}
-          <ScrollArea
-            viewportRef={viewportRef}
-            onScroll={checkScroll}
-            viewportStyle={
-              maskStyle
-                ? {
-                    WebkitMaskImage: maskStyle,
-                    maskImage: maskStyle,
-                  }
-                : undefined
-            }
-            className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block"
-          >
-            <MarkdownContent
-              content={thinking}
-              onOpenBrowser={onOpenBrowser}
-              className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
-            />
-          </ScrollArea>
+          {isExecuting && isInitiallyLong && <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[#969696]">
+            {livePreview && <span>{t("workbench.thinkingPreview")}</span>}
+            <button type="button" className="shrink-0 hover:text-[#d4d4d4]" onClick={() => {
+              if (livePreview) setThinkingSnapshot(thinking);
+              setShowFullThinking(livePreview);
+            }}>{t(livePreview ? "workbench.showFullThinking" : "workbench.liveThinking")}</button>
+          </div>}
+          {livePreview ? (
+            // A clipped live preview is not a scrollable pane. Keep its tail
+            // independent of ScrollArea sizing/observer feedback on every delta.
+            <div className="max-h-56 overflow-hidden flex flex-col justify-end">
+              <div className="shrink-0">
+                {thinking.length > 12_000 ? <pre className="whitespace-pre-wrap font-sans">{thinking.slice(-4_000)}</pre>
+                  : <MarkdownContent content={thinking} isStreaming onOpenBrowser={onOpenBrowser} className={THINKING_MARKDOWN_CLASS} />}
+              </div>
+            </div>
+          ) : <ThinkingScrollBody content={displayedThinking} isStreaming={Boolean(isExecuting)} viewportRef={viewportRef}
+            checkScroll={checkScroll} maskStyle={maskStyle} onOpenBrowser={onOpenBrowser} />}
 
           {/* Gradient fade indicator matching Image 1 to visually indicate more content below */}
-          {canScrollDown && (
+          {!livePreview && canScrollDown && (
             <div
               aria-hidden="true"
               className="pointer-events-none absolute bottom-2 left-0.5 right-2.5 h-8 bg-gradient-to-t from-[#f8f8f8] via-[#f8f8f8]/80 dark:from-[#161616] dark:via-[#161616]/80 to-transparent transition-opacity duration-200"
@@ -620,7 +644,19 @@ function ThoughtItem({
       </SmoothCollapse>
     </div>
   );
-}
+});
+
+const ThinkingScrollBody = React.memo(function ThinkingScrollBody({ content, isStreaming, viewportRef, checkScroll, maskStyle, onOpenBrowser }: {
+  content: string; isStreaming: boolean; viewportRef: React.Ref<HTMLDivElement>; checkScroll: () => void;
+  maskStyle?: string; onOpenBrowser?: (url: string) => void;
+}) {
+  return <ScrollArea viewportRef={viewportRef} onScroll={checkScroll}
+    viewportStyle={maskStyle ? { WebkitMaskImage: maskStyle, maskImage: maskStyle } : undefined}
+    className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
+    <MarkdownContent content={content} isStreaming={isStreaming} onOpenBrowser={onOpenBrowser}
+      className={THINKING_MARKDOWN_CLASS} />
+  </ScrollArea>;
+});
 
 // ---------------------------------------------------------------------------
 // Terminal Command Icon: displays language/tool brand icon powered by @thesvg/react
@@ -723,7 +759,7 @@ function TerminalCommandIcon({ cmd }: { cmd: string }) {
 // ---------------------------------------------------------------------------
 // Terminal Card: Clean single line row, click to expand terminal output
 // ---------------------------------------------------------------------------
-function TerminalCard({
+const TerminalCard = React.memo(function TerminalCard({
   tool,
   isDefaultOpen = false,
   isWaitingApproval = false,
@@ -851,12 +887,12 @@ function TerminalCard({
       </SmoothCollapse>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Python Runner Item (run_python, python, code_interpreter) with @thesvg/react Python logo
 // ---------------------------------------------------------------------------
-function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
+const PythonRunnerTraceItem = React.memo(function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
   const [isOpen, setIsOpen] = useState(false);
   const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
 
@@ -884,6 +920,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
   const isError = Boolean(tool.isError || (tool as any).status === "error");
 
   useEffect(() => {
+    if (!isOpen) return;
     if (artifacts.length === 0) return;
     const electron = (window as any).electron;
     if (!electron?.readMedia) return;
@@ -906,7 +943,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
     return () => {
       isMounted = false;
     };
-  }, [artifacts]);
+  }, [artifacts, isOpen]);
 
   return (
     <div className="w-full min-w-0 flex flex-col my-0.5">
@@ -1011,12 +1048,12 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
       </SmoothCollapse>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // File Mutation Tool Item: Clean Seti icon + filename + +X -Y diffs (#409D62 / #ff5c5c)
 // ---------------------------------------------------------------------------
-function FileMutationToolItem({
+const FileMutationToolItem = React.memo(function FileMutationToolItem({
   tool,
   mutations,
   onOpenFileDiff,
@@ -1098,12 +1135,12 @@ function FileMutationToolItem({
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Exploration Item: e.g. "Searched *pattern* 7 results" or "Read file.tsx"
 // ---------------------------------------------------------------------------
-function ExplorationItem({
+const ExplorationItem = React.memo(function ExplorationItem({
   tool,
   mutations,
   onOpenFilePreview,
@@ -1283,13 +1320,13 @@ function ExplorationItem({
       )}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // SubAgent Delegation Trace Item (Image 2 & 3)
 // Monochrome studio styling: [Bot] SubAgent <role> · <Title> [Status]
 // ---------------------------------------------------------------------------
-function SubAgentTraceItem({
+const SubAgentTraceItem = React.memo(function SubAgentTraceItem({
   tool,
   onOpenSubAgent,
 }: {
@@ -1447,12 +1484,12 @@ function SubAgentTraceItem({
       )}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Generic Tool Item fallback (including browser_* native tools)
 // ---------------------------------------------------------------------------
-function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
+const GenericToolItem = React.memo(function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
   const toolName = tool.name ?? "";
   const isBrowserTool = toolName.startsWith("browser_");
   let targetArg = "";
@@ -1509,7 +1546,7 @@ function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
       {targetArg && <span className="text-[#d4d4d4] truncate font-mono text-xs">{targetArg}</span>}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Changed Files Summary Card

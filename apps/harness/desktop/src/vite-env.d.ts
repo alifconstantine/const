@@ -278,6 +278,7 @@ export interface MemoryFileInfo {
 declare global {
   interface Window {
     electron?: {
+      reportRendererHealth?: (sample: import("./lib/renderer-health").RendererHealthSample) => Promise<void>;
       platform: string;
       versions: {
         node: string;
@@ -334,6 +335,8 @@ declare global {
         aborted?: boolean;
         alreadyRunning?: boolean;
         errorReported?: boolean;
+        outcome?: "completed" | "failed" | "cancelled";
+        errorCategory?: string;
         messages?: any[];
         workspacePath?: string;
         isOutsideProject?: boolean;
@@ -388,7 +391,7 @@ declare global {
       }) => Promise<{ success: boolean; error?: string }>;
       getRunningSessions?: () => Promise<string[]>;
       onSessionStarted?: (callback: (data: { conversationId: string; runId?: string; startedAt?: number }) => void) => () => void;
-      onSessionEnded?: (callback: (data: { conversationId: string; runId?: string }) => void) => () => void;
+      onSessionEnded?: (callback: (data: import("./lib/agent-outcomes").AgentSessionEnded) => void) => () => void;
       rollbackFile: (record: FileMutationRecord, conversationId: string) => Promise<{
         success: boolean;
         message?: string;

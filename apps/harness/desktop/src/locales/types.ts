@@ -324,6 +324,10 @@ export interface TranslationDictionary {
     editMessage: string;
     addAttachment: string;
     sendEditedPrompt: string;
+    showEarlierActivity: string;
+    thinkingPreview: string;
+    liveThinking: string;
+    showFullThinking: string;
     thinkingWithDuration: string;
     thoughtFor: string;
     greetingMorning: string;
@@ -998,6 +1002,12 @@ export interface TranslationDictionary {
     outside: string;
   };
   toast: {
+    imagePreparationFailed: string;
+    requestTooLarge: string;
+    taskCompleted: string;
+    taskCompletedBody: string;
+    taskFailed: string;
+    taskFailedBody: string;
     failedToSendEdited: string;
     agentExecutionError: string;
     communicationError: string;

@@ -95,6 +95,8 @@ app.on("browser-window-created", (_event, window) => {
 
       const { createServer } = require('node:http');
       const requests = [];
+      let releaseReload;
+      let releasePlan;
       const mock = createServer(async (req, res) => {
         try {
           const chunks = []; for await (const chunk of req) chunks.push(chunk);
@@ -103,12 +105,24 @@ app.on("browser-window-created", (_event, window) => {
           const marker = instruction.match(/WORK_([a-z_]+)/)?.[1];
           assert(marker, 'Unrecognized mock task');
           requests.push({ marker, body });
+          if (marker === 'payload_failure') { res.writeHead(413, {'Content-Type':'text/plain'}).end('FUNCTION_PAYLOAD_TOO_LARGE'); return; }
           const toolResults = body.messages.filter(message => message.role === 'tool');
+          if (marker === 'plan_checkpoint' && toolResults.length === 1 && !releasePlan) {
+            await new Promise(resolve => { releasePlan = resolve; });
+          }
+          if (marker === 'renderer_reload' && toolResults.length === 0 && !releaseReload) {
+            await new Promise(resolve => { releaseReload = resolve; });
+          }
           const cwd = marker === 'outside' ? path.join(home, '.const/harness/brain/agent_outside') : project;
           assert(body.messages.some(message => message.role === 'system' && message.content.includes('Current working directory: ' + cwd)), 'Agent prompt must name the actual cwd');
           assert(!body.messages.some(message => message.role === 'system' && message.content.includes('This task has an isolated working directory')));
           let delta, finish;
-          if (marker === 'companion') {
+          if (marker === 'plan_checkpoint') {
+            if (toolResults.length < 2) {
+              delta = { tool_calls: [{ index: 0, id: 'plan_' + toolResults.length, type: 'function', function: { name: 'todo_write', arguments: JSON.stringify({ todos: toolResults.length ? [] : [{ content: 'Verify checkpoint', status: 'pending' }] }) } }] };
+              finish = 'tool_calls';
+            } else { delta = { content: 'Plan cleared as requested by fixture.' }; finish = 'stop'; }
+          } else if (marker === 'companion') {
             delta = { content: 'Companion observes the same project.' }; finish = 'stop';
           } else if (!toolResults.length) {
             delta = { tool_calls: [{ index: 0, id: 'cwd_' + marker, type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'node -e "console.log(process.cwd())"' }) } }] };
@@ -129,6 +143,31 @@ app.on("browser-window-created", (_event, window) => {
       try {
         const baseUrl = `http://127.0.0.1:${mock.address().port}/v1`;
         await js(`window.electron.saveConfig({autoCheckUpdates:false,customModels:[{id:'directory-model',provider:'directory-provider',baseUrl:${JSON.stringify(baseUrl)}}],providers:{'directory-provider':{name:'fixture',baseUrl:${JSON.stringify(baseUrl)},apiKey:'test'}}})`);
+        await js(`window.__agentEnds=[]; window.__stopAgentEndProbe=window.electron.onSessionEnded(data => window.__agentEnds.push(data)); true;`);
+        const failed = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'payload_failed',workspacePath:project,model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_payload_failure'}]})})`);
+        assert.equal(failed.success, false);
+        assert.equal(failed.outcome, 'failed');
+        assert.equal(failed.errorCategory, 'payload');
+        assert.equal(failed.errorReported, true);
+        const failedEnd = await js(`window.__agentEnds.find(item => item.conversationId === 'payload_failed')`);
+        assert.equal(failedEnd.outcome, 'failed');
+        assert.equal(failedEnd.errorCategory, 'payload');
+        assert.equal(failedEnd.runId, failed.runId);
+        const failedLog = fs.readFileSync(path.join(home,'.const/harness/brain/payload_failed/.system_generated/logs/events.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+        const terminal = failedLog.find(event => event.type === 'run_end');
+        assert.equal(terminal.outcome, 'failed');
+        assert.equal(terminal.runId, failed.runId);
+        const diagnostics = failedLog.find(event => event.type === 'llm_request' && event.phase === 'finished').diagnostics;
+        assert.equal(diagnostics.httpStatus, 413);
+        assert.equal(diagnostics.errorCategory, 'payload');
+        assert(diagnostics.requestBytes > 0 && diagnostics.messageCount > 0);
+        assert(!JSON.stringify(diagnostics).includes('Authorization'));
+        const resumed = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'payload_failed',workspacePath:project,model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_companion'}]})})`);
+        assert.equal(resumed.success, true, resumed.error);
+        assert.equal(resumed.outcome, 'completed');
+        assert.notEqual(resumed.runId, failed.runId);
+        assert.equal(await js(`window.__agentEnds.filter(item => item.conversationId === 'payload_failed').at(-1).outcome`), 'completed');
+        console.log('PASS: failed payload IPC, session-end and durable telemetry agree, and the same chat can resume successfully');
         const startRequest = requests.length;
         const [cancelled] = await js(`Promise.all([window.electron.sendMessage({conversationId:'directory_cancel',workspacePath:${JSON.stringify(project)},model:'directory-model',messages:[{role:'user',content:'WORK_cancelled'}]}),window.electron.abortAgent('directory_cancel')])`);
         assert.equal(cancelled.success, false);
@@ -165,6 +204,44 @@ app.on("browser-window-created", (_event, window) => {
         assert.equal(fs.existsSync(path.join(home, '.const/harness/workspaces')), false);
         assert.deepEqual(await js('window.electron.getRunningSessions()'), []);
         console.log('PASS: scheduled tasks use the same actual project directory and never allocate hidden project copies');
+        await js(`window.electron.sendMessage({conversationId:'plan_checkpoint',workspacePath:${JSON.stringify(project)},model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_plan_checkpoint'}]}).catch(()=>{});true`);
+        for (let i = 0; i < 200 && !releasePlan; i++) await new Promise(resolve => setTimeout(resolve, 10));
+        assert(releasePlan, 'Expected a committed plan while the next model request is waiting');
+        const committed = await js(`window.electron.getConversation('plan_checkpoint')`);
+        assert.equal(committed.messages.at(-1).todos[0].content, 'Verify checkpoint');
+        assert.equal((await js(`window.electron.getSessionSnapshot('plan_checkpoint',{hydrate:true})`)).__remoteLive.todos[0].content, 'Verify checkpoint');
+        committed.messages.at(-1).todos = [];
+        await js(`window.electron.saveConversation(${JSON.stringify(committed)})`);
+        assert.equal((await js(`window.electron.getConversation('plan_checkpoint')`)).messages.at(-1).todos.length, 1, 'Delayed renderer state cannot clear the committed host plan');
+        releasePlan();
+        for (let i = 0; i < 500; i++) {
+          if (!(await js(`window.electron.getRunningSessions()`)).includes('plan_checkpoint')) break;
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert.deepEqual((await js(`window.electron.getConversation('plan_checkpoint')`)).messages.at(-1).todos, []);
+        assert.equal(requests.filter(request => request.marker === 'plan_checkpoint').length, 3);
+        console.log('PASS: Todo checkpoints reach SQLite during the run, reject stale renderer state, and persist clear');
+        await js(`window.electron.sendMessage({conversationId:'renderer_reload',workspacePath:${JSON.stringify(project)},model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_renderer_reload'}]}).catch(()=>{});true`);
+        for (let i = 0; i < 200 && !releaseReload; i++) await new Promise(resolve => setTimeout(resolve, 10));
+        assert(releaseReload, 'Expected an in-flight model request before reloading');
+        const beforeReload = await js(`window.electron.getSessionSnapshot('renderer_reload',{hydrate:true})`);
+        assert(beforeReload?.runId);
+        const reloaded = new Promise(resolve => window.webContents.once('did-finish-load', resolve));
+        window.webContents.reload();
+        await reloaded;
+        assert((await js(`window.electron.getRunningSessions()`)).includes('renderer_reload'));
+        assert.equal((await js(`window.electron.getSessionSnapshot('renderer_reload',{hydrate:true})`)).runId, beforeReload.runId);
+        releaseReload();
+        for (let i = 0; i < 500; i++) {
+          if (!(await js(`window.electron.getRunningSessions()`)).includes('renderer_reload')) break;
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        assert.equal(fs.readFileSync(path.join(project, 'output-renderer_reload/index.html'),'utf8'), 'renderer_reload');
+        assert.equal(requests.filter(request => request.marker === 'renderer_reload').length, 3);
+        const reloadLog = fs.readFileSync(path.join(home,'.const/harness/brain/renderer_reload/.system_generated/logs/events.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+        assert.equal(reloadLog.find(event => event.type === 'run_end').outcome, 'completed');
+        assert.equal(reloadLog.filter(event => event.type === 'tool_call').length, 2);
+        console.log('PASS: reloading the renderer preserves the in-flight agent/runId and completes tools exactly once');
       } finally { await new Promise(resolve => mock.close(resolve)); }
       app.exit(0);
     } catch (error) { fail(error); }

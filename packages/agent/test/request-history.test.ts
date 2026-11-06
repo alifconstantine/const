@@ -81,3 +81,24 @@ it("refuses to split an oversized current batch into orphaned tool results", () 
   ];
   expect(() => fitRequestHistory(history)).toThrow("current tool batch");
 });
+
+it("retains middle-of-brief requirements and delivered decisions through packing and a continue request", async () => {
+  const history = longHistory();
+  const requirement = "Keep the existing customer database and keyboard shortcuts.";
+  const decision = "Remaining: verify the export button in site/report.tsx.";
+  history[0]!.content = "a".repeat(15_000) + requirement + "b".repeat(15_000);
+  history.splice(1, 0, { role: "assistant", content: "Previous decisions: " + "x".repeat(2000) + decision });
+  history.push({ role: "user", content: "lanjutkan" });
+  let request: any;
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    request = JSON.parse(init.body);
+    return new Response('data: {"choices":[{"delta":{"content":"Verified"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+  }));
+  await new ConstAgent({ model: "fixture", baseUrl: "https://fixture.invalid/v1", apiKey: "", tools: [] }).run(history, () => {});
+  const context = JSON.stringify(request.messages);
+  expect(context).toContain(requirement);
+  expect(context).toContain(decision);
+  expect(context).toContain("lanjutkan");
+  expect(request.messages.length).toBeLessThanOrEqual(500);
+  expectCompleteToolBatches(request.messages);
+});

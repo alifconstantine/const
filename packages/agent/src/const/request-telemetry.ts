@@ -1,4 +1,4 @@
-import type { AgentEvent } from "./types.js";
+import type { AgentEvent, RequestDiagnostics } from "./types.js";
 import { parseProviderUsage, type NormalizedTokenUsage } from "./token-meter.js";
 
 /** One request can contain several cumulative usage frames. Commit its last
@@ -8,13 +8,17 @@ export function trackLlmRequest(
   model: string,
   emit: (event: AgentEvent) => void,
   now = Date.now,
+  diagnostics?: RequestDiagnostics,
 ) {
   const startedAt = now();
   let ttftMs: number | undefined;
   let usage: NormalizedTokenUsage | undefined;
   let finished = false;
-  emit({ type: "llm_request", phase: "started", requestId, model, startedAt });
+  emit({ type: "llm_request", phase: "started", requestId, model, startedAt, diagnostics });
   return {
+    updateDiagnostics(update: Partial<RequestDiagnostics>) {
+      if (diagnostics) diagnostics = { ...diagnostics, ...update };
+    },
     observeUsage(raw: unknown) {
       usage = parseProviderUsage(raw) ?? usage;
     },
@@ -39,7 +43,7 @@ export function trackLlmRequest(
           durationMs, ttftMs,
         });
       }
-      emit({ type: "llm_request", phase: "finished", requestId, model, startedAt, durationMs, ttftMs, status });
+      emit({ type: "llm_request", phase: "finished", requestId, model, startedAt, durationMs, ttftMs, status, diagnostics });
     },
   };
 }

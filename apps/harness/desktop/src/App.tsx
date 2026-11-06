@@ -1,6 +1,7 @@
 import { openBrowserPane, retainBrowserTabs } from "./lib/browser-pane-state";
 import { terminalFolderTitle, updateTerminalLocation } from "./lib/terminal-location";
 import { useRemoteRuntime } from "./lib/remote-runtime";
+import { attachFileMutation, latestTodoState, parseTodoItems } from "./lib/activity-state";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   LogIn,
@@ -30,7 +31,8 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { isTelemetryEvent, reduceTelemetry, summarizeTelemetry, estimateVisibleContext, telemetryForHistory, mergeTelemetry, type ChatTelemetry } from "./lib/chat-telemetry";
-import { shouldNotifyAgentFailure } from "./lib/agent-errors";
+import { isAgentCancellation, shouldNotifyAgentFailure } from "./lib/agent-errors";
+import { agentFailureText, sessionNotification } from "./lib/agent-outcomes";
 import { Sidebar } from "./components/sidebar";
 import { TopToolbar } from "./components/workbench/top-toolbar";
 import {
@@ -170,6 +172,7 @@ interface ChatMessage {
   attachments?: AttachedFile[];
   sideInstruction?: string;
   sourceSideChatId?: string;
+  todos?: TodoItem[];
 }
 
 function formatChatMessageForLlm(
@@ -183,6 +186,7 @@ function formatChatMessageForLlm(
   tool_call_id?: string;
   name?: string;
   thinking?: string;
+  todos?: TodoItem[];
 }> {
   if (m.role !== "user") {
     if (m.toolCalls?.length || m.traceSteps?.some(step => step.type === "commentary")) {
@@ -194,6 +198,7 @@ function formatChatMessageForLlm(
         role: m.role,
         content: m.content || "",
         thinking: m.thinking || undefined,
+        todos: latestTodoState([m]),
       },
     ];
   }
@@ -430,6 +435,8 @@ export function AuthenticatedContent({
 
   const { token } = useAppAuth();
   const { t } = useTranslation();
+  const translateRef = useRef(t);
+  translateRef.current = t;
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => !remote?.mobile);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
@@ -1757,24 +1764,7 @@ export function AuthenticatedContent({
     Map<string, { toolCallId: string; questions: QuestionItem[] }>
   >(new Map());
   const activeQuestion = pendingQuestions.get(conversationId);
-  const [conversationTodos, setConversationTodos] = useState<Map<string, TodoItem[]>>(new Map());
-
-  const activeTodos = useMemo(() => {
-    const fromMap = conversationTodos.get(conversationId);
-    if (fromMap && fromMap.length > 0) return fromMap;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg && msg.role === "assistant" && msg.traceSteps) {
-        for (let j = msg.traceSteps.length - 1; j >= 0; j--) {
-          const st = msg.traceSteps[j];
-          if (st && (st.name === "todo_write" || st.name === "todo") && st.args?.todos) {
-            return st.args.todos as TodoItem[];
-          }
-        }
-      }
-    }
-    return null;
-  }, [conversationTodos, conversationId, messages]);
+  const activeTodos = useMemo(() => latestTodoState(messages), [messages]);
 
   const [conversationSubAgents, setConversationSubAgents] = useState<Map<string, SubAgentItem[]>>(new Map());
 
@@ -2196,7 +2186,7 @@ export function AuthenticatedContent({
 
         if (!res.success && res.error) {
           if (shouldNotifyAgentFailure(res)) {
-            toast.error(res.error);
+            toast.error(agentFailureText(res, t));
           }
           setRunningConvoIds((prev) => {
             const next = new Set(prev);
@@ -2524,19 +2514,20 @@ export function AuthenticatedContent({
           return next;
         });
 
-        // Trigger desktop completion notification if enabled
+        const notification = sessionNotification(data, translateRef.current);
+        // Only an explicit successful outcome may produce completion feedback.
         try {
           const taskNotifsEnabled = localStorage.getItem("const_harness_task_notifications") !== "false";
-          if (taskNotifsEnabled) {
+          if (taskNotifsEnabled && notification) {
             if (window.electron?.showNotification) {
               window.electron.showNotification({
-                title: "Task Completed",
-                body: "Agent has finished executing the task.",
+                title: notification.title,
+                body: notification.body,
                 silent: true,
               }).catch(() => {});
             } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-              new Notification("Task Completed", {
-                body: "Agent has finished executing the task.",
+              new Notification(notification.title, {
+                body: notification.body,
                 silent: true,
               });
             }
@@ -2546,7 +2537,7 @@ export function AuthenticatedContent({
         // Play completion audio chime if enabled
         try {
           const soundEnabled = localStorage.getItem("const_harness_sound_alerts") !== "false";
-          if (soundEnabled) {
+          if (soundEnabled && notification?.playSound) {
             playTaskCompletionSound();
           }
         } catch {}
@@ -2805,15 +2796,7 @@ export function AuthenticatedContent({
             if (event.record) {
               mutations.push(event.record);
             }
-            const steps = (last.traceSteps || []).map((st) => {
-              if (st.type === "tool" && event.record && !st.mutation) {
-                const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
-                if (norm.includes("write") || norm.includes("edit") || norm.includes("replace")) {
-                  return { ...st, mutation: event.record };
-                }
-              }
-              return st;
-            });
+            const steps = event.record ? attachFileMutation(last.traceSteps || [], event.record, event.toolCallId) : last.traceSteps;
             const updated: ChatMessage = {
               ...last,
               mutations,
@@ -2856,36 +2839,15 @@ export function AuthenticatedContent({
       } else if (event.type === "approval_resolved") {
         if (event.approvalId) setPendingApprovals((prev) => removeMatchingApproval(prev, targetConvoId, event.approvalId));
       } else if (event.type === "todo_update") {
-        setConversationTodos((prev) => {
-          const next = new Map(prev);
-          next.set(targetConvoId, event.todos);
-          return next;
-        });
+        const todos = parseTodoItems(event.todos);
+        if (!todos) return;
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];
           if (last && last.role === "assistant") {
-            const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
-            const existingIdx = steps.findIndex(
-              (s) => s.name === "todo_write" || s.name === "todo"
-            );
-            if (existingIdx >= 0) {
-              steps[existingIdx] = {
-                ...steps[existingIdx]!,
-                args: { todos: event.todos },
-              };
-            } else {
-              steps.push({
-                id: `todo_${Date.now()}`,
-                type: "tool",
-                toolCallId: `todo_${Date.now()}`,
-                name: "todo_write",
-                args: { todos: event.todos },
-              });
-            }
             const updated: ChatMessage = {
               ...last,
-              traceSteps: steps,
+              todos,
             };
             targetMsgs = [...targetMsgs];
             targetMsgs[lastIdx] = updated;
@@ -3126,10 +3088,8 @@ export function AuthenticatedContent({
         const finalDuration = startTime ? Math.max(1000, Date.now() - startTime) : undefined;
         executionStartTimeMapRef.current.delete(targetConvoId);
 
-        const errorText = event.error || "Agent execution stopped";
-        const isUserCancelled =
-          errorText.toLowerCase().includes("user cancelled") ||
-          errorText.toLowerCase().includes("abort");
+        const errorText = agentFailureText(event, translateRef.current);
+        const isUserCancelled = isAgentCancellation(event);
 
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
@@ -3220,7 +3180,7 @@ export function AuthenticatedContent({
         if (isUserCancelled) {
           // Handled without error notification
         } else {
-          toast.error(event.error || t("toast.agentExecutionError"));
+          toast.error(errorText);
         }
       }
     });
@@ -3371,7 +3331,7 @@ export function AuthenticatedContent({
 
         if (!res.success && res.error) {
           if (shouldNotifyAgentFailure(res)) {
-            toast.error(res.error);
+            toast.error(agentFailureText(res, t));
           }
           setRunningConvoIds((prev) => {
             const next = new Set(prev);

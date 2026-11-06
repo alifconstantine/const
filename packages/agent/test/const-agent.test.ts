@@ -217,7 +217,7 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     expect(compacted[6].content).toBe(longOutput);
   });
 
-  it("compacts older large user prompts from prior tasks while keeping the latest user prompt intact", async () => {
+  it("preserves old requirements as well as the latest instruction when continuing a task", async () => {
     const { compactHistoryForContext } = await import("../src/const/const-agent.js");
 
     const hugePriorUserPrompt = "Build a massive application with 100 features... ".repeat(100); // ~4900 chars
@@ -231,9 +231,7 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     ];
 
     const compacted = compactHistoryForContext(history, 2);
-    // Older user prompt must be compacted
-    expect(compacted[0].content).toContain("[Prior task instructions:");
-    expect(compacted[0].content).toContain("characters compacted for context optimization]");
+    expect(compacted[0].content).toBe(hugePriorUserPrompt);
     // Latest user prompt must NOT be compacted
     expect(compacted[2].content).toBe(currentTaskPrompt);
   });

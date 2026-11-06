@@ -1153,6 +1153,8 @@ export class SubAgentManager {
           apiKey: context.parentConfig.apiKey,
           model: item.model || context.parentConfig.model,
           contextWindow: !item.model || item.model === context.parentConfig.model ? context.parentConfig.contextWindow : undefined,
+          normalizeImage: context.parentConfig.normalizeImage,
+          requestBodyLimitBytes: context.parentConfig.requestBodyLimitBytes,
           thinkingLevel: item.thinkingLevel || context.parentConfig.thinkingLevel,
           workspacePath: context.workspacePath,
           sourceProjectPath: context.parentConfig.sourceProjectPath,
@@ -1218,7 +1220,9 @@ export class SubAgentManager {
           this.emitLifecycle("updated", item);
         };
 
+        let terminalFailure: string | undefined;
         const history = await childAgent.run(initialMessages, (event) => {
+          if (event.type === "run_end" && event.outcome === "failed") terminalFailure = event.error || "Subagent stopped before completing its task.";
           if (abortController.signal.aborted && event.type !== "usage" && event.type !== "llm_request") return;
 
           if (event.type === "thinking" && event.thinking) {
@@ -1313,7 +1317,7 @@ export class SubAgentManager {
           } else if ((event.type === "usage" || event.type === "llm_request") && event.requestId) {
             const request = { ...item.requests?.[event.requestId], requestId: event.requestId,
               model: event.model || item.model || "", startedAt: event.startedAt ?? 0 };
-            for (const key of ["durationMs", "ttftMs", "promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "status"] as const) {
+            for (const key of ["durationMs", "ttftMs", "promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "status", "diagnostics"] as const) {
               if (key in event && (event as any)[key] !== undefined) (request as any)[key] = (event as any)[key];
             }
             item.requests = { ...item.requests, [event.requestId]: request };
@@ -1333,6 +1337,7 @@ export class SubAgentManager {
           }
         });
 
+        if (terminalFailure) throw new Error(terminalFailure);
         if (abortController.signal.aborted || childAgent.isCancelled) {
           item.status = "killed";
           item.endTime = Date.now();

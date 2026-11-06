@@ -70,7 +70,7 @@ import { ROUTER_DEFAULT_MODELS as DEFAULT_MODELS, DEFAULT_ROUTER_MODEL_ID } from
 import { modelDisplayName, uniqueModelsById, resolveModelId } from "../src/lib/model-identity";
 import { createAgentEventForwarder } from "../src/lib/agent-errors";
 import { AgentSessionRegistry } from "./agent-sessions";
-import { selectAgentAutosaveMessages } from "./agent-history";
+import { mergeCanonicalTodoState, selectAgentAutosaveMessages } from "./agent-history";
 import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
 import { handleDesktopIpc, invokeRemoteDesktop, sendDesktopEvent } from "./desktop-ipc";
@@ -80,6 +80,10 @@ import { DEFAULT_CONVEX_URL, DEFAULT_REMOTE_ORIGIN } from "@const/remote/config"
 import { matchesAuthState } from "./auth-state";
 import { DesktopAppUpdates } from "./app-updates";
 import { updateStrings } from "../../shared/updates/strings";
+import { normalizeModelImage } from "./model-image";
+import type { AgentSessionEnded } from "../src/lib/agent-outcomes";
+import { monitorMainRenderer } from "./renderer-health";
+import { rendererHealthStrings } from "../../shared/renderer-health-strings";
 
 registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
@@ -112,6 +116,7 @@ const harnessHomeDir = path.join(constHomeDir, "harness");
 const workingDirectories = new WorkingDirectories(harnessHomeDir);
 const constProjectsDir = path.join(harnessHomeDir, "projects");
 const constBrainDir = path.join(harnessHomeDir, "brain");
+let rendererBatchIntervalMs = 1000 / 30;
 const constConversationsDir = path.join(harnessHomeDir, "conversations");
 const constConfigFile = path.join(harnessHomeDir, "config.json");
 const remoteStateFile = path.join(harnessHomeDir, "remote-session.bin");
@@ -723,12 +728,28 @@ function createWindow() {
     }
   });
 
-  win.webContents.on("render-process-gone", (_event, details) => {
-    console.error("[Electron Main] Render process gone:", details);
-    if (details.reason !== "clean-exit") {
-      win?.reload();
-    }
+  const monitoredWindow = win;
+  const health = monitorMainRenderer(monitoredWindow, {
+    logFile: path.join(harnessHomeDir, "logs", "renderer-health.jsonl"),
+    metrics: () => app.getAppMetrics().filter(metric => metric.pid === monitoredWindow.webContents.getOSProcessId() || metric.pid === process.pid)
+      .map(metric => ({ pid: metric.pid, type: metric.type, memory: metric.memory, cpu: metric.cpu.percentCPUUsage })),
+    recover: async (_reason, signal) => {
+      const text = rendererHealthStrings(loadUserConfig().language || "en");
+      const result = await dialog.showMessageBox(monitoredWindow, {
+        type: "warning", title: "Const Harness", message: text.title, detail: text.detail,
+        buttons: [text.reload, text.wait], defaultId: 1, cancelId: 1, noLink: true, signal,
+      });
+      if (!signal.aborted && result.response === 0 && !monitoredWindow.isDestroyed()) monitoredWindow.reload();
+    },
   });
+  const healthChannel = "renderer:health";
+  ipcMain.removeHandler(healthChannel);
+  ipcMain.handle(healthChannel, (event, sample: unknown) => {
+    if (event.sender !== monitoredWindow.webContents || event.senderFrame !== monitoredWindow.webContents.mainFrame) return;
+    const current = health.heartbeat(sample);
+    if (current) rendererBatchIntervalMs = Math.max(1000 / 30, Math.min(200, current.longestTaskMs / 2));
+  });
+  monitoredWindow.once("closed", () => ipcMain.removeHandler(healthChannel));
 
   win.webContents.on("did-finish-load", () => {
     if (pendingDeepLink) {
@@ -1343,12 +1364,13 @@ app.whenReady().then(() => {
     startedAt: number;
     snapshot: { revision: number; updatedAt: number; status: string; objective: string; activeTool?: string; lastResult?: string; recentOutput: string; todos?: unknown };
     sideInstructions: Map<string, { sideChatId: string; status: "queued" | "consumed" | "plan_updated" }>;
+    result: AgentSessionEnded;
   }
   const activeSessions = new AgentSessionRegistry<ActiveAgentSession>();
   const pendingStarts = new Map<string, { controller: AbortController; mode?: "request_review" | "ask_before_changes" | "full_access" }>();
   app.once("before-quit", () => {
     for (const pending of pendingStarts.values()) pending.controller.abort();
-    for (const session of activeSessions.values()) session.agent.abort();
+    for (const session of activeSessions.values()) session.agent.abort("shutdown");
     for (const task of globalTaskManager.listAllTasks()) globalTaskManager.killTask(task.id, task.conversationId);
     terminalSessions.destroyAll();
     globalSubAgentManager.clearSubAgents();
@@ -1574,12 +1596,11 @@ app.whenReady().then(() => {
       question.resolve({ status: "cancelled", error: "Session ended" });
     }
     if (win && !win.isDestroyed()) {
-      sendDesktopEvent(win.webContents, "agent:session-ended", { conversationId: session.conversationId, runId: session.runId });
+      sendDesktopEvent(win.webContents, "agent:session-ended", session.result);
     }
     remoteDaemon.broadcast({
       type: "agent:session-ended",
-      conversationId: session.conversationId,
-      runId: session.runId,
+      ...session.result,
     });
   };
 
@@ -1704,6 +1725,8 @@ app.whenReady().then(() => {
       const agent = createConstAgent({
         preset: "harness",
         sessionKind: payload.sessionKind === "companion" ? "companion" : "main",
+        runId,
+        normalizeImage: normalizeModelImage,
         baseUrl,
         apiKey,
         model,
@@ -1772,6 +1795,7 @@ app.whenReady().then(() => {
         startedAt: Date.now(),
         snapshot: { revision: 0, updatedAt: Date.now(), status: "starting", objective: String([...payload.messages].reverse().find((message) => message.role === "user")?.content || "").slice(0, 4000), recentOutput: "" },
         sideInstructions: new Map(),
+        result: { conversationId: convoId, runId, outcome: "failed" },
       };
       if (appUpdates.getState().status === "installing") return { success: false, error: updateStrings(loadUserConfig().language || "en").installing };
       if (!activeSessions.claim(convoId, agentSession)) return { success: false, alreadyRunning: true };
@@ -1791,7 +1815,7 @@ app.whenReady().then(() => {
         if (live) updateRemoteSessionState(live, agentEvent);
         if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, runId, remoteSequence: live?.revision });
         return true;
-      });
+      }, () => rendererBatchIntervalMs);
       const eventForwarder = createAgentEventForwarder((agentEvent) => {
         if (!activeSessions.owns(convoId, runId)) return false;
         streamBatcher.forward(agentEvent);
@@ -1801,6 +1825,8 @@ app.whenReady().then(() => {
         const updatedMessages = await agent.run(
           payload.messages,
           (agentEvent: any) => {
+            if (agentEvent.type === "run_end") agentSession.result = { conversationId: convoId, runId, outcome: agentEvent.outcome,
+              error: agentEvent.error, errorCategory: agentEvent.errorCategory, recovery: agentEvent.recovery };
             if (isTelemetryEvent(agentEvent)) {
               const telemetry = conversationDb.recordTelemetry(convoId, agentEvent);
               const live = remoteLive.get(convoId);
@@ -1840,6 +1866,18 @@ app.whenReady().then(() => {
             }
             eventForwarder.forward(agentEvent);
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
+            if (agentEvent.type === "todo_update") {
+              const live = remoteLive.get(convoId);
+              if (live && !/^(?:side_conversation_|side_chat_)/.test(convoId)) {
+                try {
+                  const stored = conversationDb.getConversation(convoId);
+                  conversationDb.saveConversation({ ...stored, id: convoId, title: stored?.title || agentSession.snapshot.objective.slice(0, 80) || convoId,
+                    project: payload.workspacePath || "Outside Project", model, mode: payload.mode,
+                    createdAt: stored?.createdAt || Date.now(), updatedAt: Date.now(),
+                    messages: selectAgentAutosaveMessages(stored?.messages || [], live.messages) });
+                } catch (error) { console.warn("[Electron Main] Failed to checkpoint plan:", error); }
+              }
+            }
           }
         );
 
@@ -1889,6 +1927,7 @@ app.whenReady().then(() => {
 
         if (isCancelled) {
           return {
+            ...agentSession.result,
             success: false,
             aborted: true,
             error: "User cancelled agent execution.",
@@ -1897,13 +1936,15 @@ app.whenReady().then(() => {
         }
 
         return {
-          success: true,
+          success: agentSession.result.outcome === "completed",
+          ...agentSession.result,
+          errorReported: eventForwarder.errorReported,
           messages: updatedMessages,
           workspacePath: targetWorkspace,
           isOutsideProject: !payload.workspacePath || payload.workspacePath === "Outside Project",
         };
       } catch (err: any) {
-        return { success: false, error: err.message, errorReported: eventForwarder.errorReported };
+        return { success: false, ...agentSession.result, error: err.message, errorReported: eventForwarder.errorReported };
       } finally {
         streamBatcher.flush();
         await conversationDb.flushTranscriptEvents(convoId);
@@ -2144,7 +2185,7 @@ app.whenReady().then(() => {
     // allowing trailing tool results/telemetry to pass activeSessions.owns() checks.
     const sessionsToAbort = targetSession ? [targetSession] : !safeConvoId ? [...activeSessions.values()] : [];
     for (const session of sessionsToAbort) {
-      session.agent.abort();
+      session.agent.abort("user");
       // ask_question waits on these promises; resolve them without releasing run ownership.
       for (const [id, question] of pendingQuestions) {
         if (question.runId !== session.runId) continue;
@@ -2255,6 +2296,8 @@ app.whenReady().then(() => {
 
   handleDesktopIpc("conversations:save", async (event, convo: ConversationRecord) => {
     const stored = conversationDb.getConversation(convo.id);
+    const live = remoteLive.get(convo.id);
+    if (live) convo = { ...convo, messages: mergeCanonicalTodoState(convo.messages, live.messages) };
     // Full saves can originate from stale renderer caches. UI state has its own
     // atomic update path and must not roll back when a checkpoint is persisted.
     conversationDb.saveConversation(stored ? { ...convo, rightPaneState: stored.rightPaneState, sideConversations: stored.sideConversations } : convo);
@@ -2703,6 +2746,7 @@ app.whenReady().then(() => {
       const agent = createConstAgent({
         preset: "harness",
         baseUrl,
+        normalizeImage: normalizeModelImage,
         apiKey,
         model,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
@@ -2758,9 +2802,11 @@ app.whenReady().then(() => {
 
       const scheduledStream = createStreamBatcher(agentEvent => {
         if (win && !win.isDestroyed()) sendDesktopEvent(win.webContents, "agent:stream-event", { ...agentEvent, conversationId: convoId, isScheduled: true });
-      });
+      }, () => rendererBatchIntervalMs);
+      let scheduledFailure: string | undefined;
       try {
         const updatedMessages = await agent.run(messagesToRun, (agentEvent: any) => {
+          if (agentEvent.type === "run_end" && agentEvent.outcome !== "completed") scheduledFailure = agentEvent.error || "Scheduled task stopped before completion.";
           scheduledStream.forward(agentEvent);
           conversationDb.appendTranscriptEvent(convoId, agentEvent);
         });
@@ -2785,6 +2831,7 @@ app.whenReady().then(() => {
           console.warn("[ScheduledTasks] Failed to save conversation to DB:", dbErr);
         }
 
+        if (scheduledFailure) throw new Error(scheduledFailure);
         return { sessionId: convoId };
       } finally {
         scheduledStream.flush();

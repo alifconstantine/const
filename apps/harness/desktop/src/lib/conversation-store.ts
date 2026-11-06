@@ -1,4 +1,5 @@
 import { archiveAssistantCommentary } from "./assistant-transcript";
+import { parseTodoItems } from "./activity-state";
 import type { ChatTelemetry } from "./chat-telemetry";
 import { translate } from "./i18n";
 import { mergeTelemetry } from "./chat-telemetry";
@@ -118,6 +119,8 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
         currentAssistant = archiveAssistantCommentary(currentAssistant);
       }
       const providedSteps = Array.isArray(msg.traceSteps) ? msg.traceSteps : [];
+      const todos = parseTodoItems(msg.todos);
+      if (todos) currentAssistant.todos = todos;
       currentAssistant.traceSteps.push(...providedSteps.map((step: any) => ({ ...step })));
       if (msg.thinking) {
         currentAssistant.thinking += msg.thinking;
@@ -176,6 +179,7 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
       );
       if (existingStep) {
         existingStep.result = msg.content;
+        existingStep.isError = msg.isError;
       } else {
         currentAssistant.traceSteps.push({
           id: toolId || `tool_${Date.now()}_${currentAssistant.traceSteps.length}`,
@@ -188,6 +192,7 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
       const existingCall = currentAssistant.toolCalls.find((tc: any) => tc.id === toolId);
       if (existingCall) {
         existingCall.result = msg.content;
+        existingCall.isError = msg.isError;
       }
     }
   }

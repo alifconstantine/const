@@ -68,6 +68,19 @@ describe("context excerpts", () => {
 });
 
 describe("request-specific capability guidance", () => {
+  it("checks missing references before substitutions and advertises browser workflow only for enabled loaders", async () => {
+    const { requests, run } = fixture(() => ({ delta: { content: "Please provide the missing HTML source." }, finish_reason: "stop" }), { deferNativeTools: true });
+    await run();
+    const system = requests[0]!.messages[0]!.content;
+    expect(system).toContain("do not silently replace required artwork");
+    expect(system).toContain("SHELL VERIFICATION");
+    expect(system).toContain("AVAILABLE BROWSER");
+    expect(system).toContain("Test deadlines/assertions must fail");
+    const loader = (capabilities: string[]) => ({ type: "function" as const, function: { name: "load_plugin_tools", description: "Load", parameters: { type: "object", properties: { plugin: { type: "string", enum: capabilities } } } } });
+    expect(buildToolGuidance([loader(["computer-use"])])).not.toContain("AVAILABLE BROWSER");
+    expect(buildToolGuidance([loader(["browser-use"])])).toContain("AVAILABLE BROWSER");
+  });
+
   it("loads only the requested native plugin on demand", async () => {
     let browserCalls = 0;
     const { requests, run } = fixture(turn => turn === 1
@@ -166,7 +179,7 @@ describe("recovery preserves the actual user request", () => {
       ? { delta: { content: "I'll inspect the source.", tool_calls: [{ index: 0, id: "read", type: "function", function: { name: "read", arguments: '{"path":"source.md"}' } }] }, finish_reason: "tool_calls" }
       : { delta: { content: "Final findings." } });
     await run();
-    expect(events.filter(event => event.type === "commentary")).toEqual([{ type: "commentary", content: "I'll inspect the source." }]);
+    expect(events.filter(event => event.type === "commentary")).toMatchObject([{ type: "commentary", content: "I'll inspect the source." }]);
     expect(events.findIndex(event => event.type === "commentary")).toBeLessThan(events.findIndex(event => event.type === "tool_call"));
     expect(events.find(event => event.type === "done")).toMatchObject({ fullContent: "Final findings." });
   });
@@ -212,7 +225,7 @@ describe("recovery preserves the actual user request", () => {
     const { requests, run } = fixture(turn => turn < 3
       ? { delta: { reasoning_content: "Inspecting the request" } }
       : { delta: { content: "Audit selesai." } });
-    await run();
+    await expect(run()).rejects.toMatchObject({ category: "model" });
     expect(requests).toHaveLength(2);
     expect(requests[1]!.messages[0]!.content).toBe(requests[0]!.messages[0]!.content);
     expect(requests[1]!.messages.at(-1)!.content).toContain("Keep read-only tasks read-only");

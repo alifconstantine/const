@@ -23,6 +23,8 @@ import "../src/index.css";
 import "../src/remote.css";
 
 const listeners = new Map<string, Set<(...args: any[]) => void>>();
+const notificationProbe = { requests: [] as any[], sounds: 0 };
+let restoreAudio: (() => void) | undefined;
 // Count actual parser work to catch expensive history renders on panel toggles.
 const markdownWork = { blocks: 0, inline: 0 };
 const lex = marked.lexer.bind(marked);
@@ -113,9 +115,11 @@ if (activityFixture) {
   Object.assign(conversations[0].messages[0], { attachments });
   Object.assign(conversations[0].messages[1], {
     content: "The preview server is running. The updated files and original sources are available in Activity.",
+    todos: [{ id: "inspect", content: "Inspect workspace and sources", status: "completed" }, { id: "build", content: "Build the interactive timeline", status: "in_progress" }],
     traceSteps: [
       { id: "todo-plan", type: "tool", name: "todo_write", args: { todos: [{ id: "inspect", content: "Inspect workspace and sources", status: "completed" }, { id: "build", content: "Build the interactive timeline", status: "in_progress" }] }, result: "Plan saved" },
       { id: "review-agent", type: "tool", name: "spawn_agent", args: { description: "Review accessibility", task: "Check keyboard controls" }, result: '<agent id="review-agent" status="completed">Keyboard controls verified</agent>' },
+      { id: "todo-rejected", type: "tool", name: "todo_write", args: { todos: { malformed: true } }, isError: true, result: "Previous plan unchanged" },
     ],
     mutations: [
       { id: "edit-one", filePath: "/workspace/app.ts", targetFile: "app.ts", operation: "modify", previousContent: "original", newContent: "intermediate", timestamp: 1 },
@@ -151,6 +155,7 @@ function updateRemoteStatus(patch: Partial<RemoteDaemonStatus>) {
 api = createDesktopBridge(
   {
     async invoke(channel: string, ...args: any[]) {
+      if (channel === "system:show-notification") { notificationProbe.requests.push(args[0]); return true; }
       if (channel === "workspace:read-file") {
         fileReads.push(args);
         return { content: String(args[0]).endsWith("index.html") ? "<main>Driftlab preview fixture</main>" : "Output review fixture document", truncated: false };
@@ -286,7 +291,7 @@ api = createDesktopBridge(
         });
         await new Promise((resolve) => setTimeout(resolve, 150));
         emit("agent:stream-event", { type: "done", conversationId: id, runId });
-        emit("agent:session-ended", { conversationId: id, runId });
+        emit("agent:session-ended", { conversationId: id, runId, outcome: "completed" });
         return {
           success: true,
           messages: [
@@ -361,6 +366,15 @@ api = createDesktopBridge(
 );
 window.electron = api;
 (window as any).__remoteFixture = {
+  notificationProbe,
+  beginNotificationProbe() {
+    const original = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { notificationProbe.sounds++; return Promise.resolve(); };
+    restoreAudio = () => { HTMLMediaElement.prototype.play = original; };
+    notificationProbe.requests.length = 0;
+    notificationProbe.sounds = 0;
+  },
+  endNotificationProbe() { restoreAudio?.(); restoreAudio = undefined; },
   clipboardWrites,
   terminalCreates,
   holdTerminalDirectory(owner: string) { heldTerminalOwner = owner; },

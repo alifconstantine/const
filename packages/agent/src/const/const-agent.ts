@@ -1,7 +1,12 @@
 import { isContextWindowError, isPermanentQuotaResponse, isUnsupportedImageError } from "./model-retry.js";
 import { fitRequestHistory } from "./request-history.js";
 import { RESPONSE_PRESENTATION_GUIDANCE } from "./prompt-guidance.js";
+import { EXECUTION_DISCIPLINE_GUIDANCE, PROGRESS_REVIEW_GUIDANCE, REPEATED_RESULT_GUIDANCE } from "./prompt-guidance.js";
+import { RunProgress, toolArgumentSignature } from "./run-progress.js";
+import { TodoTracker } from "./todo-tracker.js";
+import { isTodoTool } from "./todo-state.js";
 import { consumeChatStream, abortableDelay } from "./chat-stream.js";
+import { AgentRequestError, createRequestPreparer, PAYLOAD_ERROR_MESSAGE, requestBodyBudget } from "./request-payload.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -17,6 +22,8 @@ import type {
   ApprovalRequestData,
   ApprovalResponseData,
   NativeToolDefinition,
+  AgentOutcome,
+  AgentErrorCategory,
 } from "./types.js";
 import {
   CONST_DEFAULT_TOOLS,
@@ -317,15 +324,6 @@ export function compactHistoryForContext(
     }
   }
 
-  // Identify the latest user message index
-  let latestUserIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]?.role === "user" && !messages[i]?.toolObservationId) {
-      latestUserIndex = i;
-      break;
-    }
-  }
-
   return messages.map((m, index) => {
     // Every result of the newest tool batch must reach the model at least once,
     // including batches larger than preserveRecentCount.
@@ -340,25 +338,9 @@ export function compactHistoryForContext(
 
     const compacted: AgentMessage = { ...m };
 
-    // 1. Compact older USER messages (e.g. from previous completed tasks in the same session)
-    if (
-      compacted.role === "user" &&
-      index !== latestUserIndex
-    ) {
-      if (typeof compacted.content === "string" && compacted.content.length > 800) {
-        const originalLen = compacted.content.length;
-        const head = compacted.content.slice(0, 300);
-        const tail = compacted.content.slice(-150);
-        compacted.content = `${head}\n\n... [Prior task instructions: ${originalLen} characters compacted for context optimization] ...\n\n${tail}`;
-      } else if (Array.isArray(compacted.content)) {
-        compacted.content = compacted.content.map((part) => {
-          if (part.type === "image_url" && typeof part.image_url?.url === "string" && part.image_url.url.startsWith("data:")) {
-            return { type: "text", text: "[Attached image from earlier turn]" };
-          }
-          return part;
-        });
-      }
-    }
+    // Human requirements and delivered decisions/plans stay intact across
+    // "continue". A head/tail excerpt is not a semantic summary. Media is
+    // normalized on the request projection, never removed from an upload here.
 
     // 2. Compact older tool result messages with large text outputs (> 800 chars)
     if (compacted.role === "tool" && typeof compacted.content === "string" && compacted.content.length > 800) {
@@ -375,14 +357,6 @@ export function compactHistoryForContext(
         const head = compacted.thinking.slice(0, 350);
         compacted.thinking = `${head}\n... [Prior reasoning: ${originalLen} chars compacted]`;
       }
-    }
-
-    // 4. Compact older assistant responses if very large (> 1000 chars)
-    if (compacted.role === "assistant" && typeof compacted.content === "string" && compacted.content.length > 1000) {
-      const originalLen = compacted.content.length;
-      const head = compacted.content.slice(0, 400);
-      const tail = compacted.content.slice(-200);
-      compacted.content = `${head}\n\n... [Prior assistant response: ${originalLen} chars compacted] ...\n\n${tail}`;
     }
 
     return compacted;
@@ -505,6 +479,8 @@ CONTINUATION & ERROR RECOVERY:
 - Read tool results and exit codes. After a failed edit, inspect the latest file before retrying. Change the approach when an operation fails; do not repeat identical failing arguments.
 - Verify outcomes before reporting success. Explain blockers and incomplete work clearly.
 - Keep explanations concise and report relevant changes and verification. Create commits only when requested.
+
+${EXECUTION_DISCIPLINE_GUIDANCE}
 
 RESPONSE PRESENTATION:
 ${RESPONSE_PRESENTATION_GUIDANCE}`;
@@ -720,6 +696,7 @@ export class ConstAgent {
   private abortController: AbortController | null = null;
   private isRunning = false;
   private _isCancelled = false;
+  private cancelSource: "user" | "shutdown" | "parent" | "unknown" = "unknown";
   private pendingApprovals = new Map<string, (response: ApprovalResponseData) => void>();
   private sessionAllowedTools = new Set<string>();
 
@@ -797,7 +774,8 @@ export class ConstAgent {
     return true;
   }
 
-  public abort(): void {
+  public abort(source: "user" | "shutdown" | "parent" | "unknown" = "unknown"): void {
+    if (!this._isCancelled) this.cancelSource = source;
     this._isCancelled = true;
     if (this.abortController) {
       try {
@@ -833,6 +811,7 @@ export class ConstAgent {
 
     this.isRunning = true;
     this._isCancelled = false;
+    this.cancelSource = "unknown";
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
     let deadlineReached = false;
@@ -840,12 +819,24 @@ export class ConstAgent {
     const deadline = timeoutMs > 0 ? setTimeout(() => { deadlineReached = true; this.abortController?.abort(); }, timeoutMs) : undefined;
 
     const conversationHistory: AgentMessage[] = [...messages];
+    const todos = new TodoTracker(conversationHistory);
+    let awaitingUser = false;
     const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find(model => model.id === this.config.model)?.inputTypes;
     const modelSupportsImages = !modelInputTypes || modelInputTypes.includes("image");
     const loadedNativePlugins = new Set<NativeCapability>();
     let toolVisionUnavailable = false;
     let currentTurn = 0;
-    const runId = `llm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const runId = this.config.runId ?? `llm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const publish = onEvent;
+    onEvent = event => publish({ ...event, runId });
+    let outcome: AgentOutcome = "failed";
+    let terminalError: string | undefined;
+    let errorCategory: AgentErrorCategory | undefined;
+    let lastRecovery: "payload" | "context" | undefined;
+    const prepareRequest = createRequestPreparer(this.config.normalizeImage);
+    let payloadRecoveryAttempted = false;
+    let payloadRecoveryLimit: number | undefined;
+    let rejectedPayloadBytes: number | undefined;
     let requestSequence = 0;
     let activeRequest: ReturnType<typeof trackLlmRequest> | undefined;
     let contextRecoveryAttempted = false;
@@ -868,6 +859,7 @@ export class ConstAgent {
     const recoverContext = (error: string): boolean => {
       if (contextRecoveryAttempted || !isContextWindowError(error)) return false;
       contextRecoveryAttempted = true;
+      lastRecovery = "context";
       onEvent({ type: "status", status: "thinking", message: "Model context limit reached. Reducing older context and the output reservation before retrying..." });
       return true;
     };
@@ -875,6 +867,11 @@ export class ConstAgent {
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
+    const progress = new RunProgress();
+    const recordToolCall = (entry: { name: string; argsHash: string; isError: boolean }) => {
+      toolCallHistory.push(entry);
+      if (toolCallHistory.length > 12) toolCallHistory.shift();
+    };
     const DOOM_LOOP_THRESHOLD = 3;
 
     const endpoint = this.config.baseUrl.endsWith("/chat/completions")
@@ -882,6 +879,8 @@ export class ConstAgent {
       : `${this.config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
     try {
+      const restoredTodos = todos.snapshot();
+      if (restoredTodos && this.config.sessionKind !== "companion") onEvent({ type: "todo_update", todos: restoredTodos });
       while (currentTurn < maxTurns) {
         if (signal.aborted || this._isCancelled) {
           throw new Error("User cancelled agent execution.");
@@ -890,6 +889,9 @@ export class ConstAgent {
 
         // Drain any pending steering messages into conversationHistory before next LLM turn
         if (this.steeringQueue.length > 0) {
+          progress.reset();
+          todos.resetCycle();
+          toolCallHistory.length = 0;
           while (this.steeringQueue.length > 0) {
             const steer = this.steeringQueue.shift()!;
             let steerContent = steer.content || "";
@@ -969,6 +971,18 @@ export class ConstAgent {
             : buildConstSystemPrompt(workspacePath, this.config.systemPrompt, activeTools, this.config.isolateWorkspace && this.config.sourceProjectPath && this.config.sourceProjectPath !== "Outside Project" ? this.config.sourceProjectPath : workspacePath);
 
         const turnInstructions: string[] = [];
+        const todoEnabled = !isCompanion && activeTools.some(tool => isTodoTool(tool.function.name));
+        const progressCheckpoint = isCompanion ? undefined : progress.checkpoint(currentTurn);
+        if (progressCheckpoint) {
+          onEvent({ type: "progress_checkpoint", ...progressCheckpoint });
+          turnInstructions.push(progressCheckpoint.kind === "repeated_result" ? REPEATED_RESULT_GUIDANCE : PROGRESS_REVIEW_GUIDANCE);
+          if (todoEnabled && todos.summary()) turnInstructions.push(todos.summary());
+        }
+        const planReview = todoEnabled ? todos.midRunReminder() : undefined;
+        if (planReview) {
+          onEvent({ type: "progress_checkpoint", kind: "todo_stale", turn: currentTurn });
+          turnInstructions.push(planReview);
+        }
         const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === "user" && !message.toolObservationId);
         const latestUserText = typeof latestUserMessage?.content === "string"
           ? latestUserMessage.content
@@ -994,7 +1008,7 @@ export class ConstAgent {
             content: systemPrompt,
           },
           ...requestHistory.map((m, mIdx) => {
-            const item: Record<string, any> = {
+            const item: { role: string; [key: string]: any } = {
               role: m.role,
               content: imageContentForModel(m.content ?? "", modelSupportsImages && !toolVisionUnavailable),
             };
@@ -1078,17 +1092,7 @@ export class ConstAgent {
           throw new Error("User cancelled agent execution.");
         }
 
-        const request = trackLlmRequest(`${runId}_${++requestSequence}`, this.config.model, onEvent);
-        activeRequest = request;
-        const response = await fetchWithRetry(
-          endpoint,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
-            },
-            body: JSON.stringify({
+        const prepared = await prepareRequest({
               model: this.config.model,
               messages: formattedMessages,
               ...(requestTools.length ? { tools: requestTools } : {}),
@@ -1104,12 +1108,28 @@ export class ConstAgent {
                     reasoning_effort: this.config.thinkingLevel,
                   }
                 : {}),
-            }),
-          },
+        }, { endpoint, runId, signal,
+          limitBytes: payloadRecoveryLimit ?? requestBodyBudget(endpoint, this.config.requestBodyLimitBytes),
+          recovery: payloadRecoveryAttempted ? "payload" : contextRecoveryAttempted ? "context" : undefined });
+        if (rejectedPayloadBytes !== undefined && prepared.diagnostics.requestBytes >= rejectedPayloadBytes) {
+          throw new AgentRequestError(PAYLOAD_ERROR_MESSAGE, "payload", 413);
+        }
+        Object.assign(prepared.diagnostics, {
+          thinkingLevel: this.config.thinkingLevel || "provider_default", maxOutputTokens: resolvedMaxTokens,
+          toolNames: requestTools.map(tool => tool.function.name), loadedNativePlugins: [...loadedNativePlugins], retryCount: 0,
+        });
+        onEvent({ type: "request_prepared", ...prepared.diagnostics });
+        const request = trackLlmRequest(`${runId}_${++requestSequence}`, this.config.model, onEvent, Date.now, prepared.diagnostics);
+        activeRequest = request;
+        const response = await fetchWithRetry(
+          endpoint,
+          { method: "POST", headers: { "Content-Type": "application/json",
+              ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}) }, body: prepared.body },
           {
             signal,
             maxRetries: isCompanion ? 1 : 4,
             onRetry: (attempt, maxRetries, reason) => {
+              request.updateDiagnostics({ retryCount: attempt });
               onEvent({
                 type: "status",
                 status: "thinking",
@@ -1118,6 +1138,7 @@ export class ConstAgent {
             },
           }
         );
+        request.updateDiagnostics({ httpStatus: response.status });
 
         if (!response.ok) {
           const rawErr = await response.text().catch(() => "Unknown error");
@@ -1131,7 +1152,22 @@ export class ConstAgent {
             }
           } catch {}
 
+          if (response.status === 413) {
+            request.updateDiagnostics({ errorCategory: "payload" });
+            request.finish("failed");
+            if (!payloadRecoveryAttempted && prepared.diagnostics.imageBytes > 0 && this.config.normalizeImage) {
+              payloadRecoveryAttempted = true;
+              lastRecovery = "payload";
+              rejectedPayloadBytes = prepared.diagnostics.requestBytes;
+              payloadRecoveryLimit = Math.floor(prepared.diagnostics.requestBytes * 0.65);
+              currentTurn--;
+              continue;
+            }
+            throw new AgentRequestError(PAYLOAD_ERROR_MESSAGE, "payload", 413);
+          }
+
           if (recoverContext(cleanMessage)) {
+            request.updateDiagnostics({ errorCategory: "context" });
             request.finish("failed");
             currentTurn--;
             continue;
@@ -1182,7 +1218,8 @@ export class ConstAgent {
             continue;
           }
 
-          throw new Error(`Const error (${response.status}): ${cleanMessage}`);
+          throw new AgentRequestError(`Const error (${response.status}): ${cleanMessage}`,
+            isContextWindowError(cleanMessage) ? "context" : response.status >= 500 || response.status === 429 ? "transport" : "model", response.status);
         }
 
         if (!response.body) {
@@ -1249,6 +1286,7 @@ export class ConstAgent {
           }, signal);
         } catch (streamErr: any) {
           if (turnContent) onEvent({ type: "token_reset" });
+          request.updateDiagnostics({ errorCategory: signal.aborted ? "cancelled" : isContextWindowError(streamErr?.message ?? "") ? "context" : "transport" });
           request.finish(signal.aborted || this._isCancelled ? "cancelled" : "failed");
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
@@ -1328,6 +1366,9 @@ export class ConstAgent {
         // can independently overflow, while repeated rejection of one request
         // still stops after a single smaller retry.
         contextRecoveryAttempted = false;
+        payloadRecoveryAttempted = false;
+        payloadRecoveryLimit = undefined;
+        rejectedPayloadBytes = undefined;
 
         if (turnFinishReason === "length" && toolCallsMap.size) {
           toolCallsMap.clear();
@@ -1469,14 +1510,7 @@ export class ConstAgent {
             isCompanion ? "The side chat model returned an empty response. Please try again." : hasThinking
               ? "Model berulang kali menyelesaikan analisis tanpa jawaban atau tool call. Pilih model lain atau coba prompt yang lebih ringkas."
               : `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
-          onEvent({ type: "error", error: exhaustedErrMsg });
-          onEvent({ type: "status", status: "error", message: exhaustedErrMsg });
-          conversationHistory.push({
-            role: "assistant",
-            content: exhaustedErrMsg,
-            timestamp: Date.now(),
-          });
-          return conversationHistory;
+          throw new AgentRequestError(exhaustedErrMsg, "model");
         }
 
         if (toolCalls.length > 0) {
@@ -1523,16 +1557,29 @@ export class ConstAgent {
             turnContent = "Semua instruksi dan operasi tools telah selesai dijalankan.";
           }
 
+          const reconciliation = todoEnabled && currentTurn < maxTurns ? todos.completionReminder(turnContent, awaitingUser) : undefined;
+          if (reconciliation) {
+            conversationHistory.push({ role: "assistant", content: turnContent, timestamp: Date.now(), todos: todos.snapshot() });
+            onEvent({ type: "token_reset" });
+            onEvent({ type: "progress_checkpoint", kind: "todo_reconcile", turn: currentTurn });
+            recoveryInstruction = reconciliation;
+            continue;
+          }
+
           const assistantMsg: AgentMessage = {
             role: "assistant",
             content: turnContent,
             thinking: turnThinking || undefined,
             timestamp: Date.now(),
+            todos: todos.snapshot(),
           };
           conversationHistory.push(assistantMsg);
 
           // Check if any steer messages arrived during generation
           if (this.steeringQueue.length > 0) {
+            progress.reset();
+            todos.resetCycle();
+            toolCallHistory.length = 0;
             while (this.steeringQueue.length > 0) {
               const steer = this.steeringQueue.shift()!;
               let steerContent = steer.content || "";
@@ -1593,6 +1640,7 @@ export class ConstAgent {
           }
 
           emitContext();
+          outcome = "completed";
           onEvent({
             type: "done",
             fullContent: turnContent,
@@ -1643,7 +1691,7 @@ export class ConstAgent {
             continue;
           }
           const parsedArgs = parseToolArguments(tc.function.arguments);
-          const argsHash = JSON.stringify(parsedArgs);
+          const argsHash = toolArgumentSignature(parsedArgs);
 
           // Consecutive Doom Loop Detection (OpenCode & Pi alignment)
           const recentCalls = toolCallHistory.slice(-DOOM_LOOP_THRESHOLD);
@@ -1685,7 +1733,7 @@ export class ConstAgent {
               timestamp: Date.now(),
             });
 
-            toolCallHistory.push({
+            recordToolCall({
               name: tc.function.name,
               argsHash,
               isError: true,
@@ -1912,7 +1960,7 @@ export class ConstAgent {
                 timestamp: Date.now(),
               });
 
-              toolCallHistory.push({
+              recordToolCall({
                 name: tc.function.name,
                 argsHash,
                 isError: true,
@@ -1950,7 +1998,7 @@ export class ConstAgent {
                 timestamp: Date.now(),
               });
 
-              toolCallHistory.push({
+              recordToolCall({
                 name: tc.function.name,
                 argsHash,
                 isError: true,
@@ -1998,18 +2046,24 @@ export class ConstAgent {
               allowOutsideWorkspace,
               conversationId: this.config.conversationId,
               onFileMutation: (record) => {
-                onEvent({ type: "file_mutation", record });
+                onEvent({ type: "file_mutation", record, toolCallId: tc.id });
               },
-              onTodoUpdate: (todos) => {
-                onEvent({ type: "todo_update", todos });
+              onTodoUpdate: (items) => {
+                const committed = todos.commit(items);
+                if (committed) {
+                  assistantMsg.todos = committed;
+                  onEvent({ type: "todo_update", todos: committed, toolCallId: tc.id });
+                }
               },
               askUser: async (questions) => {
+                awaitingUser = false;
                 onEvent({ type: "ask_question", toolCallId: tc.id, questions });
                 if (this.config.onAskQuestion) {
                   const questionStartedAt = Date.now();
                   try { return await this.config.onAskQuestion(tc.id, questions); }
                   finally { questionWaitingMs += Date.now() - questionStartedAt; }
                 }
+                awaitingUser = true;
                 return { status: "submitted" };
               },
               onTaskStarted: (task) => {
@@ -2085,10 +2139,13 @@ export class ConstAgent {
             tool_call_id: tc.id,
             name: tc.function.name,
             content: toolContent,
+            isError: Boolean(isError),
             timestamp: Date.now(),
           });
 
-          toolCallHistory.push({
+          progress.record(tc.function.name, parsedArgs, result, Boolean(isError));
+          todos.record(tc.function.name, Boolean(isError));
+          recordToolCall({
             name: tc.function.name,
             argsHash,
             isError: Boolean(isError),
@@ -2224,6 +2281,8 @@ export class ConstAgent {
       }
 
       emitContext();
+      if (reachedTurnLimit) throw new AgentRequestError(fallbackContent, "model");
+      outcome = "completed";
       onEvent({
         type: "done",
         fullContent: fallbackContent,
@@ -2236,24 +2295,28 @@ export class ConstAgent {
       if (deadlineReached) {
         const error = new Error("The side chat request timed out. Please try again.");
         activeRequest?.finish("failed");
-        onEvent({ type: "error", error: error.message });
+        terminalError = error.message;
+        errorCategory = "transport";
+        onEvent({ type: "error", error: error.message, category: errorCategory });
         onEvent({ type: "status", status: "error", message: error.message });
         throw error;
       }
       const isAborted =
         this._isCancelled ||
-        signal?.aborted ||
-        err?.name === "AbortError" ||
-        err?.message?.includes("cancelled") ||
-        err?.message?.includes("aborted");
+        signal?.aborted;
 
+      errorCategory = isAborted ? "cancelled" : err instanceof AgentRequestError ? err.category : isContextWindowError(err?.message ?? "") ? "context" : "transport";
+      terminalError = isAborted ? "User cancelled agent execution." : err.message;
+      if (err instanceof AgentRequestError && err.diagnostics) onEvent({ type: "request_prepared", ...err.diagnostics, errorCategory });
+      activeRequest?.updateDiagnostics({ errorCategory });
       activeRequest?.finish(isAborted ? "cancelled" : "failed");
       if (isAborted) {
+        outcome = "cancelled";
         this._isCancelled = true;
-        onEvent({ type: "error", error: "User cancelled agent execution." });
+        onEvent({ type: "error", error: "User cancelled agent execution.", category: errorCategory });
         onEvent({ type: "status", status: "idle", message: "User cancelled agent execution." });
       } else {
-        onEvent({ type: "error", error: err.message });
+        onEvent({ type: "error", error: err.message, category: errorCategory });
         onEvent({ type: "status", status: "error", message: err.message });
         throw err;
       }
@@ -2264,6 +2327,8 @@ export class ConstAgent {
       this.abortController = null;
       this.pendingApprovals.clear();
       this.steeringQueue = [];
+      onEvent({ type: "run_end", runId, outcome, error: terminalError, errorCategory, recovery: lastRecovery,
+        ...(outcome === "cancelled" ? { cancelSource: this.cancelSource } : {}) });
     }
   }
 }

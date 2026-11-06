@@ -24,7 +24,7 @@ async function main() {
     delete env.ELECTRON_RUN_AS_NODE;
     const viteBin = path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js');
     const output = path.join(temp, 'site');
-    builder = spawn(process.execPath, [viteBin, 'build', '--config', updates ? 'tests/app-updates.vite.ts' : 'tests/remote-workspace.vite.ts', '--outDir', output, '--logLevel', 'error'], { cwd: root, env, stdio: 'inherit', windowsHide: true });
+    builder = spawn(process.execPath, ['--max-old-space-size=6144', viteBin, 'build', '--config', updates ? 'tests/app-updates.vite.ts' : 'tests/remote-workspace.vite.ts', '--outDir', output, '--logLevel', 'error'], { cwd: root, env, stdio: 'inherit', windowsHide: true });
     const buildCode = await new Promise((resolve, reject) => {
       builder.on('error', reject);
       builder.on('exit', resolve);

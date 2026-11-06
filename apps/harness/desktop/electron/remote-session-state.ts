@@ -1,4 +1,5 @@
 import { archiveAssistantCommentary } from "../src/lib/assistant-transcript";
+import { attachFileMutation, latestTodoState, parseTodoItems } from "../src/lib/activity-state";
 
 /** Host-owned renderable history for joining a run between renderer checkpoints. */
 export interface RemoteSessionState {
@@ -24,7 +25,9 @@ export function createRemoteSessionState(history: any[], runId: string): RemoteS
   const last = messages[messages.length - 1];
   if (last?.role === "assistant" && !last.content && !last.thinking && !last.toolCalls?.length) messages.pop();
   messages.push(assistant(last?.role === "assistant" && !last.content ? last.id || `${runId}_live` : `${runId}_live`));
-  return { revision: 0, messages, text: "", thinking: "", status: "running", tools: [] };
+  const todos = latestTodoState(history);
+  if (todos) Object.assign(messages[messages.length - 1], { todos });
+  return { revision: 0, messages, text: "", thinking: "", status: "running", tools: [], todos };
 }
 
 export function updateRemoteSessionState(live: RemoteSessionState, event: any): void {
@@ -74,15 +77,11 @@ export function updateRemoteSessionState(live: RemoteSessionState, event: any): 
   }
   if (event.type === "file_mutation" && event.record) {
     last.mutations.push(event.record);
-    for (const step of steps) {
-      if (step.type === "tool" && !step.mutation && /write|edit|replace/.test(step.name?.toLowerCase().replace(/[-_]/g, "") || "")) step.mutation = event.record;
-    }
+    last.traceSteps = attachFileMutation(steps, event.record, event.toolCallId);
   }
   if (event.type === "todo_update") {
-    live.todos = event.todos;
-    const step = steps.find((step: any) => step.name === "todo_write" || step.name === "todo");
-    if (step) step.args = { todos: event.todos };
-    else steps.push({ id: `todo_${now}`, type: "tool", name: "todo_write", args: { todos: event.todos } });
+    const todos = parseTodoItems(event.todos);
+    if (todos) { live.todos = todos; last.todos = todos; }
   }
   if (event.type === "status") live.status = event.status || "running";
   if (event.type === "approval_request") live.approval = event;

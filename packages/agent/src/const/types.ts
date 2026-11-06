@@ -22,6 +22,9 @@ export interface AgentMessage {
   toolObservationId?: string;
   instructionId?: string;
   sourceSideChatId?: string;
+  /** Last successfully committed plan; local metadata, excluded from provider messages. */
+  todos?: TodoItem[];
+  isError?: boolean;
 }
 
 export interface ToolResultImage {
@@ -30,6 +33,40 @@ export interface ToolResultImage {
   width?: number;
   height?: number;
   scale?: number;
+}
+
+export interface ModelImageOptions {
+  maxBytes: number;
+  maxDimension: number;
+}
+
+export interface NormalizedModelImage {
+  dataUrl: string;
+  originalWidth: number;
+  originalHeight: number;
+  width: number;
+  height: number;
+}
+
+export type ModelImageNormalizer = (dataUrl: string, options: ModelImageOptions, signal: AbortSignal) => Promise<NormalizedModelImage>;
+export type AgentOutcome = "completed" | "failed" | "cancelled";
+export type AgentErrorCategory = "payload" | "image" | "context" | "transport" | "cancelled" | "model";
+
+export interface RequestDiagnostics {
+  runId: string;
+  endpointHost: string;
+  requestBytes: number;
+  imageBytes: number;
+  imageCount: number;
+  messageCount: number;
+  recovery?: "payload" | "context";
+  httpStatus?: number;
+  errorCategory?: AgentErrorCategory;
+  thinkingLevel?: ThinkingLevel | "provider_default";
+  maxOutputTokens?: number;
+  toolNames?: string[];
+  loadedNativePlugins?: string[];
+  retryCount?: number;
 }
 
 export interface ToolExecutionResult {
@@ -148,6 +185,7 @@ export interface SubAgentTraceStep {
 }
 
 export interface ModelRequestUsage {
+  diagnostics?: RequestDiagnostics;
   requestId: string;
   model: string;
   startedAt: number;
@@ -199,7 +237,11 @@ export interface AgentEventMap {
     durationMs?: number;
     ttftMs?: number;
     status?: "completed" | "failed" | "cancelled";
+    diagnostics?: RequestDiagnostics;
   };
+  request_prepared: RequestDiagnostics;
+  progress_checkpoint: { kind: "review" | "repeated_result" | "todo_stale" | "todo_reconcile"; turn: number; toolName?: string; count?: number };
+  run_end: { runId: string; outcome: AgentOutcome; errorCategory?: AgentErrorCategory; error?: string; recovery?: "payload" | "context"; cancelSource?: "user" | "shutdown" | "parent" | "unknown" };
   token: { token: string };
   token_reset: {};
   commentary: { content: string };
@@ -208,7 +250,7 @@ export interface AgentEventMap {
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean; durationMs?: number; waitingMs?: number };
   approval_request: ApprovalRequestData;
   approval_resolved: { approvalId: string; decision: ApprovalDecision };
-  file_mutation: { record: FileMutationRecord };
+  file_mutation: { record: FileMutationRecord; toolCallId?: string };
   usage: {
     requestId?: string;
     model?: string;
@@ -235,8 +277,8 @@ export interface AgentEventMap {
   };
   status: { status: "idle" | "thinking" | "calling_tool" | "waiting_approval" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
-  error: { error: string };
-  todo_update: { todos: TodoItem[] };
+  error: { error: string; category?: AgentErrorCategory };
+  todo_update: { todos: TodoItem[]; toolCallId?: string };
   ask_question: { toolCallId: string; questions: QuestionItem[] };
   task_started: { task: BackgroundTaskItem };
   task_stopped: { taskId: string; code: number | null };
@@ -251,7 +293,7 @@ export interface AgentEventMap {
 
 export type AgentEvent = {
   [K in keyof AgentEventMap]: { type: K } & AgentEventMap[K];
-}[keyof AgentEventMap];
+}[keyof AgentEventMap] & { runId?: string };
 
 export interface NativeToolDefinition {
   requiresApproval?: boolean;
@@ -294,6 +336,10 @@ export interface AgentConfig {
   maxTokens?: number;
   maxOutputTokens?: number;
   contextWindow?: number;
+  runId?: string;
+  normalizeImage?: ModelImageNormalizer;
+  /** Override a known gateway body limit; unknown endpoints have no inferred limit. */
+  requestBodyLimitBytes?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
   browserHandler?: (toolName: string, args: Record<string, any>, context?: ComputerToolContext) => Promise<{ result: any; isError: boolean }>;
   computerHandler?: (toolName: string, args: Record<string, any>, context?: ComputerToolContext) => Promise<ToolExecutionResult>;

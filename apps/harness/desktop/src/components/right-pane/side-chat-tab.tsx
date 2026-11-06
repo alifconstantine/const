@@ -28,6 +28,8 @@ import {
 } from "../../lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
 import { useTranslation } from "../../lib/i18n";
+import { agentFailureText } from "../../lib/agent-outcomes";
+import { isAgentCancellation, shouldNotifyAgentFailure } from "../../lib/agent-errors";
 
 // A side run can outlive the tab component when the user changes conversations.
 const pendingSideSends = new Set<string>();
@@ -319,12 +321,11 @@ export function SideChatTab({
 
       // 2. Error events
       if (event.type === "error" || (event.type === "status" && event.status === "error")) {
-        const errStr = event.error || event.message || "";
+        const errStr = event.category === "payload" || event.category === "image" ? agentFailureText(event, t) : event.error || event.message || "";
         if (
           errStr &&
           !reportedErrorRef.current &&
-          !errStr.toLowerCase().includes("cancelled") &&
-          !errStr.toLowerCase().includes("abort")
+          !isAgentCancellation({ ...event, error: errStr })
         ) {
           reportedErrorRef.current = true;
           toast.error(formatSideError(errStr));
@@ -635,14 +636,10 @@ export function SideChatTab({
         });
 
         if (!res.success) {
-          const failure = formatSideError(res.error || "");
+          const failure = formatSideError(agentFailureText(res, t));
           const failed = messagesRef.current.map((item) => item.id === assistantPlaceholder.id && !item.content ? { ...item, content: failure } : item);
           commitMessages(failed);
-          if (
-            !res.aborted &&
-            !failure.toLowerCase().includes("cancelled") &&
-            !failure.toLowerCase().includes("abort") && !res.errorReported
-          ) {
+          if (shouldNotifyAgentFailure(res)) {
             toast.error(failure);
           }
         } else {

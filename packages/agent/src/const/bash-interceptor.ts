@@ -119,15 +119,87 @@ export function checkBashInterception(command: string, shell: "bash" | "powershe
 function hasDetachedShellCommand(command: string, shell: "bash" | "powershell"): boolean {
   let quote = "";
   let visible = "";
+  const heredocs: Array<{ delimiter: string; tabs: boolean; quoted: boolean }> = [];
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!;
     if (char === "\\" && quote !== "'") { i++; continue; }
+    if (shell === "bash" && quote !== "'" && char === "$" && command[i + 1] === "(" && command[i + 2] !== "(") {
+      const end = substitutionEnd(command, i + 2);
+      if (hasDetachedShellCommand(command.slice(i + 2, end), shell)) return true;
+      i = end;
+      continue;
+    }
+    if (char === "`" && shell === "bash" && quote !== "'") {
+      let end = i + 1;
+      for (; end < command.length; end++) { if (command[end] === "\\") end++; else if (command[end] === "`") break; }
+      if (hasDetachedShellCommand(command.slice(i + 1, end), shell)) return true;
+      i = end; continue;
+    }
     if (quote) { if (char === quote) quote = ""; continue; }
     if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
-    if (char === "&" && command[i - 1] !== ">" && command[i - 1] !== "&" && command[i + 1] !== "&" && command[i + 1] !== ">") {
+    if (shell === "bash" && char === "#" && (i === 0 || /[\s;|&()]/.test(command[i - 1]!))) {
+      const end = command.indexOf("\n", i);
+      i = end < 0 ? command.length : end - 1;
+      continue;
+    }
+    if (shell === "bash" && char === "<" && command[i + 1] === "<" && command[i + 2] !== "<" && command[i - 1] !== "<") {
+      const word = heredocWord(command, i + 2);
+      if (word) { heredocs.push(word); i = word.end - 1; continue; }
+    }
+    if (char === "\n" && heredocs.length) {
+      for (const heredoc of heredocs.splice(0)) {
+        const bodyStart = i + 1;
+        let position = bodyStart;
+        while (position < command.length) {
+          const newline = command.indexOf("\n", position);
+          const end = newline < 0 ? command.length : newline;
+          const line = command.slice(position, end);
+          if ((heredoc.tabs ? line.replace(/^\t+/, "") : line) === heredoc.delimiter) break;
+          position = newline < 0 ? command.length : newline + 1;
+        }
+        const body = command.slice(bodyStart, position);
+        // Unquoted heredocs expand substitutions. Check those conservatively;
+        // plain embedded-language operators are data, never shell jobs.
+        if (!heredoc.quoted && /\$\(|`/.test(body) && hasDetachedShellCommand(body, shell)) return true;
+        const newline = command.indexOf("\n", position);
+        i = newline < 0 ? command.length : newline;
+      }
+      visible += "\n"; continue;
+    }
+    if (char === "&" && ![">", "&", "|"].includes(command[i - 1] || "") && command[i + 1] !== "&" && command[i + 1] !== ">") {
       if (shell !== "powershell" || !/(?:^|[;|\n(])\s*$/.test(command.slice(0, i))) return true;
     }
     visible += char;
   }
   return /\b(?:nohup|disown|Start-Process|Start-Job|Start-ThreadJob)\b/i.test(visible);
+}
+
+function heredocWord(command: string, offset: number): { delimiter: string; tabs: boolean; quoted: boolean; end: number } | undefined {
+  let end = offset;
+  const tabs = command[end] === "-";
+  if (tabs) end++;
+  while (/[ \t]/.test(command[end] || "\n")) end++;
+  let delimiter = "", quote = "", quoted = false;
+  for (; end < command.length; end++) {
+    const char = command[end]!;
+    if (char === "\\" && quote !== "'") { quoted = true; delimiter += command[++end] || ""; continue; }
+    if (quote) { if (char === quote) quote = ""; else delimiter += char; continue; }
+    if (char === "'" || char === '"') { quoted = true; quote = char; continue; }
+    if (/[\s;&|<>()]/.test(char)) break;
+    delimiter += char;
+  }
+  return (delimiter || quoted) && !quote ? { delimiter, tabs, quoted, end } : undefined;
+}
+
+function substitutionEnd(command: string, offset: number): number {
+  let depth = 1, quote = "";
+  for (let index = offset; index < command.length; index++) {
+    const char = command[index]!;
+    if (char === "\\" && quote !== "'") { index++; continue; }
+    if (quote) { if (char === quote) quote = ""; continue; }
+    if (char === "'" || char === '"' || char === "`") { quote = char; continue; }
+    if (char === "(") depth++;
+    if (char === ")" && --depth === 0) return index;
+  }
+  return command.length;
 }

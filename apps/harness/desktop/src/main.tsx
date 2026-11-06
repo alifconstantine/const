@@ -1,4 +1,5 @@
 import "./lib/disable-openui-devtools";
+import { installReactMeasureCleanup, installRendererHeartbeat } from "./lib/renderer-health";
 // Suppress OpenUI floating devtools inspector widget across all environments
 (globalThis as Record<symbol, unknown>)[Symbol.for("openui.devtools.autoMount")] = true;
 
@@ -10,6 +11,11 @@ import { initThemeListener } from "./lib/theme";
 import { I18nProvider } from "./lib/i18n";
 import { initializeSkillStorage } from "./lib/skills/skills-service";
 import "./index.css";
+
+const cleanups: Array<() => void> = [];
+if (import.meta.env.DEV && typeof PerformanceObserver !== "undefined") cleanups.push(installReactMeasureCleanup());
+if (window.electron?.reportRendererHealth && window.electron.platform !== "web") cleanups.push(installRendererHeartbeat(sample => { void window.electron?.reportRendererHealth?.(sample).catch(() => {}); }));
+import.meta.hot?.dispose(() => cleanups.forEach(cleanup => cleanup()));
 
 // Catch global uncaught errors and rejections to log them clearly
 window.addEventListener("error", (e) => {

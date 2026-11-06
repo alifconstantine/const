@@ -39,6 +39,7 @@ import {
 } from "./subagent.js";
 import { performFuzzyEdit, applyLooseUnifiedDiff } from "./edit-engine.js";
 import { checkBashInterception } from "./bash-interceptor.js";
+import { parseTodoItems } from "./todo-state.js";
 import { spoolLargeOutput } from "./output-spooler.js";
 import { executeJFind } from "./jfind.js";
 import { executeRetain, executeRecall, executeReflect } from "./memory.js";
@@ -154,14 +155,10 @@ export function getShellConfig(): ShellConfig {
     return cachedShellConfig;
   }
 
-  // Unix / macOS: Check process.env.SHELL first, then standard paths
+  // The tool promises Bash syntax, independently of the user's login shell.
   const unixShells = [
-    process.env.SHELL,
     "/bin/bash",
     "/usr/bin/bash",
-    "/bin/zsh",
-    "/usr/bin/zsh",
-    "/bin/sh",
   ].filter(Boolean) as string[];
 
   for (const candidate of unixShells) {
@@ -175,12 +172,7 @@ export function getShellConfig(): ShellConfig {
     }
   }
 
-  cachedShellConfig = {
-    shell: "sh",
-    args: ["-c"],
-    type: "bash",
-  };
-  return cachedShellConfig;
+  throw new Error("Bash is required for the bash tool. Install Bash and try again.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1562,6 +1554,10 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           timeout: {
             type: "number",
             description: "Optional timeout in seconds (defaults to 60, use 0 for infinite/watcher).",
+          },
+          verify: {
+            type: "boolean",
+            description: "Use true for foreground build/test/verification commands: enables Bash pipefail so a failed pipeline stage cannot be hidden by tail/tee. Run one check or an && chain; helper assertions/timeouts must exit nonzero. Omit/false for ordinary Bash semantics, e.g. intentional SIGPIPE from head.",
           },
           cwd: {
             type: "string",
@@ -5846,7 +5842,7 @@ async function executeNativeToolUnlocked(
         // 2. Image Files
         const imageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp", ".ico"];
         if (imageExtensions.includes(ext)) {
-          if (stat.size > 3 * 1024 * 1024) return { result: "Image exceeds the 3 MiB visual input limit; resize it before reading.", isError: true };
+          if (stat.size > 24 * 1024 * 1024) return { result: "Image exceeds the 24 MiB source limit; crop or resize it before reading.", isError: true };
           const bytes = await fs.readFile(filePath);
           const mimeType = detectSupportedImageMimeType(bytes);
           return {
@@ -6195,7 +6191,7 @@ async function executeNativeToolUnlocked(
 
       const { stdout, stderr, exitCode } = await runProcess(
         shellCfg.shell,
-        [...shellCfg.args, cmd],
+        [...shellCfg.args, args.verify === true ? `set -o pipefail\n${cmd}` : cmd],
         {
           cwd: executionCwd,
           signal,
@@ -6618,23 +6614,14 @@ async function executeNativeToolUnlocked(
     // Tool: todo_write (aliases: todo, todowrite)
     // -----------------------------------------------------------------------
     if (normalizedTool === "todowrite" || normalizedTool === "todo") {
-      const rawTodos = args.todos ?? args.tasks ?? args.items ?? [];
-      if (!Array.isArray(rawTodos)) {
+      const rawTodos = args.todos ?? args.tasks ?? args.items;
+      const validTodos = parseTodoItems(rawTodos);
+      if (!validTodos) {
         return {
-          result: "Error: 'todos' parameter must be an array of todo items.",
+          result: "Error: 'todos' must be an array of items with nonempty content and status pending, in_progress or completed. The previous plan is unchanged.",
           isError: true,
         };
       }
-
-      const validTodos: TodoItem[] = rawTodos
-        .map((t: any) => ({
-          content: String(t.content ?? t.task ?? t.text ?? "").trim(),
-          status:
-            t.status === "completed" || t.status === "in_progress" || t.status === "pending"
-              ? (t.status as "completed" | "in_progress" | "pending")
-              : "pending",
-        }))
-        .filter((t) => t.content.length > 0);
 
       options.onTodoUpdate?.(validTodos);
 

@@ -66,6 +66,7 @@ export function reduceTelemetry(previous: ChatTelemetry | undefined, event: any)
     if (event[key] !== undefined) request[key] = count(event[key]);
   }
   if (event.status) request.status = event.status;
+  if (event.diagnostics) request.diagnostics = event.diagnostics;
   if (event.type === "usage") {
     for (const key of ["promptTokens", "completionTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens"] as const) {
       request[key] = count(event[key]);

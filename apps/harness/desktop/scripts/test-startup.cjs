@@ -12,7 +12,8 @@ async function main() {
   try {
     const home = path.join(temporary, "home");
     mkdirSync(home);
-    const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_DATA_HOME: path.join(temporary, "data") };
+    const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_DATA_HOME: path.join(temporary, "data"),
+      XDG_CONFIG_HOME: path.join(temporary, "config"), XDG_CACHE_HOME: path.join(temporary, "cache") };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.VITE_DEV_SERVER_URL;
     const child = spawn(require("electron"), [path.join(root, "tests/startup.integration.cjs"), temporary, root], {
