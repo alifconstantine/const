@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
+import { BrowserTab } from "../src/components/right-pane/browser-tab";
 import { PersistentBrowserStack } from "../src/components/right-pane/persistent-browser-stack";
 import { browserPartition } from "../src/lib/browser-session";
 import type { RightPaneTab } from "../src/components/right-pane/types";
@@ -19,3 +20,20 @@ const root = createRoot(container);
       webpreferences="contextIsolation=yes,backgroundThrottling=no" style={{ width: 600, height: 500 }} />} />));
 };
 (window as any).__unmountIsolation = () => flushSync(() => root.unmount());
+
+function SearchFixture({ url }: { url: string }) {
+  const [tab, setTab] = useState<RightPaneTab>({
+    id: "search-test", conversationId: "search-test", type: "browser", title: "Browser", url,
+  });
+  return <BrowserTab tab={tab} onUpdateTab={(_id, updates) => setTab(current => ({ ...current, ...updates }))} />;
+}
+
+(window as any).__renderSearch = (url: string) => flushSync(() => root.render(<SearchFixture url={url} />));
+(window as any).__submitSearch = (query: string) => {
+  const input = container.querySelector("input")!;
+  flushSync(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, query);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  flushSync(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+};

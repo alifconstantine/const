@@ -91,6 +91,26 @@ function normalizeUrl(input: any): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
 }
 
+function googleSearchFallback(url: string): string | null {
+  try {
+    const page = new URL(url);
+    if (!/^https:\/\/(?:www\.)?google\.com$/.test(page.origin) || !/^\/sorry(?:\/index)?\/?$/.test(page.pathname)) return null;
+
+    const continuation = page.searchParams.get("continue");
+    if (!continuation) return null;
+    const search = new URL(continuation, page.origin);
+    if (search.origin !== page.origin || search.pathname !== "/search") return null;
+    const query = search.searchParams.get("q");
+    if (!query?.trim()) return null;
+
+    const fallback = new URL("https://duckduckgo.com/");
+    fallback.searchParams.set("q", query);
+    return fallback.href;
+  } catch {
+    return null;
+  }
+}
+
 export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: BrowserTabProps) {
   const remote = useRemoteRuntime();
   const { t } = useTranslation();
@@ -233,30 +253,18 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     }
   }, [tab.isMuted]);
 
-  // Keep address bar and webview in sync if tab.url changes from outside
+  // A tab URL from the parent may be a navigation request or an echo of a commit.
+  // Local address edits must not replay the last URL stored by the parent.
   useEffect(() => {
-    if (
-      tab.url &&
-      typeof tab.url === "string" &&
-      tab.url !== "[object Object]" &&
-      tab.url !== currentUrl
-    ) {
-      setCurrentUrl(tab.url);
+    const webview = webviewRef.current;
+    if (!webview || typeof tab.url !== "string" || !isAllowedBrowserUrl(tab.url)) return;
+    try {
+      if (webview.getURL() === tab.url) return;
       setAddressBarInput(tab.url);
       setLoadError(null);
-      if (webviewRef.current) {
-        try {
-          const currentWvUrl =
-            typeof webviewRef.current.getURL === "function"
-              ? webviewRef.current.getURL()
-              : "";
-          if (currentWvUrl !== tab.url) {
-            webviewRef.current.loadURL(tab.url);
-          }
-        } catch {}
-      }
-    }
-  }, [tab.url, currentUrl]);
+      void webview.loadURL(tab.url)?.catch(() => {}); // did-fail-load handles navigation errors.
+    } catch {} // The initial URL is loaded by the webview before its methods are ready.
+  }, [tab.url]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -286,11 +294,10 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       return;
     }
     setAddressBarInput(resolved);
-    setCurrentUrl(resolved);
     setLoadError(null);
     if (webviewRef.current) {
       try {
-        webviewRef.current.loadURL(resolved);
+        void webviewRef.current.loadURL(resolved)?.catch(() => {}); // did-fail-load handles navigation errors.
       } catch (e) {
         console.error("Failed to load URL:", e);
       }
@@ -602,15 +609,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     };
 
     const handleDidNavigateInPage = (e: any) => {
-      if (e.url) {
-        setCurrentUrl(e.url);
-        setAddressBarInput(e.url);
-        onUpdateTab?.(tab.id, { url: e.url });
-      }
-      try {
-        setCanGoBack(webview.canGoBack());
-        setCanGoForward(webview.canGoForward());
-      } catch {}
+      if (e.isMainFrame) handleDidNavigate(e);
     };
 
     const handlePageTitleUpdated = (e: any) => {
@@ -710,6 +709,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   // Viewport preset style
   const activePresetConfig = RESPONSIVE_PRESETS.find((p) => p.id === selectedPreset);
   const isCustomWidth = activePresetConfig && activePresetConfig.width;
+  const searchFallback = googleSearchFallback(currentUrl);
 
   return (
     <div className="flex-1 w-full h-full flex flex-col bg-[#0f0f0f] text-white select-none overflow-hidden relative">
@@ -959,6 +959,19 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           )}
         </div>
       </div>
+
+      {searchFallback && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-[#222222] px-4 py-2 text-xs text-[#d4d4d4]">
+          <p role="status">{t("rightPane.browserGoogleVerification")}</p>
+          <button
+            type="button"
+            onClick={() => handleNavigate(searchFallback)}
+            className="rounded-xl bg-[#2b2b2b] px-3 py-1.5 font-medium text-white hover:bg-[#383838] cursor-pointer"
+          >
+            {t("rightPane.browserSearchDuckDuckGo")}
+          </button>
+        </div>
+      )}
 
       {/* AI Permission Banner (Waiting for Human Verification / CAPTCHA / 2FA) */}
       {controlState.requested && (

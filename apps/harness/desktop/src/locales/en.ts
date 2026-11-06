@@ -442,6 +442,8 @@ export const en: TranslationDictionary = {
     noOpenTabs: "No open tabs",
     noOpenTabsDesc: "Select a tool or file to inspect its content",
     browserSearchPlaceholder: "Search with Google or enter address...",
+    browserGoogleVerification: "Google paused this search for verification.",
+    browserSearchDuckDuckGo: "Search with DuckDuckGo",
     diffNoChanges: "No changes detected",
     revertAll: "Revert all changes",
     revertFile: "Revert this file",

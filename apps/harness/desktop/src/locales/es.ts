@@ -442,6 +442,8 @@ export const es: TranslationDictionary = {
     noOpenTabs: "No hay pestañas abiertas",
     noOpenTabsDesc: "Selecciona una herramienta o archivo para inspeccionar su contenido",
     browserSearchPlaceholder: "Buscar en Google o escribir dirección...",
+    browserGoogleVerification: "Google ha pausado esta búsqueda para verificarla.",
+    browserSearchDuckDuckGo: "Buscar en DuckDuckGo",
     diffNoChanges: "No se detectaron cambios",
     revertAll: "Deshacer todos los cambios",
     revertFile: "Deshacer este archivo",

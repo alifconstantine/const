@@ -442,6 +442,8 @@ export const ja: TranslationDictionary = {
     noOpenTabs: "開いているタブはありません",
     noOpenTabsDesc: "ツールまたはファイルを選択して内容を確認してください",
     browserSearchPlaceholder: "Googleで検索、またはアドレスを入力...",
+    browserGoogleVerification: "Google は確認のため、この検索を一時停止しました。",
+    browserSearchDuckDuckGo: "DuckDuckGo で検索",
     diffNoChanges: "変更は検出されませんでした",
     revertAll: "すべての変更を元に戻す",
     revertFile: "このファイルを元に戻す",

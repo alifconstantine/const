@@ -9,6 +9,7 @@ import { BrowserController, HELP_REQUEST_TTL_MS } from "../electron/browser-cont
 import { BROWSER_PARTITION, applyBrowserContentsPolicy, applyBrowserSessionPolicy } from "../electron/browser/guest-policy";
 import { assertBrowserNavigation, normalizeBrowserUrl } from "../electron/browser/navigation-policy";
 import { sanitizeConsoleText, sanitizeUrl } from "../electron/browser/console-sanitizer";
+import { browserPartition } from "../src/lib/browser-session";
 
 app.setPath("userData", process.argv[2]!);
 app.on("window-all-closed", () => {});
@@ -31,6 +32,11 @@ input,button { display:block; margin:12px; width:240px; height:32px }
 let origin = "";
 let blockedDestinationHits = 0;
 const server = createServer((req, res) => {
+  if (req.url === "/browser-tab-host") {
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end("<!doctype html><body></body>");
+    return;
+  }
   if (req.url === "/redirect") {
     res.writeHead(302, { Location: origin.replace("127.0.0.1", "localhost") + "/blocked-destination" });
     res.end();
@@ -55,7 +61,7 @@ async function run() {
   const browserSession = session.fromPartition(BROWSER_PARTITION);
   applyBrowserSessionPolicy(browserSession, (url) => driver.assertNavigationAllowed(url));
   const host = new BrowserWindow({ show: false, width: 1100, height: 1000, webPreferences: { webviewTag: true, contextIsolation: true, sandbox: true } });
-  await host.loadURL("data:text/html,<html><body></body></html>");
+  await host.loadURL(origin + "/browser-tab-host");
   const addGuest = async (id: string) => {
     const attached = once(host.webContents, "did-attach-webview");
     await host.webContents.executeJavaScript(`(() => {
@@ -447,6 +453,73 @@ async function run() {
     await unlink(shot.filePath);
     backgroundDriver.inSession("d", () => backgroundDriver.unregisterWebview("background-d", background.id));
     await host.webContents.executeJavaScript(`window.__unmountIsolation()`);
+  });
+  await check("address-bar search survives a Google challenge and offers an explicit fallback", async () => {
+    const google = "https://www.google.com/";
+    const query = "café & tea";
+    const searchUrl = `${google}search?q=${encodeURIComponent(query)}`;
+    const challengeUrl = `${google}sorry/index?continue=${encodeURIComponent(searchUrl + "&sei=fixture")}`;
+    const fallbackRequests: string[] = [];
+    let finishSearch!: () => void;
+    const pendingSearch = new Promise<void>(resolve => { finishSearch = resolve; });
+    session.fromPartition(browserPartition("search-test")).protocol.handle("https", async (request) => {
+      if (request.url === searchUrl) {
+        await pendingSearch;
+        return Response.redirect(challengeUrl, 302);
+      }
+      if (request.url.startsWith("https://duckduckgo.com/?")) fallbackRequests.push(request.url);
+      return new Response("<!doctype html><title>Search fixture</title>", {
+        status: request.url === challengeUrl ? 429 : 200,
+        headers: { "content-type": "text/html" },
+      });
+    });
+    await host.loadURL(origin + "/browser-tab-host");
+    const render = (code: string) => host.webContents.executeJavaScript(code);
+    const waitForRenderer = async (condition: string) => {
+      for (let attempt = 0; attempt < 80; attempt++) {
+        if (await render(condition)) return;
+        await delay(25);
+      }
+      assert.fail(`Browser tab did not reflect navigation: ${condition}`);
+    };
+    const addressBarValue = 'document.querySelector("input").value';
+    await render(await readFile(path.join(process.argv[2]!, "browser-isolation.js"), "utf8"));
+    const attached = once(host.webContents, "did-attach-webview");
+    await render(`window.__renderSearch(${JSON.stringify(google)})`);
+    const [, searchGuest] = await attached;
+    if (searchGuest.isLoading()) await once(searchGuest, "did-finish-load");
+    const finished = once(searchGuest, "did-finish-load");
+    try {
+      await render(`window.__submitSearch(${JSON.stringify(query)})`);
+      assert.equal(await render(addressBarValue), searchUrl);
+    } finally {
+      finishSearch();
+    }
+    await finished;
+    assert.equal(searchGuest.getURL(), challengeUrl);
+    const fallbackButton = `Array.from(document.querySelectorAll("button")).find(button => button.textContent === "Search with DuckDuckGo")`;
+    await waitForRenderer(`Boolean(${fallbackButton})`);
+    assert.deepEqual(fallbackRequests, []);
+
+    const fallbackFinished = once(searchGuest, "did-finish-load");
+    await render(`${fallbackButton}.click()`);
+    await fallbackFinished;
+    const expectedFallback = new URL("https://duckduckgo.com/");
+    expectedFallback.searchParams.set("q", query);
+    assert.deepEqual(fallbackRequests, [expectedFallback.href]);
+    assert.equal(searchGuest.getURL(), expectedFallback.href);
+    await waitForRenderer(`${addressBarValue} === ${JSON.stringify(expectedFallback.href)} && !(${fallbackButton})`);
+
+    const untrusted = "https://example.test/search?q=do-not-forward";
+    for (const url of [
+      `${google}sorry/index?continue=${encodeURIComponent(untrusted)}`,
+      `https://example.test/sorry/index?continue=${encodeURIComponent(searchUrl)}`,
+    ]) {
+      await searchGuest.loadURL(url);
+      await waitForRenderer(`${addressBarValue} === ${JSON.stringify(url)}`);
+      assert.equal(await render(`Boolean(${fallbackButton})`), false);
+    }
+    assert.deepEqual(fallbackRequests, [expectedFallback.href]);
   });
   host.destroy();
   console.log(`Browser integration: ${passed} checks passed on Electron ${process.versions.electron}.`);

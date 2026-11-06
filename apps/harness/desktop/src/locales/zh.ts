@@ -442,6 +442,8 @@ export const zh: TranslationDictionary = {
     noOpenTabs: "没有打开的标签页",
     noOpenTabsDesc: "选择工具或文件以查看其内容",
     browserSearchPlaceholder: "使用 Google 搜索或输入网址...",
+    browserGoogleVerification: "Google 暂停了此次搜索，要求进行验证。",
+    browserSearchDuckDuckGo: "使用 DuckDuckGo 搜索",
     diffNoChanges: "未检测到任何更改",
     revertAll: "撤销全部更改",
     revertFile: "撤销此文件",

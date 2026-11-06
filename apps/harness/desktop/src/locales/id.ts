@@ -442,6 +442,8 @@ export const id: TranslationDictionary = {
     noOpenTabs: "Tidak ada tab terbuka",
     noOpenTabsDesc: "Pilih alat atau berkas untuk memeriksa isinya",
     browserSearchPlaceholder: "Cari dengan Google atau masukkan alamat...",
+    browserGoogleVerification: "Google menjeda pencarian ini untuk verifikasi.",
+    browserSearchDuckDuckGo: "Cari dengan DuckDuckGo",
     diffNoChanges: "Tidak ada perubahan terdeteksi",
     revertAll: "Urungkan semua perubahan",
     revertFile: "Urungkan berkas ini",

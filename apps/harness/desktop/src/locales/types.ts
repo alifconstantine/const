@@ -428,6 +428,8 @@ export interface TranslationDictionary {
     noOpenTabs: string;
     noOpenTabsDesc: string;
     browserSearchPlaceholder: string;
+    browserGoogleVerification: string;
+    browserSearchDuckDuckGo: string;
     diffNoChanges: string;
     revertAll: string;
     revertFile: string;
