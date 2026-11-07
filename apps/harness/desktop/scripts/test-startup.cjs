@@ -1,4 +1,4 @@
-const { mkdtempSync, mkdirSync, rmSync, existsSync } = require("node:fs");
+const { mkdtempSync, mkdirSync, rmSync, existsSync, realpathSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
@@ -8,7 +8,8 @@ async function main() {
   if (!existsSync(path.join(root, "dist-electron/main.js"))) {
     throw new Error("Run the desktop build before test:startup.");
   }
-  const temporary = mkdtempSync(path.join(tmpdir(), "const-startup-test-"));
+  const tempRoot = realpathSync.native(tmpdir());
+  const temporary = mkdtempSync(path.join(tempRoot, "const-startup-test-"));
   try {
     const home = path.join(temporary, "home");
     mkdirSync(home);
@@ -28,7 +29,7 @@ async function main() {
     } finally { clearTimeout(timer); }
   } finally {
     // Only remove this test's uniquely created directory within the OS temp root.
-    if (path.dirname(path.resolve(temporary)) === path.resolve(tmpdir()) && path.basename(temporary).startsWith("const-startup-test-")) {
+    if (path.dirname(path.resolve(temporary)) === tempRoot && path.basename(temporary).startsWith("const-startup-test-")) {
       rmSync(temporary, { recursive: true, force: true });
     }
   }

@@ -994,55 +994,33 @@ export function AuthenticatedContent({
     setIsOpeningNewTab(false);
   }, []);
 
-  const pendingTerminalOpenRef = useRef(new Set<string>());
-  const handleToggleBottomPanel = useCallback(async () => {
-    const owner = conversationId;
-    if (!isBottomPanelOpenRef.current && bottomPanelTabsRef.current.length === 0) {
-      if (pendingTerminalOpenRef.current.has(owner)) return;
-      pendingTerminalOpenRef.current.add(owner);
-      try {
-        const cwd = window.electron?.resolveWorkspacePath
-          ? await window.electron.resolveWorkspacePath({ project: currentProject, conversationId: owner, purpose: "terminal" })
-          : currentProject === "Outside Project" ? undefined : currentProject;
-        if (conversationIdRef.current !== owner) return;
-        const newTab: RightPaneTab = {
-          id: `bottom_terminal_${crypto.randomUUID()}`, type: "terminal",
-          title: terminalFolderTitle(cwd, currentProject) || t("bottomPanel.terminal"),
-          cwd, project: currentProject, conversationId: owner,
-        };
-        setBottomPanelTabs([newTab]);
-        setActiveBottomTabId(newTab.id);
-        setIsBottomPanelOpen(true);
-      } catch (error) {
-        if (conversationIdRef.current === owner) toast.error(error instanceof Error ? error.message : t("common.failed"));
-      } finally { pendingTerminalOpenRef.current.delete(owner); }
-      return;
-    }
-    setIsBottomPanelOpen((prev) => !prev);
-  }, [currentProject, conversationId, t]);
-
-  const handleNewBottomTab = useCallback(async () => {
-    let cwd = currentProject === "Outside Project" ? undefined : currentProject;
-    try {
-      if (window.electron?.resolveWorkspacePath) cwd = await window.electron.resolveWorkspacePath({
-        project: currentProject, conversationId, purpose: "terminal",
-      });
-    } catch (error) {
-      if (conversationIdRef.current === conversationId) toast.error(error instanceof Error ? error.message : t("common.failed"));
-      return;
-    }
-    if (conversationIdRef.current !== conversationId) return;
-    const baseTitle = terminalFolderTitle(cwd, currentProject) || t("bottomPanel.terminal");
-    const count = bottomPanelTabsRef.current.filter(tab => tab.type === "terminal" && (tab.title === baseTitle || tab.title.startsWith(baseTitle + " ("))).length;
+  const handleNewBottomTab = useCallback(() => {
+    const baseTitle = terminalFolderTitle(undefined, currentProject) || t("bottomPanel.terminal");
+    const count = bottomPanelTabsRef.current.filter(tab => tab.type === "terminal" && tab.project === currentProject).length;
     const newTab: RightPaneTab = {
       id: `bottom_terminal_${crypto.randomUUID()}`, type: "terminal",
       title: count === 0 ? baseTitle : `${baseTitle} (${count + 1})`,
-      cwd, project: currentProject, conversationId,
+      project: currentProject, conversationId,
     };
     setBottomPanelTabs((prev) => [...prev, newTab]);
     setActiveBottomTabId(newTab.id);
     setIsBottomPanelOpen(true);
   }, [currentProject, conversationId, t]);
+
+  const handleToggleBottomPanel = useCallback(() => {
+    if (isBottomPanelOpenRef.current) {
+      setIsBottomPanelOpen(false);
+      return;
+    }
+    const matchingTabs = bottomPanelTabsRef.current.filter(tab => tab.project === currentProject);
+    const tab = matchingTabs.find(tab => tab.id === activeBottomTabIdRef.current) ?? matchingTabs.at(-1);
+    if (!tab) {
+      handleNewBottomTab();
+      return;
+    }
+    setActiveBottomTabId(tab.id);
+    setIsBottomPanelOpen(true);
+  }, [currentProject, handleNewBottomTab]);
 
   const handleBottomTerminalReady = useCallback((id: string, owner: string, cwd: string) => {
     if (conversationIdRef.current !== owner) return;
@@ -1283,20 +1261,9 @@ export function AuthenticatedContent({
     let title = "";
     let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
     if (type === "terminal") {
-      if (window.electron?.resolveWorkspacePath) {
-        try {
-          resolvedCwd = await window.electron.resolveWorkspacePath({
-            project: currentProject,
-            conversationId,
-            purpose: "terminal",
-          });
-        } catch (error) {
-          if (conversationIdRef.current === conversationId) toast.error(error instanceof Error ? error.message : t("common.failed"));
-          return;
-        }
-      }
-      const baseTitle = terminalFolderTitle(resolvedCwd, currentProject) || t("bottomPanel.terminal");
-      const count = rightPaneTabs.filter(tab => tab.type === "terminal" && (tab.title === baseTitle || tab.title.startsWith(baseTitle + " ("))).length;
+      resolvedCwd = undefined;
+      const baseTitle = terminalFolderTitle(undefined, currentProject) || t("bottomPanel.terminal");
+      const count = rightPaneTabs.filter(tab => tab.type === "terminal" && tab.project === currentProject).length;
       title = count === 0 ? baseTitle : `${baseTitle} (${count + 1})`;
     } else if (type === "review") {
       const count = rightPaneTabs.filter((t) => t.type === type).length;

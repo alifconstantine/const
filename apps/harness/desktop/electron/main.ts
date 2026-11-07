@@ -495,7 +495,7 @@ const terminalSessions = new TerminalSessions({
   finally { terminal.kill(); }
 });
 
-async function resolveConversationWorkspace(options?: { project?: string; conversationId?: string }) {
+function resolveConversationProject(options?: { project?: string; conversationId?: string }) {
   const owner = requireConversationId(options?.conversationId);
   const conversation = conversationDb.getConversation(owner);
   const project = options?.project || conversation?.project;
@@ -503,15 +503,23 @@ async function resolveConversationWorkspace(options?: { project?: string; conver
     const canonical = (value: string) => value === "Outside Project" ? value : fs.realpathSync(value);
     if (canonical(conversation.project) !== canonical(options.project)) throw new Error("Workspace project does not match this conversation");
   }
+  return { project: project && project !== "Outside Project" ? project : undefined, owner };
+}
+
+async function resolveConversationWorkspace(options?: { project?: string; conversationId?: string }) {
+  const { project, owner } = resolveConversationProject(options);
   const root = await workingDirectories.resolve(project, owner, loadUserConfig().defaultProjectLocation);
-  return { root, project: project && project !== "Outside Project" ? project : undefined, owner };
+  return { root, project, owner };
 }
 
 async function terminalWorkingDirectory(options: { project?: string; conversationId?: string; cwd?: string }) {
-  const workspace = await resolveConversationWorkspace(options);
+  const { project, owner } = resolveConversationProject(options);
+  // Outside Project is a manual shell in the user's home. Saved cwd hints
+  // from older tabs may still point at per-conversation agent directories.
+  if (!project) return fs.promises.realpath(os.homedir());
   return resolveTerminalDirectory({
-    workspaceRoot: workspace.root, project: workspace.project, cwd: options.cwd,
-    legacyWorkspace: options.cwd && workspace.project ? await workingDirectories.legacy(workspace.project, workspace.owner) : undefined,
+    workspaceRoot: await workingDirectories.resolve(project, owner), project, cwd: options.cwd,
+    legacyWorkspace: options.cwd ? await workingDirectories.legacy(project, owner) : undefined,
   });
 }
 
@@ -2903,9 +2911,7 @@ app.whenReady().then(() => {
       const owner = requireConversationId(options.conversationId);
       if (mcpShuttingDown) throw new Error("Desktop is shutting down");
       try {
-        const targetCwd = await terminalWorkingDirectory(options);
-        if (mcpShuttingDown) throw new Error("Desktop is shutting down");
-        return await terminalSessions.create({ ...options, conversationId: owner, cwd: targetCwd });
+        return await terminalSessions.create({ ...options, conversationId: owner, cwd: () => terminalWorkingDirectory(options) });
       } catch (err: any) {
         console.error(`[Terminal ${id}] Spawn failed:`, err);
         return { success: false, error: err.message };

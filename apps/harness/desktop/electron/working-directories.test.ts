@@ -11,12 +11,13 @@ import { requireConversationId, updateSessionMode } from "./session-ownership";
 
 const run = promisify(execFile);
 async function fixture(execute: (root: string, project: string, service: WorkingDirectories) => Promise<void>) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "const-directory-test-"));
+  const temp = await fs.realpath(os.tmpdir());
+  const root = await fs.mkdtemp(path.join(temp, "const-directory-test-"));
   const project = path.join(root, "source");
   await fs.mkdir(project);
   try { await execute(root, project, new WorkingDirectories(path.join(root, "home"))); }
   finally {
-    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
+    assert.equal(path.dirname(path.resolve(root)), temp);
     assert.ok(path.basename(root).startsWith("const-directory-test-"));
     await fs.rm(root, { recursive: true, force: true });
   }

@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { stripVTControlCharacters } = require("node:util");
 const { app } = require("electron");
 assert.equal(typeof globalThis.crypto?.subtle?.encrypt, "function", "Remote relay requires WebCrypto in Electron main");
 assert.equal(typeof globalThis.CompressionStream, "function", "Remote transfers require bounded gzip streams");
@@ -37,7 +38,7 @@ app.on("browser-window-created", (_event, window) => {
       assert.equal(status.pairingUrl, null);
       assert(!window.isVisible());
       console.log("PASS: production main, preload, renderer, and remote IPC start in Electron");
-      const project = path.join(temporary, "project");
+      const project = path.join(temporary, "Selected project");
       fs.mkdirSync(project);
       fs.writeFileSync(path.join(project, "reference.txt"), "original");
       const owners = ['a','b','c','d'];
@@ -56,24 +57,40 @@ app.on("browser-window-created", (_event, window) => {
       console.log('PASS: all project chats resolve the actual selected directory without allocating copies');
       // This IPC probe has no xterm to answer fish/zsh capability queries.
       const terminalShell = process.platform === 'win32' ? undefined : '/bin/sh';
-      const terminals = await Promise.all(owners.map(owner => js(`window.electron.terminal.create(${JSON.stringify({ id: 'terminal_' + owner, project, conversationId: 'project_' + owner, shell: terminalShell })})`)));
+      const openTerminal = options => js(`window.electron.terminal.create(${JSON.stringify({ cols: 160, shell: terminalShell, ...options })})`);
+      const projectTerminal = owner => openTerminal({ id: 'terminal_' + owner, conversationId: 'project_' + owner });
+      const waitForTerminalOutput = async (attach, matches) => {
+        let output = '';
+        for (let i = 0; i < 80; i++) {
+          const terminal = await attach();
+          assert.equal(terminal.success, true, terminal.error);
+          output = stripVTControlCharacters(terminal.replay);
+          if (matches(output)) return;
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        assert.fail('Expected terminal output: ' + output);
+      };
+      const checkWindowsPrompt = (attach, cwd) => process.platform === 'win32'
+        ? waitForTerminalOutput(attach, output => output.includes(cwd + '>'))
+        : Promise.resolve();
+      const terminals = await Promise.all(owners.map(projectTerminal));
       for (const terminal of terminals) {
         assert.equal(terminal.success, true, terminal.error);
         assert.equal(terminal.cwd, project);
       }
+      await Promise.all(owners.map(owner => checkWindowsPrompt(() => projectTerminal(owner), project)));
       assert.equal(await js(`window.electron.terminal.resize({id:'terminal_a',cols:111,rows:33,conversationId:'project_a'})`), true);
       assert.equal(await js(`window.electron.terminal.resize({id:'terminal_a',cols:111,rows:33,conversationId:'project_b'})`), false);
-      await Promise.all(owners.map(owner => js(`new Promise((resolve, reject) => {
-        const owner = ${JSON.stringify(owner)};
-        let output = '';
-        const timer = setTimeout(() => { cleanup(); reject(new Error('Terminal command timed out: ' + output)); }, 8000);
-        const cleanup = window.electron.terminal.onData(payload => {
-          if (payload.id !== 'terminal_' + owner || payload.conversationId !== 'project_' + owner) return;
-          output += payload.data;
-          if (output.split(String.fromCharCode(13)).join(String.fromCharCode(10)).split(String.fromCharCode(10)).some(line => line.trim() === 'TERMINAL_DONE_' + owner)) { clearTimeout(timer); cleanup(); resolve(true); }
-        });
-        window.electron.terminal.write({id:'terminal_' + owner,conversationId:'project_' + owner,data:'cd site-' + owner + ' && echo ' + owner + ' > owner.txt && echo TERMINAL_DONE_' + owner + String.fromCharCode(13)}).catch(error => { clearTimeout(timer); cleanup(); reject(error); });
-      })`)));
+      await Promise.all(owners.map(async owner => {
+        const command = 'cd site-' + owner + ' && echo ' + owner + ' > owner.txt && echo TERMINAL_DONE_' + owner;
+        const input = { id: 'terminal_' + owner, conversationId: 'project_' + owner, data: command + '\r' };
+        assert.equal(await js(`window.electron.terminal.write(${JSON.stringify(input)})`), true);
+        if (process.platform === 'win32') {
+          await checkWindowsPrompt(() => projectTerminal(owner), path.join(project, 'site-' + owner));
+        } else {
+          await waitForTerminalOutput(() => projectTerminal(owner), output => output.split(/\r?\n/).includes('TERMINAL_DONE_' + owner));
+        }
+      }));
       for (const owner of owners) assert.equal(fs.readFileSync(path.join(project, 'site-' + owner, 'owner.txt'), 'utf8').trim(), owner);
       const reattached = await js(`window.electron.terminal.create({id:'terminal_a',project:${JSON.stringify(project)},conversationId:'project_a'})`);
       assert.match(reattached.replay, /TERMINAL_DONE_a/);
@@ -85,13 +102,17 @@ app.on("browser-window-created", (_event, window) => {
       assert.equal(await js(`window.electron.terminal.destroy('terminal_a','project_b')`), false);
       for (const owner of owners) assert.equal(await js(`window.electron.terminal.destroy('terminal_${owner}','project_${owner}')`), true);
       console.log('PASS: four project PTYs keep independent cwd/process/output, resize and replay while enforcing control ownership');
-      const outside = await js(`window.electron.terminal.create(${JSON.stringify({ id: 'outside-terminal', conversationId: 'outside_a', shell: terminalShell })})`);
+      const retiredOutsideCwd = path.join(home, '.const/harness/brain/outside_a');
+      const outsideOptions = { id: 'outside-terminal', project: 'Outside Project', conversationId: 'outside_a', cwd: retiredOutsideCwd };
+      const outside = await openTerminal(outsideOptions);
       assert.equal(outside.success, true, outside.error);
-      assert.equal(outside.cwd, path.join(home, '.const/harness/brain/outside_a'));
-      const outsidePeer = await js(`window.electron.terminal.create(${JSON.stringify({ id: 'outside-bad', conversationId: 'outside_b', cwd: outside.cwd, shell: terminalShell })})`);
-      assert.equal(outsidePeer.success, false);
+      assert.equal(outside.cwd, home);
+      await checkWindowsPrompt(() => openTerminal(outsideOptions), home);
+      assert.equal(fs.existsSync(retiredOutsideCwd), false);
+      assert.equal(await js("window.electron.resolveWorkspacePath({ conversationId: 'outside_a', purpose: 'terminal' })"), home);
+      assert.equal(await js("window.electron.terminal.destroy('outside-terminal','outside_b')"), false);
       assert.equal(await js(`window.electron.terminal.destroy('outside-terminal','outside_a')`), true);
-      console.log('PASS: Outside Project terminals remain in their own workspace');
+      console.log('PASS: Outside Project terminals start in the user home, including tabs with a retired cwd');
 
       const { createServer } = require('node:http');
       const requests = [];

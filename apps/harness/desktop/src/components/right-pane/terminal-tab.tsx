@@ -16,12 +16,14 @@ export function TerminalTab({ tab, onReady }: TerminalTabProps) {
   const { t } = useTranslation();
   const translateRef = useRef(t);
   translateRef.current = t;
+  const launchOptions = useRef({ cwd: tab.cwd, project: tab.project });
+  launchOptions.current = { cwd: tab.cwd, project: tab.project };
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
     let disposed = false;
     let ready = false;
     let lastSequence = 0;
@@ -63,14 +65,15 @@ export function TerminalTab({ tab, onReady }: TerminalTabProps) {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    term.open(containerRef.current);
+    term.open(container);
     termRef.current = term;
-    fitAddonRef.current = fitAddon;
 
-    // Initial fit
-    try {
-      fitAddon.fit();
-    } catch {}
+    const fit = () => {
+      // Hidden tabs have no usable dimensions. Fitting them can resize
+      // the running console to the addon's one-row minimum.
+      if (container.clientWidth > 0 && container.clientHeight > 0) fitAddon.fit();
+    };
+    fit();
 
     // 1. Hook up user keyboard input to Electron IPC
     const onDataDisposable = term.onData((data) => {
@@ -104,8 +107,7 @@ export function TerminalTab({ tab, onReady }: TerminalTabProps) {
     // 3. Initialize terminal session in backend
     window.electron?.terminal?.create({
       id: tab.id,
-      cwd: tab.cwd,
-      project: tab.project,
+      ...launchOptions.current,
       conversationId: tab.conversationId,
       cols: term.cols,
       rows: term.rows,
@@ -121,22 +123,19 @@ export function TerminalTab({ tab, onReady }: TerminalTabProps) {
       queuedOutput = [];
       ready = true;
       if (result.cwd) onReadyRef.current?.(result.cwd);
-      try { fitAddon.fit(); } catch {}
+      fit();
       resize();
     }).catch(error => {
       if (!disposed) term.writeln(translateRef.current("bottomPanel.terminalStartFailed").replace("{error}", String(error)));
     });
 
     // Handle container resizing smoothly with ResizeObserver
+    let fitFrame = 0;
     const resizeObserver = new ResizeObserver(() => {
-      window.requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {}
-      });
+      cancelAnimationFrame(fitFrame);
+      fitFrame = requestAnimationFrame(fit);
     });
-
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     // Focus terminal on mount and initial render
     const focusTimer = setTimeout(() => {
@@ -152,11 +151,13 @@ export function TerminalTab({ tab, onReady }: TerminalTabProps) {
       cleanupOnData?.();
       cleanupOnExit?.();
       resizeObserver.disconnect();
+      cancelAnimationFrame(fitFrame);
       term.dispose();
       termRef.current = null;
-      fitAddonRef.current = null;
     };
-  }, [tab.id, tab.cwd, tab.conversationId, tab.project]);
+    // The resolved cwd updates the tab label after launch. The PTY and its
+    // xterm view stay attached to the same terminal ID through that update.
+  }, [tab.id, tab.conversationId]);
 
   return (
     <div

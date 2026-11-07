@@ -4,7 +4,7 @@ type SpawnOptions = IPtyForkOptions & IWindowsPtyForkOptions;
 type Spawner = (file: string, args: string[], options: SpawnOptions) => IPty;
 type Owner = { id: string; conversationId: string };
 type Session = Owner & { cwd: string; process: IPty; output: string; sequence: number };
-type CreateOptions = Owner & { cwd: string; shell?: string; cols?: number; rows?: number };
+type CreateOptions = Owner & { cwd: string | (() => Promise<string>); shell?: string; cols?: number; rows?: number };
 type CreatedTerminal = { success: true; id: string; cwd: string; replay: string; sequence: number };
 
 function dimension(value: number | undefined, fallback: number): number {
@@ -34,7 +34,7 @@ export class TerminalSessions {
   ) {}
 
   async create(options: CreateOptions) {
-    const { id, conversationId, cwd } = options;
+    const { id, conversationId } = options;
     const existing = this.sessions.get(id) || this.pending.get(id);
     if (existing) {
       if (existing.conversationId !== conversationId) throw new Error("Terminal belongs to another conversation");
@@ -43,6 +43,8 @@ export class TerminalSessions {
     }
     const state = { cancelled: false };
     const promise = (async () => {
+      const cwd = typeof options.cwd === "string" ? options.cwd : await options.cwd();
+      if (state.cancelled) throw new Error("Terminal creation was cancelled");
       const spawn = await this.loadSpawner();
       if (state.cancelled) throw new Error("Terminal creation was cancelled");
       const { file, args } = terminalCommand(options.shell);
@@ -81,7 +83,7 @@ export class TerminalSessions {
   resize({ id, conversationId, cols, rows }: Owner & { cols: number; rows: number }): boolean {
     const session = this.sessions.get(id);
     if (session?.conversationId !== conversationId || !Number.isSafeInteger(cols) || !Number.isSafeInteger(rows) || cols < 1 || rows < 1 || cols > 1000 || rows > 1000) return false;
-    session.process.resize(cols, rows);
+    if (session.process.cols !== cols || session.process.rows !== rows) session.process.resize(cols, rows);
     return true;
   }
 

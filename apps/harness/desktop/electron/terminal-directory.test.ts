@@ -6,11 +6,12 @@ import path from "node:path";
 import { resolveTerminalDirectory } from "./terminal-directory";
 
 async function fixture(run: (root: string, project: string) => Promise<void>) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "const-terminal-directory-"));
+  const temp = await fs.realpath(os.tmpdir());
+  const root = await fs.mkdtemp(path.join(temp, "const-terminal-directory-"));
   const project = path.join(root, "project"); await fs.mkdir(project);
   try { await run(root, project); }
   finally {
-    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
+    assert.equal(path.dirname(path.resolve(root)), temp);
     assert.ok(path.basename(root).startsWith("const-terminal-directory-"));
     await fs.rm(root, { recursive: true, force: true });
   }

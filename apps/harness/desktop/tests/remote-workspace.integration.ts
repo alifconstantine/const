@@ -64,27 +64,36 @@ async function run() {
     await delay(150);
   });
 
-  await check("terminal folder labels and late resolutions remain attached to their own chat", async () => {
+  await check("terminal startup and its prompt stay attached to the selected project and chat", async () => {
     await js(`window.electron.saveConversation({id:'terminal-chat-b',title:'Terminal workspace B',project:'/workspace/const',createdAt:Date.now(),updatedAt:Date.now(),messages:[]})`);
-    await js(`window.__remoteFixture.emit('conversations:changed',{conversationId:'terminal-chat-b'}); window.__remoteFixture.holdTerminalDirectory('preview-chat')`);
+    await js(`window.__remoteFixture.emit('conversations:changed',{conversationId:'terminal-chat-b'}); window.__remoteFixture.holdTerminalStart('preview-chat')`);
     await waitFor(`document.querySelector('.workspace-sidebar').innerText.includes('Terminal workspace B')`);
     await js(`document.querySelector('.workspace-shell button[aria-label="Terminal"]').click()`);
+    await waitFor(`window.__remoteFixture.terminalCreates.some(item => item.conversationId === 'preview-chat')`);
     await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Terminal workspace B').click()`);
     await delay(150);
     await js(`document.querySelector('.workspace-shell button[aria-label="Terminal"]').click()`);
     await waitFor(`window.__remoteFixture.terminalCreates.some(item => item.conversationId === 'terminal-chat-b')`);
-    assert.equal(await js(`window.__remoteFixture.terminalCreates.find(item => item.conversationId === 'terminal-chat-b').cwd`), '/workspace/const');
+    assert.equal(await js(`window.__remoteFixture.terminalCreates.find(item => item.conversationId === 'terminal-chat-b').project`), '/workspace/const');
     await capture('terminal-selected-project');
-    await js(`window.__remoteFixture.releaseTerminalDirectory('/workspace/const')`);
+    await js(`window.__remoteFixture.releaseTerminalStart('D:/Tasks/a/robot jellyfish')`);
     await delay(150);
-    assert.equal(await js(`window.__remoteFixture.terminalCreates.some(item => item.conversationId === 'preview-chat')`), false);
+    assert.equal(await js(`window.__remoteFixture.terminalCreates.length`), 2);
     assert.equal(await js(`Boolean(document.querySelector('[title="const (/workspace/const)"]'))`), true);
     assert.equal(await js(`Boolean(document.querySelector('[title="robot jellyfish (D:/Tasks/a/robot jellyfish)"]'))`), false);
     await js(`document.querySelector('button[aria-label="New Terminal"]').click()`);
     await waitFor(`window.__remoteFixture.terminalCreates.filter(item => item.conversationId === 'terminal-chat-b').length === 2`);
-    assert.equal(await js(`window.__remoteFixture.terminalCreates.filter(item => item.conversationId === 'terminal-chat-b').every(item => item.cwd === '/workspace/const')`), true);
-    assert.equal(await js(`Boolean(document.querySelector('[title="const (2) (/workspace/const)"]'))`), true);
+    await waitFor(`Boolean(document.querySelector('[title="const (2) (/workspace/const)"]'))`);
+    await waitFor(`Array.from(document.querySelectorAll('.xterm-rows')).some(rows => rows.getClientRects().length && rows.textContent.includes('/workspace/const>'))`);
+    assert.equal(await js(`window.__remoteFixture.terminalCreates.filter(item => item.conversationId === 'terminal-chat-b').every(item => item.project === '/workspace/const' && item.cwd === undefined)`), true);
+    assert.equal(await js(`window.__remoteFixture.terminalCreates.length`), 3);
     await capture('terminal-shared-project-directory');
+    await js(`document.querySelector('button[aria-label="Toggle right sidebar"]').click()`);
+    const rightTerminalOption = `Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Terminal')`;
+    await waitFor(`Boolean(${rightTerminalOption})`);
+    await js(`${rightTerminalOption}.click()`);
+    await waitFor(`document.querySelector('[role="tabpanel"] .xterm-rows')?.textContent.includes('/workspace/const>')`);
+    assert.equal(await js(`window.__remoteFixture.terminalCreates.length`), 4);
     await js(`Array.from(document.querySelectorAll('.workspace-sidebar span')).find(element => element.textContent === 'Review remote integration').click()`);
     await delay(150);
   });

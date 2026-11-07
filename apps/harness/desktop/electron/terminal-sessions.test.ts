@@ -73,6 +73,23 @@ test("concurrent create requests start one shell and shutdown cancels pending cr
   assert.equal(f.spawned(), 1);
 });
 
+test("closing a tab while its directory resolves cancels the pending shell", async () => {
+  const f = fixture();
+  let resolveDirectory!: (cwd: string) => void;
+  const opening = f.sessions.create({
+    ...options,
+    cwd: () => new Promise(resolve => { resolveDirectory = resolve; }),
+  });
+  assert.equal(f.sessions.destroy(owner.id, "chat-b"), false);
+  assert.equal(f.sessions.destroy(owner.id, owner.conversationId), true);
+  resolveDirectory(options.cwd);
+  await assert.rejects(opening, /cancelled/);
+  assert.equal(f.spawned(), 0);
+  await f.sessions.create(options);
+  assert.equal(f.spawned(), 1);
+  f.sessions.destroyAll();
+});
+
 test("a missing native addon rejects creation and can be retried", async () => {
   const f = fixture();
   let first = true;
