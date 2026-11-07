@@ -96,6 +96,7 @@
   "build": {
     "appId": "id.web.const.harness.desktop",
     "productName": "Const Harness",
+    "npmRebuild": false,
     "directories": {
       "output": "release",
       "buildResources": "build"
