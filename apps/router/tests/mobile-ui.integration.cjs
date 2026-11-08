@@ -38,6 +38,19 @@ async function main() {
           assert.equal(await js(`Array.from(document.querySelectorAll('main select')).filter(el => el.offsetWidth && el.offsetHeight >= 44).length`), 4);
           assert.deepEqual(await js(`Array.from(document.querySelectorAll('main article:first-child dl dt')).slice(0, 3).map(el => el.textContent)`), ["Input", "Cached input", "Output"]);
           assert.match(await js(`document.querySelector('main article').innerText`), /1M context[\s\S]+Official[\s\S]+60% lower/);
+          assert.match(await js(`document.querySelector('article [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('article').innerText`), /\$0\.006\s+\/ minute/);
+        } else {
+          assert.deepEqual(await js(`Array.from(document.querySelector('main thead tr').cells, cell => cell.textContent)`), ["Model", "Context / Max output", "Input", "Cached input", "Output", "Vs. official"]);
+          const comparison = modelId => js(`Array.from(
+            document.querySelector('tr [aria-label="Copy model ID ${modelId}"]').closest('tr').lastElementChild.querySelectorAll('dt, dd'),
+            el => el.textContent
+          )`);
+          assert.deepEqual(await comparison("claude-opus-5.5"), ["Input", "85% lower", "Cached input", "70% lower", "Output", "85% lower"]);
+          assert.deepEqual(await comparison("claude-fable-5.1"), ["Input", "75% lower", "Cached input", "Same price", "Output", "75% lower"]);
+          assert.deepEqual(await js(`(() => {
+            const row = document.querySelector('tr [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('tr');
+            return [row.cells[2].innerText, row.lastElementChild.querySelector('.sr-only').textContent];
+          })()`), ["$0.006\n/ minute", "Official comparison unavailable"]);
         }
         if (width === 390) {
           await setSelect("Provider", "anthropic");

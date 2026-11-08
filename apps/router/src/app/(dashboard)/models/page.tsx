@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
-import { ModelRate, OfficialPricingNote } from "@/components/models/model-rate";
+import {
+  ModelRate,
+  OfficialPricingNote,
+  OfficialRateComparison,
+} from "@/components/models/model-rate";
 import {
   BUILTIN_MODELS,
   parseUsdRate,
@@ -53,9 +57,6 @@ const categoryName = (category?: string) =>
         : category === "image"
           ? "Image"
           : "Other";
-
-const unit = (model: ModelSpec) =>
-  model.pricing?.unit || "Unit unavailable";
 
 function pricingTierGroup(model: ModelSpec): {
   key: string;
@@ -481,14 +482,13 @@ export function ModelCatalog({
                         : "Context not applicable"}
                       {model.maxOutputTokens && model.maxOutputTokens !== "-"
                         ? ` · ${model.maxOutputTokens} max output`
-                        : ""}{" "}
-                      · {unit(model)}
+                        : ""}
                     </p>
                     <dl className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-xs">
                       <div>
                         <dt className="text-muted-foreground">Input</dt>
                         <dd className="mt-1 text-base">
-                          <ModelRate model={model} field="input" />
+                          <ModelRate model={model} field="input" showUnit />
                         </dd>
                       </div>
                       <div>
@@ -522,7 +522,7 @@ export function ModelCatalog({
                         "Input",
                         "Cached input",
                         "Output",
-                        "Billing unit",
+                        "Vs. official",
                       ].map((label, index) => (
                         <th
                           key={label}
@@ -556,16 +556,16 @@ export function ModelCatalog({
                           </p>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="input" />
+                          <ModelRate model={model} field="input" showComparison={false} showUnit />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="cache" />
+                          <ModelRate model={model} field="cache" showComparison={false} />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="output" />
+                          <ModelRate model={model} field="output" showComparison={false} />
                         </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-muted-foreground">
-                          {unit(model)}
+                        <td className="px-5 py-4">
+                          <OfficialRateComparison model={model} />
                         </td>
                       </tr>
                     ))}
