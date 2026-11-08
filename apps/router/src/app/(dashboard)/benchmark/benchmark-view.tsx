@@ -12,13 +12,16 @@ type BenchmarkRow = {
 export function BenchmarkView({
   rows,
   version,
+  notice,
 }: {
   rows: BenchmarkRow[];
   version: number | null;
+  notice?: string;
 }) {
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-12">
       <h1 className="text-3xl font-semibold tracking-tight">Benchmark</h1>
+      {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <table className="w-full table-fixed text-left text-xs sm:text-sm">
           <caption className="sr-only">Artificial Analysis Intelligence Index by model</caption>

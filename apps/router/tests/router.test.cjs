@@ -1211,7 +1211,7 @@ test("benchmark scores require a commercial key and match exact variants across 
   });
   const slug = benchmarkSlugs["claude-opus-5.5"];
   delete process.env[env];
-  assert.equal(await getBenchmarks([slug]), null);
+  assert.deepEqual(await getBenchmarks([slug]), { state: "unconfigured" });
   process.env[env] = "test-benchmark-key";
 
   const row = {
@@ -1226,8 +1226,12 @@ test("benchmark scores require a commercial key and match exact variants across 
     pagination: { page, has_more: hasMore },
     data,
   });
-  global.fetch = async () => envelope("pro", 1, false, [row]);
-  assert.equal(await getBenchmarks([slug]), null);
+  for (const tier of ["free", "pro"]) {
+    global.fetch = async () => envelope(tier, 1, false, [row]);
+    assert.deepEqual(await getBenchmarks([slug]), { state: "commercial_required" });
+  }
+  global.fetch = async () => new Response(null, { status: 401 });
+  assert.deepEqual(await getBenchmarks([slug]), { state: "key_rejected" });
 
   const pages = [];
   global.fetch = async (url, options) => {
@@ -1241,6 +1245,7 @@ test("benchmark scores require a commercial key and match exact variants across 
   };
   const result = await getBenchmarks([slug]);
   assert.deepEqual(pages, [1, 2]);
+  assert.equal(result.state, "ready");
   assert.equal(result.version, 5);
   assert.deepEqual([...result.models.entries()], [[slug, {
     name: row.name,

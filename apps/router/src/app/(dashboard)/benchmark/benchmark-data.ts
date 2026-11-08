@@ -32,6 +32,10 @@ type Benchmark = {
   intelligence: number | null;
 };
 
+type BenchmarkFeed =
+  | { state: "ready"; models: Map<string, Benchmark>; version: number }
+  | { state: "unconfigured" | "commercial_required" | "key_rejected" | "unavailable" };
+
 type BenchmarkResponse = {
   tier: string;
   intelligence_index_version: number;
@@ -50,9 +54,10 @@ function metric(value: number | null | undefined) {
     : null;
 }
 
-export async function getBenchmarks(slugs: readonly string[]) {
+export async function getBenchmarks(slugs: readonly string[]): Promise<BenchmarkFeed> {
   const key = process.env.ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY?.trim();
-  if (!key || slugs.length === 0) return null;
+  if (!key) return { state: "unconfigured" };
+  if (slugs.length === 0) return { state: "unavailable" };
 
   const remaining = new Set(slugs);
   const models = new Map<string, Benchmark>();
@@ -70,15 +75,27 @@ export async function getBenchmarks(slugs: readonly string[]) {
           signal,
         },
       );
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.warn("[router benchmark] Artificial Analysis request failed", {
+          status: response.status,
+          page,
+        });
+        return { state: response.status === 401 ? "key_rejected" : "unavailable" };
+      }
       const result: BenchmarkResponse = await response.json();
+      if (result.tier === "free" || result.tier === "pro") {
+        return { state: "commercial_required" };
+      }
       if (
         result.tier !== "commercial" ||
         result.pagination?.page !== page ||
         !Array.isArray(result.data) ||
         !Number.isFinite(result.intelligence_index_version) ||
         (version !== null && version !== result.intelligence_index_version)
-      ) return null;
+      ) {
+        console.warn("[router benchmark] Unexpected Artificial Analysis response", { page });
+        return { state: "unavailable" };
+      }
 
       version = result.intelligence_index_version;
       for (const model of result.data) {
@@ -93,7 +110,8 @@ export async function getBenchmarks(slugs: readonly string[]) {
       if (remaining.size === 0 || !result.pagination.has_more) break;
     }
   } catch {
-    return null;
+    console.warn("[router benchmark] Could not fetch or read Artificial Analysis scores");
+    return { state: "unavailable" };
   }
-  return { models, version };
+  return version === null ? { state: "unavailable" } : { state: "ready", models, version };
 }
