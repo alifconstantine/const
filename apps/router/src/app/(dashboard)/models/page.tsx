@@ -5,20 +5,19 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
+import { ModelRate, OfficialPricingNote } from "@/components/models/model-rate";
 import {
   BUILTIN_MODELS,
-  effectiveModelPricing,
-  isPromoActive,
   parseUsdRate,
   type ModelSpec,
 } from "@/lib/model-specs";
 import { Button, Input, toast, cn } from "@const/ui";
-import { Copy, Search, ArrowUpRight, Sparkles } from "lucide-react";
+import { Copy, Search, ArrowUpRight } from "lucide-react";
 import { QueryBoundary } from "@/components/query-boundary";
 import { formatUsd } from "@/lib/router-analytics";
 
 type GroupMode = "provider" | "pricing" | "none";
-type SortMode = "cheapest" | "priciest" | "discount";
+type SortMode = "cheapest" | "priciest";
 
 const VENDOR_ORDER: Record<string, number> = {
   anthropic: 1,
@@ -45,7 +44,7 @@ const categoryName = (category?: string) =>
           : "Other";
 
 const unit = (model: ModelSpec) =>
-  effectiveModelPricing(model)?.unit || model.pricing?.unit || "Unit unavailable";
+  model.pricing?.unit || "Unit unavailable";
 
 function pricingTierGroup(model: ModelSpec): {
   key: string;
@@ -61,20 +60,20 @@ function pricingTierGroup(model: ModelSpec): {
       order: 4,
     };
   }
-  const inputRate = parseUsdRate(effectiveModelPricing(model)?.input);
+  const inputRate = parseUsdRate(model.pricing?.input);
   if (inputRate <= 0.1) {
     return {
       key: "flash",
       title: "Flash & High-Volume (≤ $0.10 / 1M input)",
-      subtitle: "Sub-cent to ultra-low rates for daily coding agents and fast loops",
+      subtitle: "Low input rates for daily coding agents and high-volume workloads",
       order: 1,
     };
   }
   if (inputRate <= 0.65) {
     return {
       key: "balanced",
-      title: "Balanced Pro ($0.11 – $0.65 / 1M input)",
-      subtitle: "Multimodal & deep-reasoning workhorses with heavy promo savings",
+      title: "Balanced Pro (over $0.10 to $0.65 / 1M input)",
+      subtitle: "Multimodal and reasoning models for everyday work",
       order: 2,
     };
   }
@@ -84,16 +83,6 @@ function pricingTierGroup(model: ModelSpec): {
     subtitle: "Top-tier Claude, GPT-6, Kimi K3, Gemini 4, and Grok flagship models",
     order: 3,
   };
-}
-
-function discountPercentVsOfficial(model: ModelSpec): number {
-  if (isPromoActive(model) && model.promo) return model.promo.totalPercentOff;
-  const off = parseUsdRate(model.officialPricing?.input);
-  const cur = parseUsdRate(effectiveModelPricing(model)?.input);
-  if (off > 0 && cur > 0 && cur < off) {
-    return Math.round(((off - cur) / off) * 100);
-  }
-  return 0;
 }
 
 export function ModelCatalog({
@@ -133,13 +122,9 @@ export function ModelCatalog({
     return [...filtered].sort((a, b) => {
       if (a.category !== "llm" && b.category === "llm") return 1;
       if (a.category === "llm" && b.category !== "llm") return -1;
-      const inA = parseUsdRate(effectiveModelPricing(a)?.input);
-      const inB = parseUsdRate(effectiveModelPricing(b)?.input);
+      const inA = parseUsdRate(a.pricing?.input);
+      const inB = parseUsdRate(b.pricing?.input);
       if (sortBy === "priciest") return inB - inA;
-      if (sortBy === "discount") {
-        const diff = discountPercentVsOfficial(b) - discountPercentVsOfficial(a);
-        if (diff !== 0) return diff;
-      }
       return inA - inB;
     });
   }, [models, category, vendorFilter, search, sortBy]);
@@ -204,14 +189,14 @@ export function ModelCatalog({
           const llmItems = section.items.filter((m) => m.category === "llm");
           const minInput = llmItems.length
             ? llmItems.reduce((best, cur) => {
-                const r = parseUsdRate(effectiveModelPricing(cur)?.input);
-                return r < parseUsdRate(effectiveModelPricing(best)?.input)
+                const r = parseUsdRate(cur.pricing?.input);
+                return r < parseUsdRate(best.pricing?.input)
                   ? cur
                   : best;
               }, llmItems[0]!)
             : undefined;
           const minRate = minInput
-            ? effectiveModelPricing(minInput)?.input
+            ? minInput.pricing?.input
             : undefined;
           return {
             ...section,
@@ -234,35 +219,15 @@ export function ModelCatalog({
     }
   }
 
-  const renderBadges = (model: ModelSpec) => {
-    const promoActive = isPromoActive(model) && model.promo;
-    const totalOff = discountPercentVsOfficial(model);
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
+  const identity = (model: ModelSpec) => (
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-foreground">{model.name}</span>
         {model.vendorName && model.vendor !== "const" && groupBy !== "provider" && (
           <span className="rounded-md border border-border bg-secondary/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             {model.vendorName}
           </span>
         )}
-        {promoActive ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-            <Sparkles className="size-3" />
-            {model.promo!.label} · {model.promo!.totalPercentOff}% off official
-          </span>
-        ) : totalOff > 0 ? (
-          <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {totalOff}% off official
-          </span>
-        ) : null}
-      </div>
-    );
-  };
-
-  const identity = (model: ModelSpec) => (
-    <div className="min-w-0 space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-foreground">{model.name}</span>
-        {renderBadges(model)}
       </div>
       <button
         type="button"
@@ -275,40 +240,6 @@ export function ModelCatalog({
       </button>
     </div>
   );
-
-  const renderRateCell = (
-    model: ModelSpec,
-    field: "input" | "output" | "cache",
-  ) => {
-    const active = effectiveModelPricing(model) ?? model.pricing;
-    const currentVal = active?.[field];
-    if (!currentVal || currentVal === "-") {
-      return <span className="text-muted-foreground">—</span>;
-    }
-    const promoActive = isPromoActive(model) && Boolean(model.promo);
-    const standardVal = model.standardPricing?.[field];
-    const officialVal = model.officialPricing?.[field];
-
-    return (
-      <div className="space-y-0.5">
-        <div className="font-medium text-foreground tabular-nums">
-          {currentVal}
-        </div>
-        {field !== "cache" && (promoActive || officialVal) && (
-          <div className="text-[11px] text-muted-foreground tabular-nums">
-            {promoActive && standardVal && standardVal !== currentVal && (
-              <span className="mr-1.5 line-through opacity-75">
-                {standardVal}
-              </span>
-            )}
-            {officialVal && (
-              <span className="opacity-80">Off. {officialVal}</span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-5">
@@ -364,7 +295,6 @@ export function ModelCatalog({
               [
                 ["cheapest", "Cheapest"],
                 ["priciest", "Priciest"],
-                ["discount", "Top Promo"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -458,8 +388,7 @@ export function ModelCatalog({
 
       <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
         <p aria-live="polite">
-          Showing {visible.length} of {models.length} models · Standard Const
-          rates are 40% below official, plus limited-time extra promos
+          Showing {visible.length} of {models.length} models
         </p>
         <p>Prices in USD · per 1M tokens unless noted</p>
       </div>
@@ -522,19 +451,19 @@ export function ModelCatalog({
                       <div>
                         <dt className="text-muted-foreground">Input</dt>
                         <dd className="mt-1.5">
-                          {renderRateCell(model, "input")}
+                          <ModelRate model={model} field="input" />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Cached input</dt>
                         <dd className="mt-1.5">
-                          {renderRateCell(model, "cache")}
+                          <ModelRate model={model} field="cache" />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Output</dt>
                         <dd className="mt-1.5">
-                          {renderRateCell(model, "output")}
+                          <ModelRate model={model} field="output" />
                         </dd>
                       </div>
                     </dl>
@@ -590,13 +519,13 @@ export function ModelCatalog({
                           </p>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          {renderRateCell(model, "input")}
-                        </td>
-                        <td className="px-5 py-4 text-right text-muted-foreground">
-                          {renderRateCell(model, "cache")}
+                          <ModelRate model={model} field="input" />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          {renderRateCell(model, "output")}
+                          <ModelRate model={model} field="cache" />
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <ModelRate model={model} field="output" />
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-muted-foreground">
                           {unit(model)}
@@ -612,10 +541,7 @@ export function ModelCatalog({
       )}
 
       <p className="max-w-3xl text-xs leading-6 text-muted-foreground">
-        All models are billed from your unified credit balance using exact
-        upstream token usage. Limited-time promotional rates automatically
-        apply at settlement while active, then revert to Const&apos;s standard
-        40%-off-official pricing.
+        <OfficialPricingNote />
       </p>
     </div>
   );
@@ -635,9 +561,11 @@ function ConnectedCatalog() {
             Models &amp; pricing
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Compare frontier models grouped by provider or pricing tier. Standard
-            rates start 40% below official vendor pricing, with extra
-            limited-time discounts up to 76% off.
+            Compare fixed Const rates with official API pricing. See model
+            evaluations in the{" "}
+            <Link href="/benchmark" className="text-[var(--router-highlight)] underline">
+              Benchmark
+            </Link>.
           </p>
         </div>
         <Button asChild variant="outline" className="gap-2">

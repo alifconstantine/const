@@ -8,12 +8,17 @@ import { LandingNavbar } from "@/components/landing/LandingNavbar";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ParticleBackdrop } from "@/components/landing/ParticleBackdrop";
 import { CodeBlock, QUICKSTART_TABS } from "@/components/landing/CodeBlock";
-import { BUILTIN_MODELS } from "@/lib/model-specs";
+import { ModelRate, OfficialPricingNote } from "@/components/models/model-rate";
+import { BUILTIN_MODELS, parseUsdRate } from "@/lib/model-specs";
+import { formatUsd } from "@/lib/router-analytics";
 import { ROUTER_ENDPOINTS } from "@/lib/api-contract";
 import "./landing.css";
 
 const chatModels = BUILTIN_MODELS.filter(
   (model) => model.category === "llm",
+);
+const lowestInputRate = Math.min(
+  ...chatModels.flatMap((model) => model.pricing ? [parseUsdRate(model.pricing.input)] : []),
 );
 
 export default function HomePage() {
@@ -252,14 +257,17 @@ export default function HomePage() {
               The rate in plain sight.
             </h2>
             <p>
-              Published chat rates in USD per million tokens. Every model uses
-              your wallet balance. Top up in rupiah with QRIS.
+              Fixed chat rates from{" "}
+              <strong className="font-semibold text-[var(--rp-accent)]">
+                {formatUsd(lowestInputRate)} per million input tokens
+              </strong>.
+              Compare input, cached input, and output with official API rates.
             </p>
           </div>
           <div id="pricing" className="router-model-table-wrap" role="region" aria-label="Chat model pricing" tabIndex={0}>
             <table className="router-model-table">
               <caption className="sr-only">
-                Const Router chat model pricing per million tokens
+                Const Router chat model pricing and official rates per million tokens
               </caption>
               <thead>
                 <tr>
@@ -278,9 +286,9 @@ export default function HomePage() {
                       <code>{model.id}</code>
                     </th>
                     <td>{model.contextWindow}</td>
-                    <td>{model.pricing?.input ?? "—"}</td>
-                    <td>{model.pricing?.cache ?? "—"}</td>
-                    <td>{model.pricing?.output ?? "—"}</td>
+                    <td><ModelRate model={model} field="input" /></td>
+                    <td><ModelRate model={model} field="cache" /></td>
+                    <td><ModelRate model={model} field="output" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -292,17 +300,17 @@ export default function HomePage() {
                   <span>{model.contextWindow} context</span>
                 </div>
                 <dl>
-                  <div><dt>Input / 1M</dt><dd>{model.pricing?.input ?? "—"}</dd></div>
-                  <div><dt>Cached / 1M</dt><dd>{model.pricing?.cache ?? "—"}</dd></div>
-                  <div><dt>Output / 1M</dt><dd>{model.pricing?.output ?? "—"}</dd></div>
+                  <div><dt>Input / 1M</dt><dd><ModelRate model={model} field="input" /></dd></div>
+                  <div><dt>Cached / 1M</dt><dd><ModelRate model={model} field="cache" /></dd></div>
+                  <div><dt>Output / 1M</dt><dd><ModelRate model={model} field="output" /></dd></div>
                 </dl>
               </li>)}
             </ul>
           </div>
           <div className="router-table-note">
-            <span>Rates come from the same catalog used by the gateway.</span>
-            <Link href="/models" className="router-text-link">
-              Full model catalog <ArrowUpRight size={15} />
+            <p className="max-w-xl text-xs leading-5"><OfficialPricingNote /></p>
+            <Link href="/benchmark" className="router-text-link">
+              View model benchmarks <ArrowUpRight size={15} />
             </Link>
           </div>
           <div id="billing" className="router-allowance">

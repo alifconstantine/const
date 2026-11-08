@@ -24,16 +24,6 @@ export interface ModelPricing {
   unit?: string;
 }
 
-export interface ModelPromo {
-  /** Additional limited-time discount on top of Const's 40%-off-official standard rate */
-  extraPercentOff: number;
-  /** Combined total percentage discount vs official vendor rate */
-  totalPercentOff: number;
-  label: string;
-  endsAt?: string;
-  pricing: ModelPricing;
-}
-
 export interface ModelSpec {
   id: string;
   name: string;
@@ -47,8 +37,6 @@ export interface ModelSpec {
   thinkingDefault?: ThinkingLevel;
   pricing?: ModelPricing;
   officialPricing?: ModelPricing;
-  standardPricing?: ModelPricing;
-  promo?: ModelPromo;
   isCombo?: boolean;
   comboSlug?: string;
   modelsCount?: number;
@@ -64,8 +52,6 @@ export interface ModelSpec {
   outputTypes?: string[];
 }
 
-export const LIMITED_PROMO_ENDS_AT = "2026-12-05T00:00:00.000Z";
-
 function rateTokens(input: string, output: string, cache?: string): ModelPricing {
   return {
     input,
@@ -75,40 +61,8 @@ function rateTokens(input: string, output: string, cache?: string): ModelPricing
   };
 }
 
-function buildPromo(
-  extraPercentOff: number,
-  totalPercentOff: number,
-  input: string,
-  output: string,
-  cache: string,
-  endsAt = LIMITED_PROMO_ENDS_AT,
-): ModelPromo {
-  return {
-    extraPercentOff,
-    totalPercentOff,
-    label: `Limited -${extraPercentOff}%`,
-    endsAt,
-    pricing: rateTokens(input, output, cache),
-  };
-}
-
-export function isPromoActive(model: ModelSpec, now = Date.now()): boolean {
-  if (!model.promo) return false;
-  if (!model.promo.endsAt) return true;
-  const endsAtMs = Date.parse(model.promo.endsAt);
-  return Number.isFinite(endsAtMs) && now < endsAtMs;
-}
-
-export function effectiveModelPricing(
-  model: ModelSpec,
-  now = Date.now(),
-): ModelPricing | undefined {
-  if (isPromoActive(model, now)) return model.promo!.pricing;
-  return model.standardPricing ?? model.pricing;
-}
-
 // Built-in models matching exactly what is managed by Const Gateway (<= 3 months old, >= Aug 2026)
-const CATALOG_MODELS: ModelSpec[] = [
+export const BUILTIN_MODELS: ModelSpec[] = [
   // --- FAST / DAILY CODING MODELS ---
   {
     id: "deepseek-v4.1-flash",
@@ -127,9 +81,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$0.150", "$0.600", "$0.015"),
-    standardPricing: rateTokens("$0.090", "$0.360", "$0.0135"),
-    promo: buildPromo(10, 46, "$0.081", "$0.324", "$0.012"),
+    officialPricing: rateTokens("$0.150", "$0.600", "$0.003"),
+    pricing: rateTokens("$0.06", "$0.24", "$0.006"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -150,9 +103,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "48K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$0.150", "$0.500", "$0.015"),
-    standardPricing: rateTokens("$0.090", "$0.300", "$0.0135"),
-    promo: buildPromo(25, 55, "$0.0675", "$0.225", "$0.010"),
+    officialPricing: rateTokens("$0.150", "$0.500", "$0.030"),
+    pricing: rateTokens("$0.05", "$0.17", "$0.005"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -174,8 +126,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$0.150", "$0.600", "$0.015"),
-    standardPricing: rateTokens("$0.090", "$0.360", "$0.0135"),
-    promo: buildPromo(20, 52, "$0.072", "$0.288", "$0.011"),
+    pricing: rateTokens("$0.06", "$0.24", "$0.006"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -196,9 +147,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$0.500", "$3.000", "$0.050"),
-    standardPricing: rateTokens("$0.300", "$1.800", "$0.045"),
-    promo: buildPromo(50, 70, "$0.150", "$0.900", "$0.0225"),
+    officialPricing: rateTokens("$0.500", "$3.000", "$0.100"),
+    pricing: rateTokens("$0.15", "$0.90", "$0.015"),
     inputTypes: ["text", "image", "video"],
     outputTypes: ["text"],
   },
@@ -220,8 +170,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$0.750", "$3.750", "$0.075"),
-    standardPricing: rateTokens("$0.450", "$2.250", "$0.0675"),
-    promo: buildPromo(40, 64, "$0.270", "$1.350", "$0.0405"),
+    pricing: rateTokens("$0.15", "$0.75", "$0.015"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -243,8 +192,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$0.100", "$0.500", "$0.010"),
-    standardPricing: rateTokens("$0.060", "$0.300", "$0.009"),
-    promo: buildPromo(25, 55, "$0.045", "$0.225", "$0.007"),
+    pricing: rateTokens("$0.04", "$0.20", "$0.004"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -266,8 +214,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$0.100", "$0.500", "$0.010"),
-    standardPricing: rateTokens("$0.060", "$0.300", "$0.009"),
-    promo: buildPromo(50, 70, "$0.030", "$0.150", "$0.0045"),
+    pricing: rateTokens("$0.06", "$0.30", "$0.006"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -290,9 +237,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$0.660", "$1.980", "$0.066"),
-    standardPricing: rateTokens("$0.396", "$1.188", "$0.060"),
-    promo: buildPromo(50, 70, "$0.198", "$0.594", "$0.030"),
+    officialPricing: rateTokens("$0.660", "$1.980", "$0.022"),
+    pricing: rateTokens("$0.20", "$0.60", "$0.020"),
     inputTypes: ["text"],
     outputTypes: ["text"],
   },
@@ -313,9 +259,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
-    promo: buildPromo(50, 70, "$0.600", "$1.800", "$0.090"),
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.250"),
+    pricing: rateTokens("$0.35", "$1.05", "$0.035"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -336,9 +281,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
-    promo: buildPromo(60, 76, "$0.480", "$1.440", "$0.072"),
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.250"),
+    pricing: rateTokens("$0.32", "$0.96", "$0.032"),
     inputTypes: ["text"],
     outputTypes: ["text"],
   },
@@ -359,9 +303,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$1.400", "$4.400", "$0.140"),
-    standardPricing: rateTokens("$0.840", "$2.640", "$0.126"),
-    promo: buildPromo(40, 64, "$0.504", "$1.584", "$0.076"),
+    officialPricing: rateTokens("$1.400", "$4.400", "$0.260"),
+    pricing: rateTokens("$0.40", "$1.25", "$0.040"),
     inputTypes: ["text"],
     outputTypes: ["text"],
   },
@@ -383,8 +326,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
-    promo: buildPromo(25, 55, "$0.900", "$4.500", "$0.135"),
+    pricing: rateTokens("$0.65", "$3.25", "$0.065"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -406,8 +348,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$3.000", "$15.000", "$0.300"),
-    standardPricing: rateTokens("$1.800", "$9.000", "$0.270"),
-    promo: buildPromo(30, 58, "$1.260", "$6.300", "$0.189"),
+    pricing: rateTokens("$0.65", "$3.25", "$0.065"),
     inputTypes: ["text", "image", "video"],
     outputTypes: ["text"],
   },
@@ -428,8 +369,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "64K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$12.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$7.200", "$0.180"),
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.100"),
+    pricing: rateTokens("$0.75", "$4.50", "$0.075"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -450,9 +391,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
-    promo: buildPromo(30, 58, "$0.840", "$4.200", "$0.126"),
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.100"),
+    pricing: rateTokens("$0.50", "$2.50", "$0.050"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -473,9 +413,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$4.000", "$20.000", "$0.400"),
-    standardPricing: rateTokens("$2.400", "$12.000", "$0.360"),
-    promo: buildPromo(35, 61, "$1.560", "$7.800", "$0.234"),
+    officialPricing: rateTokens("$4.000", "$20.000", "$0.200"),
+    pricing: rateTokens("$0.60", "$3.00", "$0.060"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -496,9 +435,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$10.000", "$50.000", "$1.000"),
-    standardPricing: rateTokens("$6.000", "$30.000", "$0.900"),
-    promo: buildPromo(20, 52, "$4.800", "$24.000", "$0.720"),
+    officialPricing: rateTokens("$10.000", "$50.000", "$0.250"),
+    pricing: rateTokens("$2.50", "$12.50", "$0.250"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -519,9 +457,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$1.000", "$5.000", "$0.100"),
-    standardPricing: rateTokens("$0.600", "$3.000", "$0.090"),
-    promo: buildPromo(50, 70, "$0.300", "$1.500", "$0.045"),
+    officialPricing: rateTokens("$1.000", "$5.000", "$0.050"),
+    pricing: rateTokens("$0.30", "$1.50", "$0.030"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -542,9 +479,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$10.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$6.000", "$0.180"),
-    promo: buildPromo(50, 70, "$0.600", "$3.000", "$0.090"),
+    officialPricing: rateTokens("$2.000", "$10.000", "$0.100"),
+    pricing: rateTokens("$0.60", "$3.00", "$0.060"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -566,8 +502,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     officialPricing: rateTokens("$10.000", "$50.000", "$1.000"),
-    standardPricing: rateTokens("$6.000", "$30.000", "$0.900"),
-    promo: buildPromo(60, 76, "$2.400", "$12.000", "$0.360"),
+    pricing: rateTokens("$2.75", "$13.75", "$0.275"),
     inputTypes: ["text", "image"],
     outputTypes: ["text"],
   },
@@ -588,8 +523,8 @@ const CATALOG_MODELS: ModelSpec[] = [
     maxOutputTokens: "64K",
     supportsThinking: true,
     thinkingDefault: "medium",
-    officialPricing: rateTokens("$2.000", "$6.000", "$0.200"),
-    standardPricing: rateTokens("$1.200", "$3.600", "$0.180"),
+    officialPricing: rateTokens("$2.000", "$6.000", "$0.500"),
+    pricing: rateTokens("$0.55", "$1.65", "$0.055"),
     inputTypes: ["text"],
     outputTypes: ["text"],
   },
@@ -603,6 +538,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     providerName: "Const",
     vendor: "const",
     vendorName: "Const",
+    tier: "paid",
     category: "stt",
     endpoint: "/v1/audio/transcriptions",
     supportsThinking: false,
@@ -625,6 +561,7 @@ const CATALOG_MODELS: ModelSpec[] = [
     providerName: "Const",
     vendor: "const",
     vendorName: "Const",
+    tier: "paid",
     category: "search",
     endpoint: "/v1/search",
     supportsThinking: false,
@@ -642,11 +579,6 @@ const CATALOG_MODELS: ModelSpec[] = [
 ];
 
 export const DEFAULT_MODEL = "deepseek-v4.1-flash";
-export const BUILTIN_MODELS: ModelSpec[] = CATALOG_MODELS.map((m) => ({
-  ...m,
-  tier: "paid",
-  pricing: effectiveModelPricing(m) ?? m.pricing,
-}));
 
 const UPSTREAM_MODELS: Record<string, string> = {
   "deepseek-v4.1-flash": "atmo/ali/deepseek-v4.1-flash",
@@ -713,8 +645,8 @@ export function parseUsdRate(s?: string): number {
   return Number((s || "0").replace(/[^0-9.]/g, "")) || 0;
 }
 
-export function modelRatesNanoPerToken(model: ModelSpec, now = Date.now()) {
-  const pricing = effectiveModelPricing(model, now);
+export function modelRatesNanoPerToken(model: ModelSpec) {
+  const pricing = model.pricing;
   const inputUsdPerMillion = parseUsdRate(pricing?.input);
   const outputUsdPerMillion = parseUsdRate(pricing?.output);
   const cacheUsdPerMillion = pricing?.cache && pricing.cache !== "-"
@@ -733,11 +665,10 @@ export function tokenCostNano(
   promptTokens: number,
   completionTokens: number,
   cachedTokens = 0,
-  now = Date.now(),
 ): number {
   const model = getManagedModel(modelId);
   if (!model) throw new Error("Unknown model");
-  const rates = modelRatesNanoPerToken(model, now);
+  const rates = modelRatesNanoPerToken(model);
   return Math.ceil(
     Math.max(0, promptTokens - cachedTokens) * rates.input +
       cachedTokens * rates.cache +

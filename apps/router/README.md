@@ -5,6 +5,7 @@
 ## Yang tersedia
 
 - Katalog model dan konfigurasi provider.
+- Perbandingan tarif model dengan harga resmi dan tautan benchmark Artificial Analysis.
 - API keys dengan pengaturan akses serta batas penggunaan.
 - Combos untuk merangkai pilihan model dan strategi eksekusinya.
 - Playground generation dan riwayat percakapan.
@@ -42,3 +43,5 @@ pnpm --filter @const/router build
 ```
 
 Web memakai port 3002. Diperlukan backend Convex, autentikasi Accounts, dan konfigurasi provider di sisi layanan. Jangan menyimpan API key atau encryption secret dalam source.
+
+Halaman Benchmark menautkan hasil tiap model di Artificial Analysis. Untuk menampilkan metrik di Router, isi `ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY` di server setelah memperoleh izin untuk menampilkan data di produk publik. [Artificial Analysis Data API](https://artificialanalysis.ai/data-api)

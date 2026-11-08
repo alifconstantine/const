@@ -18,7 +18,7 @@ The developer audience is inferred from the repository's SDK examples and API wo
 
 - Next.js App Router, React, Convex, Tailwind, and shared `@const/ui` primitives.
 - Supported routes and contracts come from `src/lib/api-contract.ts` and actual `src/app/v1` handlers. Do not advertise unsupported API formats.
-- The built-in catalog is the pricing source. Competitor prices and performance, uptime, or savings guarantees are not verified evidence.
+- The built-in catalog supplies fixed Const rates and dated vendor API references. Percentage comparisons use the reference for the same token type.
 - All managed model and utility requests use prepaid USD credits. Retired free variants are unavailable. QRIS payments use IDR at a server-configured rate shown before checkout; only verified payment completion adds credit. Token usage may be estimated when provider usage is absent; copy must reflect this.
 - Authentication, billing, account preferences, and destructive actions retain their authorization boundaries.
 - Playground is a current-session workspace. The user requested removal of saved chat history.
@@ -29,4 +29,4 @@ Keep the Const name/logo and black foundation. The user delegated other design c
 
 ## Evidence
 
-The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. No testimonials, health feed, or benchmark evidence is supplied.
+The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. Benchmark links point to Artificial Analysis. Its model scores and provider measurements can appear in the console's public Benchmark page under a license covering public display.

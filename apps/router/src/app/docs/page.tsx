@@ -264,6 +264,7 @@ export default function DocsPage() {
           </Section>
           <Section id="models-allowance" title="Models & billing">
             <p>All models use prepaid USD credit. Choose a model from <Link href="/models">the catalog</Link> and use its exact ID. Retired model IDs are rejected.</p>
+            <p>Compare input, cached input, and output rates in <Link href="/models">Models &amp; pricing</Link>. See independent model evaluations in <Link href="/benchmark">Benchmark</Link>.</p>
             <p>Open <Link href="/credits">Credits</Link> to add balance with QRIS. Choose a USD amount and review the rupiah total and exchange rate before creating a checkout. The rate is fixed for that payment and gateway fees are covered by Const.</p>
             <p>Credit is added after the payment provider confirms payment. Returning from checkout alone does not confirm payment. Unpaid links expire after 24 hours. Paid requests reserve credit before inference and settle against recorded usage.</p>
           </Section>

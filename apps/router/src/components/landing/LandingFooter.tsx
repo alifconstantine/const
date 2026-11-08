@@ -17,6 +17,7 @@ export function LandingFooter() {
           </div>
           <nav aria-label="Product links">
             <Link href="/models">Models &amp; rates</Link>
+            <Link href="/benchmark">Benchmark</Link>
             <Link href="/docs">Documentation</Link>
             <Link href="/dashboard">Dashboard</Link>
             <a

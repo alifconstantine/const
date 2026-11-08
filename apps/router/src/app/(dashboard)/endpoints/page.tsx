@@ -153,7 +153,7 @@ export default function EndpointsPage() {
                       "rounded-md border px-2 py-1 text-[10px] font-semibold",
                       endpoint.method === "GET"
                         ? "border-border text-foreground"
-                        : "border-[#cfbd9c]/20 bg-[#cfbd9c]/5 text-[var(--router-highlight)]",
+                        : "border-ring/20 bg-ring/5 text-[var(--router-highlight)]",
                     )}
                   >
                     {endpoint.method}

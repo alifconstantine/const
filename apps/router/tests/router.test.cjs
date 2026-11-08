@@ -151,6 +151,9 @@ const { SseUsageParser } = load("apps/router/src/lib/telemetry.ts");
 const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
+const { benchmarkSlugs, getBenchmarks } = sourceLoader({ "server-only": {} })(
+  "apps/router/src/app/benchmark/benchmark-data.ts",
+);
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
 const secret = "router-test-secret-32-characters-minimum";
@@ -431,10 +434,10 @@ test("paid request uses actual cached price, settles once, and releases reservat
   assert.equal((await db.query("creditTransactions").collect()).length, 1);
 });
 for (const [model, upstream, expectedCostNano] of [
-  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 24960],
-  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 99840],
-  ["claude-sonnet-5.5", "atmo/cc/claude-sonnet-5-5", 34944],
-  ["minimax-m3.1-flash", "atmo/cbcn/minimax-m3.1-flash", 2636],
+  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 24840],
+  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 113850],
+  ["claude-sonnet-5.5", "atmo/cc/claude-sonnet-5-5", 20700],
+  ["minimax-m3.1-flash", "atmo/cbcn/minimax-m3.1-flash", 2184],
 ]) {
   for (const mode of ["API JSON", "API streaming", "playground SSO"]) {
     test(`${model} routes and bills correctly through ${mode}`, async () => {
@@ -1175,16 +1178,76 @@ test('hiding an invoice does not stop verified completion or create duplicate cr
   assert.equal((await db.query('creditTransactions').collect()).filter(tx => tx.type === 'deposit').length, 1);
 });
 
-test('promo pricing automatically reverts to 40%-off-official standard pricing after promo endsAt', () => {
-  const duringPromo = Date.parse('2026-11-10T00:00:00.000Z');
-  const afterPromo = Date.parse('2027-01-01T00:00:00.000Z');
-  const sol = catalog.getManagedModel('gpt-6.1-sol');
-  assert.equal(catalog.isPromoActive(sol, duringPromo), true);
-  assert.equal(catalog.isPromoActive(sol, afterPromo), false);
-  // Promo: $0.600 in / $3.000 out / $0.090 cache -> 16*600 + 4*90 + 5*3000 = 24,960 nanoUSD
-  assert.equal(catalog.tokenCostNano('gpt-6.1-sol', 20, 5, 4, duringPromo), 24960);
-  // Standard (40% off official $2/$10): $1.200 in / $6.000 out / $0.180 cache -> 16*1200 + 4*180 + 5*6000 = 49,920 nanoUSD
-  assert.equal(catalog.tokenCostNano('gpt-6.1-sol', 20, 5, 4, afterPromo), 49920);
+test("Opus discovery and settlement use the same fixed input, cache, and output rates", async () => {
+  const response = await models.GET(new NextRequest("http://localhost/v1/models"));
+  const { data } = await response.json();
+  const opus = data.find((model) => model.id === "claude-opus-5.5");
+  assert.equal(opus.pricing.unit, "USD/token");
+  assert.equal(Number(opus.pricing.prompt), 0.60 / 1e6);
+  assert.equal(Number(opus.pricing.cache), 0.060 / 1e6);
+  assert.equal(Number(opus.pricing.completion), 3.00 / 1e6);
+  assert(!("promo" in opus));
+
+  const ticket = await gateway.begin.handler(ctx, ticketArgs(opus.id));
+  await gateway.settle.handler(ctx, result(ticket.id));
+  assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - 24840);
+});
+
+test("benchmark links cover every managed chat model", () => {
+  assert.deepEqual(
+    Object.keys(benchmarkSlugs).sort(),
+    catalog.BUILTIN_MODELS.filter(model => model.category === "llm")
+      .map(model => model.modelId)
+      .sort(),
+  );
+});
+
+test("public benchmark metrics require a commercial key and match exact variants across pages", async (t) => {
+  const env = "ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY";
+  const previous = process.env[env];
+  t.after(() => {
+    if (previous === undefined) delete process.env[env];
+    else process.env[env] = previous;
+  });
+  const slug = benchmarkSlugs["claude-opus-5.5"];
+  delete process.env[env];
+  assert.equal(await getBenchmarks([slug]), null);
+  process.env[env] = "test-benchmark-key";
+
+  const row = {
+    slug,
+    name: "Claude Opus 5.5 (Max)",
+    evaluations: { artificial_analysis_intelligence_index: 50.5 },
+    performance: { median_output_tokens_per_second: 70.25 },
+  };
+  const envelope = (tier, page, hasMore, data) => Response.json({
+    tier,
+    intelligence_index_version: 5,
+    pagination: { page, has_more: hasMore },
+    data,
+  });
+  global.fetch = async () => envelope("pro", 1, false, [row]);
+  assert.equal(await getBenchmarks([slug]), null);
+
+  const pages = [];
+  global.fetch = async (url, options) => {
+    const page = Number(new URL(url).searchParams.get("page"));
+    pages.push(page);
+    assert.equal(options.headers["x-api-key"], "test-benchmark-key");
+    assert.equal(options.next.revalidate, 21600);
+    return page === 1
+      ? envelope("commercial", 1, true, [{ ...row, slug: slug + "-low" }])
+      : envelope("commercial", 2, false, [row]);
+  };
+  const result = await getBenchmarks([slug]);
+  assert.deepEqual(pages, [1, 2]);
+  assert.equal(result.version, 5);
+  assert.deepEqual([...result.models.entries()], [[slug, {
+    name: row.name,
+    intelligence: 50.5,
+    outputSpeed: 70.25,
+    firstToken: null,
+  }]]);
 });
 
 test('per-model maxOutputTokens caps clamp oversized max_tokens before forwarding upstream', async () => {

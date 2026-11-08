@@ -6,7 +6,7 @@
   --rp-line: #29292e;
   --rp-text: #f4f1eb;
   --rp-muted: #a3a3ab;
-  --rp-accent: #cfbd9c;
+  --rp-accent: var(--router-signal);
   background: var(--rp-bg);
   color: var(--rp-text);
   font-family: var(--font-sans), sans-serif;
@@ -20,7 +20,7 @@
 }
 .router-public ::selection,
 .router-docs ::selection {
-  background: #cfbd9c;
+  background: var(--rp-accent);
   color: #09090b;
 }
 .router-public :focus-visible,
@@ -84,10 +84,14 @@
   gap: 30px;
   font-size: 13px;
   color: var(--rp-muted);
+  white-space: nowrap;
 }
 .router-desktop-nav a:hover,
 .router-footer a:hover {
   color: var(--rp-text);
+}
+.router-navbar [aria-current="page"] {
+  color: var(--rp-accent);
 }
 .router-nav-actions {
   display: flex;
@@ -436,7 +440,7 @@
   line-height: 1.95;
   padding: 25px;
   margin: 0;
-  color: #d2c7b3;
+  color: #c1ccdf;
   tab-size: 2;
   scrollbar-color: #49494f #121214;
 }
@@ -923,8 +927,11 @@
   .router-container {
     padding-inline: 32px;
   }
+  .router-nav-inner {
+    gap: 16px;
+  }
   .router-desktop-nav {
-    gap: 20px;
+    gap: 14px;
   }
   .router-hero h1 {
     font-size: clamp(3.25rem, 6.1vw, 4.25rem);

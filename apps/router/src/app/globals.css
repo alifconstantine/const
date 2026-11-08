@@ -1,6 +1,7 @@
 @import "@const/ui/globals.css";
 :root {
   --font-sans: var(--font-router, Manrope), sans-serif;
+  --router-signal: #a8c8ff;
   color-scheme: light;
   --background: 45 15% 97%; --foreground: 240 6% 10%;
   --card: 0 0% 100%; --card-foreground: 240 6% 10%;
@@ -8,15 +9,15 @@
   --primary: 240 6% 10%; --primary-foreground: 45 15% 97%;
   --secondary: 40 8% 93%; --secondary-foreground: 240 6% 15%;
   --muted: 40 6% 91%; --muted-foreground: 240 4% 41%;
-  --accent: 40 8% 91%; --accent-foreground: 240 6% 10%;
+  --accent: 218 38% 91%; --accent-foreground: 240 6% 10%;
   --destructive: 0 68% 45%; --destructive-foreground: 0 0% 100%;
-  --border: 40 5% 84%; --input: 40 5% 84%; --ring: 35 24% 42%;
+  --border: 40 5% 84%; --input: 40 5% 84%; --ring: 218 50% 41%;
   --radius: .75rem;
   --sidebar-background: 40 10% 94%; --sidebar-foreground: 240 4% 38%;
   --sidebar-primary: 240 6% 10%; --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 40 6% 88%; --sidebar-accent-foreground: 240 6% 10%;
-  --sidebar-border: 40 5% 84%; --sidebar-ring: 35 24% 42%;
-  --router-highlight: #78613e; --router-chart-free: #817255; --router-chart-paid: #637c96;
+  --sidebar-accent: 218 34% 89%; --sidebar-accent-foreground: 240 6% 10%;
+  --sidebar-border: 40 5% 84%; --sidebar-ring: var(--ring);
+  --router-highlight: #345a9d; --router-chart-free: var(--router-highlight); --router-chart-paid: #637c96;
 }
 .dark {
   color-scheme: dark;
@@ -26,18 +27,18 @@
   --primary: 40 23% 94%; --primary-foreground: 240 10% 4%;
   --secondary: 240 5% 11%; --secondary-foreground: 40 12% 89%;
   --muted: 240 5% 14%; --muted-foreground: 240 5% 66%;
-  --accent: 35 10% 15%; --accent-foreground: 40 23% 94%;
+  --accent: 218 23% 16%; --accent-foreground: 40 23% 94%;
   --destructive: 0 63% 52%; --destructive-foreground: 0 0% 100%;
-  --border: 240 5% 17%; --input: 240 5% 21%; --ring: 38 35% 70%;
+  --border: 240 5% 17%; --input: 240 5% 21%; --ring: 218 100% 83%;
   --sidebar-background: 240 7% 5.5%; --sidebar-foreground: 240 5% 66%;
   --sidebar-primary: 40 23% 94%; --sidebar-primary-foreground: 240 10% 4%;
-  --sidebar-accent: 35 8% 12%; --sidebar-accent-foreground: 40 23% 94%;
-  --sidebar-border: 240 5% 14%; --sidebar-ring: 38 35% 70%;
-  --router-highlight: #cfbd9c; --router-chart-free: #cfbd9c; --router-chart-paid: #94adbd;
+  --sidebar-accent: 218 22% 14%; --sidebar-accent-foreground: 40 23% 94%;
+  --sidebar-border: 240 5% 14%; --sidebar-ring: var(--ring);
+  --router-highlight: var(--router-signal); --router-chart-free: var(--router-highlight); --router-chart-paid: #94adbd;
 }
 html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
 body { font-feature-settings: "ss01"; }
-::selection { background: #cfbd9c; color: #17130e; }
+::selection { background: var(--router-signal); color: #10192b; }
 button, input, select, textarea { font: inherit; }
 input, textarea { caret-color: var(--router-highlight); }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }

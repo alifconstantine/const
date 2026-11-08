@@ -14,8 +14,6 @@ import {
 import { Search, Check, X, Layers } from "lucide-react";
 import {
   BUILTIN_MODELS,
-  effectiveModelPricing,
-  isPromoActive,
   type ModelSpec,
 } from "@/lib/model-specs";
 
@@ -215,9 +213,6 @@ export function ModelSelectorPanel({
                   {items.map((m) => {
                     const isSelected =
                       m.modelId === selectedModelId || m.id === selectedModelId;
-                    const active = effectiveModelPricing(m) ?? m.pricing;
-                    const promoActive = isPromoActive(m) && m.promo;
-
                     return (
                       <button
                         type="button"
@@ -239,11 +234,6 @@ export function ModelSelectorPanel({
                             <span className="truncate text-sm sm:text-base font-medium">
                               {m.name}
                             </span>
-                            {promoActive && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                -{m.promo!.totalPercentOff}%
-                              </span>
-                            )}
                           </div>
                           <span
                             className={cn(
@@ -254,8 +244,8 @@ export function ModelSelectorPanel({
                             )}
                           >
                             {m.modelId}
-                            {active?.input && active?.output
-                              ? ` · ${active.input}/${active.output}`
+                            {m.pricing?.input && m.pricing?.output
+                              ? ` · ${m.pricing.input}/${m.pricing.output}`
                               : ""}
                           </span>
                         </div>

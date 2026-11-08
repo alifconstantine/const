@@ -1,17 +1,20 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ConstLogoIcon } from "@const/ui";
 import { ArrowUpRight, Menu, X } from "lucide-react";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 const links = [
   { href: "/#models", label: "Models & pricing" },
+  { href: "/benchmark", label: "Benchmark" },
   { href: "/#features", label: "Why Const" },
   { href: "/#start", label: "Integration" },
   { href: "/docs", label: "Docs" },
 ];
 export function LandingNavbar() {
   const { isAuthenticated, isLoading, signIn } = useRouterAuth();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   return (
     <header className="router-navbar">
@@ -27,7 +30,7 @@ export function LandingNavbar() {
         </Link>
         <nav aria-label="Main navigation" className="router-desktop-nav">
           {links.map((link) => (
-            <Link key={link.href} href={link.href}>
+            <Link key={link.href} href={link.href} aria-current={pathname === link.href ? "page" : undefined}>
               {link.label}
             </Link>
           ))}
@@ -74,6 +77,7 @@ export function LandingNavbar() {
             <Link
               href={link.href}
               key={link.href}
+              aria-current={pathname === link.href ? "page" : undefined}
               onClick={() => setOpen(false)}
             >
               {link.label}

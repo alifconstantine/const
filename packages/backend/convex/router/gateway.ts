@@ -115,14 +115,14 @@ export const begin = mutation({
       if (remaining <= prompt) fail("Daily API key limit reached", 429);
       output = Math.min(output, remaining - prompt);
     }
-    const rates = modelRatesNanoPerToken(spec, now);
+    const rates = modelRatesNanoPerToken(spec);
     const utilityCost =
       spec.category !== "llm"
         ? Math.ceil((args.units ?? 1) * rates.unit)
         : 0;
     const reservedNanoUsd =
       spec.category === "llm"
-          ? tokenCostNano(args.model, prompt, output, 0, now)
+          ? tokenCostNano(args.model, prompt, output)
           : utilityCost;
     if (!Number.isSafeInteger(reservedNanoUsd) || reservedNanoUsd < 0)
       fail("Invalid reservation", 400);

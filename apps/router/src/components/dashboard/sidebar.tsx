@@ -3,13 +3,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu";
 import { Button, ScrollArea, cn, ConstLogoIcon } from "@const/ui";
-import { LayoutGrid, ScrollText, Key, Terminal, GitFork, Box, Bot, Settings, BookOpen, PanelLeftClose, PanelLeftOpen, Wallet } from "lucide-react";
+import { LayoutGrid, ScrollText, Key, Terminal, GitFork, Box, Bot, Settings, BookOpen, PanelLeftClose, PanelLeftOpen, Wallet, ChartNoAxesColumnIncreasing } from "lucide-react";
 
 const navigation = [
   { title: "Workspace", items: [
     { title: "Overview", href: "/dashboard", icon: LayoutGrid },
     { title: "Playground", href: "/generation", icon: Bot },
     { title: "Models & pricing", href: "/models", icon: Box },
+    { title: "Benchmark", href: "/benchmark", icon: ChartNoAxesColumnIncreasing },
     { title: "Endpoints", href: "/endpoints", icon: Terminal },
   ] },
   { title: "Manage", items: [

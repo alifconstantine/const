@@ -1,13 +1,13 @@
 ---
 name: Const Router
-description: Black and graphite API workspace with warm type and restrained champagne state.
+description: Black and graphite API workspace with warm type and cool blue accents.
 colors:
   public-background: "#09090b"
   public-panel: "#121214"
   public-line: "#29292e"
   public-text: "#f4f1eb"
   public-muted: "#a3a3ab"
-  champagne: "#cfbd9c"
+  ice-blue: "#a8c8ff"
   console-background: hsl(240 10% 3.5%)
   console-text: hsl(40 23% 94%)
   console-card: hsl(240 5% 7%)
@@ -17,11 +17,11 @@ colors:
   console-muted-text: hsl(240 5% 66%)
   console-border: hsl(240 5% 17%)
   console-input: hsl(240 5% 21%)
-  console-ring: hsl(38 35% 70%)
+  console-ring: hsl(218 100% 83%)
   console-primary-ink: hsl(240 10% 4%)
   console-destructive: hsl(0 63% 52%)
   sidebar-background: hsl(240 7% 5.5%)
-  sidebar-active: hsl(35 8% 12%)
+  sidebar-active: hsl(218 22% 14%)
   chart-paid: "#94adbd"
   light-background: hsl(45 15% 97%)
   light-text: hsl(240 6% 10%)
@@ -31,12 +31,12 @@ colors:
   light-muted: hsl(40 6% 91%)
   light-muted-text: hsl(240 4% 41%)
   light-border: hsl(40 5% 84%)
-  light-ring: hsl(35 24% 42%)
-  light-highlight: "#78613e"
+  light-ring: hsl(218 50% 41%)
+  light-highlight: "#345a9d"
   light-sidebar: hsl(40 10% 94%)
   light-sidebar-text: hsl(240 4% 38%)
-  light-sidebar-active: hsl(40 6% 88%)
-  light-chart-free: "#817255"
+  light-sidebar-active: hsl(218 34% 89%)
+  light-chart-free: "#345a9d"
   light-chart-paid: "#637c96"
   light-destructive: hsl(0 68% 45%)
 typography:
@@ -98,7 +98,7 @@ components:
     padding: 12px 21px
     height: 48px
   public-button-primary-hover:
-    backgroundColor: "{colors.champagne}"
+    backgroundColor: "{colors.ice-blue}"
   console-button-primary:
     backgroundColor: "{colors.console-text}"
     textColor: "{colors.console-primary-ink}"
@@ -138,14 +138,14 @@ components:
 
 **Creative North Star: "The Working Gateway"**
 
-Router uses a black and graphite foundation, warm white text, and restrained champagne emphasis. Manrope carries the public site and working console through the app’s self-hosted next/font setup. The existing Const mark and desktop particle backdrop remain the identity assets.
+Router uses a black and graphite foundation, warm white text, and restrained ice blue emphasis. Manrope carries the public site and working console through the app’s self-hosted next/font setup. The existing Const mark and desktop particle backdrop remain the identity assets.
 
 The finished interface uses open sections, fine dividers, and quiet bordered work areas. Density follows the task: broad public sections, compact console controls, and a narrower documentation reading column. Console preferences retain a light theme; the public site and documentation keep their scoped dark palette.
 
 **Key Characteristics:**
 
 - Warm type on black and graphite surfaces.
-- Champagne for selection, focus, and highlighted technical values.
+- Ice blue for selection, focus, and highlighted technical values.
 - Manrope throughout the shared shell and public headings.
 - Dividers and tonal layering rather than decorative surface shadows.
 
@@ -155,7 +155,7 @@ This is a source-derived record of the finished build, not an independent claim 
 
 ### Primary
 
-Champagne is a restrained interaction and information accent. Public primary actions begin in warm white and become champagne on hover. Console primary actions use the semantic foreground as their fill, with contrasting dark ink. Usage charts use restrained semantic accents; paid cost uses a muted blue-gray.
+Ice blue is a restrained interaction and information accent. Public primary actions begin in warm white and become ice blue on hover. Console primary actions use the semantic foreground as their fill, with contrasting dark ink. Usage charts use restrained semantic accents; paid cost uses a muted blue-gray.
 
 ### Neutral
 
@@ -207,7 +207,7 @@ Public action controls have gently curved 6px corners and code panels have 10px 
 
 ### Buttons
 
-Public actions are solid, compact rectangles with a 48px minimum height, warm-white fill, black text, and champagne hover. The mobile form is 46px high. Public navigation actions use an outlined transparent treatment and a quiet darker hover. Console primary and outline buttons use semantic theme colors; working screens commonly override the shared pill radius with the app control radius. Shared buttons have a 200ms state transition, a 0.98 active scale, and disabled opacity of 0.5.
+Public actions are solid, compact rectangles with a 48px minimum height, warm-white fill, black text, and ice blue hover. The mobile form is 46px high. Public navigation actions use an outlined transparent treatment and a quiet darker hover. Console primary and outline buttons use semantic theme colors; working screens commonly override the shared pill radius with the app control radius. Shared buttons have a 200ms state transition, a 0.98 active scale, and disabled opacity of 0.5.
 
 ### Cards / Containers
 
@@ -227,7 +227,7 @@ The console groups workspace, management, and account routes. Each item has a 40
 
 ### Integration panels
 
-Code samples combine a tab toolbar, copy action, dark panel, and fine dividers. Selected tabs use champagne text and a bottom rule. Code content scrolls within the panel and uses 12px type with 1.95 leading on desktop; mobile samples use 10px with 1.9 leading.
+Code samples combine a tab toolbar, copy action, dark panel, and fine dividers. Selected tabs use ice blue text and a bottom rule. Code content scrolls within the panel and uses 12px type with 1.95 leading on desktop; mobile samples use 10px with 1.9 leading.
 
 Reduced-motion preferences disable public transitions and the hero backdrop; global animation and transition durations reduce to 0.01ms.
 
