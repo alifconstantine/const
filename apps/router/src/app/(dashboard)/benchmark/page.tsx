@@ -23,7 +23,7 @@ const rows = BUILTIN_MODELS.flatMap((model) => {
     variant: benchmark.variant,
     url: `${artificialAnalysisUrl}/models/${benchmark.slug}`,
   }];
-}).sort((a, b) => a.name.localeCompare(b.name));
+});
 
 export default function BenchmarkPage() {
   return <BenchmarkView rows={rows} />;

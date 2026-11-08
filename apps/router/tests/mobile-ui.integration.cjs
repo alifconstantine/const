@@ -35,6 +35,27 @@ async function main() {
           return Array.from(view.closest('tr').cells, cell => cell.innerText.trim());
         })()`), ["Claude Opus 5.5\nMax, Default Fallback", "Anthropic", "59", "View"]);
         assert.equal(await js(`Array.from(document.querySelectorAll('main tbody tr')).filter(row => row.cells[2].textContent === 'N/A').length`), 2);
+        const scores = `Array.from(document.querySelectorAll('main tbody tr'), row => row.cells[2].textContent)`;
+        const defaultScores = await js(scores);
+        assert.equal(defaultScores[0], "59");
+        assert.deepEqual(defaultScores.slice(-2), ["N/A", "N/A"]);
+        assert.deepEqual(defaultScores, [...defaultScores.slice(0, -2)].sort((a, b) => Number(b) - Number(a)).concat("N/A", "N/A"));
+        if (width === 390) {
+          const setFilter = (index, value) => js(`(() => {
+            const select = document.querySelectorAll('main select')[${index}];
+            select.value = ${JSON.stringify(value)};
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          })()`);
+          await setFilter(1, "lowest");
+          await wait(`(${scores})[0] === "20"`);
+          assert.deepEqual((await js(scores)).slice(-2), ["N/A", "N/A"]);
+          await setFilter(0, "Anthropic");
+          await wait(`(${scores}).length === 4`);
+          assert.deepEqual(await js(scores), ["36", "49", "55", "59"]);
+          await setFilter(1, "name");
+          await wait(`document.querySelector('main tbody tr th').textContent.startsWith('Claude Fable 5.1')`);
+          assert.deepEqual(await js(scores), ["49", "36", "59", "55"]);
+        }
         if (width >= 768) {
           assert.equal(await js(`document.querySelector('aside a[aria-current=page]').getAttribute('href')`), "/benchmark");
         }
