@@ -19,6 +19,17 @@ import { formatUsd } from "@/lib/router-analytics";
 type GroupMode = "provider" | "pricing" | "none";
 type SortMode = "cheapest" | "priciest";
 
+const GROUP_OPTIONS = [
+  ["provider", "By Provider"],
+  ["pricing", "By Pricing"],
+  ["none", "Flat List"],
+] as const;
+
+const SORT_OPTIONS = [
+  ["cheapest", "Cheapest"],
+  ["priciest", "Priciest"],
+] as const;
+
 const VENDOR_ORDER: Record<string, number> = {
   anthropic: 1,
   openai: 2,
@@ -95,6 +106,15 @@ export function ModelCatalog({
   const [vendorFilter, setVendorFilter] = useState("all");
   const [groupBy, setGroupBy] = useState<GroupMode>("provider");
   const [sortBy, setSortBy] = useState<SortMode>("cheapest");
+  const categories = [
+    ["all", "All categories"],
+    ["llm", "Chat"],
+    ["stt", "Audio"],
+    ["search", "Search"],
+    ...(models.some((model) => model.category === "image")
+      ? [["image", "Image"]]
+      : []),
+  ] as const;
 
   const vendors = useMemo(() => {
     const map = new Map<string, string>();
@@ -220,7 +240,7 @@ export function ModelCatalog({
   }
 
   const identity = (model: ModelSpec) => (
-    <div className="min-w-0 space-y-1.5">
+    <div className="min-w-0 sm:space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-foreground">{model.name}</span>
         {model.vendorName && model.vendor !== "const" && groupBy !== "provider" && (
@@ -242,33 +262,63 @@ export function ModelCatalog({
   );
 
   return (
-    <div className="space-y-5">
-      {/* Top toolbar: Search + Group By + Sort + Category */}
+    <div className="space-y-4 [container-type:inline-size] sm:space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full lg:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="h-10 bg-card pl-9"
+            className="h-11 bg-card pl-9 lg:h-10"
             aria-label="Search models"
-            placeholder="Search model, ID, or provider (Claude, OpenAI…)"
+            placeholder="Search model, ID, or provider"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-3 lg:hidden">
+          {[
+            {
+              label: "Provider",
+              value: vendorFilter,
+              onChange: setVendorFilter,
+              options: [["all", "All providers"], ...vendors],
+            },
+            { label: "Category", value: category, onChange: setCategory, options: categories },
+            {
+              label: "Group by",
+              value: groupBy,
+              onChange: (value: string) => setGroupBy(value as GroupMode),
+              options: GROUP_OPTIONS,
+            },
+            {
+              label: "Sort by",
+              value: sortBy,
+              onChange: (value: string) => setSortBy(value as SortMode),
+              options: SORT_OPTIONS,
+            },
+          ].map(({ label, value, onChange, options }) => (
+            <label key={label} className="min-w-0 space-y-1.5">
+              <span className="block text-xs font-medium text-muted-foreground">{label}</span>
+              <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="h-11 w-full rounded-lg border border-border bg-card px-2.5 text-sm text-foreground"
+              >
+                {options.map(([option, name]) => (
+                  <option key={option} value={option}>{name}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+
+        <div className="hidden flex-wrap items-center gap-2 lg:flex">
           <div
             className="inline-flex items-center rounded-lg border border-border bg-card p-1"
             role="group"
             aria-label="Group models by"
           >
-            {(
-              [
-                ["provider", "By Provider"],
-                ["pricing", "By Pricing"],
-                ["none", "Flat List"],
-              ] as const
-            ).map(([value, label]) => (
+            {GROUP_OPTIONS.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -291,12 +341,7 @@ export function ModelCatalog({
             role="group"
             aria-label="Sort models by"
           >
-            {(
-              [
-                ["cheapest", "Cheapest"],
-                ["priciest", "Priciest"],
-              ] as const
-            ).map(([value, label]) => (
+            {SORT_OPTIONS.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -319,20 +364,12 @@ export function ModelCatalog({
             role="group"
             aria-label="Model category"
           >
-            {[
-              ["all", "All"],
-              ["llm", "Chat"],
-              ["stt", "Audio"],
-              ["search", "Search"],
-              ...(models.some((model) => model.category === "image")
-                ? [["image", "Image"]]
-                : []),
-            ].map(([value, label]) => (
+            {categories.map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 aria-pressed={category === value}
-                onClick={() => setCategory(value!)}
+                onClick={() => setCategory(value)}
                 className={cn(
                   "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring",
                   category === value
@@ -340,7 +377,7 @@ export function ModelCatalog({
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {label}
+                {value === "all" ? "All" : label}
               </button>
             ))}
           </div>
@@ -349,7 +386,7 @@ export function ModelCatalog({
 
       {/* Provider filter pills */}
       <div
-        className="flex flex-wrap items-center gap-1.5"
+        className="hidden flex-wrap items-center gap-1.5 lg:flex"
         role="group"
         aria-label="Filter by provider"
       >
@@ -420,7 +457,7 @@ export function ModelCatalog({
               className="overflow-hidden rounded-xl border border-border bg-card"
             >
               {groupBy !== "none" && (
-                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border bg-secondary/25 px-5 py-3.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border bg-secondary/25 px-3 py-3 sm:px-5 sm:py-3.5">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground">
                     {section.title}
                   </h2>
@@ -433,9 +470,9 @@ export function ModelCatalog({
               )}
 
               {/* Mobile cards */}
-              <div className="divide-y divide-border md:hidden">
+              <div className="divide-y divide-border [@container_(min-width:820px)]:hidden">
                 {section.items.map((model) => (
-                  <article key={model.modelId} className="space-y-4 p-5">
+                  <article key={model.modelId} className="space-y-2 px-3 py-4 sm:space-y-3 sm:px-5">
                     {identity(model)}
                     <p className="text-xs text-muted-foreground">
                       {categoryName(model.category)} ·{" "}
@@ -447,22 +484,22 @@ export function ModelCatalog({
                         : ""}{" "}
                       · {unit(model)}
                     </p>
-                    <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-xs">
+                    <dl className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-xs">
                       <div>
                         <dt className="text-muted-foreground">Input</dt>
-                        <dd className="mt-1.5">
+                        <dd className="mt-1 text-base">
                           <ModelRate model={model} field="input" />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Cached input</dt>
-                        <dd className="mt-1.5">
+                        <dd className="mt-1 text-base">
                           <ModelRate model={model} field="cache" />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Output</dt>
-                        <dd className="mt-1.5">
+                        <dd className="mt-1 text-base">
                           <ModelRate model={model} field="output" />
                         </dd>
                       </div>
@@ -472,8 +509,8 @@ export function ModelCatalog({
               </div>
 
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[820px] text-left text-xs">
+              <div className="hidden [@container_(min-width:820px)]:block">
+                <table className="w-full text-left text-xs">
                   <caption className="sr-only">
                     {section.title} pricing in USD.
                   </caption>
@@ -554,10 +591,10 @@ function ConnectedCatalog() {
     isAuthenticated ? {} : "skip",
   );
   return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      <header className="flex flex-wrap items-start justify-between gap-5">
+    <div className="mx-auto max-w-7xl space-y-5 pb-12 sm:space-y-8">
+      <header className="flex flex-wrap items-start justify-between gap-3 sm:gap-5">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Models &amp; pricing
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -574,13 +611,13 @@ function ConnectedCatalog() {
           </Link>
         </Button>
       </header>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-card px-3 py-1.5 sm:px-5 sm:py-4">
         <p className="text-sm">
           {wallet
             ? formatUsd(wallet.availableUsd) + " available credit"
             : "Loading your balance…"}
         </p>
-        <Link href="/credits" className="text-xs font-medium hover:underline">
+        <Link href="/credits" className="inline-flex items-center text-xs font-medium hover:underline max-sm:min-h-11">
           Add credit with QRIS
         </Link>
       </div>

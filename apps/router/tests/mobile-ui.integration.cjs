@@ -18,6 +18,12 @@ async function main() {
     }
     throw Error("Timed out: " + code);
   };
+  const setSelect = (label, value) => js(`(() => {
+    const select = Array.from(document.querySelectorAll('main select'))
+      .find(el => el.labels[0].querySelector('span').textContent === ${JSON.stringify(label)});
+    select.value = ${JSON.stringify(value)};
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
   for (const width of [320, 390, 768, 1440]) {
     win.setSize(width, 900);
     for (const route of ["dashboard", "credits", "models", "benchmark", "endpoints", "settings", "generation", "keys", "logs", "combos"]) {
@@ -25,15 +31,41 @@ async function main() {
       await wait(`Boolean(document.querySelector('main h1'))`);
       assert.equal(await js(`document.querySelector('main').innerText.includes('could not be loaded')`), false, route + " query fixture");
       assert.equal(await js(`document.documentElement.scrollWidth <= innerWidth && (()=>{const page = document.querySelector('.router-page-content') || document.querySelector('main');return page.scrollWidth <= page.clientWidth + 1})()`), true, route + " overflow at " + width);
+      if (route === "models") {
+        assert.equal(await js(`Boolean(document.querySelector('main article').offsetWidth)`), width < 1024);
+        assert.equal(await js(`Boolean(document.querySelector('main table').offsetWidth)`), width >= 1024);
+        if (width < 1024) {
+          assert.equal(await js(`Array.from(document.querySelectorAll('main select')).filter(el => el.offsetWidth && el.offsetHeight >= 44).length`), 4);
+          assert.deepEqual(await js(`Array.from(document.querySelectorAll('main article:first-child dl dt')).slice(0, 3).map(el => el.textContent)`), ["Input", "Cached input", "Output"]);
+          assert.match(await js(`document.querySelector('main article').innerText`), /1M context[\s\S]+Official[\s\S]+60% lower/);
+        }
+        if (width === 390) {
+          await setSelect("Provider", "anthropic");
+          await wait(`document.querySelectorAll('main article').length === 4`);
+          await setSelect("Sort by", "priciest");
+          await wait(`document.querySelector('main article').innerText.startsWith('Claude Fable 5.1')`);
+          await setSelect("Group by", "none");
+          await wait(`document.querySelector('main article').closest('section').querySelector('h2') === null`);
+          await setSelect("Category", "stt");
+          await wait(`document.querySelector('main').innerText.includes('No models match these filters.')`);
+          await js(`Array.from(document.querySelectorAll('main button')).find(el => el.textContent === 'Clear filters').click()`);
+          await wait(`document.querySelectorAll('main article').length > 4`);
+        }
+      }
       if (route === "benchmark") {
         assert.equal(await js(`document.querySelector('main h1').textContent`), "Benchmark");
         assert.equal(await js(`document.querySelector('.router-navbar') === null && document.querySelector('.router-shell header').textContent.includes('Benchmark')`), true);
-        assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th'), cell => (cell.querySelector(':scope > span:not([aria-hidden])') ?? cell).textContent.trim())`), ["Model", "Creator", "Intelligence Index", "View"]);
+        assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th')).filter(cell => cell.offsetWidth).map(cell => (cell.querySelector(':scope > span:not([aria-hidden])') ?? cell).textContent.trim())`), width < 1024 ? ["Model", "Intelligence Index", "View"] : ["Model", "Creator", "Intelligence Index", "View"]);
         assert.equal(await js(`document.querySelectorAll('main tbody tr').length`), 21);
         assert.deepEqual(await js(`(() => {
           const view = document.querySelector('main tbody a[href="https://artificialanalysis.ai/models/claude-opus-5-5"]');
-          return Array.from(view.closest('tr').cells, cell => cell.innerText.trim());
-        })()`), ["Claude Opus 5.5\nMax, Default Fallback", "Anthropic", "59", "View"]);
+          return Array.from(view.closest('tr').cells).filter(cell => cell.offsetWidth).map(cell => cell.innerText.trim());
+        })()`), width < 1024
+          ? ["Claude Opus 5.5\nAnthropic · Max, Default Fallback", "59", "View"]
+          : ["Claude Opus 5.5\nMax, Default Fallback", "Anthropic", "59", "View"]);
+        if (width < 1024) {
+          assert.equal(await js(`[...document.querySelectorAll('main select, main tbody a')].every(el => el.offsetWidth >= 44 && el.offsetHeight >= 44)`), true);
+        }
         assert.equal(await js(`Array.from(document.querySelectorAll('main tbody tr')).filter(row => row.cells[2].textContent === 'N/A').length`), 2);
         const scores = `Array.from(document.querySelectorAll('main tbody tr'), row => row.cells[2].textContent)`;
         const defaultScores = await js(scores);
@@ -41,18 +73,13 @@ async function main() {
         assert.deepEqual(defaultScores.slice(-2), ["N/A", "N/A"]);
         assert.deepEqual(defaultScores, [...defaultScores.slice(0, -2)].sort((a, b) => Number(b) - Number(a)).concat("N/A", "N/A"));
         if (width === 390) {
-          const setFilter = (index, value) => js(`(() => {
-            const select = document.querySelectorAll('main select')[${index}];
-            select.value = ${JSON.stringify(value)};
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-          })()`);
-          await setFilter(1, "lowest");
+          await setSelect("Sort by", "lowest");
           await wait(`(${scores})[0] === "20"`);
           assert.deepEqual((await js(scores)).slice(-2), ["N/A", "N/A"]);
-          await setFilter(0, "Anthropic");
+          await setSelect("Creator", "Anthropic");
           await wait(`(${scores}).length === 4`);
           assert.deepEqual(await js(scores), ["36", "49", "55", "59"]);
-          await setFilter(1, "name");
+          await setSelect("Sort by", "name");
           await wait(`document.querySelector('main tbody tr th').textContent.startsWith('Claude Fable 5.1')`);
           assert.deepEqual(await js(scores), ["49", "36", "59", "55"]);
         }

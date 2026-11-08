@@ -15,7 +15,7 @@ type BenchmarkRow = {
 };
 
 type SortOrder = "highest" | "lowest" | "name";
-const selectClass = "h-9 w-full rounded-lg border border-border bg-card px-3 text-xs text-foreground focus-visible:outline-2 focus-visible:outline-ring sm:w-40";
+const selectClass = "h-11 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring sm:w-44 sm:px-3 lg:h-9 lg:w-40 lg:text-xs";
 
 export function BenchmarkView({ rows }: { rows: BenchmarkRow[] }) {
   const [creator, setCreator] = useState("");
@@ -31,8 +31,8 @@ export function BenchmarkView({ rows }: { rows: BenchmarkRow[] }) {
     });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-12">
-      <h1 className="text-3xl font-semibold tracking-tight">Benchmark</h1>
+    <div className="mx-auto max-w-7xl space-y-4 pb-12 sm:space-y-6">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Benchmark</h1>
       <div className="grid grid-cols-2 gap-3 sm:flex">
         <label className="min-w-0 space-y-1.5">
           <span className="block text-xs font-medium text-muted-foreground">Creator</span>
@@ -60,43 +60,46 @@ export function BenchmarkView({ rows }: { rows: BenchmarkRow[] }) {
         <p className="sr-only" aria-live="polite">{visibleRows.length} models</p>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <table className="w-full table-fixed text-left text-xs sm:text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <caption className="sr-only">Artificial Analysis Intelligence Index by model</caption>
           <thead className="border-b border-border bg-secondary/25 text-muted-foreground">
-            <tr className="[&>th]:px-2 [&>th]:py-3 [&>th]:font-medium sm:[&>th]:px-5">
+            <tr className="text-xs lg:text-sm [&>th]:px-2 [&>th]:py-3 [&>th]:font-medium [&>th:first-child]:pl-3 lg:[&>th]:px-5 lg:[&>th:first-child]:pl-5">
               <th scope="col" aria-sort={sortOrder === "name" ? "ascending" : undefined}>Model</th>
-              <th scope="col" className="w-[25%]">Creator</th>
+              <th scope="col" className="hidden w-[25%] lg:table-cell">Creator</th>
               <th
                 scope="col"
                 aria-sort={sortOrder === "name" ? undefined : sortOrder === "highest" ? "descending" : "ascending"}
-                className="w-14 text-right sm:w-36 lg:w-44"
+                className="w-14 text-right lg:w-44"
               >
-                <span className="sr-only sm:not-sr-only">Intelligence Index</span>
-                <span aria-hidden="true" className="sm:hidden">Index</span>
+                <span className="sr-only lg:not-sr-only">Intelligence Index</span>
+                <span aria-hidden="true" className="lg:hidden">Index</span>
               </th>
-              <th scope="col" className="w-16 sm:w-24">
+              <th scope="col" className="w-[4.75rem] lg:w-24">
                 <span className="sr-only">View</span>
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {visibleRows.map(({ id, name, creator, score, variant, url }) => (
-              <tr key={id} className="[&>*]:px-2 [&>*]:py-2 sm:[&>*]:px-5">
+              <tr key={id} className="[&>*]:px-2 [&>*]:py-2 [&>th]:pl-3 lg:[&>*]:px-5 lg:[&>th]:pl-5">
                 <th scope="row" className="break-words font-medium">
                   {name}
-                  {variant && <span className="block text-[11px] text-muted-foreground">{variant}</span>}
+                  <span className="block text-xs font-normal leading-snug text-muted-foreground lg:text-[11px]">
+                    <span className="lg:hidden">{creator}{variant && <span aria-hidden="true"> · </span>}</span>
+                    {variant}
+                  </span>
                 </th>
-                <td className="break-words text-muted-foreground">{creator}</td>
-                <td className="text-right font-medium tabular-nums">{score ?? "N/A"}</td>
+                <td className="hidden break-words text-muted-foreground lg:table-cell">{creator}</td>
+                <td className="text-right text-base font-semibold tabular-nums lg:text-sm lg:font-medium">{score ?? "N/A"}</td>
                 <td className="text-right">
-                  <Button asChild variant="ghost" size="sm" className="h-11 min-w-11 gap-1 px-2 text-xs sm:h-9">
+                  <Button asChild variant="ghost" size="sm" className="h-11 min-w-11 gap-1 px-2 text-xs lg:h-9">
                     <a
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`View ${name} on Artificial Analysis (opens in a new tab)`}
                     >
-                      View <ArrowUpRight aria-hidden="true" className="hidden size-3.5 lg:block" />
+                      View <ArrowUpRight aria-hidden="true" className="size-3.5" />
                     </a>
                   </Button>
                 </td>
