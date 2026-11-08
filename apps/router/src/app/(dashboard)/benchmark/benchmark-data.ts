@@ -28,9 +28,8 @@ export const benchmarkSlugs: Readonly<Record<string, string>> = {
 
 type Benchmark = {
   name: string;
+  creator: string | null;
   intelligence: number | null;
-  outputSpeed: number | null;
-  firstToken: number | null;
 };
 
 type BenchmarkResponse = {
@@ -40,11 +39,8 @@ type BenchmarkResponse = {
   data: {
     name: string;
     slug: string;
+    model_creator?: { name?: string };
     evaluations?: { artificial_analysis_intelligence_index?: number | null };
-    performance?: {
-      median_output_tokens_per_second?: number | null;
-      median_time_to_first_token_seconds?: number | null;
-    };
   }[];
 };
 
@@ -87,11 +83,11 @@ export async function getBenchmarks(slugs: readonly string[]) {
       version = result.intelligence_index_version;
       for (const model of result.data) {
         if (!model || typeof model.name !== "string" || !remaining.delete(model.slug)) continue;
+        const creator = model.model_creator?.name;
         models.set(model.slug, {
           name: model.name,
+          creator: typeof creator === "string" ? creator.trim() || null : null,
           intelligence: metric(model.evaluations?.artificial_analysis_intelligence_index),
-          outputSpeed: metric(model.performance?.median_output_tokens_per_second),
-          firstToken: metric(model.performance?.median_time_to_first_token_seconds),
         });
       }
       if (remaining.size === 0 || !result.pagination.has_more) break;

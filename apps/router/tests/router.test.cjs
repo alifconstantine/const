@@ -152,7 +152,7 @@ const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
 const { benchmarkSlugs, getBenchmarks } = sourceLoader({ "server-only": {} })(
-  "apps/router/src/app/benchmark/benchmark-data.ts",
+  "apps/router/src/app/(dashboard)/benchmark/benchmark-data.ts",
 );
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
 const originalFetch = global.fetch;
@@ -1202,7 +1202,7 @@ test("benchmark links cover every managed chat model", () => {
   );
 });
 
-test("public benchmark metrics require a commercial key and match exact variants across pages", async (t) => {
+test("benchmark scores require a commercial key and match exact variants across pages", async (t) => {
   const env = "ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY";
   const previous = process.env[env];
   t.after(() => {
@@ -1217,8 +1217,8 @@ test("public benchmark metrics require a commercial key and match exact variants
   const row = {
     slug,
     name: "Claude Opus 5.5 (Max)",
+    model_creator: { name: "Anthropic" },
     evaluations: { artificial_analysis_intelligence_index: 50.5 },
-    performance: { median_output_tokens_per_second: 70.25 },
   };
   const envelope = (tier, page, hasMore, data) => Response.json({
     tier,
@@ -1244,9 +1244,8 @@ test("public benchmark metrics require a commercial key and match exact variants
   assert.equal(result.version, 5);
   assert.deepEqual([...result.models.entries()], [[slug, {
     name: row.name,
+    creator: "Anthropic",
     intelligence: 50.5,
-    outputSpeed: 70.25,
-    firstToken: null,
   }]]);
 });
 

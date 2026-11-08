@@ -29,4 +29,4 @@ Keep the Const name/logo and black foundation. The user delegated other design c
 
 ## Evidence
 
-The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. Benchmark links point to Artificial Analysis. Its model scores and provider measurements can appear in the console's public Benchmark page under a license covering public display.
+The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. The console's Benchmark page links to Artificial Analysis and can show its Intelligence Index under a license covering display in Router.

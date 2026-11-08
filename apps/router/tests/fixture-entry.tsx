@@ -3,12 +3,13 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@const/ui";
-import { DashboardShell } from "../src/app/(dashboard)/layout";
+import DashboardLayout, { DashboardShell } from "../src/app/(dashboard)/layout";
 import DashboardPage, {
   OverviewView,
 } from "../src/app/(dashboard)/dashboard/page";
 import CreditsPage, { CreditsView } from "../src/app/(dashboard)/credits/page";
 import ModelsPage from "../src/app/(dashboard)/models/page";
+import { BenchmarkView } from "../src/app/(dashboard)/benchmark/benchmark-view";
 import EndpointsPage from "../src/app/(dashboard)/endpoints/page";
 import SettingsPage from "../src/app/(dashboard)/settings/page";
 import GenerationPage from "../src/app/(dashboard)/generation/page";
@@ -116,6 +117,17 @@ function Fixture() {
       )
     ) : path === "/models" ? (
       <ModelsPage />
+    ) : path === "/benchmark" ? (
+      <BenchmarkView
+        rows={[{
+          id: "claude-opus-5.5",
+          name: "Claude Opus 5.5",
+          creator: "Anthropic",
+          score: 50.5,
+          url: "https://artificialanalysis.ai/models/claude-opus-5-5",
+        }]}
+        version={5}
+      />
     ) : path === "/endpoints" ? (
       <EndpointsPage />
     ) : path === "/settings" ? (
@@ -144,12 +156,16 @@ function Fixture() {
   };
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-      <DashboardShell
-        currentTitle={titles[path] || "Overview"}
-        isGeneration={path === "/generation"}
-      >
-        {view}
-      </DashboardShell>
+      {path === "/benchmark" ? (
+        <DashboardLayout>{view}</DashboardLayout>
+      ) : (
+        <DashboardShell
+          currentTitle={titles[path] || "Overview"}
+          isGeneration={path === "/generation"}
+        >
+          {view}
+        </DashboardShell>
+      )}
       <Toaster />
     </ThemeProvider>
   );

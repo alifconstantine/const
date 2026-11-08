@@ -45,6 +45,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/endpoints": "Endpoints",
   "/combos": "Combos",
   "/models": "Models & Pricing",
+  "/benchmark": "Benchmark",
   "/generation": "Playground",
   "/credits": "Credits & balance",
   "/deposit": "Credits & balance",
