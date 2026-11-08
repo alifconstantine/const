@@ -1,13 +1,7 @@
 import { parseUsdRate, type ModelSpec } from "@/lib/model-specs";
 import { formatUsd } from "@/lib/router-analytics";
 
-const comparisonFields = [
-  ["input", "Input"],
-  ["cache", "Cached input"],
-  ["output", "Output"],
-] as const;
-
-type RateField = (typeof comparisonFields)[number][0];
+type RateField = "input" | "cache" | "output";
 
 function compareOfficialRate(model: ModelSpec, field: RateField) {
   const rate = model.pricing?.[field];
@@ -21,18 +15,16 @@ function compareOfficialRate(model: ModelSpec, field: RateField) {
     ? "Same price"
     : `${Math.abs(savings)}% ${savings > 0 ? "lower" : "higher"}`;
 
-  return { official, difference };
+  return { official, savings, difference };
 }
 
 export function ModelRate({
   model,
   field,
-  showComparison = true,
   showUnit = false,
 }: {
   model: ModelSpec;
   field: RateField;
-  showComparison?: boolean;
   showUnit?: boolean;
 }) {
   const rate = model.pricing?.[field];
@@ -61,22 +53,16 @@ export function ModelRate({
       <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
         Official {formatUsd(comparison.official)}
       </span>
-      {showComparison && (
-        <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
-          {comparison.difference}
-        </span>
-      )}
+      <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
+        {comparison.difference}
+      </span>
     </span>
   );
 }
 
-export function OfficialRateComparison({ model }: { model: ModelSpec }) {
-  const differences = comparisonFields.flatMap(([field, label]) => {
-    const comparison = compareOfficialRate(model, field);
-    return comparison ? [{ label, difference: comparison.difference }] : [];
-  });
-
-  if (!differences.length) {
+export function OfficialInputComparison({ model }: { model: ModelSpec }) {
+  const comparison = compareOfficialRate(model, "input");
+  if (!comparison) {
     return (
       <span className="text-muted-foreground">
         <span aria-hidden="true">—</span>
@@ -85,15 +71,13 @@ export function OfficialRateComparison({ model }: { model: ModelSpec }) {
     );
   }
 
+  const { savings, difference } = comparison;
+  const sign = savings > 0 ? "−" : savings < 0 ? "+" : "";
   return (
-    <dl className="space-y-0.5 whitespace-nowrap text-[11px] leading-4">
-      {differences.map(({ label, difference }) => (
-        <div key={label} className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">{label}</dt>
-          <dd className="font-medium">{difference}</dd>
-        </div>
-      ))}
-    </dl>
+    <span className="font-semibold tabular-nums">
+      <span aria-hidden="true">{sign}{Math.abs(savings)}%</span>
+      <span className="sr-only">{difference}</span>
+    </span>
   );
 }
 

@@ -41,12 +41,12 @@ async function main() {
           assert.match(await js(`document.querySelector('article [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('article').innerText`), /\$0\.006\s+\/ minute/);
         } else {
           assert.deepEqual(await js(`Array.from(document.querySelector('main thead tr').cells, cell => cell.textContent)`), ["Model", "Context / Max output", "Input", "Cached input", "Output", "Vs. official"]);
-          const comparison = modelId => js(`Array.from(
-            document.querySelector('tr [aria-label="Copy model ID ${modelId}"]').closest('tr').lastElementChild.querySelectorAll('dt, dd'),
-            el => el.textContent
-          )`);
-          assert.deepEqual(await comparison("claude-opus-5.5"), ["Input", "85% lower", "Cached input", "70% lower", "Output", "85% lower"]);
-          assert.deepEqual(await comparison("claude-fable-5.1"), ["Input", "75% lower", "Cached input", "Same price", "Output", "75% lower"]);
+          assert.deepEqual(await js(`(() => {
+            const row = document.querySelector('tr [aria-label="Copy model ID claude-opus-5.5"]').closest('tr');
+            const comparison = row.lastElementChild;
+            return [comparison.querySelector('[aria-hidden]').textContent, comparison.querySelector('.sr-only').textContent];
+          })()`), ["−85%", "85% lower"]);
+          assert.match(await js(`document.querySelector('tr [aria-label="Copy model ID claude-fable-5.1"]').closest('tr').cells[3].innerText`), /Same price/);
           assert.deepEqual(await js(`(() => {
             const row = document.querySelector('tr [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('tr');
             return [row.cells[2].innerText, row.lastElementChild.querySelector('.sr-only').textContent];

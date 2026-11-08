@@ -7,8 +7,8 @@ import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import {
   ModelRate,
+  OfficialInputComparison,
   OfficialPricingNote,
-  OfficialRateComparison,
 } from "@/components/models/model-rate";
 import {
   BUILTIN_MODELS,
@@ -556,16 +556,16 @@ export function ModelCatalog({
                           </p>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="input" showComparison={false} showUnit />
+                          <ModelRate model={model} field="input" showUnit />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="cache" showComparison={false} />
+                          <ModelRate model={model} field="cache" />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="output" showComparison={false} />
+                          <ModelRate model={model} field="output" />
                         </td>
                         <td className="px-5 py-4">
-                          <OfficialRateComparison model={model} />
+                          <OfficialInputComparison model={model} />
                         </td>
                       </tr>
                     ))}
@@ -578,6 +578,9 @@ export function ModelCatalog({
       )}
 
       <p className="max-w-3xl text-xs leading-6 text-muted-foreground">
+        <span className="hidden [@container_(min-width:820px)]:inline">
+          The “Vs. official” column compares input rates.{" "}
+        </span>
         <OfficialPricingNote />
       </p>
     </div>
