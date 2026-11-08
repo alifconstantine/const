@@ -28,9 +28,13 @@ async function main() {
       if (route === "benchmark") {
         assert.equal(await js(`document.querySelector('main h1').textContent`), "Benchmark");
         assert.equal(await js(`document.querySelector('.router-navbar') === null && document.querySelector('.router-shell header').textContent.includes('Benchmark')`), true);
-        assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th'), cell => cell.textContent.trim())`), ["Model", "Creator", "Intelligence Index"]);
-        assert.deepEqual(await js(`Array.from(document.querySelector('main tbody tr').cells, cell => cell.textContent.trim())`), ["Claude Opus 5.5", "Anthropic", "View"]);
-        assert.equal(await js(`document.querySelector('main tbody a').href`), "https://artificialanalysis.ai/models/claude-opus-5-5");
+        assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th'), cell => (cell.querySelector(':scope > span:not([aria-hidden])') ?? cell).textContent.trim())`), ["Model", "Creator", "Intelligence Index", "View"]);
+        assert.equal(await js(`document.querySelectorAll('main tbody tr').length`), 21);
+        assert.deepEqual(await js(`(() => {
+          const view = document.querySelector('main tbody a[href="https://artificialanalysis.ai/models/claude-opus-5-5"]');
+          return Array.from(view.closest('tr').cells, cell => cell.innerText.trim());
+        })()`), ["Claude Opus 5.5\nMax, Default Fallback", "Anthropic", "59", "View"]);
+        assert.equal(await js(`Array.from(document.querySelectorAll('main tbody tr')).filter(row => row.cells[2].textContent === 'N/A').length`), 2);
         if (width >= 768) {
           assert.equal(await js(`document.querySelector('aside a[aria-current=page]').getAttribute('href')`), "/benchmark");
         }

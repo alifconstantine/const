@@ -29,4 +29,4 @@ Keep the Const name/logo and black foundation. The user delegated other design c
 
 ## Evidence
 
-The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. The console's Benchmark page links to the Intelligence Index on each Artificial Analysis model profile.
+The repository supplies the catalog, API routes, quota/credit queries, billing contracts, and particle backdrop. The console's Benchmark page shows a dated Intelligence Index snapshot with links to each Artificial Analysis model profile.

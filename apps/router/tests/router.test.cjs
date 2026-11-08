@@ -151,7 +151,7 @@ const { SseUsageParser } = load("apps/router/src/lib/telemetry.ts");
 const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
-const { benchmarkSlugs } = load(
+const { benchmarks } = load(
   "apps/router/src/app/(dashboard)/benchmark/benchmark-data.ts",
 );
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
@@ -1193,9 +1193,9 @@ test("Opus discovery and settlement use the same fixed input, cache, and output 
   assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - 24840);
 });
 
-test("benchmark links cover every managed chat model", () => {
+test("benchmark snapshot covers every managed chat model", () => {
   assert.deepEqual(
-    Object.keys(benchmarkSlugs).sort(),
+    Object.keys(benchmarks).sort(),
     catalog.BUILTIN_MODELS.filter(model => model.category === "llm")
       .map(model => model.modelId)
       .sort(),

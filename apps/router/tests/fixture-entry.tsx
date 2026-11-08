@@ -9,7 +9,7 @@ import DashboardPage, {
 } from "../src/app/(dashboard)/dashboard/page";
 import CreditsPage, { CreditsView } from "../src/app/(dashboard)/credits/page";
 import ModelsPage from "../src/app/(dashboard)/models/page";
-import { BenchmarkView } from "../src/app/(dashboard)/benchmark/benchmark-view";
+import BenchmarkPage from "../src/app/(dashboard)/benchmark/page";
 import EndpointsPage from "../src/app/(dashboard)/endpoints/page";
 import SettingsPage from "../src/app/(dashboard)/settings/page";
 import GenerationPage from "../src/app/(dashboard)/generation/page";
@@ -118,14 +118,7 @@ function Fixture() {
     ) : path === "/models" ? (
       <ModelsPage />
     ) : path === "/benchmark" ? (
-      <BenchmarkView
-        rows={[{
-          id: "claude-opus-5.5",
-          name: "Claude Opus 5.5",
-          creator: "Anthropic",
-          url: "https://artificialanalysis.ai/models/claude-opus-5-5",
-        }]}
-      />
+      <BenchmarkPage />
     ) : path === "/endpoints" ? (
       <EndpointsPage />
     ) : path === "/settings" ? (

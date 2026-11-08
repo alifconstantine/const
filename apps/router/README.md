@@ -44,4 +44,4 @@ pnpm --filter @const/router build
 
 Web memakai port 3002. Diperlukan backend Convex, autentikasi Accounts, dan konfigurasi provider di sisi layanan. Jangan menyimpan API key atau encryption secret dalam source.
 
-Halaman Benchmark di dashboard menautkan Intelligence Index tiap model di [Artificial Analysis](https://artificialanalysis.ai/models).
+Halaman Benchmark di dashboard menampilkan snapshot Intelligence Index dan menautkan profil tiap model di [Artificial Analysis](https://artificialanalysis.ai/models).
