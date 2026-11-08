@@ -21,10 +21,12 @@ function compareOfficialRate(model: ModelSpec, field: RateField) {
 export function ModelRate({
   model,
   field,
+  showComparison = true,
   showUnit = false,
 }: {
   model: ModelSpec;
   field: RateField;
+  showComparison?: boolean;
   showUnit?: boolean;
 }) {
   const rate = model.pricing?.[field];
@@ -53,9 +55,11 @@ export function ModelRate({
       <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
         Official {formatUsd(comparison.official)}
       </span>
-      <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
-        {comparison.difference}
-      </span>
+      {showComparison && (
+        <span className="text-[11px] leading-4 text-[color:var(--rp-muted,hsl(var(--muted-foreground)))]">
+          {comparison.difference}
+        </span>
+      )}
     </span>
   );
 }

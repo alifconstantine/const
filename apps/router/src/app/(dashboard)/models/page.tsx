@@ -474,7 +474,15 @@ export function ModelCatalog({
               <div className="divide-y divide-border [@container_(min-width:820px)]:hidden">
                 {section.items.map((model) => (
                   <article key={model.modelId} className="space-y-2 px-3 py-4 sm:space-y-3 sm:px-5">
-                    {identity(model)}
+                    <div className="flex items-start justify-between gap-3">
+                      {identity(model)}
+                      <dl className="shrink-0 text-right">
+                        <dt className="text-xs text-muted-foreground">Vs. official</dt>
+                        <dd className="mt-0.5 text-sm">
+                          <OfficialInputComparison model={model} />
+                        </dd>
+                      </dl>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {categoryName(model.category)} ·{" "}
                       {model.contextWindow && model.contextWindow !== "-"
@@ -488,19 +496,19 @@ export function ModelCatalog({
                       <div>
                         <dt className="text-muted-foreground">Input</dt>
                         <dd className="mt-1 text-base">
-                          <ModelRate model={model} field="input" showUnit />
+                          <ModelRate model={model} field="input" showComparison={false} showUnit />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Cached input</dt>
                         <dd className="mt-1 text-base">
-                          <ModelRate model={model} field="cache" />
+                          <ModelRate model={model} field="cache" showComparison={false} />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Output</dt>
                         <dd className="mt-1 text-base">
-                          <ModelRate model={model} field="output" />
+                          <ModelRate model={model} field="output" showComparison={false} />
                         </dd>
                       </div>
                     </dl>
@@ -556,13 +564,13 @@ export function ModelCatalog({
                           </p>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="input" showUnit />
+                          <ModelRate model={model} field="input" showComparison={false} showUnit />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="cache" />
+                          <ModelRate model={model} field="cache" showComparison={false} />
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <ModelRate model={model} field="output" />
+                          <ModelRate model={model} field="output" showComparison={false} />
                         </td>
                         <td className="px-5 py-4">
                           <OfficialInputComparison model={model} />
@@ -578,9 +586,7 @@ export function ModelCatalog({
       )}
 
       <p className="max-w-3xl text-xs leading-6 text-muted-foreground">
-        <span className="hidden [@container_(min-width:820px)]:inline">
-          The “Vs. official” column compares input rates.{" "}
-        </span>
+        “Vs. official” compares input rates.{" "}
         <OfficialPricingNote />
       </p>
     </div>

@@ -36,8 +36,10 @@ async function main() {
         assert.equal(await js(`Boolean(document.querySelector('main table').offsetWidth)`), width >= 1024);
         if (width < 1024) {
           assert.equal(await js(`Array.from(document.querySelectorAll('main select')).filter(el => el.offsetWidth && el.offsetHeight >= 44).length`), 4);
-          assert.deepEqual(await js(`Array.from(document.querySelectorAll('main article:first-child dl dt')).slice(0, 3).map(el => el.textContent)`), ["Input", "Cached input", "Output"]);
-          assert.match(await js(`document.querySelector('main article').innerText`), /1M context[\s\S]+Official[\s\S]+60% lower/);
+          assert.deepEqual(await js(`Array.from(document.querySelectorAll('main article dl dt')).slice(0, 4).map(el => el.textContent)`), ["Vs. official", "Input", "Cached input", "Output"]);
+          assert.match(await js(`document.querySelector('main article').innerText`), /1M context/);
+          assert.equal(await js(`document.querySelector('main article dl dd [aria-hidden]').textContent`), "−60%");
+          assert.deepEqual(await js(`Array.from(document.querySelectorAll('main article:first-child > dl dd')).slice(0, 3).map(el => el.textContent)`), ["Const $0.04Official $0.10", "Const $0.004Official $0.01", "Const $0.20Official $0.50"]);
           assert.match(await js(`document.querySelector('article [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('article').innerText`), /\$0\.006\s+\/ minute/);
         } else {
           assert.deepEqual(await js(`Array.from(document.querySelector('main thead tr').cells, cell => cell.textContent)`), ["Model", "Context / Max output", "Input", "Cached input", "Output", "Vs. official"]);
@@ -46,7 +48,10 @@ async function main() {
             const comparison = row.lastElementChild;
             return [comparison.querySelector('[aria-hidden]').textContent, comparison.querySelector('.sr-only').textContent];
           })()`), ["−85%", "85% lower"]);
-          assert.match(await js(`document.querySelector('tr [aria-label="Copy model ID claude-fable-5.1"]').closest('tr').cells[3].innerText`), /Same price/);
+          assert.deepEqual(await js(`(() => {
+            const row = document.querySelector('tr [aria-label="Copy model ID claude-opus-5.5"]').closest('tr');
+            return Array.from(row.cells).slice(2, 5).map(el => el.textContent);
+          })()`), ["Const $0.60Official $4.00", "Const $0.06Official $0.20", "Const $3.00Official $20.00"]);
           assert.deepEqual(await js(`(() => {
             const row = document.querySelector('tr [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('tr');
             return [row.cells[2].innerText, row.lastElementChild.querySelector('.sr-only').textContent];
