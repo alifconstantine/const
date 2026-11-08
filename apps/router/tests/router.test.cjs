@@ -151,7 +151,7 @@ const { SseUsageParser } = load("apps/router/src/lib/telemetry.ts");
 const chat = load("apps/router/src/app/v1/chat/completions/route.ts");
 const generation = load("apps/router/src/app/api/generation/chat/route.ts");
 const models = load("apps/router/src/app/v1/models/route.ts");
-const { benchmarkSlugs, getBenchmarks } = sourceLoader({ "server-only": {} })(
+const { benchmarkSlugs } = load(
   "apps/router/src/app/(dashboard)/benchmark/benchmark-data.ts",
 );
 const { isPublicAddress } = load("apps/router/src/lib/public-fetch.ts");
@@ -1200,58 +1200,6 @@ test("benchmark links cover every managed chat model", () => {
       .map(model => model.modelId)
       .sort(),
   );
-});
-
-test("benchmark scores require a commercial key and match exact variants across pages", async (t) => {
-  const env = "ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY";
-  const previous = process.env[env];
-  t.after(() => {
-    if (previous === undefined) delete process.env[env];
-    else process.env[env] = previous;
-  });
-  const slug = benchmarkSlugs["claude-opus-5.5"];
-  delete process.env[env];
-  assert.deepEqual(await getBenchmarks([slug]), { state: "unconfigured" });
-  process.env[env] = "test-benchmark-key";
-
-  const row = {
-    slug,
-    name: "Claude Opus 5.5 (Max)",
-    model_creator: { name: "Anthropic" },
-    evaluations: { artificial_analysis_intelligence_index: 50.5 },
-  };
-  const envelope = (tier, page, hasMore, data) => Response.json({
-    tier,
-    intelligence_index_version: 5,
-    pagination: { page, has_more: hasMore },
-    data,
-  });
-  for (const tier of ["free", "pro"]) {
-    global.fetch = async () => envelope(tier, 1, false, [row]);
-    assert.deepEqual(await getBenchmarks([slug]), { state: "commercial_required" });
-  }
-  global.fetch = async () => new Response(null, { status: 401 });
-  assert.deepEqual(await getBenchmarks([slug]), { state: "key_rejected" });
-
-  const pages = [];
-  global.fetch = async (url, options) => {
-    const page = Number(new URL(url).searchParams.get("page"));
-    pages.push(page);
-    assert.equal(options.headers["x-api-key"], "test-benchmark-key");
-    assert.equal(options.next.revalidate, 21600);
-    return page === 1
-      ? envelope("commercial", 1, true, [{ ...row, slug: slug + "-low" }])
-      : envelope("commercial", 2, false, [row]);
-  };
-  const result = await getBenchmarks([slug]);
-  assert.deepEqual(pages, [1, 2]);
-  assert.equal(result.state, "ready");
-  assert.equal(result.version, 5);
-  assert.deepEqual([...result.models.entries()], [[slug, {
-    name: row.name,
-    creator: "Anthropic",
-    intelligence: 50.5,
-  }]]);
 });
 
 test('per-model maxOutputTokens caps clamp oversized max_tokens before forwarding upstream', async () => {

@@ -44,4 +44,4 @@ pnpm --filter @const/router build
 
 Web memakai port 3002. Diperlukan backend Convex, autentikasi Accounts, dan konfigurasi provider di sisi layanan. Jangan menyimpan API key atau encryption secret dalam source.
 
-Halaman Benchmark di dashboard menautkan hasil tiap model di Artificial Analysis. Untuk menampilkan skor Intelligence Index di Router, isi `ARTIFICIAL_ANALYSIS_COMMERCIAL_API_KEY` di server setelah memperoleh izin untuk menampilkan data di produk. [Artificial Analysis Data API](https://artificialanalysis.ai/data-api)
+Halaman Benchmark di dashboard menautkan Intelligence Index tiap model di [Artificial Analysis](https://artificialanalysis.ai/models).

@@ -123,10 +123,8 @@ function Fixture() {
           id: "claude-opus-5.5",
           name: "Claude Opus 5.5",
           creator: "Anthropic",
-          score: 50.5,
           url: "https://artificialanalysis.ai/models/claude-opus-5-5",
         }]}
-        version={5}
       />
     ) : path === "/endpoints" ? (
       <EndpointsPage />

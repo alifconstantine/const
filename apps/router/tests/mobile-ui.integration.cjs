@@ -28,8 +28,8 @@ async function main() {
       if (route === "benchmark") {
         assert.equal(await js(`document.querySelector('main h1').textContent`), "Benchmark");
         assert.equal(await js(`document.querySelector('.router-navbar') === null && document.querySelector('.router-shell header').textContent.includes('Benchmark')`), true);
-        assert.equal(await js(`document.querySelectorAll('main thead th').length`), 4);
-        assert.deepEqual(await js(`Array.from(document.querySelector('main tbody tr').cells, cell => cell.textContent.trim())`), ["Claude Opus 5.5", "Anthropic", "50.5", "View"]);
+        assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th'), cell => cell.textContent.trim())`), ["Model", "Creator", "Intelligence Index"]);
+        assert.deepEqual(await js(`Array.from(document.querySelector('main tbody tr').cells, cell => cell.textContent.trim())`), ["Claude Opus 5.5", "Anthropic", "View"]);
         assert.equal(await js(`document.querySelector('main tbody a').href`), "https://artificialanalysis.ai/models/claude-opus-5-5");
         if (width >= 768) {
           assert.equal(await js(`document.querySelector('aside a[aria-current=page]').getAttribute('href')`), "/benchmark");
