@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { useI18n } from "@/context/I18nContext";
-import { ParticleField } from "./ParticleField";
 
 export function DownloadCtaSection() {
   const { t } = useI18n();
@@ -11,18 +10,7 @@ export function DownloadCtaSection() {
   return (
     <section className="download-section-container ch-download py-16" id="download">
       <div className="max-w-7xl mx-auto px-6">
-        <div
-          className="ch-download-cta-panel relative rounded-3xl overflow-hidden py-28 sm:py-36 px-8 sm:px-16 border border-zinc-200 dark:border-[#262626] bg-[#f8f9fa] dark:bg-[#0a0a0a] min-h-[460px] flex items-center transition-colors duration-300"
-          style={{ isolation: "isolate" }}
-        >
-          {/* Cosmic Particle Backdrop */}
-          <div
-            className="ch-download-backdrop absolute inset-0 z-0 overflow-hidden rounded-[inherit] pointer-events-none"
-            aria-hidden="true"
-          >
-            <ParticleField />
-          </div>
-
+        <div className="ch-download-cta-panel relative rounded-3xl overflow-hidden py-16 sm:py-24 px-8 sm:px-16 border border-zinc-200 dark:border-[#262626] bg-[#f8f9fa] dark:bg-[#0a0a0a] flex items-center transition-colors duration-300">
           {/* Download Section Content */}
           <div className="relative z-10 flex flex-col items-start max-w-2xl">
             <div className="mb-6">

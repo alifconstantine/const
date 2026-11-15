@@ -23,9 +23,6 @@ export function ThemeToggle({ className }: { className?: string }) {
       setTheme(nextTheme);
     }
     if (typeof window !== "undefined") {
-      if ((window as any).setAllParticlesTheme) {
-        (window as any).setAllParticlesTheme(nextTheme);
-      }
       window.dispatchEvent(
         new CustomEvent("theme-change", { detail: { theme: nextTheme } }),
       );
