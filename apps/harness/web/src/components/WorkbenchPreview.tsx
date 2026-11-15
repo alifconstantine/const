@@ -8,7 +8,6 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
-  ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
   Circle,
@@ -50,12 +49,7 @@ interface ProjectFolder {
 }
 
 const THINKING_LEVELS = ["Low", "Medium", "High", "Max"] as const;
-const DEMO_MODELS = [
-  "Claude Sonnet 4",
-  "Gemini 2.5 Pro",
-  "DeepSeek V3",
-  "GPT-4o",
-] as const;
+const DEMO_MODEL = "DeepSeek V4.1 Flash";
 
 export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
   const { resolvedTheme } = useTheme();
@@ -74,7 +68,6 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
   const [activeChat, setActiveChat] = useState("redesign-hero");
   const [inputMessage, setInputMessage] = useState("");
   const [selectedContext, setSelectedContext] = useState("const-web");
-  const [modelIndex, setModelIndex] = useState(0);
   const [thinkingIndex, setThinkingIndex] = useState(2); // High
   const [authMode, setAuthMode] = useState<"ask_before_changes" | "request_review" | "full_access">("ask_before_changes");
   const [isSending, setIsSending] = useState(false);
@@ -83,7 +76,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
   const [isOutsideExpanded, setIsOutsideExpanded] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
-  const model = DEMO_MODELS[modelIndex] ?? DEMO_MODELS[0];
+  const model = DEMO_MODEL;
   const thinkingLabel = THINKING_LEVELS[thinkingIndex] ?? "High";
 
   // Project Folders tree matching the desktop workbench structure
@@ -183,10 +176,6 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
       setIsSending(false);
       setInputMessage("");
     }, 800);
-  };
-
-  const cycleModel = () => {
-    setModelIndex((prev) => (prev + 1) % DEMO_MODELS.length);
   };
 
   const toggleAuthMode = () => {
@@ -723,15 +712,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                             </button>
                             <div className="ch-desk-model-popover-header">
                               <span className="ch-desk-thinking-title">{thinkingLabel}</span>
-                              <button
-                                type="button"
-                                className="ch-desk-model-switch"
-                                onClick={cycleModel}
-                                title="Cycle model"
-                              >
-                                <span className="truncate">{model}</span>
-                                <ChevronRight className="w-3 h-3 shrink-0" />
-                              </button>
+                              <span className="ch-desk-model-switch truncate">{model}</span>
                             </div>
                             <div className="ch-desk-thinking-track" aria-label="Thinking level slider">
                               <div

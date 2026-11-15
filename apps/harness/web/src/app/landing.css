@@ -1468,11 +1468,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   border: none;
   font-size: 12px;
   color: #71717a;
-  cursor: pointer;
-}
-
-.ch-desk-model-switch:hover {
-  color: var(--ch-desk-text-primary);
 }
 
 .ch-desk-thinking-track {
