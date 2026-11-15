@@ -22,6 +22,12 @@ export const zh: Copy = {
   "hero.subtitle":
     "从编程开发到日常办公，Const Harness 连接您的本地文件、工具和浏览器，助您执行、整理、验证并将创意转化为可交付成果。",
   "hero.downloadButton": "下载 Const Harness",
+  "hero.dropdownHeader": "桌面应用与远程控制（Web / 移动端）",
+  "hero.platform.web.detail": "浏览器远程控制 · 无需安装",
+  "hero.platform.windows.detail": "Windows 10/11 (.exe) · x64 与 ARM64",
+  "hero.platform.macos.detail": "macOS (.dmg) · Apple Silicon 与 Intel",
+  "hero.platform.ios.detail": "iPhone 与 iPad · 移动端远程控制",
+  "hero.platform.android.detail": "Android 9+ (.apk) · 移动端远程控制",
   "statement.title":
     "Const Harness 是为开发者、研究者和创作者打造的桌面 AI 工作台。将项目、模型与工具汇集一处，把想法变成可运行的代码、有价值的研究和完成的作品。",
   "tasks.title": "每一项任务，都交付到位",
@@ -54,6 +60,9 @@ export const zh: Copy = {
   "capabilities.4.description":
     "随时随地控制桌面工作台。通过端到端加密的中继会话，安全配对网页与移动设备，移动中也能下发指令、审查 diff 与审批操作。",
   "capabilities.4.cta": "打开远程工作空间",
+  "capabilities.5.title": "Intelligence UI",
+  "capabilities.5.description":
+    "超越纯文本与 Markdown。Const Harness 可在对话中直接渲染结构化的 openui-lang 界面——包含支持搜索排序与 CSV 导出的交互式表格、指标卡片、柱状图以及可提交的后续表单。",
   "platform.title": "在任何地方使用 Const Harness",
   "platform.0.title": "桌面端应用",
   "platform.0.description":
@@ -137,7 +146,7 @@ export const zh: Copy = {
   "platform.terminalCta": "探索远程控制",
   "platform.scheduleCta": "了解定时任务",
   "media.note":
-    "部分插图使用 MiniMax 参考素材；工作流程与功能可用性说明对应 Const Harness。",
+    "交互式预览基于 Const Harness 桌面端与移动端真实界面构建；功能与可用性取决于你的配置。",
   "comparison.category": "工作方式",
   "comparison.other": "纯聊天工作流",
   "comparison.0.harness": "在一个工作台中整合本地项目、文件搜索、对话与成果。",

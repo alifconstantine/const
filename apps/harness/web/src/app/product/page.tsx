@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ContentShell, PageIntro } from "@/components/ContentShell";
+import { WorkbenchPreview } from "@/components/WorkbenchPreview";
+import { TaskShowcase } from "@/components/showcases/TaskShowcase";
+import { CapabilityShowcase } from "@/components/showcases/CapabilityShowcase";
 
 export const metadata: Metadata = {
   title: "The workbench — Const Harness",
@@ -11,30 +14,27 @@ export const metadata: Metadata = {
 
 const workflows = [
   {
+    key: "coding",
     title: "Work where your files are.",
     text: "Open a project, give the agent a clear outcome, and let it investigate the relevant files. Code, research, documents, and creative work can share the same conversation and working directory.",
     href: "/docs/projects",
     label: "Projects & review",
-    image: "task-coding.png",
-    alt: "Existing Const Harness coding workflow artwork",
   },
   {
+    key: "browser",
     title: "Give the task the tools it needs.",
     text: "Use a browser to inspect a page, a terminal to run checks, or a connected MCP service to bring in context. Add reusable skills and plugins for work you do often.",
     href: "/integrations",
     label: "Explore integrations",
-    image: "capability-browser.png",
-    alt: "Existing browser-control workflow artwork",
   },
   {
+    key: "analysis",
     title: "Keep the result in view.",
-    text: "Read files, review a diff, inspect tool activity, and open the output beside the conversation. Delegate independent work to subagents when useful, then check the combined result before using it.",
+    text: "Read files, review a diff, inspect tool activity, and open Intelligence UI charts or tables beside the conversation. Delegate independent work to subagents when useful, then check the combined result before using it.",
     href: "/docs/projects#review",
     label: "How review works",
-    image: "task-analysis.png",
-    alt: "Existing analysis workflow artwork",
   },
-];
+] as const;
 
 export default function ProductPage() {
   return (
@@ -56,14 +56,9 @@ export default function ProductPage() {
             </Link>
           </div>
         </PageIntro>
-        <figure className="ch-product-cover">
-          <img
-            src="/assets/image/landing/hero-workbench.png"
-            alt="Illustrative workspace preview using existing Const imagery"
-            width={1920}
-            height={1080}
-          />
-        </figure>
+        <div className="ch-product-cover">
+          <WorkbenchPreview />
+        </div>
         <div className="ch-story-rows">
           {workflows.map((item) => (
             <section className="ch-story-row" key={item.title}>
@@ -74,13 +69,13 @@ export default function ProductPage() {
                   {item.label} <ArrowUpRight size={17} aria-hidden="true" />
                 </Link>
               </div>
-              <img
-                src={`/assets/image/landing/${item.image}`}
-                alt={item.alt}
-                width={1400}
-                height={934}
-                loading="lazy"
-              />
+              {item.key === "coding" ? (
+                <TaskShowcase mode="coding" />
+              ) : item.key === "browser" ? (
+                <CapabilityShowcase kind="browser" />
+              ) : (
+                <TaskShowcase mode="analysis" />
+              )}
             </section>
           ))}
         </div>

@@ -23,6 +23,12 @@ export const id: Copy = {
   "hero.subtitle":
     "Dari coding hingga pekerjaan kantor, Const Harness menghubungkan berkas lokal, alat, dan browser untuk membantu Anda mengeksekusi, mengorganisir, memverifikasi, dan mewujudkan ide menjadi hasil nyata.",
   "hero.downloadButton": "Unduh Const Harness",
+  "hero.dropdownHeader": "Aplikasi Desktop & Remote (Web / Mobile)",
+  "hero.platform.web.detail": "Remote Browser · Tanpa instalasi",
+  "hero.platform.windows.detail": "Windows 10/11 (.exe) · x64 & ARM64",
+  "hero.platform.macos.detail": "macOS (.dmg) · Apple Silicon & Intel",
+  "hero.platform.ios.detail": "iPhone & iPad · Kontrol remote seluler",
+  "hero.platform.android.detail": "Android 9+ (.apk) · Kontrol remote seluler",
   "statement.title":
     "Const Harness adalah workbench AI desktop untuk developer, peneliti, dan kreator. Satukan proyek, model, dan alat untuk mengubah ide menjadi kode yang berjalan, riset yang berguna, dan karya kreatif yang selesai.",
   "tasks.title": "Setiap tugas, dikerjakan dengan kualitas",
@@ -55,6 +61,9 @@ export const id: Copy = {
   "capabilities.4.description":
     "Kendalikan workbench desktop Anda dari mana saja. Pasangkan perangkat web dan seluler dengan sesi relay terenkripsi end-to-end untuk mengarahkan tugas, meninjau diff, dan memantau progres.",
   "capabilities.4.cta": "Buka remote workspace",
+  "capabilities.5.title": "Intelligence UI",
+  "capabilities.5.description":
+    "Melampaui respons teks biasa. Const Harness merender antarmuka openui-lang terstruktur langsung di dalam percakapan—tabel interaktif dengan pencarian, pengurutan, ekspor CSV, kartu metrik, grafik batang, hingga form tindak lanjut.",
   "platform.title": "Pakai Const Harness di mana pun Anda bekerja",
   "platform.0.title": "Aplikasi desktop",
   "platform.0.description":
@@ -144,7 +153,7 @@ export const id: Copy = {
   "platform.terminalCta": "Jelajahi remote control",
   "platform.scheduleCta": "Cara kerja penjadwalan",
   "media.note":
-    "Ilustrasi mencakup aset referensi dari MiniMax; alur kerja dan ketersediaan fitur dijelaskan untuk Const Harness.",
+    "Pratinjau interaktif dimodelkan langsung dari workbench desktop dan seluler Const Harness; kemampuan serta ketersediaan fitur mengikuti konfigurasi yang didukung.",
   "comparison.category": "Alur kerja Anda",
   "comparison.other": "Alur kerja hanya chat",
   "comparison.0.harness":

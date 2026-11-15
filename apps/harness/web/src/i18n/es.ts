@@ -23,6 +23,12 @@ export const es: Copy = {
   "hero.subtitle":
     "Desde programación hasta trabajo de oficina, Const Harness conecta tus archivos locales, herramientas y navegador para ayudarte a ejecutar, organizar, verificar y convertir ideas en resultados entregables.",
   "hero.downloadButton": "Descargar Const Harness",
+  "hero.dropdownHeader": "App de escritorio y remoto (Web / Móvil)",
+  "hero.platform.web.detail": "Remoto en navegador · Sin instalación",
+  "hero.platform.windows.detail": "Windows 10/11 (.exe) · x64 y ARM64",
+  "hero.platform.macos.detail": "macOS (.dmg) · Apple Silicon e Intel",
+  "hero.platform.ios.detail": "iPhone y iPad · Control remoto móvil",
+  "hero.platform.android.detail": "Android 9+ (.apk) · Control remoto móvil",
   "statement.title":
     "Const Harness es un entorno de IA de escritorio para desarrolladores, investigadores y creadores. Reúne proyectos, modelos y herramientas para convertir una idea en código funcional, investigación útil y trabajos terminados.",
   "tasks.title": "Cada tarea, entregada con calidad",
@@ -55,6 +61,9 @@ export const es: Copy = {
   "capabilities.4.description":
     "Controla tu entorno de escritorio desde cualquier lugar. Empareja de forma segura dispositivos web y móviles mediante sesiones cifradas de extremo a extremo para dirigir tareas y revisar cambios.",
   "capabilities.4.cta": "Abrir espacio remoto",
+  "capabilities.5.title": "Intelligence UI",
+  "capabilities.5.description":
+    "Ve más allá del texto plano. Const Harness renderiza interfaces openui-lang estructuradas dentro de la conversación: tablas con búsqueda, ordenación y exportación CSV, tarjetas de métricas, gráficos de barras y formularios interactivos.",
   "platform.title": "Usa Const Harness donde trabajes",
   "platform.0.title": "Aplicación de escritorio",
   "platform.0.description":
@@ -144,7 +153,7 @@ export const es: Copy = {
   "platform.terminalCta": "Explorar control remoto",
   "platform.scheduleCta": "Cómo funciona",
   "media.note":
-    "Las ilustraciones incluyen recursos de referencia de MiniMax; los flujos y la disponibilidad descritos corresponden a Const Harness.",
+    "Las vistas previas interactivas reproducen la interfaz real de escritorio y móvil de Const Harness; los flujos y la disponibilidad dependen de tu configuración.",
   "comparison.category": "Tu flujo de trabajo",
   "comparison.other": "Solo chat",
   "comparison.0.harness":

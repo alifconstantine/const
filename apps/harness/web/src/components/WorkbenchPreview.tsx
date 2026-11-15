@@ -1,28 +1,38 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Archive,
   ArrowUp,
+  Bot,
   CalendarClock,
+  Check,
   ChevronDown,
+  ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
-  Columns2,
+  Circle,
+  Eye,
+  FileDiff,
   Folder,
   FolderOpen,
-  Globe,
   Hand,
+  LayoutList,
   MessageCirclePlus,
   MessageSquare,
   Minus,
   PanelLeft,
+  PanelRight,
   Plus,
   Search,
+  Settings,
+  ShieldAlert,
+  Square,
   SquareTerminal,
   Store,
   X,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { ConstLogoIcon } from "@const/ui";
 
 interface ChatItem {
@@ -39,116 +49,101 @@ interface ProjectFolder {
   totalCount?: number;
 }
 
-function WindowsRestoreIcon({ className = "w-3 h-3" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 12 12"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.15"
-    >
-      <rect x="3.5" y="1.5" width="7" height="7" rx="0.5" />
-      <path d="M1.5 3.5v7h7" />
-    </svg>
-  );
-}
-
-// Exact Reasoning / Thinking Effort icon from Image 1 & desktop chat-card
-function ThinkingEffortIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-    >
-      <circle cx="8" cy="8" r="6" />
-      <line x1="8" y1="3.5" x2="8" y2="12.5" />
-      <line x1="4.5" y1="6" x2="6" y2="6" />
-      <line x1="10" y1="6" x2="11.5" y2="6" />
-      <line x1="4.5" y1="8" x2="6" y2="8" />
-      <line x1="10" y1="8" x2="11.5" y2="8" />
-      <line x1="4.5" y1="10" x2="6" y2="10" />
-      <line x1="10" y1="10" x2="11.5" y2="10" />
-    </svg>
-  );
-}
+const THINKING_LEVELS = ["Low", "Medium", "High", "Max"] as const;
+const DEMO_MODELS = [
+  "Claude Sonnet 4",
+  "Gemini 2.5 Pro",
+  "DeepSeek V3",
+  "GPT-4o",
+] as const;
 
 export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
-  // Desktop sidebar collapse state
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Desktop sidebar & overlays state
   const [sidebarOpen, setSidebarOpen] = useState(!compact);
-  // Mobile drawer open state
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
 
   // Active chat & input state
-  const [activeChat, setActiveChat] = useState("hii-tess");
+  const [activeChat, setActiveChat] = useState("redesign-hero");
   const [inputMessage, setInputMessage] = useState("");
-  const [selectedContext, setSelectedContext] = useState("Outside Project");
-  const [model, setModel] = useState("DeepSeek v4.1 Flash:free");
-  const [effort, setEffort] = useState("High");
-  const [authMode, setAuthMode] = useState("Ask before ch...");
+  const [selectedContext, setSelectedContext] = useState("const-web");
+  const [modelIndex, setModelIndex] = useState(0);
+  const [thinkingIndex, setThinkingIndex] = useState(2); // High
+  const [authMode, setAuthMode] = useState<"ask_before_changes" | "request_review" | "full_access">("ask_before_changes");
   const [isSending, setIsSending] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [allCollapsed, setAllCollapsed] = useState(false);
   const [isOutsideExpanded, setIsOutsideExpanded] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
-  // Exact Project Folders tree from Image 3 & desktop codebase
+  const model = DEMO_MODELS[modelIndex] ?? DEMO_MODELS[0];
+  const thinkingLabel = THINKING_LEVELS[thinkingIndex] ?? "High";
+
+  // Project Folders tree matching the desktop workbench structure
   const [folders, setFolders] = useState<ProjectFolder[]>([
     {
-      id: "const",
-      name: "Const",
+      id: "const-web",
+      name: "const-web",
       open: true,
       items: [
-        { id: "hii-tess", title: "hii tess", time: "7d" },
-        { id: "buka-browser", title: "buka browser dan ke ...", time: "15d" },
-        { id: "cek-home", title: "cek /home/constantine...", time: "25d" },
-        { id: "tes-const", title: "tes", time: "25d" },
+        { id: "redesign-hero", title: "Redesign landing hero", time: "2h" },
+        { id: "inspect-mobile", title: "Inspect mobile layout", time: "1d" },
+        { id: "add-i18n", title: "Sync i18n locale keys", time: "3d" },
+        { id: "audit-theme", title: "Audit dark mode tokens", time: "5d" },
       ],
     },
     {
-      id: "learn",
-      name: "Learn",
-      open: true,
-      items: [{ id: "learn-tes", title: "tes", time: "25d" }],
-    },
-    {
-      id: "uts",
-      name: "UTS",
+      id: "api-router",
+      name: "api-router",
       open: true,
       items: [
-        { id: "uts-1", title: "kamu jawab instruksi c...", time: "27d" },
-        { id: "uts-2", title: "kamu jawab dan buat...", time: "27d" },
+        { id: "stream-proxy", title: "Optimize streaming proxy", time: "4d" },
+        { id: "verify-qris", title: "Verify webhook signature", time: "6d" },
       ],
     },
     {
-      id: "tes",
-      name: "Tes",
+      id: "research",
+      name: "research",
       open: true,
       items: [
-        { id: "tes-1", title: "apa cappability kamu...", time: "47d" },
-        { id: "tes-2", title: "buat folder baru berna...", time: "47d" },
-        { id: "tes-3", title: "buat folder baru dan b...", time: "47d" },
-        { id: "tes-4", title: "buat folder baru dan b...", time: "47d" },
-        { id: "tes-5", title: "buat folder baru beris...", time: "47d" },
-        { id: "tes-6", title: "buat folder baru beris...", time: "48d" },
+        { id: "bench-summary", title: "Q4 benchmark summary", time: "1w" },
+        { id: "agent-eval", title: "Compare subagent traces", time: "2w" },
       ],
-      totalCount: 9,
+    },
+    {
+      id: "design-kit",
+      name: "design-kit",
+      open: false,
+      items: [
+        { id: "token-audit", title: "Export Figma tokens", time: "2w" },
+        { id: "icon-set", title: "Standardize icon grid", time: "3w" },
+        { id: "motion-curve", title: "Tune scroll reveal easing", time: "3w" },
+        { id: "card-states", title: "Review button states", time: "1mo" },
+        { id: "a11y-check", title: "Run contrast checks", time: "1mo" },
+        { id: "type-scale", title: "Refine heading scale", time: "1mo" },
+        { id: "mobile-nav", title: "Polish drawer transitions", time: "1mo" },
+      ],
+      totalCount: 7,
     },
   ]);
 
-  // Outside Project state (matching Image 3)
+  // Outside Project collapsible group
   const [outsideOpen, setOutsideOpen] = useState(true);
   const outsideItems: ChatItem[] = [
-    { id: "out-1", title: "kamu ada tool call apa...", time: "48d" },
-    { id: "out-2", title: "apa yang bisa kamu la...", time: "48d" },
-    { id: "out-3", title: "buatkan game tic tac ...", time: "48d" },
-    { id: "out-4", title: "buat folder baru dan b...", time: "49d" },
-    { id: "out-5", title: "buat folder baru dan b...", time: "49d" },
-    { id: "out-6", title: "buat folder baru dan b...", time: "49d" },
-    { id: "out-7", title: "buat folder baru berna...", time: "49d" },
-    { id: "out-8", title: "buat folder baru berna...", time: "50d" },
+    { id: "out-1", title: "Draft release changelog", time: "3d" },
+    { id: "out-2", title: "Analyze CSV sales metrics", time: "5d" },
+    { id: "out-3", title: "Build slide deck from brief", time: "1w" },
+    { id: "out-4", title: "Automate daily repo check", time: "2w" },
+    { id: "out-5", title: "Review security audit notes", time: "2w" },
+    { id: "out-6", title: "Summarize API docs", time: "3w" },
+    { id: "out-7", title: "Clean up stale branches", time: "1mo" },
   ];
 
   const toggleFolder = (folderId: string) => {
@@ -167,53 +162,53 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
   const handleSelectChat = (item: ChatItem, contextName: string) => {
     setActiveChat(item.id);
     setSelectedContext(contextName);
-    setInputMessage(item.title.replace(/\.\.\.$/, ""));
+    setInputMessage(item.title);
+    setStatusNotice(null);
     setMobileDrawerOpen(false);
   };
 
   const handleNewChat = () => {
     setActiveChat("");
     setInputMessage("");
+    setStatusNotice(null);
     setMobileDrawerOpen(false);
   };
 
   const handleSend = () => {
-    if (!inputMessage.trim()) return;
+    const trimmed = inputMessage.trim();
+    if (!trimmed || isSending) return;
     setIsSending(true);
+    setStatusNotice(`Queued "${trimmed}" in ${selectedContext} (${model})`);
     setTimeout(() => {
       setIsSending(false);
       setInputMessage("");
-    }, 900);
+    }, 800);
   };
 
-  const toggleModel = () => {
-    const models = [
-      "DeepSeek v4.1 Flash:free",
-      "Claude 3.7 Sonnet",
-      "Gemini 2.5 Pro",
-      "GPT-4o",
-    ];
-    const currentIndex = models.indexOf(model);
-    const next = models[(currentIndex + 1) % models.length];
-    if (next) setModel(next);
-  };
-
-  const toggleEffort = () => {
-    const levels = ["High", "Medium", "Low"];
-    const currentIndex = levels.indexOf(effort);
-    const next = levels[(currentIndex + 1) % levels.length];
-    if (next) setEffort(next);
+  const cycleModel = () => {
+    setModelIndex((prev) => (prev + 1) % DEMO_MODELS.length);
   };
 
   const toggleAuthMode = () => {
-    const modes = ["Ask before ch...", "Request review", "Full access"];
-    const currentIndex = modes.indexOf(authMode);
-    const next = modes[(currentIndex + 1) % modes.length];
+    const order: Array<"ask_before_changes" | "request_review" | "full_access"> = [
+      "ask_before_changes",
+      "request_review",
+      "full_access",
+    ];
+    const currentIndex = order.indexOf(authMode);
+    const next = order[(currentIndex + 1) % order.length];
     if (next) setAuthMode(next);
   };
 
+  const authModeLabel =
+    authMode === "full_access"
+      ? "Full access"
+      : authMode === "request_review"
+        ? "Request review"
+        : "Ask before changes";
+
   const toggleContext = () => {
-    const contexts = ["Outside Project", "Const", "Learn", "UTS", "Tes"];
+    const contexts = ["const-web", "api-router", "research", "design-kit", "Outside Project"];
     const currentIndex = contexts.indexOf(selectedContext);
     const next = contexts[(currentIndex + 1) % contexts.length];
     if (next) setSelectedContext(next);
@@ -227,11 +222,11 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center gap-2 px-0.5">
           <ConstLogoIcon
             size={18}
-            variant="transparent"
+            variant={mounted && resolvedTheme === "dark" ? "dark-transparent" : "transparent"}
             className="w-[18px] h-[18px] shrink-0"
           />
           <div className="flex items-center gap-1.5">
-            <span className="font-serif text-base font-normal tracking-tight text-foreground">
+            <span className="font-serif text-base font-normal tracking-tight ch-desk-brand-word">
               Const
             </span>
             <span className="ch-desk-harness-badge">HARNESS</span>
@@ -433,21 +428,21 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                 className="ch-desk-see-all-btn"
                 onClick={() => setIsOutsideExpanded((prev) => !prev)}
               >
-                {isOutsideExpanded ? "Show less" : "See all (20)"}
+                {isOutsideExpanded ? "Show less" : `See all (${outsideItems.length})`}
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* 5. User Profile Bar (Clean circular 'A' initials avatar as requested) */}
+      {/* 5. User Profile Bar */}
       <div className="ch-desk-user-footer">
         <div className="ch-desk-user-avatar">
-          <span>A</span>
+          <span>C</span>
         </div>
         <div className="ch-desk-user-info">
-          <span className="ch-desk-user-name">Alif Constantine 2</span>
-          <span className="ch-desk-user-email">alifconstantine2@gmail.com</span>
+          <span className="ch-desk-user-name">Const Workspace</span>
+          <span className="ch-desk-user-email">workspace@const.web.id</span>
         </div>
         <ChevronsUpDown className="w-4 h-4 shrink-0 ml-auto" />
       </div>
@@ -483,7 +478,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="ch-desk-drawer-top">
-                <span className="text-xs font-semibold text-foreground">Navigation</span>
+                <span className="text-xs font-semibold ch-desk-brand-word">Navigation</span>
                 <button
                   type="button"
                   className="ch-desk-drawer-close"
@@ -533,45 +528,115 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
               )}
             </div>
 
-            {/* Right: Globe + Terminal + Split Panel + Windows Controls */}
+            {/* Right: Activity + Terminal + SidePanel + Window Controls matching desktop/src/App.tsx */}
             <div className="ch-desk-canvas-topbar-right">
               <div className="ch-desk-utility-tools">
-                <button type="button" className="ch-desk-tool-btn" title="Open Browser">
-                  <Globe className="w-4 h-4" />
+                <button
+                  type="button"
+                  className={`ch-desk-tool-btn ${activityOpen ? "active" : ""}`}
+                  onClick={() => setActivityOpen((prev) => !prev)}
+                  title="Activity"
+                  aria-label="Activity"
+                  aria-expanded={activityOpen}
+                >
+                  <LayoutList className="w-4 h-4" />
                 </button>
-                <button type="button" className="ch-desk-tool-btn" title="Toggle Terminal / Messages">
+                <button
+                  type="button"
+                  className="ch-desk-tool-btn"
+                  title="Open Terminal"
+                  aria-label="Terminal"
+                >
                   <SquareTerminal className="w-4 h-4" />
                 </button>
-                <button type="button" className="ch-desk-tool-btn" title="Split Layout">
-                  <Columns2 className="w-4 h-4" />
+                <button
+                  type="button"
+                  className="ch-desk-tool-btn"
+                  title="Open right sidebar"
+                  aria-label="Toggle right pane"
+                >
+                  <PanelRight className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="ch-desk-win-controls">
-                <button type="button" className="ch-desk-win-btn" title="Minimize">
+                <button type="button" className="ch-desk-win-btn" title="Minimize" aria-label="Minimize">
                   <Minus className="w-3.5 h-3.5" />
                 </button>
-                <button type="button" className="ch-desk-win-btn" title="Restore Down">
-                  <WindowsRestoreIcon className="w-3 h-3" />
+                <button type="button" className="ch-desk-win-btn" title="Maximize" aria-label="Maximize">
+                  <Square className="w-3 h-3" />
                 </button>
-                <button type="button" className="ch-desk-win-btn close" title="Close">
+                <button type="button" className="ch-desk-win-btn close" title="Close" aria-label="Close">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Centered Workspace Area (Greeting & Two-Tier AI ChatCard) */}
+          {/* Floating Activity Overlay matching FloatingWorkbenchCard in desktop App.tsx */}
+          {activityOpen && (
+            <div className="ch-desk-activity-popover" role="region" aria-label="Workspace Activity">
+              <div className="ch-desk-activity-header">
+                <div className="flex items-center gap-2">
+                  <LayoutList className="w-3.5 h-3.5 text-[#3b82f6]" />
+                  <span>Activity</span>
+                </div>
+                <button
+                  type="button"
+                  className="ch-desk-icon-btn"
+                  onClick={() => setActivityOpen(false)}
+                  aria-label="Close activity"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="ch-desk-activity-section">
+                <div className="ch-desk-activity-section-head">
+                  <span>Progress</span>
+                  <span>2/3</span>
+                </div>
+                <div className="ch-desk-activity-row">
+                  <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="truncate">Audit desktop ChatCard & toolbar</span>
+                </div>
+                <div className="ch-desk-activity-row">
+                  <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="truncate">Update landing Intelligence UI</span>
+                </div>
+                <div className="ch-desk-activity-row muted">
+                  <Circle className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Verify production Next.js build</span>
+                </div>
+              </div>
+              <div className="ch-desk-activity-section">
+                <div className="ch-desk-activity-section-head">
+                  <span>SubAgents &amp; Changes</span>
+                  <span>2</span>
+                </div>
+                <div className="ch-desk-activity-row">
+                  <Bot className="w-3 h-3 text-[#3b82f6] shrink-0" />
+                  <span className="truncate">ui-auditor · Desktop tokens verified</span>
+                </div>
+                <div className="ch-desk-activity-row">
+                  <FileDiff className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="truncate">HeroSection.tsx</span>
+                  <span className="ml-auto text-[10.5px] font-mono text-emerald-500">+18</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Centered Workspace Area (Greeting & Unified ChatCard matching desktop/src/components/workbench/chat-card.tsx) */}
           <div className="ch-desk-canvas-center">
             <div className="ch-desk-canvas-inner">
-              {/* Centered Greeting Text (Matching exact proportions from Image 2: font-size 19px, color #d4d4d4, margin 14px) */}
+              {/* Centered Greeting Text */}
               <p className="ch-desk-greeting">
                 Morning, how can I help?
               </p>
 
-              {/* Two-Tier ChatCard (Audited from chat-card.tsx lines 1258-1420 & Image 2) */}
+              {/* Unified ChatCard (Audited from chat-card.tsx lines 1379-2398) */}
               <div className="ch-desk-chat-card">
-                {/* Tier 1 (Top Strip): Choose Project header background */}
+                {/* Top Header Strip: Choose Project */}
                 <div className="ch-desk-card-top-strip">
                   <button
                     type="button"
@@ -585,7 +650,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                   </button>
                 </div>
 
-                {/* Tier 2 (Inner Card): Lighter container with rounded-14px & border */}
+                {/* AI Input Box (#ffffff light / #2b2b2b dark) */}
                 <div className="ch-desk-card-inner-box">
                   {/* Input Area */}
                   <div className="ch-desk-input-container">
@@ -601,53 +666,98 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                     />
                   </div>
 
-                  {/* Bottom Actions Row (Audited from chat-card.tsx lines 1676-2228 & Image 2) */}
+                  {/* Bottom Actions Row: + , Permission Mode | Model Selector , Send */}
                   <div className="ch-desk-card-bottom-row">
-                    {/* Left: Plus attachment + Hand "Ask before changes" */}
+                    {/* Left: Plus context + Access Mode Selector */}
                     <div className="ch-desk-actions-left">
                       <button
                         type="button"
                         className="ch-desk-plus-btn"
                         title="Add context"
+                        aria-label="Add context"
                       >
                         <Plus className="w-4 h-4 stroke-[1.75]" />
                       </button>
 
                       <button
                         type="button"
-                        className="ch-desk-mode-btn"
+                        className={`ch-desk-mode-btn ${authMode === "full_access" ? "full-access" : ""}`}
                         onClick={toggleAuthMode}
-                        title="Permission Mode: Ask before changes"
+                        title={authModeLabel}
                       >
-                        <Hand className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
-                        <span className="hidden sm:inline truncate max-w-[120px]">{authMode}</span>
+                        {authMode === "full_access" ? (
+                          <ShieldAlert className="w-4 h-4 text-[#e79737] stroke-[1.75] shrink-0" />
+                        ) : authMode === "request_review" ? (
+                          <Eye className="w-4 h-4 stroke-[1.75] shrink-0" />
+                        ) : (
+                          <Hand className="w-4 h-4 stroke-[1.75] shrink-0" />
+                        )}
+                        <span className="hidden sm:inline truncate max-w-[140px]">{authModeLabel}</span>
                         <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
                       </button>
                     </div>
 
-                    {/* Right: Model Selector + Reasoning Meter "High" + Squircle Send Button */}
+                    {/* Right: Model Selector (opens Thinking Level popover) + Squircle Send Button */}
                     <div className="ch-desk-actions-right">
-                      <button
-                        type="button"
-                        className="ch-desk-action-pill"
-                        onClick={toggleModel}
-                        title="Switch Model"
-                      >
-                        <span className="hidden sm:inline truncate max-w-[150px]">{model}</span>
-                        <span className="sm:hidden truncate max-w-[75px] text-[11.5px]">DeepSeek</span>
-                        <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
-                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          className={`ch-desk-action-pill ${modelPopoverOpen ? "active" : ""}`}
+                          onClick={() => setModelPopoverOpen((prev) => !prev)}
+                          title={`Model: ${model} (Thinking: ${thinkingLabel})`}
+                          aria-expanded={modelPopoverOpen}
+                        >
+                          <span className="truncate max-w-[130px] sm:max-w-[180px]">{model}</span>
+                          <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
+                        </button>
 
-                      <button
-                        type="button"
-                        className="ch-desk-action-pill"
-                        onClick={toggleEffort}
-                        title="Thinking effort: High"
-                      >
-                        <ThinkingEffortIcon className="w-3.5 h-3.5 shrink-0" />
-                        <span className="hidden sm:inline">{effort}</span>
-                        <ChevronDown className="w-3 h-3 ml-0.5 shrink-0" />
-                      </button>
+                        {modelPopoverOpen && (
+                          <div className="ch-desk-model-popover" role="dialog" aria-label="Model and thinking level">
+                            <button
+                              type="button"
+                              className="ch-desk-model-gear"
+                              onClick={() => setModelPopoverOpen(false)}
+                              title="Close"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="ch-desk-model-popover-header">
+                              <span className="ch-desk-thinking-title">{thinkingLabel}</span>
+                              <button
+                                type="button"
+                                className="ch-desk-model-switch"
+                                onClick={cycleModel}
+                                title="Cycle model"
+                              >
+                                <span className="truncate">{model}</span>
+                                <ChevronRight className="w-3 h-3 shrink-0" />
+                              </button>
+                            </div>
+                            <div className="ch-desk-thinking-track" aria-label="Thinking level slider">
+                              <div
+                                className="ch-desk-thinking-fill"
+                                style={{
+                                  width: `${Math.max(18, ((thinkingIndex + 1) / THINKING_LEVELS.length) * 100)}%`,
+                                }}
+                              />
+                              {THINKING_LEVELS.map((lvl, i) => {
+                                const leftPct = 10 + (i / (THINKING_LEVELS.length - 1)) * 80;
+                                return (
+                                  <button
+                                    key={lvl}
+                                    type="button"
+                                    className={`ch-desk-thinking-stop ${i === thinkingIndex ? "active" : ""}`}
+                                    style={{ left: `${leftPct}%` }}
+                                    onClick={() => setThinkingIndex(i)}
+                                    title={`Thinking: ${lvl}`}
+                                    aria-label={`Thinking: ${lvl}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       <button
                         type="button"
@@ -664,6 +774,12 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
                   </div>
                 </div>
               </div>
+
+              {statusNotice && (
+                <p className="ch-desk-status-notice" role="status">
+                  {statusNotice}
+                </p>
+              )}
             </div>
           </div>
         </main>

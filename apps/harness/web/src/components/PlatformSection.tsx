@@ -1,6 +1,7 @@
 "use client";
 import { useI18n } from "@/context/I18nContext";
 import { WorkbenchPreview } from "./WorkbenchPreview";
+import { MobileRemoteShowcase } from "./showcases/MobileRemoteShowcase";
 import { HeadingReveal } from "@/components/ui/text-reveal";
 import { motion } from "framer-motion";
 
@@ -30,15 +31,7 @@ export function PlatformSection() {
                 {index === 0 ? (
                   <WorkbenchPreview compact />
                 ) : (
-                  <div className="ch-remote-illustration">
-                    <img
-                      src="/assets/image/landing/platform-mobile.png"
-                      alt={t("platform.1.title")}
-                      width={1377}
-                      height={1377}
-                      loading="lazy"
-                    />
-                  </div>
+                  <MobileRemoteShowcase />
                 )}
               </div>
               <h3 className="ch-platform-title">

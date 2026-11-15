@@ -24,6 +24,12 @@ export const ja: Copy = {
   "hero.subtitle":
     "コーディングから日常のオフィスワークまで、Const Harness はローカルファイル、ツール、ブラウザを連携し、実行、整理、検証、そしてアイデアの実現を支援します。",
   "hero.downloadButton": "Const Harness をダウンロード",
+  "hero.dropdownHeader": "デスクトップアプリ & リモート (Web / モバイル)",
+  "hero.platform.web.detail": "ブラウザリモート · インストール不要",
+  "hero.platform.windows.detail": "Windows 10/11 (.exe) · x64 & ARM64",
+  "hero.platform.macos.detail": "macOS (.dmg) · Apple Silicon & Intel",
+  "hero.platform.ios.detail": "iPhone & iPad · モバイルリモート操作",
+  "hero.platform.android.detail": "Android 9+ (.apk) · モバイルリモート操作",
   "statement.title":
     "Const Harnessは開発者、研究者、クリエイターのためのデスクトップAIワークベンチです。プロジェクト、モデル、ツールをまとめて、アイデアを動くコード、有用な調査、完成した作品へと変えます。",
   "tasks.title": "あらゆる課題を、品質とともに届ける",
@@ -56,6 +62,9 @@ export const ja: Copy = {
   "capabilities.4.description":
     "どこからでもデスクトップワークベンチを操作。Webやモバイル端末とエンドツーエンド暗号化で安全にペアリングし、タスク指示やdiff確認が可能です。",
   "capabilities.4.cta": "リモートワークスペースを開く",
+  "capabilities.5.title": "Intelligence UI",
+  "capabilities.5.description":
+    "通常のテキストやMarkdownを超えて、構造化された openui-lang UI を会話内に直接描画します。検索・ソート・CSV出力対応のテーブル、メトリクスカード、棒グラフ、対話型フォームを安全に操作できます。",
   "platform.title": "Const Harness をどこからでも使う",
   "platform.0.title": "デスクトップアプリ",
   "platform.0.description":
@@ -144,7 +153,7 @@ export const ja: Copy = {
   "platform.terminalCta": "リモート機能を見る",
   "platform.scheduleCta": "定期実行について",
   "media.note":
-    "一部の画像はMiniMaxの参考素材です。機能と利用条件の説明はConst Harnessのものです。",
+    "画面プレビューはConst HarnessのデスクトップおよびモバイルUIを忠実に再現したインタラクティブな表示です。機能と利用条件は設定により異なります。",
   "comparison.category": "作業の流れ",
   "comparison.other": "チャットのみ",
   "comparison.0.harness":

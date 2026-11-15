@@ -22,6 +22,12 @@ export const en = {
   "hero.subtitle":
     "From coding to office work, Const Harness connects to your local files, tools, and browser to help you execute, organize, verify, and turn ideas into deliverable results.",
   "hero.downloadButton": "Download Const Harness",
+  "hero.dropdownHeader": "Desktop App & Remote (Web / Mobile)",
+  "hero.platform.web.detail": "Browser Remote · No installation needed",
+  "hero.platform.windows.detail": "Windows 10/11 (.exe) · x64 & ARM64",
+  "hero.platform.macos.detail": "macOS (.dmg) · Apple Silicon & Intel",
+  "hero.platform.ios.detail": "iPhone & iPad · Mobile remote control",
+  "hero.platform.android.detail": "Android 9+ (.apk) · Mobile remote control",
   "statement.title":
     "Const Harness is a desktop AI workbench for developers, researchers, and creators. Bring your projects, models, and tools together to turn an idea into working code, useful research, and finished creative work.",
   "tasks.title": "Every task, delivered with quality",
@@ -54,6 +60,9 @@ export const en = {
   "capabilities.4.description":
     "Control your desktop workbench from anywhere. Securely pair web and mobile devices with end-to-end encrypted relay sessions to steer tasks, inspect diffs, and review changes on the go.",
   "capabilities.4.cta": "Open remote workspace",
+  "capabilities.5.title": "Intelligence UI",
+  "capabilities.5.description":
+    "Go beyond plain Markdown responses. Const Harness renders structured openui-lang interfaces directly inside conversations—searchable and sortable tables with CSV export, metric cards, zero-baseline bar charts, and interactive follow-up forms.",
   "platform.title": "Use Const Harness wherever you work",
   "platform.0.title": "Desktop app",
   "platform.0.description":
@@ -143,7 +152,7 @@ export const en = {
   "platform.terminalCta": "Explore remote control",
   "platform.scheduleCta": "How scheduling works",
   "media.note":
-    "Illustrations include reference assets from MiniMax; product workflows and availability are described for Const Harness.",
+    "Interactive previews are modeled on the Const Harness desktop and mobile workbench; capabilities and availability reflect supported configurations.",
   "comparison.category": "Your workflow",
   "comparison.other": "Chat-only workflow",
   "comparison.0.harness":

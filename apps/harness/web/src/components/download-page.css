@@ -51,13 +51,26 @@
   margin: 0;
 }
 .ch-download-list-page .ch-download-platform-icon {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+.ch-download-list-page .ch-download-platform-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ch-surface-muted) 88%, var(--ch-line));
+  border: 1px solid var(--ch-line);
+  color: var(--ch-ink);
+}
+.ch-download-list-page .ch-download-upcoming-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--ch-surface-muted);
+  border: 1px solid var(--ch-line);
+  color: var(--ch-ink-muted);
 }
 .ch-platform-description {
   font-size: 15px;
@@ -227,8 +240,8 @@ a.ch-installer-row[data-primary="true"]:hover {
   min-height: 44px;
 }
 .ch-download-list-page .ch-download-upcoming-item .ch-download-platform-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 .ch-download-soon {
   color: var(--ch-ink-faint);

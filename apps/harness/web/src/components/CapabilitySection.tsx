@@ -1,16 +1,17 @@
 "use client";
 import { useI18n } from "@/context/I18nContext";
-import { WorkbenchPreview } from "./WorkbenchPreview";
 import { HeadingReveal } from "@/components/ui/text-reveal";
 import { motion } from "framer-motion";
+import { CapabilityShowcase, type CapabilityKind } from "./showcases/CapabilityShowcase";
 
 const CAPABILITIES = [
-  { index: 0, image: "/assets/image/landing/capability-plugins.png" },
-  { index: 1, image: null },
-  { index: 2, image: "/assets/image/landing/capability-browser.png" },
-  { index: 3, image: "/assets/image/landing/capability-video.png" },
-  { index: 4, image: "/assets/image/landing/capability-remote.png" },
-] as const;
+  { index: 0, kind: "plugins" },
+  { index: 1, kind: "computer" },
+  { index: 2, kind: "browser" },
+  { index: 3, kind: "subagents" },
+  { index: 5, kind: "intelligence", id: "intelligence-ui" },
+  { index: 4, kind: "remote", id: "remote" },
+] as const satisfies ReadonlyArray<{ index: 0 | 1 | 2 | 3 | 4 | 5; kind: CapabilityKind; id?: string }>;
 
 export function CapabilitySection() {
   const { t } = useI18n();
@@ -25,7 +26,7 @@ export function CapabilitySection() {
             <motion.article
               key={item.index}
               className="ch-capability"
-              id={item.index === 4 ? "remote" : undefined}
+              id={"id" in item ? item.id : undefined}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
@@ -40,17 +41,7 @@ export function CapabilitySection() {
                 </p>
               </div>
               <div className="ch-capability-media">
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={t(`capabilities.${item.index}.title`)}
-                    width={1400}
-                    height={934}
-                    loading="lazy"
-                  />
-                ) : (
-                  <WorkbenchPreview compact />
-                )}
+                <CapabilityShowcase kind={item.kind} />
               </div>
             </motion.article>
           ))}

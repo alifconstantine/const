@@ -3,13 +3,14 @@ import { useState, type KeyboardEvent } from "react";
 import { useI18n } from "@/context/I18nContext";
 import { HeadingReveal } from "@/components/ui/text-reveal";
 import { motion } from "framer-motion";
+import { TaskShowcase, type TaskShowcaseMode } from "./showcases/TaskShowcase";
 
 const TASKS = [
-  { index: 0, image: "/assets/image/landing/task-presentation.png" },
-  { index: 1, image: "/assets/image/landing/task-analysis.png" },
-  { index: 2, image: "/assets/image/landing/task-website.png" },
-  { index: 3, image: "/assets/image/landing/task-coding.png" },
-] as const;
+  { index: 0, mode: "presentation" },
+  { index: 1, mode: "analysis" },
+  { index: 2, mode: "website" },
+  { index: 3, mode: "coding" },
+] as const satisfies ReadonlyArray<{ index: 0 | 1 | 2 | 3; mode: TaskShowcaseMode }>;
 
 export function TaskExplorerSection() {
   const { t } = useI18n();
@@ -84,14 +85,7 @@ export function TaskExplorerSection() {
             aria-labelledby={`task-tab-${active}`}
             tabIndex={0}
           >
-            <img
-              src={current.image}
-              alt={t(`tasks.${current.index}.title`)}
-              width={1400}
-              height={1144}
-              loading="lazy"
-              decoding="async"
-            />
+            <TaskShowcase mode={current.mode} />
           </div>
         </motion.div>
       </div>

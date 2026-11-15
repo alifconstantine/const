@@ -38,11 +38,9 @@ export function Navbar() {
       window.removeEventListener("keydown", onKey);
     };
   }, []);
+  const solidHeader = scrolled || open || pathname !== "/";
   return (
-    <header
-      className="ch-header"
-      data-scrolled={scrolled || open || pathname !== "/"}
-    >
+    <header className="ch-header" data-scrolled={solidHeader}>
       <a className="ch-skip-link" href="#main-content">
         {t("nav.skip")}
       </a>
@@ -50,6 +48,7 @@ export function Navbar() {
         <Link href="/" className="ch-brand group" aria-label="Const Harness">
           <ConstLogoIcon
             size="sm"
+            variant={solidHeader ? "transparent" : "dark-transparent"}
             className="w-[26px] h-[26px] shrink-0 transition-transform group-hover:scale-105"
           />
           <span>Const Harness</span>

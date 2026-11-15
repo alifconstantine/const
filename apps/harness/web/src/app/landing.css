@@ -326,12 +326,12 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   top: 12px;
 }
 /* =========================================================================
- * Hero Section — Sky gradient background & Elevated Window (Ref: Image 1)
+ * Hero Section — Sky gradient background & Elevated Window
  * ========================================================================= */
 .ch-hero {
-  --ch-hero-sky: #54c8f5;
-  --ch-hero-blue: #2996f0;
-  --ch-hero-deep: #1f80dc;
+  --ch-hero-sky: #32b4f2;
+  --ch-hero-blue: #1a82e8;
+  --ch-hero-deep: #135fc7;
 
   position: relative;
   padding-top: 114px;
@@ -396,6 +396,8 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 }
 
 .ch-hero-header {
+  position: relative;
+  z-index: 20;
   text-align: center;
   max-width: 860px;
   margin: 0 auto 38px;
@@ -408,7 +410,7 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   line-height: 1.08;
   letter-spacing: -0.04em;
   color: #ffffff;
-  text-shadow: 0 2px 14px rgba(14, 116, 217, 0.35);
+  text-shadow: 0 2px 18px rgba(10, 64, 150, 0.28);
 }
 
 .dark .ch-hero-main-title {
@@ -420,10 +422,10 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   margin: 18px auto 0;
   font-size: clamp(14.5px, 1.4vw, 16px);
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.94);
+  color: rgba(255, 255, 255, 0.96);
   font-weight: 400;
   text-wrap: balance;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+  text-shadow: 0 1px 8px rgba(10, 50, 110, 0.22);
 }
 
 .ch-hero-cta-wrap {
@@ -435,16 +437,19 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-hero-download-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 9px;
   background: #ffffff;
   color: #0f172a;
-  padding: 10px 24px;
+  padding: 11px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 999px;
   font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
   box-shadow:
-    0 4px 18px rgba(0, 0, 0, 0.14),
+    0 6px 22px rgba(10, 48, 112, 0.22),
     0 1px 3px rgba(0, 0, 0, 0.08);
   transition:
     transform 0.15s ease,
@@ -455,7 +460,7 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-hero-download-btn:hover {
   background: #f8fafc;
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 28px rgba(10, 48, 112, 0.28);
 }
 
 .ch-hero-platforms-row {
@@ -470,13 +475,13 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-hero-platform-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 16px;
+  gap: 7px;
+  padding: 7px 14px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.32);
+  background: rgba(10, 22, 48, 0.28);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   color: #ffffff;
   font-size: 13px;
   font-weight: 500;
@@ -485,13 +490,28 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 }
 
 .ch-hero-platform-pill:hover {
-  background: rgba(15, 23, 42, 0.5);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(10, 22, 48, 0.44);
+  border-color: rgba(255, 255, 255, 0.42);
   transform: translateY(-2px);
   color: #ffffff;
 }
 
+.ch-hero-platform-pill-soon {
+  opacity: 0.85;
+}
+
+.ch-hero-pill-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.94);
+}
+
 .ch-hero-preview-container {
+  position: relative;
+  z-index: 2;
   width: 100%;
   display: flex;
   justify-content: center;
@@ -716,7 +736,8 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   transition: all 0.15s ease;
 }
 
-.ch-desk-tool-btn:hover {
+.ch-desk-tool-btn:hover,
+.ch-desk-tool-btn.active {
   background: var(--ch-desk-btn-hover-bg);
   color: var(--ch-desk-btn-hover-text);
 }
@@ -1139,14 +1160,15 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   font-family: inherit;
 }
 
-/* Two-Tier ChatCard (Exact design from apps/harness/desktop/src/components/workbench/chat-card.tsx & Image 1/2) */
+/* Two-Tier ChatCard (Exact design from apps/harness/desktop/src/components/workbench/chat-card.tsx) */
 .ch-desk-chat-card {
   width: 100%;
   background: var(--ch-desk-card-tier1-bg);
   border: 1px solid var(--ch-desk-card-border);
   border-radius: 16px;
   box-shadow: var(--ch-desk-card-shadow);
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease,
@@ -1161,6 +1183,7 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   padding: 8px 14px 6px;
   display: flex;
   align-items: center;
+  border-radius: 16px 16px 0 0;
 }
 
 .ch-desk-project-btn {
@@ -1185,15 +1208,16 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   color: var(--ch-desk-pill-icon);
 }
 
-/* Inner Box Tier: lighter container with its own border & rounded-14px */
+/* Inner Box Tier: lighter container with its own border & rounded-2xl (16px) */
 .ch-desk-card-inner-box {
   background: var(--ch-desk-card-tier2-bg);
   border: 1px solid var(--ch-desk-card-border);
-  border-radius: 14px;
+  border-radius: 16px;
   margin: 0 -1px -1px -1px;
-  padding: 10px 14px 8px;
+  padding: 10px 14px 10px;
   display: flex;
   flex-direction: column;
+  position: relative;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease;
@@ -1272,7 +1296,16 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   background: var(--ch-desk-pill-hover-bg);
 }
 
-.ch-desk-mode-btn svg {
+.ch-desk-mode-btn.full-access {
+  color: #e79737;
+}
+
+.ch-desk-mode-btn.full-access:hover {
+  color: #e79737;
+  background: rgba(231, 151, 55, 0.1);
+}
+
+.ch-desk-mode-btn:not(.full-access) svg {
   color: var(--ch-desk-pill-icon);
 }
 
@@ -1286,8 +1319,8 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 3px 7px;
+  border-radius: 6px;
   background: transparent;
   border: none;
   color: var(--ch-desk-pill-text);
@@ -1296,13 +1329,195 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   transition: all 0.15s ease;
 }
 
-.ch-desk-action-pill:hover {
+.ch-desk-action-pill:hover,
+.ch-desk-action-pill.active {
   color: var(--ch-desk-pill-hover-text);
   background: var(--ch-desk-pill-hover-bg);
 }
 
 .ch-desk-action-pill svg {
   color: var(--ch-desk-pill-icon);
+}
+
+/* Floating Activity Popover (FloatingWorkbenchCard lookalike) */
+.ch-desk-activity-popover {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  width: 268px;
+  max-width: calc(100% - 24px);
+  border-radius: 14px;
+  padding: 10px 10px 8px;
+  background: var(--ch-desk-card-tier2-bg);
+  border: 1px solid var(--ch-desk-card-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  z-index: 30;
+  text-align: left;
+  color: var(--ch-desk-text-primary);
+}
+
+.dark .ch-desk-activity-popover {
+  background: #1c1c1e;
+  border-color: #2f2f32;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.72);
+}
+
+.ch-desk-activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px 8px;
+  border-bottom: 1px solid var(--ch-desk-sidebar-border);
+  margin-bottom: 6px;
+}
+
+.ch-desk-activity-section {
+  padding: 2px 2px 6px;
+}
+
+.ch-desk-activity-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ch-desk-text-muted);
+  padding: 4px;
+}
+
+.ch-desk-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--ch-desk-text-primary);
+}
+
+.ch-desk-activity-row.muted {
+  color: var(--ch-desk-text-muted);
+}
+
+/* Unified Model & Thinking Level Popover (chat-card.tsx lines 2084-2175) */
+.ch-desk-model-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 244px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e2e4;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+  z-index: 40;
+  text-align: center;
+}
+
+.dark .ch-desk-model-popover {
+  background: #1c1c1e;
+  border-color: #2c2c2e;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.78);
+}
+
+.ch-desk-model-gear {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ch-desk-model-gear:hover {
+  background: var(--ch-desk-pill-hover-bg);
+  color: var(--ch-desk-text-primary);
+}
+
+.ch-desk-model-popover-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-inline: 20px;
+}
+
+.ch-desk-thinking-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b82f6;
+  line-height: 1.1;
+}
+
+.ch-desk-model-switch {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 180px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: #71717a;
+  cursor: pointer;
+}
+
+.ch-desk-model-switch:hover {
+  color: var(--ch-desk-text-primary);
+}
+
+.ch-desk-thinking-track {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  border-radius: 999px;
+  background: #e4e4e7;
+  overflow: hidden;
+}
+
+.dark .ch-desk-thinking-track {
+  background: #2a2a2e;
+}
+
+.ch-desk-thinking-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: #3b82f6;
+  transition: width 0.15s ease;
+}
+
+.ch-desk-thinking-stop {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.ch-desk-thinking-stop.active {
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .ch-desk-send-btn {
@@ -1387,6 +1602,17 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-desk-drawer-close:hover {
   background: var(--ch-desk-btn-hover-bg);
   color: var(--ch-desk-btn-hover-text);
+}
+
+.ch-desk-brand-word {
+  color: var(--ch-desk-text-primary);
+}
+
+.ch-desk-status-notice {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--ch-desk-text-secondary);
+  text-align: center;
 }
 
 /* Compact Mode (for Capability section or narrow embeds) */
@@ -1550,7 +1776,7 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   border-radius: 20px;
   align-self: start;
   overflow: hidden;
-  background: #28acff;
+  background: transparent;
 }
 .ch-task-media img {
   width: 100%;
@@ -1559,13 +1785,15 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 }
 .ch-capabilities {
   margin-top: 100px;
+  display: grid;
+  gap: 84px;
 }
 .ch-capability {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 64px;
   align-items: center;
-  padding-block: 16px;
+  padding-block: 0;
   margin-block: 0;
 }
 .ch-capability > div:first-child {
@@ -1586,19 +1814,28 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 }
 .ch-capability-media {
   border-radius: 18px;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
-  background: #25adff;
+  background: transparent;
 }
 .ch-capability-media img {
   display: block;
   width: 100%;
   height: auto;
 }
-.ch-capability-media:has(.ch-workbench) {
+.ch-capability-media:has(.ch-desk-window) {
   height: 390px;
-  padding: 32px 0 0 28px;
+  padding: 28px 0 0 28px;
   background: var(--ch-surface-muted);
+  border: 1px solid var(--ch-line);
+}
+.ch-capability-media > .ch-desk-window {
+  width: 132%;
+  max-width: none;
+  height: 490px;
+  min-height: 490px;
+  transform: scale(0.76);
+  transform-origin: top left;
 }
 .ch-command {
   padding: 14px 16px;
@@ -1625,14 +1862,21 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 .ch-platform-visual {
   position: relative;
   background: var(--ch-surface-muted);
+  border: 1px solid var(--ch-line);
   border-radius: 18px;
   height: 250px;
   width: 100%;
   overflow: hidden;
-  padding: 26px 0 0 22px;
+  padding: 24px 0 0 22px;
 }
-.ch-platform-visual > .ch-workbench {
+.ch-platform-visual > .ch-desk-window {
+  width: 178%;
+  max-width: none;
+  height: 440px;
+  min-height: 440px;
   transform: scale(0.56);
+  transform-origin: top left;
+  pointer-events: none;
 }
 .ch-remote-illustration {
   width: 100%;
@@ -2122,11 +2366,14 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   .ch-capability {
     gap: 100px;
   }
-  .ch-capability-media:has(.ch-workbench) {
-    height: 480px;
+  .ch-capability-media:has(.ch-desk-window) {
+    height: 460px;
   }
-  .ch-workbench-compact {
-    width: 900px;
+  .ch-capability-media > .ch-desk-window {
+    width: 122%;
+    height: 540px;
+    min-height: 540px;
+    transform: scale(0.82);
   }
   .ch-hero {
     padding-top: 140px;
@@ -2149,12 +2396,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   .ch-capability {
     gap: 40px;
   }
-  .ch-workbench-body {
-    grid-template-columns: 160px minmax(0, 1fr) minmax(0, 0.75fr);
-  }
-  .ch-workbench-review pre {
-    font-size: 9px;
-  }
 }
 @media (max-width: 950px) {
   .ch-nav {
@@ -2170,17 +2411,18 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   .ch-shell-wide {
     width: calc(100% - 64px);
   }
-  .ch-workbench-body {
-    grid-template-columns: 145px minmax(0, 1fr);
-  }
-  .ch-workbench-review {
-    display: none;
-  }
   .ch-capability {
     gap: 32px;
   }
-  .ch-capability-media:has(.ch-workbench) {
-    height: 290px;
+  .ch-capability-media:has(.ch-desk-window) {
+    height: 310px;
+    padding: 20px 0 0 20px;
+  }
+  .ch-capability-media > .ch-desk-window {
+    width: 154%;
+    height: 450px;
+    min-height: 450px;
+    transform: scale(0.65);
   }
   .ch-plan {
     padding: 28px 22px;
@@ -2226,42 +2468,11 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
     padding: 8px 16px;
   }
   .ch-hero {
-    padding-top: 112px;
+    padding-top: 104px;
+    padding-bottom: 48px;
   }
-  .ch-hero-subtitle {
-    font-size: 15px;
-    margin-top: 24px;
-  }
-  .ch-hero-shortcuts {
-    gap: 8px;
-    margin-bottom: 32px;
-  }
-  .ch-hero-shortcuts a {
-    min-width: 64px;
-    font-size: 11px;
-    padding: 13px 8px;
-    border-radius: 12px;
-  }
-  .ch-hero-preview {
-    padding: 0;
-  }
-  .ch-workbench {
-    width: 700px;
-  }
-  .ch-hero-preview .ch-workbench {
-    width: 100%;
-  }
-  .ch-hero-preview .ch-workbench-body {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 390px;
-    padding-left: 8px;
-  }
-  .ch-hero-preview .ch-workbench-sidebar {
-    display: none;
-  }
-  .ch-preview-toolbar {
-    font-size: 9px;
-    padding-inline: 10px;
+  .ch-hero-header {
+    margin-bottom: 28px;
   }
   .ch-statement {
     padding-block: 110px;
@@ -2291,15 +2502,12 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   }
   .ch-capabilities {
     margin-top: 55px;
+    gap: 56px;
   }
   .ch-capability {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     padding-block: 0;
-    margin-top: 64px;
-  }
-  .ch-capability:first-child {
-    margin-top: 0;
   }
   .ch-capability-title {
     font-size: 32px;
@@ -2308,8 +2516,15 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
   .ch-capability-description {
     font-size: 16px;
   }
-  .ch-capability-media:has(.ch-workbench) {
-    height: 300px;
+  .ch-capability-media:has(.ch-desk-window) {
+    height: 290px;
+    padding: 16px 0 0 16px;
+  }
+  .ch-capability-media > .ch-desk-window {
+    width: 142%;
+    height: 400px;
+    min-height: 400px;
+    transform: scale(0.7);
   }
   .ch-platform-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -2317,7 +2532,7 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
     margin-top: 44px;
   }
   .ch-platform-visual {
-    height: 270px;
+    height: 250px;
   }
   .ch-platform-title {
     font-size: 28px;
@@ -2415,12 +2630,6 @@ body:has(.ch-remote-page) .ch-header .ch-theme-toggle:hover {
 @media (max-width: 380px) {
   .ch-header-cta {
     display: none;
-  }
-  .ch-hero-title {
-    font-size: 44px;
-  }
-  .ch-hero-shortcuts a {
-    min-width: 60px;
   }
 }
 
