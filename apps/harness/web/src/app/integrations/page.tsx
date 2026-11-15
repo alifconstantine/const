@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ContentShell, PageIntro } from "@/components/ContentShell";
-import { CapabilityShowcase } from "@/components/showcases/CapabilityShowcase";
 
 export const metadata: Metadata = {
   title: "Integrations — Const Harness",
@@ -45,9 +44,6 @@ export default function IntegrationsPage() {
           title="Your tools, in the same conversation."
           description="Bring in the context and capabilities your work needs. Start with a model, then add connections as the task grows."
         />
-        <div className="ch-integrations-cover">
-          <CapabilityShowcase kind="plugins" />
-        </div>
         <div className="ch-integration-rows">
           {connections.map((item) => (
             <section key={item.title}>

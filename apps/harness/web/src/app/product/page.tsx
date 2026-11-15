@@ -2,9 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ContentShell, PageIntro } from "@/components/ContentShell";
-import { WorkbenchPreview } from "@/components/WorkbenchPreview";
-import { TaskShowcase } from "@/components/showcases/TaskShowcase";
-import { CapabilityShowcase } from "@/components/showcases/CapabilityShowcase";
 
 export const metadata: Metadata = {
   title: "The workbench — Const Harness",
@@ -56,26 +53,16 @@ export default function ProductPage() {
             </Link>
           </div>
         </PageIntro>
-        <div className="ch-product-cover">
-          <WorkbenchPreview />
-        </div>
         <div className="ch-story-rows">
           {workflows.map((item) => (
             <section className="ch-story-row" key={item.title}>
+              <h2>{item.title}</h2>
               <div>
-                <h2>{item.title}</h2>
                 <p>{item.text}</p>
                 <Link className="ch-inline-link" href={item.href}>
                   {item.label} <ArrowUpRight size={17} aria-hidden="true" />
                 </Link>
               </div>
-              {item.key === "coding" ? (
-                <TaskShowcase mode="coding" />
-              ) : item.key === "browser" ? (
-                <CapabilityShowcase kind="browser" />
-              ) : (
-                <TaskShowcase mode="analysis" />
-              )}
             </section>
           ))}
         </div>
