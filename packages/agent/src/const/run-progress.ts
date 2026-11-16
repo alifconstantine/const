@@ -22,6 +22,17 @@ export class RunProgress {
   constructor(private readonly reviewEveryTurns = 20) {}
 
   reset() { this.recent = []; this.warned.clear(); this.pending = undefined; }
+  repeatedCycle(): boolean {
+    for (let period = 1; period <= 3; period++) {
+      const cycle = this.recent.slice(-period * 3);
+      if (cycle.length === period * 3 && cycle.every((item, index) => {
+        const first = cycle[index % period]!;
+        return item.key === first.key && item.result === first.result;
+      })) return true;
+    }
+    return false;
+  }
+
   record(name: string, args: unknown, result: unknown, isError: boolean) {
     const toolName = normalizeToolName(name);
     if (POLLING.has(toolName)) return;

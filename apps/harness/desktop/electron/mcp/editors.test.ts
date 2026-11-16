@@ -217,9 +217,10 @@ test("project targeting rejects outside workspaces, ambiguous Unreal projects an
   const f = fixture();
   try {
     const record = f.record();
+    const project = fs.realpathSync(record.editorProjectPath!);
     assert.equal(
       editorProject(record, f.work),
-      fs.realpathSync(record.editorProjectPath!).toLowerCase(),
+      process.platform === "win32" ? project.toLowerCase() : project,
     );
     assert.throws(() => editorProject(record), /editor_project/);
     assert.throws(

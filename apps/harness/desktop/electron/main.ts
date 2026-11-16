@@ -25,7 +25,7 @@ import { randomUUID } from "node:crypto";
 import { TerminalSessions } from "./terminal-sessions";
 import { resolveTerminalDirectory } from "./terminal-directory";
 import {
-  createConstAgent,
+  OmpAgent,
   rollbackFileMutation,
   getMutationHistory,
   killProcessTree,
@@ -43,6 +43,7 @@ import {
   extractPdfText,
   extractDocumentText,
 } from "@const/agent";
+import { ompExecutable } from "./omp-executable";
 import { WorkingDirectories, workingDirectoryInstructions } from "./working-directories";
 import { requireConversationId, updateSessionMode } from "./session-ownership";
 import { ConversationDatabase, type ConversationRecord } from "./database";
@@ -1364,7 +1365,7 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   interface ActiveAgentSession {
     runId: string;
-    agent: any;
+    agent: OmpAgent;
     conversationId: string;
     workspacePath: string;
     model: string;
@@ -1730,7 +1731,7 @@ app.whenReady().then(() => {
       personalizationParts.push(workingDirectoryInstructions(targetWorkspace, path.join(constBrainDir, convoId)));
       const systemPrompt = personalizationParts.join("\n\n");
 
-      const agent = createConstAgent({
+      const agent = new OmpAgent({
         preset: "harness",
         sessionKind: payload.sessionKind === "companion" ? "companion" : "main",
         runId,
@@ -1791,7 +1792,7 @@ app.whenReady().then(() => {
           }
           return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
-      });
+      }, ompExecutable());
 
       const agentSession: ActiveAgentSession = {
         runId,
@@ -2751,7 +2752,7 @@ app.whenReady().then(() => {
       const targetWorkspace = await workingDirectories.resolve(task.workspacePath, convoId, config.defaultProjectLocation);
 
       // Scheduled tasks run autonomously in the background with full access
-      const agent = createConstAgent({
+      const agent = new OmpAgent({
         preset: "harness",
         baseUrl,
         normalizeImage: normalizeModelImage,
@@ -2788,7 +2789,7 @@ app.whenReady().then(() => {
           }
           return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
-      });
+      }, ompExecutable());
 
       const taskName = task.name || task.title || "Scheduled Task";
       const taskPrompt = task.prompt || task.instructions || "";

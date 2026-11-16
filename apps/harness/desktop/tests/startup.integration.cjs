@@ -88,7 +88,7 @@ app.on("browser-window-created", (_event, window) => {
         if (process.platform === 'win32') {
           await checkWindowsPrompt(() => projectTerminal(owner), path.join(project, 'site-' + owner));
         } else {
-          await waitForTerminalOutput(() => projectTerminal(owner), output => output.split(/\r?\n/).includes('TERMINAL_DONE_' + owner));
+          await waitForTerminalOutput(() => projectTerminal(owner), output => output.split(/\r?\n/).some(line => line.trim() === 'TERMINAL_DONE_' + owner));
         }
       }));
       for (const owner of owners) assert.equal(fs.readFileSync(path.join(project, 'site-' + owner, 'owner.txt'), 'utf8').trim(), owner);
@@ -122,12 +122,30 @@ app.on("browser-window-created", (_event, window) => {
         try {
           const chunks = []; for await (const chunk of req) chunks.push(chunk);
           const body = JSON.parse(Buffer.concat(chunks).toString());
-          const instruction = body.messages.filter(message => message.role === 'user').map(message => message.content).join('\n');
-          const marker = instruction.match(/WORK_([a-z_]+)/)?.[1];
+          const text = content => Array.isArray(content) ? content.filter(part => part.type === 'text').map(part => part.text).join('\n') : content;
+          const instruction = body.messages.filter(message => message.role === 'user').map(message => text(message.content)).join('\n');
+          const marker = Array.from(instruction.matchAll(/WORK_([a-z_]+)/g)).at(-1)?.[1];
           assert(marker, 'Unrecognized mock task');
           requests.push({ marker, body });
           if (marker === 'payload_failure') { res.writeHead(413, {'Content-Type':'text/plain'}).end('FUNCTION_PAYLOAD_TOO_LARGE'); return; }
+          if (marker === 'truncated' && requests.filter(request => request.marker === marker).length === 1) {
+            const partial = { choices: [{ index: 0, finish_reason: null, delta: { tool_calls: [{ index: 0, id: 'incomplete', type: 'function',
+              function: { name: 'harness_write', arguments: JSON.stringify({ path: 'truncated.txt', content: 'forbidden' }) } }] } }] };
+            res.writeHead(200, { 'Content-Type': 'text/event-stream' }).end('data: ' + JSON.stringify(partial) + '\n\n');
+            return;
+          }
           const toolResults = body.messages.filter(message => message.role === 'tool');
+          const toolNames = (body.tools || []).map(tool => tool.function.name);
+          if (marker === 'companion') assert.deepEqual(toolNames, []);
+          else if (marker === 'delegate_child') {
+            assert(toolNames.includes('harness_read'));
+            assert(!toolNames.includes('harness_write') && !toolNames.includes('harness_bash'));
+          }
+          else {
+            assert(toolNames.includes('todo'), 'The OMP Todo tool must be active');
+            assert(toolNames.includes('harness_bash'), 'Workspace Bash must be hosted by Harness');
+            assert(!toolNames.includes('bash') && !toolNames.includes('write'));
+          }
           if (marker === 'plan_checkpoint' && toolResults.length === 1 && !releasePlan) {
             await new Promise(resolve => { releasePlan = resolve; });
           }
@@ -140,17 +158,51 @@ app.on("browser-window-created", (_event, window) => {
           let delta, finish;
           if (marker === 'plan_checkpoint') {
             if (toolResults.length < 2) {
-              delta = { tool_calls: [{ index: 0, id: 'plan_' + toolResults.length, type: 'function', function: { name: 'todo_write', arguments: JSON.stringify({ todos: toolResults.length ? [] : [{ content: 'Verify checkpoint', status: 'pending' }] }) } }] };
+              const args = toolResults.length ? { op: 'rm' } : { op: 'init', phase: 'Verification', items: ['Verify checkpoint'] };
+              delta = { tool_calls: [{ index: 0, id: 'plan_' + toolResults.length, type: 'function', function: { name: 'todo', arguments: JSON.stringify(args) } }] };
               finish = 'tool_calls';
             } else { delta = { content: 'Plan cleared as requested by fixture.' }; finish = 'stop'; }
+          } else if (marker === 'repeat') {
+            const file = toolResults.length % 2 === 0 ? 'reference.txt' : 'output-a/index.html';
+            delta = { tool_calls: [{ index: 0, id: 'read_' + toolResults.length, type: 'function', function: { name: 'harness_read', arguments: JSON.stringify({ path: file }) } }] };
+            finish = 'tool_calls';
+          } else if (marker === 'bypass') {
+            if (toolResults.length) {
+              assert.match(String(toolResults[0].content), /not found/i);
+              delta = { content: 'Inactive upstream write was rejected.' }; finish = 'stop';
+            } else {
+              delta = { tool_calls: [{ index: 0, id: 'attempt_bypass', type: 'function', function: { name: 'write', arguments: JSON.stringify({ path: path.join(project, 'bypass.txt'), content: 'forbidden' }) } }] };
+              finish = 'tool_calls';
+            }
+          } else if (marker === 'stop') {
+            delta = { tool_calls: [{ index: 0, id: 'stop_at_approval', type: 'function', function: { name: 'harness_write', arguments: JSON.stringify({ path: 'stopped.txt', content: 'forbidden' }) } }] };
+            finish = 'tool_calls';
+          } else if (marker === 'resume') {
+            assert(instruction.includes('WORK_a'), 'The prior user turn must be included on resume');
+            assert(toolResults.some(result => result.tool_call_id === 'write_a'), 'The prior tool result must be included on resume');
+            delta = { content: 'Prior messages and tool results restored.' }; finish = 'stop';
+          } else if (marker === 'truncated') {
+            assert.equal(fs.existsSync(path.join(project, 'truncated.txt')), false, 'Retry must precede any attempted write');
+            delta = { content: 'Recovered from an incomplete stream.' }; finish = 'stop';
+          } else if (marker === 'delegate_child') {
+            delta = { content: 'Child output verified.' }; finish = 'stop';
+          } else if (marker === 'delegate') {
+            if (toolResults.length) {
+              assert.match(String(toolResults[0].content), /Child output verified/);
+              delta = { content: 'Parent observed child output.' }; finish = 'stop';
+            } else {
+              delta = { tool_calls: [{ index: 0, id: 'delegate_child', type: 'function', function: { name: 'harness_task',
+                arguments: JSON.stringify({ task: 'WORK_delegate_child', agent: 'scout', name: 'Fixture' }) } }] };
+              finish = 'tool_calls';
+            }
           } else if (marker === 'companion') {
             delta = { content: 'Companion observes the same project.' }; finish = 'stop';
           } else if (!toolResults.length) {
-            delta = { tool_calls: [{ index: 0, id: 'cwd_' + marker, type: 'function', function: { name: 'bash', arguments: JSON.stringify({ command: 'node -e "console.log(process.cwd())"' }) } }] };
+            delta = { tool_calls: [{ index: 0, id: 'cwd_' + marker, type: 'function', function: { name: 'harness_bash', arguments: JSON.stringify({ command: 'node -e "console.log(process.cwd())"' }) } }] };
             finish = 'tool_calls';
           } else if (toolResults.length === 1) {
             assert(String(toolResults[0].content).includes(cwd), 'The shell must execute in the selected directory');
-            delta = { tool_calls: [{ index: 0, id: 'write_' + marker, type: 'function', function: { name: 'write', arguments: JSON.stringify({ path: 'output-' + marker + '/index.html', content: marker }) } }] };
+            delta = { tool_calls: [{ index: 0, id: 'write_' + marker, type: 'function', function: { name: 'harness_write', arguments: JSON.stringify({ path: 'output-' + marker + '/index.html', content: marker }) } }] };
             finish = 'tool_calls';
           } else {
             assert(!String(toolResults.at(-1).content).includes('File conflict'));
@@ -181,12 +233,13 @@ app.on("browser-window-created", (_event, window) => {
         const diagnostics = failedLog.find(event => event.type === 'llm_request' && event.phase === 'finished').diagnostics;
         assert.equal(diagnostics.httpStatus, 413);
         assert.equal(diagnostics.errorCategory, 'payload');
-        assert(diagnostics.requestBytes > 0 && diagnostics.messageCount > 0);
+        assert.equal(diagnostics.endpointHost, '127.0.0.1');
         assert(!JSON.stringify(diagnostics).includes('Authorization'));
-        const resumed = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'payload_failed',workspacePath:project,model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_companion'}]})})`);
+        const resumed = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'payload_failed',workspacePath:project,model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_bypass'}]})})`);
         assert.equal(resumed.success, true, resumed.error);
         assert.equal(resumed.outcome, 'completed');
         assert.notEqual(resumed.runId, failed.runId);
+        assert.equal(fs.existsSync(path.join(project, 'bypass.txt')), false);
         assert.equal(await js(`window.__agentEnds.filter(item => item.conversationId === 'payload_failed').at(-1).outcome`), 'completed');
         console.log('PASS: failed payload IPC, session-end and durable telemetry agree, and the same chat can resume successfully');
         const startRequest = requests.length;
@@ -207,6 +260,10 @@ app.on("browser-window-created", (_event, window) => {
           const saved = await js(`window.electron.getConversation('project_${owner}')`);
           assert.equal(saved.project, project);
         }
+        const continued = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'project_a',workspacePath:project,model:'directory-model',mode:'full_access',
+          messages:[...outputs[0].messages,{role:'user',content:'WORK_resume'}]})})`);
+        assert.equal(continued.outcome, 'completed', continued.error);
+        console.log('PASS: continuing a conversation replays prior messages and completed tool pairs into OMP');
         assert.equal(fs.readFileSync(path.join(project, 'reference.txt'), 'utf8'), 'original');
         const outsideRun = await js(`window.electron.sendMessage({conversationId:'agent_outside',model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_outside'}]})`);
         assert.equal(outsideRun.success, true, outsideRun.error);
@@ -225,11 +282,45 @@ app.on("browser-window-created", (_event, window) => {
         assert.equal(fs.existsSync(path.join(home, '.const/harness/workspaces')), false);
         assert.deepEqual(await js('window.electron.getRunningSessions()'), []);
         console.log('PASS: scheduled tasks use the same actual project directory and never allocate hidden project copies');
+        const repeat = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'omp_repeat',workspacePath:project,model:'directory-model',mode:'full_access',maxTurns:20,messages:[{role:'user',content:'WORK_repeat'}]})})`);
+        assert.equal(repeat.outcome, 'failed');
+        assert.match(repeat.error, /cycle without progress/);
+        assert.equal(requests.filter(request => request.marker === 'repeat').length, 7);
+        assert.match(repeat.messages.at(-1).content, /original/);
+        const partial = await js("window.electron.getConversation('omp_repeat')");
+        assert(partial.messages.length > 1, 'The failed loop retains evidence in its conversation');
+        console.log('PASS: alternating read loop stops early and saves partial results');
+        const stopped = await js(`(async () => {
+          const unsubscribe = window.electron.onAgentEvent(event => {
+            if (event.conversationId === 'omp_stop' && event.type === 'approval_request') void window.electron.abortAgent('omp_stop');
+          });
+          try {
+            return await window.electron.sendMessage(${JSON.stringify({conversationId:'omp_stop',workspacePath:project,model:'directory-model',mode:'request_review',messages:[{role:'user',content:'WORK_stop'}]})});
+          } finally { unsubscribe(); }
+        })()`);
+        assert.equal(stopped.outcome, 'cancelled');
+        assert.equal(fs.existsSync(path.join(project, 'stopped.txt')), false);
+        assert.equal(requests.filter(request => request.marker === 'stop').length, 1);
+        console.log('PASS: stopping the OMP run at approval cancels the tool and leaves the project intact');
+        const truncated = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'omp_truncated',workspacePath:project,model:'directory-model',mode:'full_access',
+          messages:[{role:'user',content:'WORK_truncated'}]})})`);
+        assert.equal(truncated.outcome, 'completed', truncated.error);
+        assert.equal(requests.filter(request => request.marker === 'truncated').length, 2);
+        assert.equal(fs.existsSync(path.join(project, 'truncated.txt')), false);
+        const truncatedLog = fs.readFileSync(path.join(home, '.const/harness/brain/omp_truncated/.system_generated/logs/events.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+        assert(!truncatedLog.some(event => event.type === 'tool_call' && event.toolCallId === 'incomplete'));
+        console.log('PASS: OMP retries an incomplete provider stream without executing the unfinished write');
+        const delegated = await js(`window.electron.sendMessage(${JSON.stringify({conversationId:'omp_delegate',workspacePath:project,model:'directory-model',mode:'full_access',
+          messages:[{role:'user',content:'WORK_delegate'}]})})`);
+        assert.equal(delegated.outcome, 'completed', delegated.error);
+        assert.equal(requests.filter(request => request.marker === 'delegate_child').length, 1);
+        console.log('PASS: non-default conversations wait for their foreground OMP subagent and receive its result');
         await js(`window.electron.sendMessage({conversationId:'plan_checkpoint',workspacePath:${JSON.stringify(project)},model:'directory-model',mode:'full_access',messages:[{role:'user',content:'WORK_plan_checkpoint'}]}).catch(()=>{});true`);
         for (let i = 0; i < 200 && !releasePlan; i++) await new Promise(resolve => setTimeout(resolve, 10));
         assert(releasePlan, 'Expected a committed plan while the next model request is waiting');
         const committed = await js(`window.electron.getConversation('plan_checkpoint')`);
         assert.equal(committed.messages.at(-1).todos[0].content, 'Verify checkpoint');
+        assert.equal(committed.messages.at(-1).todos[0].phase, 'Verification');
         assert.equal((await js(`window.electron.getSessionSnapshot('plan_checkpoint',{hydrate:true})`)).__remoteLive.todos[0].content, 'Verify checkpoint');
         committed.messages.at(-1).todos = [];
         await js(`window.electron.saveConversation(${JSON.stringify(committed)})`);

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import type { AgentErrorCategory, ModelImageNormalizer, NormalizedModelImage, RequestDiagnostics } from "./types.js";
 
 export const CONST_REQUEST_BODY_BUDGET = 4_000_000;
+type MeasuredRequestDiagnostics = RequestDiagnostics & Required<Pick<RequestDiagnostics,
+  "requestBytes" | "imageBytes" | "imageCount" | "messageCount">>;
 const IMAGE_TARGET_BYTES = 500 * 1024;
 const IMAGE_MAX_DIMENSION = 1568;
 const MIN_IMAGE_BYTES = 32 * 1024;
@@ -49,7 +51,7 @@ export function createRequestPreparer(normalizeImage?: ModelImageNormalizer) {
   return async (payload: ChatRequestPayload, options: {
     endpoint: string; runId: string; signal: AbortSignal; limitBytes?: number;
     recovery?: "payload" | "context";
-  }): Promise<{ body: string; diagnostics: RequestDiagnostics }> => {
+  }): Promise<{ body: string; diagnostics: MeasuredRequestDiagnostics }> => {
     options.signal.throwIfAborted();
     const inline: Array<{ part: ImagePart; replace: (parts: Array<Record<string, unknown>>) => void }> = [];
     const wire: ChatRequestPayload = { ...payload, messages: payload.messages.map(message => {
@@ -69,7 +71,7 @@ export function createRequestPreparer(normalizeImage?: ModelImageNormalizer) {
     }) };
 
     const originalBody = JSON.stringify(wire);
-    const originalDiagnostics: RequestDiagnostics = { runId: options.runId, endpointHost: new URL(options.endpoint).hostname,
+    const originalDiagnostics: MeasuredRequestDiagnostics = { runId: options.runId, endpointHost: new URL(options.endpoint).hostname,
       requestBytes: Buffer.byteLength(originalBody), messageCount: wire.messages.length, imageBytes: 0, imageCount: 0, recovery: options.recovery };
     for (const message of wire.messages) {
       if (!Array.isArray(message.content)) continue;
@@ -133,7 +135,7 @@ export function createRequestPreparer(normalizeImage?: ModelImageNormalizer) {
         if (url.startsWith("data:")) imageBytes += Buffer.byteLength(url);
       }
     }
-    const diagnostics: RequestDiagnostics = { runId: options.runId, endpointHost: new URL(options.endpoint).hostname,
+    const diagnostics: MeasuredRequestDiagnostics = { runId: options.runId, endpointHost: new URL(options.endpoint).hostname,
       requestBytes, imageBytes, imageCount, messageCount: wire.messages.length, recovery: options.recovery };
     if (wire.messages.length > 500 || (options.limitBytes !== undefined && requestBytes > options.limitBytes)) {
       throw new AgentRequestError(PAYLOAD_ERROR_MESSAGE, "payload", undefined, diagnostics);

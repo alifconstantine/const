@@ -9,7 +9,8 @@ export function parseTodoItems(value: unknown): TodoItem[] | undefined {
     const content = raw.content ?? raw.task ?? raw.text ?? raw.title;
     const status = raw.status ?? "pending";
     if (typeof content !== "string" || !content.trim() || !["pending", "in_progress", "completed"].includes(status)) return undefined;
-    items.push({ content: content.trim(), status, ...(typeof raw.id === "string" ? { id: raw.id } : {}) });
+    items.push({ content: content.trim(), status, ...(typeof raw.id === "string" ? { id: raw.id } : {}),
+      ...(typeof raw.phase === "string" && raw.phase ? { phase: raw.phase } : {}) });
   }
   return items;
 }

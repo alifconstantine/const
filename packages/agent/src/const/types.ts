@@ -55,10 +55,10 @@ export type AgentErrorCategory = "payload" | "image" | "context" | "transport" |
 export interface RequestDiagnostics {
   runId: string;
   endpointHost: string;
-  requestBytes: number;
-  imageBytes: number;
-  imageCount: number;
-  messageCount: number;
+  requestBytes?: number;
+  imageBytes?: number;
+  imageCount?: number;
+  messageCount?: number;
   recovery?: "payload" | "context";
   httpStatus?: number;
   errorCategory?: AgentErrorCategory;
@@ -137,6 +137,7 @@ export interface ApprovalResponseData {
 
 export interface TodoItem {
   id?: string;
+  phase?: string;
   title?: string;
   task?: string;
   content: string;
@@ -347,6 +348,14 @@ export interface AgentConfig {
   imageConfig?: any;
   speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
   imageHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
+  /** Reuse the embedding application's engine for nested coding tasks. */
+  createChildAgent?: (config: AgentConfig) => CodingAgentRuntime;
+}
+
+export interface CodingAgentRuntime {
+  readonly isCancelled: boolean;
+  run(messages: AgentMessage[], onEvent: (event: AgentEvent) => void): Promise<AgentMessage[]>;
+  abort(source?: "user" | "shutdown" | "parent" | "unknown"): void;
 }
 
 export type ConstAgentMessage = AgentMessage;

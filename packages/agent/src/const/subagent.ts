@@ -11,6 +11,7 @@ import type {
   NativeToolDefinition,
 } from "./types.js";
 import { ConstAgent } from "./const-agent.js";
+import type { CodingAgentRuntime } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // 1. Concurrency Control & Semaphore (Adapted from oh-my-pi parallel.ts)
@@ -773,7 +774,7 @@ const MAX_HISTORY_ITEMS = 120;
 export class SubAgentManager {
   private subagents = new Map<string, SubAgentItem>();
   private abortControllers = new Map<string, AbortController>();
-  private childAgents = new Map<string, ConstAgent>();
+  private childAgents = new Map<string, CodingAgentRuntime>();
   private executionPromises = new Map<string, Promise<void>>();
   private sessionSemaphores = new Map<string, Semaphore>();
   private sessionTakenNames = new Map<string, Set<string>>();
@@ -1179,9 +1180,10 @@ export class SubAgentManager {
           externalToolHandler: agentDef.readOnly ? undefined : context.parentConfig.externalToolHandler,
           nativeCapabilityEnabled: context.parentConfig.nativeCapabilityEnabled,
           deferNativeTools: context.parentConfig.deferNativeTools,
+          createChildAgent: context.parentConfig.createChildAgent,
         };
 
-        const childAgent = new ConstAgent(childConfig);
+        const childAgent = childConfig.createChildAgent?.(childConfig) ?? new ConstAgent(childConfig);
         this.childAgents.set(item.id, childAgent);
 
         // CRITICAL FIX 1: Wire abortController directly to childAgent.abort()
@@ -1667,6 +1669,7 @@ export async function executeSpawnAgent(
           globalSubAgentManager.waitForSubAgent(s.item.id, callbacks?.signal, conversationId)
         )
       );
+      callbacks?.signal?.throwIfAborted();
     }
 
     const envelopes: string[] = [];
@@ -1770,8 +1773,11 @@ export async function executeSpawnAgent(
   }
 
   // Foreground (default): wait for subagent to finish and return its findings directly
-  const settled =
-    (await globalSubAgentManager.waitForSubAgent(agent.id, callbacks?.signal)) || agent;
+  const settled = await globalSubAgentManager.waitForSubAgent(agent.id, callbacks?.signal, conversationId);
+  callbacks?.signal?.throwIfAborted();
+  if (!settled || settled.status === "running") {
+    return { result: "The subagent did not return a finished result.", isError: true, agentId: agent.id };
+  }
   const durationSec = Math.round(
     ((settled.endTime || Date.now()) - settled.startTime) / 1000
   );

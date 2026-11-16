@@ -19,7 +19,6 @@ import type {
   AgentMessage,
   ToolCall,
   ApprovalDecision,
-  ApprovalRequestData,
   ApprovalResponseData,
   NativeToolDefinition,
   AgentOutcome,
@@ -29,10 +28,7 @@ import {
   CONST_DEFAULT_TOOLS,
   CONST_LEARN_TOOLS,
   executeNativeTool,
-  extractCommandArg,
   extractPathArg,
-  resolveSafePath,
-  isPathWithinWorkspace,
 } from "./tools.js";
 import { globalSubAgentManager, formatTaskResultEnvelope } from "./subagent.js";
 import {
@@ -41,7 +37,8 @@ import {
 } from "./token-meter.js";
 import { trackLlmRequest } from "./request-telemetry.js";
 import { DEFAULT_MODELS } from "./models.js";
-import { getToolActionKind, normalizeToolName } from "./tool-policy.js";
+import { normalizeToolName } from "./tool-policy.js";
+import { ToolAuthorization } from "./tool-authorization.js";
 import { appendToolObservations, disableToolObservationImages, imageContentForModel, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 import { buildToolGuidance, LANGUAGE_GUIDANCE, TASK_SCOPE_GUIDANCE, promptFileExcerpt, RESPONSE_RECOVERY_GUIDANCE, TRUNCATED_RESPONSE_GUIDANCE } from "./prompt-guidance.js";
 
@@ -697,8 +694,7 @@ export class ConstAgent {
   private isRunning = false;
   private _isCancelled = false;
   private cancelSource: "user" | "shutdown" | "parent" | "unknown" = "unknown";
-  private pendingApprovals = new Map<string, (response: ApprovalResponseData) => void>();
-  private sessionAllowedTools = new Set<string>();
+  private readonly authorization: ToolAuthorization;
 
   constructor(config: AgentConfig) {
     this.config = {
@@ -706,35 +702,19 @@ export class ConstAgent {
       workspacePath: process.cwd(),
       ...config,
     };
-    if (config.initialAllowedTools) {
-      for (const item of config.initialAllowedTools) {
-        if (item) this.sessionAllowedTools.add(item.includes(":") || item === "file_mutations" ? item : normalizeToolName(item));
-      }
-    }
+    this.authorization = new ToolAuthorization(this.config);
   }
 
   public get sessionAllowedToolsSet(): Set<string> {
-    return new Set(this.sessionAllowedTools);
+    return this.authorization.sessionAllowedToolsSet;
   }
 
-  public get mode(): "request_review" | "ask_before_changes" | "full_access" {
-    return this.config.mode || "ask_before_changes";
+  public get mode(): NonNullable<AgentConfig["mode"]> {
+    return this.authorization.mode;
   }
 
-  public updateMode(newMode: "request_review" | "ask_before_changes" | "full_access"): void {
-    this.config.mode = newMode;
-    if (newMode === "full_access") {
-      // Auto-resolve any pending approvals immediately so execution proceeds
-      for (const [id, resolver] of this.pendingApprovals.entries()) {
-        try {
-          resolver({
-            approvalId: id,
-            decision: "allow_once",
-          });
-        } catch {}
-      }
-      this.pendingApprovals.clear();
-    }
+  public updateMode(newMode: NonNullable<AgentConfig["mode"]>): void {
+    this.authorization.updateMode(newMode);
   }
 
   public get isCancelled(): boolean {
@@ -742,14 +722,7 @@ export class ConstAgent {
   }
 
   public resolveApproval(approvalId: string, response: ApprovalResponseData): boolean {
-    if (response.approvalId !== approvalId) return false;
-    const resolver = this.pendingApprovals.get(approvalId);
-    if (resolver) {
-      this.pendingApprovals.delete(approvalId);
-      resolver(response);
-      return true;
-    }
-    return false;
+    return this.authorization.resolveApproval(approvalId, response);
   }
 
   public get maxTurns(): number {
@@ -767,9 +740,7 @@ export class ConstAgent {
       ...metadata,
     });
     if (metadata) {
-      for (const [approvalId, resolve] of this.pendingApprovals) {
-        resolve({ approvalId, decision: "deny", feedback: "A new instruction arrived; reconsider this action before proceeding." });
-      }
+      this.authorization.denyPending("A new instruction arrived; reconsider this action before proceeding.");
     }
     return true;
   }
@@ -788,16 +759,7 @@ export class ConstAgent {
         globalSubAgentManager.killAllRunningSubAgents(undefined, this.config.conversationId);
       }
     } catch {}
-    for (const [id, resolver] of this.pendingApprovals.entries()) {
-      try {
-        resolver({
-          approvalId: id,
-          decision: "deny",
-          feedback: "Agent execution was cancelled by user.",
-        });
-      } catch {}
-    }
-    this.pendingApprovals.clear();
+    this.authorization.denyPending("Agent execution was cancelled by user.");
     this.isRunning = false;
   }
 
@@ -1749,269 +1711,23 @@ export class ConstAgent {
             args: parsedArgs,
           });
 
-          // Check for Approval in "ask_before_changes" mode for terminal / shell execution, python execution, and file mutations
-          const toolLower = normalizeToolName(tc.function.name);
-          const actionKind = getToolActionKind(tc.function.name);
-          const isTerminalTool = actionKind === "terminal";
-          const isPythonTool = actionKind === "python";
-          const isFileMutationTool = actionKind === "file_mutation";
-          const isExternalTool = tc.function.name.startsWith("mcp_");
-          const externalDefinition = activeTools.find((tool) => tool.function.name === tc.function.name);
+          const { allowOutsideWorkspace, waitingMs, rejection } = await this.authorization.authorize(
+            tc, parsedArgs, workspacePath,
+            activeTools.find(tool => tool.function.name === tc.function.name), signal, onEvent,
+          );
+          if (rejection) {
+            onEvent({ type: "tool_result", toolCallId: tc.id, toolName: tc.function.name, result: rejection.text, durationMs: 0, waitingMs, isError: true });
+            conversationHistory.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: rejection.text, timestamp: Date.now() });
+            recordToolCall({ name: tc.function.name, argsHash, isError: true });
+            if (rejection.decision === "skip") continue;
 
-          let cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
-          let targetCwd = workspacePath;
-          let description = isExternalTool ? `Call connected tool: ${tc.function.name}` : "";
-          let isOutside = false;
-          let targetFilePath = "";
-
-          let diffStats: { added: number; removed: number } | undefined = undefined;
-          let fileName = "";
-          let dirPath = "";
-
-          if (isTerminalTool) {
-            const rawCwd = parsedArgs.cwd || parsedArgs.working_directory || parsedArgs.workdir || parsedArgs.path;
-            targetCwd = rawCwd ? path.resolve(workspacePath, rawCwd) : workspacePath;
-            description = `Execute terminal command: ${cmd || tc.function.name}`;
-          } else if (isPythonTool) {
-            const pyCode =
-              (typeof parsedArgs.code === "string" ? parsedArgs.code : "") ||
-              (typeof parsedArgs.script === "string" ? parsedArgs.script : "") ||
-              (typeof parsedArgs.python_code === "string" ? parsedArgs.python_code : "");
-            cmd = pyCode ? (pyCode.length > 80 ? pyCode.slice(0, 77) + "..." : pyCode) : "run_python";
-            targetCwd = workspacePath;
-            description = `Execute Python script: ${cmd}`;
-          } else if (isFileMutationTool) {
-            targetFilePath = extractPathArg(parsedArgs) || "";
-            const resolvedPath = resolveSafePath(targetFilePath, workspacePath);
-            isOutside = !isPathWithinWorkspace(resolvedPath, workspacePath);
-            cmd = `${tc.function.name}: ${targetFilePath || "file"}`;
-            targetCwd = workspacePath;
-            description = `Modify file: ${targetFilePath || tc.function.name}`;
-
-            const cleanRelPath = isOutside
-              ? targetFilePath
-              : path.relative(workspacePath, resolvedPath).replace(/\\/g, "/");
-            fileName = cleanRelPath.split("/").filter(Boolean).pop() || targetFilePath;
-            dirPath = cleanRelPath.split("/").slice(0, -1).join("/");
-            if (dirPath) dirPath = `${dirPath}/`;
-
-            // Compute added / removed lines estimate
-            if (toolLower === "write" || toolLower === "writefile") {
-              const codeStr = parsedArgs.CodeContent || parsedArgs.code || parsedArgs.content || "";
-              const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
-              diffStats = { added: lineCount, removed: 0 };
-            } else if (toolLower === "replaceinfile") {
-              const rep = typeof parsedArgs.ReplacementContent === "string" ? parsedArgs.ReplacementContent.split("\n").length : 1;
-              const tar = typeof parsedArgs.TargetContent === "string" ? parsedArgs.TargetContent.split("\n").length : 1;
-              diffStats = { added: rep, removed: tar };
-            } else if (toolLower === "edit" || toolLower === "editfile") {
-              const codeStr = parsedArgs.code || parsedArgs.content || "";
-              const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
-              diffStats = { added: lineCount, removed: 0 };
+            for (const skipped of toolCalls.slice(tcIdx + 1)) {
+              const result = "[ACTION CANCELLED]: An earlier action in this batch was rejected by the user. Replan using their feedback before proposing further actions.";
+              onEvent({ type: "tool_result", toolCallId: skipped.id, toolName: skipped.function.name, result, isError: true });
+              conversationHistory.push({ role: "tool", tool_call_id: skipped.id, name: skipped.function.name, content: result, timestamp: Date.now() });
             }
+            break;
           }
-
-          const isAlreadyAllowed =
-            this.sessionAllowedTools.has(toolLower) ||
-            (isFileMutationTool && this.sessionAllowedTools.has("file_mutations") && !isOutside) ||
-            Boolean(
-              targetFilePath &&
-                (this.sessionAllowedTools.has(`file:${targetFilePath}`) ||
-                  this.sessionAllowedTools.has(`file:${resolveSafePath(targetFilePath, workspacePath)}`))
-            ) ||
-            Boolean(cmd && this.sessionAllowedTools.has(`cmd:${cmd.trim()}`));
-
-          // Mode behavior:
-          // In "request_review", EVERY action (including file edits inside workspace) requires approval.
-          // In "ask_before_changes", file mutations INSIDE workspace proceed without interruption,
-          // while terminal executions, Python executions, and out-of-workspace writes require approval.
-          const isRequestReview = this.config.mode === "request_review";
-          const requiresApproval =
-            (isExternalTool && externalDefinition?.requiresApproval !== false) || (isRequestReview
-              ? isTerminalTool || isPythonTool || isFileMutationTool
-              : this.config.mode === "ask_before_changes" && (isTerminalTool || isPythonTool || (isFileMutationTool && isOutside)));
-
-          let approvedThisTurn = false;
-          let waitingMs = 0;
-
-          if ((isRequestReview || this.config.mode === "ask_before_changes") && requiresApproval && !isAlreadyAllowed) {
-            const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-            const approvalReq: ApprovalRequestData = {
-              approvalId,
-              toolCallId: tc.id,
-              toolName: tc.function.name,
-              args: parsedArgs,
-              command: cmd,
-              cwd: targetCwd,
-              description,
-              createdAt: Date.now(),
-              targetFile: fileName || undefined,
-              filePath: targetFilePath || undefined,
-              dirPath: dirPath || undefined,
-              diffStats,
-              isMutation: isFileMutationTool,
-            };
-
-            // Wait for user approval or abort signal
-            const approvalStartedAt = Date.now();
-            const userResponse = await new Promise<ApprovalResponseData>((resolve, reject) => {
-              const onAbort = () => {
-                this.pendingApprovals.delete(approvalId);
-                reject(new Error("Operation cancelled"));
-              };
-
-              if (signal.aborted) {
-                return reject(new Error("Operation cancelled"));
-              }
-              signal.addEventListener("abort", onAbort, { once: true });
-
-              this.pendingApprovals.set(approvalId, (res) => {
-                this.pendingApprovals.delete(approvalId);
-                signal.removeEventListener("abort", onAbort);
-                resolve(res);
-              });
-
-              // Register first: subscribers may respond or change mode synchronously.
-              try {
-                onEvent({
-                  type: "status",
-                  status: "waiting_approval",
-                  message: `Waiting for approval: ${description || cmd || tc.function.name}`,
-                });
-                if (!this.pendingApprovals.has(approvalId)) return;
-                onEvent({
-                  type: "approval_request",
-                  id: approvalId,
-                  approval: approvalReq,
-                  ...approvalReq,
-                });
-              } catch (error) {
-                this.pendingApprovals.delete(approvalId);
-                signal.removeEventListener("abort", onAbort);
-                reject(error);
-              }
-            });
-
-            onEvent({
-              type: "approval_resolved",
-              approvalId,
-              decision: userResponse.decision,
-            });
-
-            waitingMs += Date.now() - approvalStartedAt;
-            if (signal.aborted || this._isCancelled) {
-              throw new Error("User cancelled agent execution.");
-            }
-
-            if (userResponse.decision === "full_access") {
-              this.updateMode("full_access");
-              approvedThisTurn = true;
-            } else if (
-              userResponse.decision === "allow_always" ||
-              userResponse.decision === "allow_conversation" ||
-              userResponse.decision === "allow_project"
-            ) {
-              approvedThisTurn = true;
-              if (isFileMutationTool) {
-                this.sessionAllowedTools.add(toolLower);
-                if (targetFilePath) {
-                  this.sessionAllowedTools.add(`file:${targetFilePath}`);
-                  this.sessionAllowedTools.add(`file:${resolveSafePath(targetFilePath, workspacePath)}`);
-                }
-                if (!isOutside) {
-                  this.sessionAllowedTools.add("file_mutations");
-                }
-              } else if (isPythonTool) {
-                this.sessionAllowedTools.add(toolLower);
-                if (cmd && cmd.trim()) this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
-              } else if (cmd && cmd.trim()) {
-                this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
-                this.sessionAllowedTools.add(toolLower);
-              } else {
-                this.sessionAllowedTools.add(toolLower);
-              }
-            } else if (userResponse.decision === "allow_once") {
-              approvedThisTurn = true;
-            } else if (userResponse.decision === "deny") {
-              const feedbackText = userResponse.feedback?.trim();
-              const actionSubject = isFileMutationTool
-                ? `file mutation: '${targetFilePath || "file"}'`
-                : isPythonTool
-                ? `Python execution`
-                : `command: '${cmd}'`;
-              const rejectionMessage = feedbackText
-                ? `[ACTION REJECTED BY USER]: The user denied permission to execute ${actionSubject}. User instruction / feedback: "${feedbackText}". Adapt your plan immediately based on this instruction and proceed without running that action.`
-                : `[ACTION REJECTED BY USER]: The user denied permission to execute ${actionSubject}. Do NOT execute this action. Choose a different approach or explain the options clearly.`;
-
-              onEvent({
-                type: "tool_result",
-                toolCallId: tc.id,
-                toolName: tc.function.name,
-                result: rejectionMessage, durationMs: 0, waitingMs: waitingMs,
-                isError: true,
-              });
-
-              conversationHistory.push({
-                role: "tool",
-                tool_call_id: tc.id,
-                name: tc.function.name,
-                content: rejectionMessage,
-                timestamp: Date.now(),
-              });
-
-              recordToolCall({
-                name: tc.function.name,
-                argsHash,
-                isError: true,
-              });
-
-              // A denial invalidates the rest of this model-generated plan. Supply
-              // a result for every pending call before asking the model to replan.
-              for (const skippedTc of toolCalls.slice(tcIdx + 1)) {
-                const result = "[ACTION CANCELLED]: An earlier action in this batch was rejected by the user. Replan using their feedback before proposing further actions.";
-                onEvent({ type: "tool_result", toolCallId: skippedTc.id, toolName: skippedTc.function.name, result, isError: true });
-                conversationHistory.push({ role: "tool", tool_call_id: skippedTc.id, name: skippedTc.function.name, content: result, timestamp: Date.now() });
-              }
-              break;
-            } else if (userResponse.decision === "skip") {
-              const actionSubject = isFileMutationTool
-                ? `file mutation: '${targetFilePath || "file"}'`
-                : isPythonTool
-                ? `Python execution`
-                : `command: '${cmd}'`;
-              const skipMessage = `[ACTION SKIPPED BY USER]: The user skipped execution of ${actionSubject}. Proceed with other tasks or ask the user how to continue.`;
-
-              onEvent({
-                type: "tool_result",
-                toolCallId: tc.id,
-                toolName: tc.function.name,
-                result: skipMessage, durationMs: 0, waitingMs: waitingMs,
-                isError: true,
-              });
-
-              conversationHistory.push({
-                role: "tool",
-                tool_call_id: tc.id,
-                name: tc.function.name,
-                content: skipMessage,
-                timestamp: Date.now(),
-              });
-
-              recordToolCall({
-                name: tc.function.name,
-                argsHash,
-                isError: true,
-              });
-
-              continue;
-            }
-          }
-
-          const allowOutsideWorkspace =
-            !this.config.isolateWorkspace && (this.config.mode === "full_access" ||
-            isAlreadyAllowed ||
-            approvedThisTurn);
 
           const isTaskTool = isSubAgentToolName(tc.function.name);
           const isExplicitBackground = Boolean(
@@ -2325,7 +2041,7 @@ export class ConstAgent {
       if (deadline) clearTimeout(deadline);
       this.isRunning = false;
       this.abortController = null;
-      this.pendingApprovals.clear();
+      this.authorization.denyPending("Agent execution ended.");
       this.steeringQueue = [];
       onEvent({ type: "run_end", runId, outcome, error: terminalError, errorCategory, recovery: lastRecovery,
         ...(outcome === "cancelled" ? { cancelSource: this.cancelSource } : {}) });
