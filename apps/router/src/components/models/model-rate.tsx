@@ -88,7 +88,7 @@ export function OfficialInputComparison({ model }: { model: ModelSpec }) {
 export function OfficialPricingNote() {
   return (
     <>
-      Official rates use the 8 Nov 2026{" "}
+      Official rates use the 19 Nov 2026{" "}
       <a className="underline" href="https://atmorouter.dev/api/dashboard/catalog">
         AtmoRouter catalog
       </a>{" "}

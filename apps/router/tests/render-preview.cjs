@@ -74,7 +74,7 @@ write(
         amountUsd: 0.00001234,
         balanceAfterUsd: 14.30251,
         status: "completed",
-        description: "gpt-6.1-sol usage",
+        description: "gpt-6.2-sol usage",
         requestId: "req_example",
         createdAt: Date.UTC(2026, 9, 25, 0, 0),
       },

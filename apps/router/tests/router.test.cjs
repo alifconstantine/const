@@ -373,13 +373,13 @@ const result = (id, extra = {}) => ({
 test("catalog has no free variants and every chat model has a nonzero rate", () => {
   assert.equal(catalog.BUILTIN_MODELS.filter(m => m.tier === "free").length, 0);
   const llmModels = catalog.BUILTIN_MODELS.filter(m => m.category === "llm");
-  assert.equal(llmModels.length, 21);
+  assert.equal(llmModels.length, 19);
   for (const model of catalog.BUILTIN_MODELS) {
     assert.equal(model.tier, "paid");
     assert.equal(catalog.getManagedModel(model.modelId + ":free"), undefined);
     if (model.category === "llm") assert(catalog.tokenCostNano(model.modelId, 20, 5) > 0);
   }
-  assert.equal(catalog.normalizeConstModelName(standard), "atmo/ali/deepseek-v4.1-flash");
+  assert.equal(catalog.normalizeConstModelName(standard), "atmo/cb/deepseek-v4.1-flash");
 });
 
 test("unauthenticated, revoked, and expired credentials never call the engine", async () => {
@@ -403,7 +403,7 @@ test("unauthenticated, revoked, and expired credentials never call the engine", 
 });
 test("forged free suffix and malformed messages are rejected before dispatch", async () => {
   assert.equal(
-    (await chat.POST(request(body("gpt-6.1-sol:free")))).status,
+    (await chat.POST(request(body("gpt-6.2-sol:free")))).status,
     400,
   );
   assert.equal(
@@ -423,10 +423,10 @@ test("standard model request debits wallet and does not create a weekly quota", 
 });
 
 test("paid request uses actual cached price, settles once, and releases reservation", async () => {
-  const ticket = await gateway.begin.handler(ctx, ticketArgs("gpt-6.1-sol"));
+  const ticket = await gateway.begin.handler(ctx, ticketArgs("gpt-6.2-sol"));
   await gateway.settle.handler(ctx, result(ticket.id));
   await gateway.settle.handler(ctx, result(ticket.id));
-  const expected = catalog.tokenCostNano("gpt-6.1-sol", 20, 5, 4);
+  const expected = catalog.tokenCostNano("gpt-6.2-sol", 20, 5, 4);
   const wallet = await db.get("wallet");
   assert.equal(wallet.balanceNanoUsd, 1e9 - expected);
   assert.equal(wallet.reservedNanoUsd, 0);
@@ -434,10 +434,10 @@ test("paid request uses actual cached price, settles once, and releases reservat
   assert.equal((await db.query("creditTransactions").collect()).length, 1);
 });
 for (const [model, upstream, expectedCostNano] of [
-  ["gpt-6.1-sol", "atmo/cx/gpt-6.1-sol", 24840],
-  ["gpt-6-astra", "atmo/cx/gpt-6-astra", 113850],
-  ["claude-sonnet-5.5", "atmo/cc/claude-sonnet-5-5", 20700],
-  ["minimax-m3.1-flash", "atmo/cbcn/minimax-m3.1-flash", 2184],
+  ["gpt-6.2-sol", "atmo/cx/gpt-6.2-sol", 12420],
+  ["gpt-6.2-astra", "atmo/cx/gpt-6.2-astra", 49680],
+  ["claude-sonnet-5.5", "atmo/cc/claude-sonnet-5-5", 33120],
+  ["minimax-m3.1-flash", "atmo/cb/minimax-m3.1-flash", 819],
 ]) {
   for (const mode of ["API JSON", "API streaming", "playground SSO"]) {
     test(`${model} routes and bills correctly through ${mode}`, async () => {
@@ -479,7 +479,7 @@ for (const [model, upstream, expectedCostNano] of [
 
 test("zero-balance paid requests never reach the engine", async () => {
   await db.patch("wallet", { balanceUsd: 0 });
-  assert.equal((await chat.POST(request(body("gpt-6.1-sol")))).status, 402);
+  assert.equal((await chat.POST(request(body("gpt-6.2-sol")))).status, 402);
   assert.equal(fetches, 0);
 });
 
@@ -489,12 +489,20 @@ test("retired models are absent from discovery and cannot execute while active C
   assert(discovered.some((model) => model.id === "claude-sonnet-5.5" && model.vendor === "anthropic"));
   assert(discovered.some((model) => model.id === "claude-opus-5.5" && model.vendor === "anthropic"));
   assert(discovered.some((model) => model.id === "minimax-m3.1-flash" && model.vendor === "minimax"));
-  assert(discovered.some((model) => model.id === "qwen-3.8-27b" && model.vendor === "qwen"));
+  assert(discovered.some((model) => model.id === "qwen4-max" && model.vendor === "qwen"));
   for (const model of [
     "claude-sonnet-4.6",
     "claude-opus-4.7",
+    "claude-fable-5.1",
     "qwen-3.8-omni-flash",
+    "qwen-3.8-27b",
+    "qwen-3.8-max",
+    "qwen-3.8-2.4t-a95b",
+    "deepseek-v4-pro",
     "kimi-k2.8-preview",
+    "kimi-k3",
+    "gpt-6.1-sol",
+    "gpt-6-astra",
     "minimax-m3",
   ]) {
     assert(!discovered.some((entry) => entry.id === model));
@@ -733,7 +741,7 @@ test("failed upstream calls release held credit without charging the wallet", as
   const origFetch = global.fetch;
   try {
     global.fetch = async () => new Response("Unavailable", { status: 503 });
-    const response = await chat.POST(request(body("gpt-6.1-sol")));
+    const response = await chat.POST(request(body("gpt-6.2-sol")));
     assert.equal(response.status, 503);
     assert.equal((await db.get("wallet")).reservedNanoUsd, 0);
     assert.equal((await db.get("wallet")).balanceUsd, 1);
@@ -1183,14 +1191,14 @@ test("Opus discovery and settlement use the same fixed input, cache, and output 
   const { data } = await response.json();
   const opus = data.find((model) => model.id === "claude-opus-5.5");
   assert.equal(opus.pricing.unit, "USD/token");
-  assert.equal(Number(opus.pricing.prompt), 0.60 / 1e6);
-  assert.equal(Number(opus.pricing.cache), 0.060 / 1e6);
-  assert.equal(Number(opus.pricing.completion), 3.00 / 1e6);
+  assert.equal(Number(opus.pricing.prompt), 1.60 / 1e6);
+  assert.equal(Number(opus.pricing.cache), 0.16 / 1e6);
+  assert.equal(Number(opus.pricing.completion), 8.00 / 1e6);
   assert(!("promo" in opus));
 
   const ticket = await gateway.begin.handler(ctx, ticketArgs(opus.id));
   await gateway.settle.handler(ctx, result(ticket.id));
-  assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - 24840);
+  assert.equal((await db.get("wallet")).balanceNanoUsd, 1e9 - 66240);
 });
 
 test("benchmark snapshot covers every managed chat model", () => {
@@ -1204,7 +1212,7 @@ test("benchmark snapshot covers every managed chat model", () => {
 
 test('per-model maxOutputTokens caps clamp oversized max_tokens before forwarding upstream', async () => {
   for (const [modelId, expectedCap] of [
-    ['kimi-k3', 32000],
+    ['kimi-k3.1-pro', 32000],
     ['glm-5.3-flash', 48000],
     ['gemini-3.8-flash', 65536],
   ]) {

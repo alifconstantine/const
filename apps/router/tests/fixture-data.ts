@@ -25,7 +25,7 @@ export const transactions = [
     amountUsd: 0.000012,
     balanceAfterUsd: 14.30251,
     status: "completed",
-    description: "gpt-6.1-sol usage",
+    description: "gpt-6.2-sol usage",
     requestId: "req_fixture_01",
     createdAt: now - 120_000,
   },
@@ -79,7 +79,7 @@ export const analytics = {
       costUsd: 0,
     },
     {
-      model: "gpt-6.1-sol",
+      model: "gpt-6.2-sol",
       tier: "paid",
       requests: 327,
       tokens: 948_721,
@@ -106,7 +106,7 @@ export const logs = [
   },
   {
     _id: "fixture_log2",
-    model: "gpt-6.1-sol",
+    model: "gpt-6.2-sol",
     totalTokens: 1894,
     status: 200,
     createdAt: now - 240000,

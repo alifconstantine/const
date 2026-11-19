@@ -183,7 +183,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <span>model</span>
-                  <code>gpt-6.1-sol</code>
+                  <code>gpt-6.2-sol</code>
                 </div>
               </div>
             </div>
@@ -215,11 +215,11 @@ export default function HomePage() {
                   </li>
                   <li>
                     <span>Fallback</span>
-                    <code>qwen-3.8-27b</code>
+                    <code>qwen4-max</code>
                   </li>
                   <li>
                     <span>Fallback</span>
-                    <code>gpt-6.1-sol</code>
+                    <code>gpt-6.2-sol</code>
                   </li>
                 </ol>
               </div>

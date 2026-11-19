@@ -47,11 +47,11 @@ async function main() {
             const row = document.querySelector('tr [aria-label="Copy model ID claude-opus-5.5"]').closest('tr');
             const comparison = row.lastElementChild;
             return [comparison.querySelector('[aria-hidden]').textContent, comparison.querySelector('.sr-only').textContent];
-          })()`), ["−85%", "85% lower"]);
+          })()`), ["−60%", "60% lower"]);
           assert.deepEqual(await js(`(() => {
             const row = document.querySelector('tr [aria-label="Copy model ID claude-opus-5.5"]').closest('tr');
             return Array.from(row.cells).slice(2, 5).map(el => el.textContent);
-          })()`), ["Const $0.60Official $4.00", "Const $0.06Official $0.20", "Const $3.00Official $20.00"]);
+          })()`), ["Const $1.60Official $4.00", "Const $0.16Official $0.40", "Const $8.00Official $20.00"]);
           assert.deepEqual(await js(`(() => {
             const row = document.querySelector('tr [aria-label="Copy model ID whisper-large-v3-turbo"]').closest('tr');
             return [row.cells[2].innerText, row.lastElementChild.querySelector('.sr-only').textContent];
@@ -61,7 +61,7 @@ async function main() {
           await setSelect("Provider", "anthropic");
           await wait(`document.querySelectorAll('main article').length === 4`);
           await setSelect("Sort by", "priciest");
-          await wait(`document.querySelector('main article').innerText.startsWith('Claude Fable 5.1')`);
+          await wait(`document.querySelector('main article').innerText.startsWith('Claude Fable 5.2')`);
           await setSelect("Group by", "none");
           await wait(`document.querySelector('main article').closest('section').querySelector('h2') === null`);
           await setSelect("Category", "stt");
@@ -74,7 +74,7 @@ async function main() {
         assert.equal(await js(`document.querySelector('main h1').textContent`), "Benchmark");
         assert.equal(await js(`document.querySelector('.router-navbar') === null && document.querySelector('.router-shell header').textContent.includes('Benchmark')`), true);
         assert.deepEqual(await js(`Array.from(document.querySelectorAll('main thead th')).filter(cell => cell.offsetWidth).map(cell => (cell.querySelector(':scope > span:not([aria-hidden])') ?? cell).textContent.trim())`), width < 1024 ? ["Model", "Intelligence Index", "View"] : ["Model", "Creator", "Intelligence Index", "View"]);
-        assert.equal(await js(`document.querySelectorAll('main tbody tr').length`), 21);
+        assert.equal(await js(`document.querySelectorAll('main tbody tr').length`), 19);
         assert.deepEqual(await js(`(() => {
           const view = document.querySelector('main tbody a[href="https://artificialanalysis.ai/models/claude-opus-5-5"]');
           return Array.from(view.closest('tr').cells).filter(cell => cell.offsetWidth).map(cell => cell.innerText.trim());
@@ -84,22 +84,20 @@ async function main() {
         if (width < 1024) {
           assert.equal(await js(`[...document.querySelectorAll('main select, main tbody a')].every(el => el.offsetWidth >= 44 && el.offsetHeight >= 44)`), true);
         }
-        assert.equal(await js(`Array.from(document.querySelectorAll('main tbody tr')).filter(row => row.cells[2].textContent === 'N/A').length`), 2);
+        assert.equal(await js(`Array.from(document.querySelectorAll('main tbody tr')).filter(row => row.cells[2].textContent === 'N/A').length`), 0);
         const scores = `Array.from(document.querySelectorAll('main tbody tr'), row => row.cells[2].textContent)`;
         const defaultScores = await js(scores);
-        assert.equal(defaultScores[0], "59");
-        assert.deepEqual(defaultScores.slice(-2), ["N/A", "N/A"]);
-        assert.deepEqual(defaultScores, [...defaultScores.slice(0, -2)].sort((a, b) => Number(b) - Number(a)).concat("N/A", "N/A"));
+        assert.equal(defaultScores[0], "65");
+        assert.deepEqual(defaultScores, [...defaultScores].sort((a, b) => Number(b) - Number(a)));
         if (width === 390) {
           await setSelect("Sort by", "lowest");
-          await wait(`(${scores})[0] === "20"`);
-          assert.deepEqual((await js(scores)).slice(-2), ["N/A", "N/A"]);
+          await wait(`(${scores})[0] === "28"`);
           await setSelect("Creator", "Anthropic");
           await wait(`(${scores}).length === 4`);
-          assert.deepEqual(await js(scores), ["36", "49", "55", "59"]);
+          assert.deepEqual(await js(scores), ["36", "55", "59", "65"]);
           await setSelect("Sort by", "name");
-          await wait(`document.querySelector('main tbody tr th').textContent.startsWith('Claude Fable 5.1')`);
-          assert.deepEqual(await js(scores), ["49", "36", "59", "55"]);
+          await wait(`document.querySelector('main tbody tr th').textContent.startsWith('Claude Fable 5.2')`);
+          assert.deepEqual(await js(scores), ["65", "36", "59", "55"]);
         }
         if (width >= 768) {
           assert.equal(await js(`document.querySelector('aside a[aria-current=page]').getAttribute('href')`), "/benchmark");
