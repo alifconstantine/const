@@ -2,7 +2,6 @@ packages:
   - "apps/*"
   - "apps/harness/*"
   - "packages/*"
-  - "packages/session-backends/*"
 allowBuilds:
   '@google/genai': true
   '@openuidev/lang-core': false

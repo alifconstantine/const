@@ -87,13 +87,14 @@ describe("chat stream completion", () => {
     });
     await expect(consumeChatStream(body, () => {}, signal(), 1000, 10)).rejects.toThrow("generation timed out");
   });
-  it("aborts continuous reasoning-only streams at reasoningOnlyMs without waiting for totalMs", async () => {
+  it("aborts continuous reasoning-only streams only when an explicit reasoningOnlyMs cap is configured", async () => {
     let thinker: ReturnType<typeof setInterval>;
+    let step = 0;
     const cancel = vi.fn(() => clearInterval(thinker));
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         thinker = setInterval(() => {
-          controller.enqueue(bytes.encode('data: {"choices":[{"delta":{"reasoning_content":"still thinking "}}]}\n\n'));
+          controller.enqueue(bytes.encode(`data: {"choices":[{"delta":{"reasoning_content":"step ${++step} analyzing architecture "}}]}\n\n`));
         }, 2);
       },
       cancel,
@@ -102,5 +103,21 @@ describe("chat stream completion", () => {
       ReasoningOnlyTimeoutError,
     );
     expect(cancel).toHaveBeenCalledOnce();
+  });
+  it("allows long healthy non-repeating reasoning by default and catches degenerate repeating thinking loops", async () => {
+    // Healthy diverse reasoning completes cleanly without artificial wall-clock cutoff
+    const healthyChunks = Array.from({ length: 40 }, (_, i) =>
+      `data: {"choices":[{"delta":{"reasoning_content":"Step ${i}: designing slider layout metric ${i * 17}px. "}}]}\n\n`,
+    ).join("") + 'data: {"choices":[{"delta":{"content":"Ready."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+    const seen: any[] = [];
+    await consumeChatStream(stream(healthyChunks), (c) => seen.push(c), signal());
+    expect(seen.at(-1)?.choices?.[0]?.delta?.content).toBe("Ready.");
+
+    // Degenerate repeating thinking cycle IS aborted immediately
+    const stuckPhrase = "Confirming safety and verifying completion again. ";
+    const loopChunks = Array.from({ length: 12 }, () =>
+      `data: {"choices":[{"delta":{"reasoning_content":${JSON.stringify(stuckPhrase)}}}]}\n\n`,
+    ).join("");
+    await expect(consumeChatStream(stream(loopChunks), () => {}, signal())).rejects.toThrow("Thinking loop detected");
   });
 });

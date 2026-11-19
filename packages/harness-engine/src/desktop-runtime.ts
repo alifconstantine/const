@@ -28,7 +28,6 @@ import {
   isUnsupportedImageError,
   LANGUAGE_GUIDANCE,
   nativeCapabilityForTool,
-  nativePluginLoader,
   normalizeToolName,
   parseToolArguments,
   PAYLOAD_ERROR_MESSAGE,
@@ -36,6 +35,7 @@ import {
   PROGRESS_REVIEW_GUIDANCE,
   REASONING_RECOVERY_GUIDANCE,
   ReasoningOnlyTimeoutError,
+  registerSubAgentRuntimeFactory,
   REPEATED_FAILURE_GUIDANCE,
   REPEATED_RESULT_GUIDANCE,
   requestBodyBudget,
@@ -67,6 +67,7 @@ import {
   type Model,
   type ToolCall as PiToolCall,
 } from "@earendil-works/pi-ai";
+import { executeToolSearch, resolveHarnessToolDefinitions } from "./tool-registry.js";
 
 const EMPTY_USAGE = {
   input: 0,
@@ -353,6 +354,7 @@ export class PiHarnessAgent implements CodingAgentRuntime {
     const modelInputTypes = this.config.inputTypes ?? DEFAULT_MODELS.find((m) => m.id === this.config.model)?.inputTypes;
     const modelSupportsImages = !modelInputTypes || modelInputTypes.includes("image");
     const loadedNativePlugins = new Set<NativeCapability>();
+    const activatedDeferredTools = new Set<string>();
     let toolVisionUnavailable = false;
     let currentTurn = 0;
     let requestSequence = 0;
@@ -480,23 +482,20 @@ export class PiHarnessAgent implements CodingAgentRuntime {
     const resolveActiveTools = async (signal: AbortSignal): Promise<{
       definitions: NativeToolDefinition[];
       enabledNativePlugins: NativeCapability[];
+      hasBrowserOrComputerTools: boolean;
     }> => {
-      if (isCompanion) return { definitions: [], enabledNativePlugins: [] };
-      const baseTools = this.config.tools ?? CONST_DEFAULT_TOOLS;
-      const enabledNativePlugins = [...new Set(baseTools.map((tool) => nativeCapabilityForTool(tool.function.name)))]
-        .filter((capability): capability is NativeCapability => !!capability && this.config.nativeCapabilityEnabled?.(capability) !== false);
-      const external = await this.config.externalTools?.(signal) ?? [];
-      const definitions = [
-        ...baseTools.filter((tool) => {
-          const capability = nativeCapabilityForTool(tool.function.name);
-          return !capability || (enabledNativePlugins.includes(capability) && (!this.config.deferNativeTools || loadedNativePlugins.has(capability)));
-        }),
-        ...external,
-      ];
-      if (this.config.deferNativeTools && enabledNativePlugins.length > 0) {
-        definitions.push(nativePluginLoader(enabledNativePlugins));
-      }
-      return { definitions, enabledNativePlugins };
+      if (isCompanion) return { definitions: [], enabledNativePlugins: [], hasBrowserOrComputerTools: false };
+      const externalTools = await this.config.externalTools?.(signal) ?? [];
+      return resolveHarnessToolDefinitions({
+        isCompanion,
+        explicitTools: this.config.tools,
+        externalTools,
+        deferNativeTools: this.config.deferNativeTools,
+        nativeCapabilityEnabled: this.config.nativeCapabilityEnabled,
+        loadedNativePlugins,
+        activatedDeferredTools,
+        conversationId: this.config.conversationId,
+      });
     };
 
     const buildPiTools = (
@@ -522,6 +521,13 @@ export class PiHarnessAgent implements CodingAgentRuntime {
 
             const toolStartedAt = Date.now();
             let questionWaitingMs = 0;
+
+            // Handle deferred specialist tool discovery/activation
+            if (name === "tool_search") {
+              const { result, isError } = executeToolSearch(args, activatedDeferredTools);
+              toolMetaByCallId.set(toolCallId, { rawResult: result, durationMs: Date.now() - toolStartedAt, waitingMs: perm.waitingMs, isError });
+              return { content: [{ type: "text", text: result }], details: result, isError };
+            }
 
             // Handle deferred native plugin loader if enabled
             if (name === "load_plugin_tools" && agentConfig.deferNativeTools) {
@@ -570,8 +576,12 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               onFileMutation: (record) => emitEvent({ type: "file_mutation", record, toolCallId }),
               onTodoUpdate: (items) => {
                 const committed = todos.commit(items);
-                if (committed) emitEvent({ type: "todo_update", todos: committed, toolCallId });
+                if (committed) {
+                  if (currentTurnAssistantMsg) currentTurnAssistantMsg.todos = committed;
+                  emitEvent({ type: "todo_update", todos: committed, toolCallId });
+                }
               },
+              currentTodos: () => todos.snapshot(),
               askUser: agentConfig.onAskQuestion
                 ? async (questions) => {
                     const askStart = Date.now();
@@ -666,7 +676,7 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             currentTurn++;
             emitEvent({ type: "status", status: "thinking" });
 
-            const { definitions: activeTools, enabledNativePlugins } = await resolveActiveTools(callSignal);
+            const { definitions: activeTools, enabledNativePlugins, hasBrowserOrComputerTools } = await resolveActiveTools(callSignal);
             activeToolDefinitions = activeTools;
             if (this.activePiAgent) {
               this.activePiAgent.state.tools = buildPiTools(activeTools, enabledNativePlugins);
@@ -794,7 +804,7 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               model: this.config.model,
               messages: formattedMessages,
               ...(requestTools.length ? { tools: requestTools } : {}),
-              ...(activeTools.length > 0 ? { parallel_tool_calls: false } : {}),
+              ...(hasBrowserOrComputerTools ? { parallel_tool_calls: false } : {}),
               stream: true,
               stream_options: { include_usage: true },
               ...(useMaxCompletionTokensOnly
@@ -1100,12 +1110,6 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             payloadRecoveryAttempted = false;
             payloadRecoveryLimit = undefined;
             rejectedPayloadBytes = undefined;
-            consecutivePlanningTurns = 0;
-            consecutiveEmptyRetries = 0;
-            if (reasoningDowngradedForTurn) {
-              effectiveThinkingLevel = this.config.thinkingLevel;
-              reasoningDowngradedForTurn = false;
-            }
 
             if (turnFinishReason === "length" && toolCallsMap.size > 0) {
               toolCallsMap.clear();
@@ -1131,6 +1135,29 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               const declared = new Set(activeTools.map((t) => t.function.name));
               const fallback = extractFallbackToolCalls(turnContent, declared);
               if (fallback.length > 0) rawToolCalls = fallback;
+            }
+
+            const hasActionableOutput = rawToolCalls.length > 0 || turnContent.trim().length > 0;
+            const hasThinking = turnThinking.trim().length > 0;
+            if (hasActionableOutput) {
+              consecutivePlanningTurns = 0;
+              consecutiveEmptyRetries = 0;
+              if (reasoningDowngradedForTurn) {
+                effectiveThinkingLevel = this.config.thinkingLevel;
+                reasoningDowngradedForTurn = false;
+              }
+            } else if (!isCompanion && hasThinking) {
+              if (consecutivePlanningTurns >= 1) {
+                throw new AgentRequestError("Model returned only private reasoning without a response or tool call.", "model");
+              }
+              consecutivePlanningTurns++;
+              const downgraded = downgradeThinkingLevel(effectiveThinkingLevel);
+              if (downgraded && !reasoningDowngradedForTurn) {
+                effectiveThinkingLevel = downgraded;
+                reasoningDowngradedForTurn = true;
+              }
+              recoveryInstruction = REASONING_RECOVERY_GUIDANCE;
+              continue;
             }
 
             // Build Pi AssistantMessage
@@ -1242,6 +1269,17 @@ export class PiHarnessAgent implements CodingAgentRuntime {
         sessionId: this.config.conversationId,
         identity: { attribution: null },
         streamFn,
+        prepareRequest: async (request, signal) => {
+          const effectiveSignal = signal ? AbortSignal.any([runSignal, signal]) : runSignal;
+          const { definitions, enabledNativePlugins } = await resolveActiveTools(effectiveSignal);
+          activeToolDefinitions = definitions;
+          const nextTools = buildPiTools(definitions, enabledNativePlugins);
+          if (this.activePiAgent) this.activePiAgent.state.tools = nextTools;
+          return { context: { ...request.context, tools: nextTools } };
+        },
+        prepareNextTurnWithContext: ({ context }) => ({
+          context: { ...context, tools: this.activePiAgent?.state.tools ?? context.tools },
+        }),
         beforeToolCall: async ({ assistantMessage, toolCall, args: validatedArgs }, signal) => {
           const effectiveSignal = signal ? AbortSignal.any([runSignal, signal]) : runSignal;
           if (effectiveSignal.aborted || this._isCancelled) {
@@ -1527,3 +1565,6 @@ export class PiHarnessAgent implements CodingAgentRuntime {
 export function createPiHarnessAgent(config: AgentConfig): PiHarnessAgent {
   return new PiHarnessAgent(config);
 }
+
+// Route all spawned `task` subagents through Pi Core as well for a single unified engine.
+registerSubAgentRuntimeFactory(createPiHarnessAgent);

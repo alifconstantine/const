@@ -1,10 +1,39 @@
-/** Raised when a model streams only private reasoning for too long without producing text or tool calls. */
+/** Raised when a model enters a degenerate repeating reasoning loop or hits an explicit caller reasoning cap. */
 export class ReasoningOnlyTimeoutError extends Error {
   readonly isReasoningOnlyTimeout = true;
-  constructor(message = "Model spent too long reasoning without producing output or tool calls.") {
+  constructor(message = "Model reasoning entered a repetitive loop without producing output or tool calls.") {
     super(message);
     this.name = "ReasoningOnlyTimeoutError";
   }
+}
+
+/**
+ * Detect genuine runaway repetition in private reasoning (inspired by oh-my-pi's `thinking-loop.ts`).
+ * Healthy deep thinking on large prompts is never cut off by wall-clock time; only byte-identical
+ * repeating tail cycles (e.g. a model stuck repeating the same phrase/paragraph over and over) trip this guard.
+ */
+function hasDegenerateThinkingCycle(tail: string): boolean {
+  const len = tail.length;
+  if (len < 180) return false;
+  const maxUnit = Math.min(1024, Math.floor(len / 3));
+  for (let unit = 12; unit <= maxUnit; unit++) {
+    const pattern = tail.slice(len - unit);
+    let repeats = 1;
+    let pos = len - unit * 2;
+    while (pos >= 0 && tail.slice(pos, pos + unit) === pattern) {
+      repeats++;
+      pos -= unit;
+    }
+    const repeatedChars = repeats * unit;
+    const spansLineBreak = pattern.includes("\n");
+    if (!spansLineBreak && unit <= 60 && repeats >= 4 && repeatedChars >= 180) {
+      return true;
+    }
+    if (repeats >= 3 && repeatedChars >= 1024) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Consume OpenAI-compatible SSE without treating a dropped connection as success. */
@@ -12,10 +41,10 @@ export async function consumeChatStream(
   body: ReadableStream<Uint8Array>,
   onChunk: (chunk: any) => void,
   signal: AbortSignal,
-  idleMs = 35_000,
-  totalMs = 600_000,
-  firstTokenMs = Math.min(totalMs, Math.max(idleMs * 2, 75_000)),
-  reasoningOnlyMs = Math.min(totalMs, 90_000),
+  idleMs = 60_000,
+  totalMs = 900_000,
+  firstTokenMs = Math.min(totalMs, Math.max(idleMs * 2, 120_000)),
+  reasoningOnlyMs = 0,
 ) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -27,6 +56,8 @@ export async function consumeChatStream(
   let firstTokenExpired = false;
   let semanticStalled = false;
   let reasoningOnlyExpired = false;
+  let thinkingTail = "";
+  let thinkingCharsSinceScan = 0;
   const deadline = new AbortController();
   const totalTimer = setTimeout(() => deadline.abort(), totalMs);
   let firstTokenTimer: ReturnType<typeof setTimeout> | undefined =
@@ -47,7 +78,7 @@ export async function consumeChatStream(
           }
         }, reasoningOnlyMs)
       : undefined;
-  const semanticIdleMs = Math.max(idleMs * 3, 120_000);
+  const semanticIdleMs = Math.max(idleMs * 3, 180_000);
   let semanticTimer: ReturnType<typeof setTimeout> | undefined;
   const resetSemanticTimer = () => {
     if (semanticTimer) clearTimeout(semanticTimer);
@@ -61,6 +92,7 @@ export async function consumeChatStream(
   const markVisibleOutput = () => {
     if (hasVisibleOutput) return;
     hasVisibleOutput = true;
+    thinkingTail = "";
     if (reasoningOnlyTimer) {
       clearTimeout(reasoningOnlyTimer);
       reasoningOnlyTimer = undefined;
@@ -104,15 +136,24 @@ export async function consumeChatStream(
         (delta.content ||
           (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0)),
     );
-    const hasReasoningDelta = Boolean(
+    const reasoningText =
       delta &&
-        (delta.reasoning_content ||
-          delta.reasoning ||
-          delta.thought ||
-          delta.thinking),
-    );
+      (delta.reasoning_content ||
+        delta.reasoning ||
+        delta.thought ||
+        (typeof delta.thinking === "string" ? delta.thinking : ""));
+    const hasReasoningDelta = Boolean(reasoningText);
     if (hasFinish || hasActionableDelta) {
       markVisibleOutput();
+    } else if (hasReasoningDelta && !hasVisibleOutput) {
+      thinkingTail = (thinkingTail + reasoningText).slice(-4096);
+      thinkingCharsSinceScan += reasoningText.length;
+      if (thinkingCharsSinceScan >= 128) {
+        thinkingCharsSinceScan = 0;
+        if (hasDegenerateThinkingCycle(thinkingTail)) {
+          throw new ReasoningOnlyTimeoutError("Thinking loop detected: model repeated identical reasoning cycles without producing output.");
+        }
+      }
     }
     if (chunk.usage || hasFinish || hasActionableDelta || hasReasoningDelta) {
       markSemanticProgress();

@@ -86,6 +86,7 @@ export interface ExecuteToolOptions {
   conversationId?: string;
   onFileMutation?: (record: FileMutationRecord) => void;
   onTodoUpdate?: (todos: TodoItem[]) => void;
+  currentTodos?: () => TodoItem[] | undefined;
   askUser?: (questions: QuestionItem[]) => Promise<any>;
   onTaskStarted?: (task: BackgroundTaskItem) => void;
   onTaskStopped?: (taskId: string, code: number | null) => void;
@@ -1517,7 +1518,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "edit",
       description:
-        "Preferred tool for partial changes to existing files: replace an exact existing text substring (old_content) with new content (new_content), preserving all other content. Read the current file first. Automatically normalizes CRLF/LF line endings.",
+        "Preferred tool for partial edits to existing files. Replace an exact substring (old_content -> new_content) or apply an atomic batch via edits[]. Read the file first; CRLF/LF normalized automatically.",
       parameters: {
         type: "object",
         properties: {
@@ -1527,14 +1528,31 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
           old_content: {
             type: "string",
-            description: "The exact existing text chunk to find and replace.",
+            description: "Exact existing text to replace (single-edit mode).",
           },
           new_content: {
             type: "string",
-            description: "The new text chunk to insert as replacement.",
+            description: "Replacement text (single-edit mode).",
+          },
+          allow_multiple: {
+            type: "boolean",
+            description: "Allow replacing all occurrences of old_content.",
+          },
+          edits: {
+            type: "array",
+            description: "Optional atomic list of edits applied in order.",
+            items: {
+              type: "object",
+              properties: {
+                old_content: { type: "string" },
+                new_content: { type: "string" },
+                allow_multiple: { type: "boolean" },
+              },
+              required: ["old_content", "new_content"],
+            },
           },
         },
-        required: ["path", "old_content", "new_content"],
+        required: ["path"],
       },
     },
   },
@@ -1750,33 +1768,38 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "todo_write",
       description:
-        "Update the active task checklist to track plan progress. Replace the entire list on each update. Set status as 'pending', 'in_progress', or 'completed'.",
+        "Track task progress. Pass 'todos' to replace the full list, or use granular 'operation' ('add' | 'update' | 'remove' | 'clear' | 'view') to modify individual items without rewriting the whole plan.",
       parameters: {
         type: "object",
         properties: {
+          operation: {
+            type: "string",
+            enum: ["replace", "add", "update", "remove", "clear", "view"],
+            description: "Optional granular operation (defaults to 'replace' when 'todos' is passed).",
+          },
+          id: { type: "string", description: "Target item ID (or exact content) for 'update'/'remove', or stable ID for 'add'." },
+          content: { type: "string", description: "Task description for 'add' or updated text for 'update'." },
+          phase: { type: "string", description: "Optional phase name." },
+          status: {
+            type: "string",
+            enum: ["pending", "in_progress", "completed"],
+            description: "Status for 'add' or 'update'.",
+          },
           todos: {
             type: "array",
-            description: "The complete updated list of todos.",
+            description: "Full list of todos (for 'replace' / default mode).",
             items: {
               type: "object",
               properties: {
-                content: {
-                  type: "string",
-                  description: "Concise description of the task or milestone.",
-                },
-                id: { type: "string", description: "Stable ID for this item across updates, when available." },
-                phase: { type: "string", description: "Optional name of the phase that contains this item." },
-                status: {
-                  type: "string",
-                  enum: ["pending", "in_progress", "completed"],
-                  description: "Status of this task item.",
-                },
+                content: { type: "string" },
+                id: { type: "string" },
+                phase: { type: "string" },
+                status: { type: "string", enum: ["pending", "in_progress", "completed"] },
               },
               required: ["content", "status"],
             },
           },
         },
-        required: ["todos"],
       },
     },
   },
@@ -2200,106 +2223,35 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "task",
       description:
-        "Delegate work to one or more isolated subagents. Supports single-task mode ('task') or parallel batch mode ('context' + 'tasks[]'). Runs synchronously in the foreground by default and returns <task-result> envelopes with complete findings while streaming live progress to the UI.\nAvailable specialist personas:\n- 'scout': Fast READ-ONLY codebase researcher for pattern search and architectural tracing.\n- 'reviewer': READ-ONLY code review specialist for logic correctness, regressions, and cross-boundary verification.\n- 'security-reviewer': READ-ONLY security specialist for vulnerability & source-to-sink auditing.\n- 'task': General-purpose worker with full read/write/edit/terminal capabilities (default).\n- 'sonic': High-speed worker for quick mechanical edits or targeted updates.\n(Also supports custom agents defined in .const/agents/*.md or .omp/agents/*.md).",
+        "Delegate work to isolated subagents (single via 'task' or parallel batch via 'context' + 'tasks[]'). Personas: 'scout' (read-only research), 'reviewer' (read-only code review), 'security-reviewer' (read-only security), 'task' (full worker, default), 'sonic' (fast targeted edits).",
       parameters: {
         type: "object",
         properties: {
-          context: {
-            type: "string",
-            description:
-              "Optional shared background context, architectural contracts, or interfaces prepended to all spawned subagents (recommended when spawning a batch via 'tasks').",
-          },
+          task: { type: "string", description: "Self-contained instructions and acceptance criteria (single mode)." },
+          agent: { type: "string", description: "Persona: 'scout' | 'reviewer' | 'security-reviewer' | 'task' | 'sonic' or custom." },
+          name: { type: "string", description: "Short label/handle." },
+          context: { type: "string", description: "Shared background context for parallel 'tasks[]'." },
           tasks: {
             type: "array",
-            description:
-              "Optional array of subagent tasks to spawn concurrently in parallel batch mode (up to 5 concurrent).",
+            description: "Parallel batch of subagent tasks (up to 5 concurrent).",
             items: {
               type: "object",
               properties: {
-                task: {
-                  type: "string",
-                  description:
-                    "Self-contained task instructions (# Target files, # Change steps, # Acceptance criteria).",
-                },
-                assignment: {
-                  type: "string",
-                  description:
-                    "Alias for 'task': self-contained task assignment instructions.",
-                },
-                agent: {
-                  type: "string",
-                  description:
-                    "Specialist persona: 'scout', 'reviewer', 'security-reviewer', 'task', 'sonic', or custom agent name. Default: 'task'.",
-                },
-                name: {
-                  type: "string",
-                  description:
-                    "Short CamelCase or descriptive handle (e.g. 'AuthAudit', 'Sub-agent 1: Hero Section'). Auto-generated if omitted.",
-                },
-                id: {
-                  type: "string",
-                  description: "Alias for 'name' (short CamelCase task identifier).",
-                },
-                description: {
-                  type: "string",
-                  description: "Short human-readable summary of what this subagent does.",
-                },
-                solution_space: {
-                  type: "string",
-                  description:
-                    "Optional brief note on how open-ended the problem is (e.g. 'one fix: rename prop' vs 'race condition cause open').",
-                },
-                effort: {
-                  type: "string",
-                  enum: ["lo", "med", "hi"],
-                  description: "Optional reasoning effort override ('lo', 'med', 'hi').",
-                },
-                model: {
-                  type: "string",
-                  description: "Optional model ID override for this subagent.",
-                },
-                run_in_background: {
-                  type: "boolean",
-                  description:
-                    "If true, launches in background and returns immediately. Use 'wait' to collect results.",
-                },
+                task: { type: "string" },
+                assignment: { type: "string" },
+                agent: { type: "string" },
+                name: { type: "string" },
+                id: { type: "string" },
+                description: { type: "string" },
+                effort: { type: "string", enum: ["lo", "med", "hi"] },
+                model: { type: "string" },
+                run_in_background: { type: "boolean" },
               },
             },
           },
-          task: {
-            type: "string",
-            description:
-              "Complete, self-contained instructions and acceptance criteria when spawning a single subagent.",
-          },
-          agent: {
-            type: "string",
-            description:
-              "The specialist subagent persona to spawn: 'scout' (read-only research), 'reviewer' (code review), 'security-reviewer' (security audit), 'task' (general worker), or 'sonic' (fast worker). Default: 'task'.",
-          },
-          name: {
-            type: "string",
-            description:
-              "Optional short identifier or label for this task (e.g. 'AuthAudit', 'Sub-agent 1: Navbar'). Auto-generated if omitted.",
-          },
-          solution_space: {
-            type: "string",
-            description:
-              "Optional brief description of how open-ended the problem is (guides subagent thinking effort).",
-          },
-          effort: {
-            type: "string",
-            enum: ["lo", "med", "hi"],
-            description: "Optional reasoning effort override ('lo', 'med', 'hi').",
-          },
-          model: {
-            type: "string",
-            description: "Optional model ID override for this subagent.",
-          },
-          run_in_background: {
-            type: "boolean",
-            description:
-              "If true, runs the subagent in the background without blocking. Call 'wait' to await completion. Default is false.",
-          },
+          effort: { type: "string", enum: ["lo", "med", "hi"], description: "Reasoning effort override." },
+          model: { type: "string", description: "Model ID override." },
+          run_in_background: { type: "boolean", description: "Run without blocking; collect via 'wait'." },
         },
       },
     },
@@ -6007,6 +5959,7 @@ async function executeNativeToolUnlocked(
         };
       }
 
+      const batchEdits = Array.isArray(args.edits) && args.edits.length > 0 ? args.edits : null;
       const oldContent =
         args.old_content ??
         args.oldContent ??
@@ -6023,9 +5976,9 @@ async function executeNativeToolUnlocked(
         args.replacement_content ??
         "";
 
-      if (!oldContent) {
+      if (!batchEdits && !oldContent) {
         return {
-          result: "Error: Missing 'old_content' parameter to replace.",
+          result: "Error: Missing 'old_content' (or 'edits[]') parameter to replace.",
           isError: true,
         };
       }
@@ -6037,19 +5990,40 @@ async function executeNativeToolUnlocked(
         ? filePath
         : path.relative(workspacePath, filePath);
 
-      const editResult = performFuzzyEdit(fileText, oldContent, newContent, {
-        allowMultiple: args.allow_multiple === true || args.allowMultiple === true,
-      });
+      const ops = batchEdits
+        ? batchEdits.map((entry: any) => ({
+            oldContent: entry?.old_content ?? entry?.oldContent ?? entry?.old_text ?? entry?.old_string ?? "",
+            newContent: entry?.new_content ?? entry?.newContent ?? entry?.new_text ?? "",
+            allowMultiple: entry?.allow_multiple === true || entry?.allowMultiple === true,
+          }))
+        : [{
+            oldContent,
+            newContent,
+            allowMultiple: args.allow_multiple === true || args.allowMultiple === true,
+          }];
 
-      if (!editResult.success || !editResult.resultText) {
-        const totalLines = fileText.split(/\r?\n/).length;
-        return {
-          result: `[EDIT FAILED]: Could not edit '${path.basename(filePath)}' (${totalLines} lines).\nReason: ${editResult.error || "'old_content' not found in file."}\nAction Required: Use the 'read' tool to inspect the latest file contents around your target area before attempting another edit.`,
-          isError: true,
-        };
+      let workingText = fileText;
+      let totalReplacements = 0;
+      const matchTypes: string[] = [];
+      for (let i = 0; i < ops.length; i++) {
+        const op = ops[i]!;
+        const editResult = performFuzzyEdit(workingText, op.oldContent, op.newContent, {
+          allowMultiple: op.allowMultiple,
+        });
+        if (!editResult.success || editResult.resultText === undefined) {
+          const totalLines = workingText.split(/\r?\n/).length;
+          const prefix = ops.length > 1 ? `Edit #${i + 1}/${ops.length} failed (no changes written). ` : "";
+          return {
+            result: `[EDIT FAILED]: Could not edit '${path.basename(filePath)}' (${totalLines} lines).\nReason: ${prefix}${editResult.error || "'old_content' not found in file."}\nAction Required: Use the 'read' tool to inspect the latest file contents around your target area before attempting another edit.`,
+            isError: true,
+          };
+        }
+        workingText = editResult.resultText;
+        totalReplacements += editResult.replacementsCount || 1;
+        if (editResult.matchType) matchTypes.push(editResult.matchType);
       }
 
-      await fs.writeFile(filePath, editResult.resultText, "utf-8");
+      await fs.writeFile(filePath, workingText, "utf-8");
 
       notifyFileMutation(
         {
@@ -6060,14 +6034,14 @@ async function executeNativeToolUnlocked(
           filePath: filePath,
           targetFile: editDisplayPath || filePath,
           previousContent: fileText,
-          newContent: editResult.resultText,
+          newContent: workingText,
           timestamp: Date.now(),
         },
         options
       );
 
       return {
-        result: `Successfully edited '${path.basename(filePath)}' (matched via ${editResult.matchType || "fuzzy engine"}, replaced ${editResult.replacementsCount || 1} occurrence(s)).`,
+        result: `Successfully edited '${path.basename(filePath)}' (matched via ${matchTypes[0] || "fuzzy engine"}, replaced ${totalReplacements} occurrence(s)).`,
         isError: false,
       };
     }
@@ -6603,11 +6577,58 @@ async function executeNativeToolUnlocked(
     // Tool: todo_write (aliases: todo, todowrite)
     // -----------------------------------------------------------------------
     if (normalizedTool === "todowrite" || normalizedTool === "todo") {
-      const rawTodos = args.todos ?? args.tasks ?? args.items;
-      const validTodos = parseTodoItems(rawTodos);
+      const op = typeof args.operation === "string" ? args.operation.toLowerCase() : "";
+      const current = options.currentTodos?.() ? options.currentTodos()!.map((t) => ({ ...t })) : [];
+
+      if (op === "view") {
+        if (current.length === 0) return { result: "Todo list is currently empty.", isError: false };
+        const formatted = current.map((t, idx) => `${idx + 1}. [${t.status}]${t.id ? ` (${t.id})` : ""}${t.phase ? ` [${t.phase}]` : ""} ${t.content}`).join("\n");
+        return { result: formatted, isError: false };
+      }
+
+      let validTodos: TodoItem[] | undefined;
+      if (op === "clear") {
+        validTodos = [];
+      } else if (op === "add") {
+        const content = String(args.content ?? args.task ?? "").trim();
+        const status = (args.status ?? "pending") as TodoItem["status"];
+        if (!content || !["pending", "in_progress", "completed"].includes(status)) {
+          return { result: "Error: 'add' requires nonempty 'content' and valid 'status'.", isError: true };
+        }
+        const id = typeof args.id === "string" && args.id.trim() ? args.id.trim() : `t_${current.length + 1}`;
+        validTodos = [...current, { id, content, status, ...(typeof args.phase === "string" && args.phase ? { phase: args.phase } : {}) }];
+      } else if (op === "update") {
+        const key = String(args.id ?? args.content ?? "").trim();
+        const idx = current.findIndex((t) => (t.id && t.id === key) || t.content === key);
+        if (idx === -1) {
+          return { result: `Error: Todo item '${key}' not found in current plan.`, isError: true };
+        }
+        const nextStatus = args.status ?? current[idx]!.status;
+        if (!["pending", "in_progress", "completed"].includes(nextStatus)) {
+          return { result: "Error: Invalid 'status'. Must be pending, in_progress, or completed.", isError: true };
+        }
+        current[idx] = {
+          ...current[idx]!,
+          ...(typeof args.content === "string" && args.content.trim() ? { content: args.content.trim() } : {}),
+          ...(typeof args.phase === "string" && args.phase ? { phase: args.phase } : {}),
+          status: nextStatus,
+        };
+        validTodos = current;
+      } else if (op === "remove") {
+        const key = String(args.id ?? args.content ?? "").trim();
+        const next = current.filter((t) => t.id !== key && t.content !== key);
+        if (next.length === current.length) {
+          return { result: `Error: Todo item '${key}' not found in current plan.`, isError: true };
+        }
+        validTodos = next;
+      } else {
+        const rawTodos = args.todos ?? args.tasks ?? args.items;
+        validTodos = parseTodoItems(rawTodos);
+      }
+
       if (!validTodos) {
         return {
-          result: "Error: 'todos' must be an array of items with nonempty content and status pending, in_progress or completed. The previous plan is unchanged.",
+          result: "Error: 'todos' must be an array of items with nonempty content and status pending, in_progress or completed (or pass a valid 'operation'). The previous plan is unchanged.",
           isError: true,
         };
       }

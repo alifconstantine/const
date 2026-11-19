@@ -15,7 +15,7 @@ Harness menyimpan workspace secara lokal. Penggunaan model, tools, dan layanan y
 
 ## Di dalam monorepo
 
-`apps/` berisi produk dan situsnya. `packages/` berisi backend Convex, UI bersama, runtime agent dan model, protokol/client/server, remote transport, telemetry, session storage, serta konfigurasi TypeScript. Paket terminal seperti `packages/tui` adalah library internal, bukan janji adanya produk Harness TUI.
+`apps/` berisi produk dan situsnya. `packages/` berisi backend Convex, UI bersama, engine coding Pi (`harness-engine`), runtime tools & agen (`agent`), remote transport, serta konfigurasi TypeScript.
 
 Panduan penggunaan Harness tersedia di [Docs](https://harness.const.web.id/docs). Kontrak endpoint Router tersedia di [Router Docs](https://router.const.web.id/docs). README masing-masing produk menjelaskan fitur dan cara menjalankannya dari source.
 

@@ -11,6 +11,14 @@ import type {
   NativeToolDefinition,
 } from "./types.js";
 import { ConstAgent } from "./const-agent.js";
+
+export type SubAgentRuntimeFactory = (config: AgentConfig) => CodingAgentRuntime;
+let subAgentRuntimeFactory: SubAgentRuntimeFactory = (config) => new ConstAgent(config);
+
+/** Register the coding-agent runtime used to execute spawned subagents (e.g. Pi Core). */
+export function registerSubAgentRuntimeFactory(factory: SubAgentRuntimeFactory): void {
+  subAgentRuntimeFactory = factory;
+}
 import type { CodingAgentRuntime } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -1183,7 +1191,7 @@ export class SubAgentManager {
           deferNativeTools: context.parentConfig.deferNativeTools,
         };
 
-        const childAgent = new ConstAgent(childConfig);
+        const childAgent = subAgentRuntimeFactory(childConfig);
         this.childAgents.set(item.id, childAgent);
 
         // CRITICAL FIX 1: Wire abortController directly to childAgent.abort()

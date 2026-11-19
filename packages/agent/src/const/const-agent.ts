@@ -1434,11 +1434,6 @@ export class ConstAgent {
         payloadRecoveryAttempted = false;
         payloadRecoveryLimit = undefined;
         rejectedPayloadBytes = undefined;
-        consecutivePlanningTurns = 0;
-        if (reasoningDowngradedForTurn) {
-          effectiveThinkingLevel = this.config.thinkingLevel;
-          reasoningDowngradedForTurn = false;
-        }
 
         if (turnFinishReason === "length" && toolCallsMap.size) {
           toolCallsMap.clear();
@@ -1533,7 +1528,12 @@ export class ConstAgent {
 
         if (hasActionableOutput) {
           consecutiveEmptyRetries = 0;
+          consecutivePlanningTurns = 0;
           recoveryInstruction = "";
+          if (reasoningDowngradedForTurn) {
+            effectiveThinkingLevel = this.config.thinkingLevel;
+            reasoningDowngradedForTurn = false;
+          }
         } else {
           // Model produced no actionable text and no tool calls!
           if (!isCompanion && hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 1) {
@@ -1899,6 +1899,7 @@ export class ConstAgent {
                   onEvent({ type: "todo_update", todos: committed, toolCallId: tc.id });
                 }
               },
+              currentTodos: () => todos.snapshot(),
               askUser: async (questions) => {
                 awaitingUser = false;
                 onEvent({ type: "ask_question", toolCallId: tc.id, questions });

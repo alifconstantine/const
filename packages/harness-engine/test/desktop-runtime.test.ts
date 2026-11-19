@@ -263,8 +263,173 @@ describe("PiHarnessAgent desktop runtime resilience", () => {
     const toolNames: string[] = (requests[0]?.tools ?? []).map((t: any) => t.function.name);
     expect(toolNames).toContain("read");
     expect(toolNames).toContain("write");
+    expect(toolNames).toContain("edit");
     expect(toolNames).toContain("bash");
     expect(toolNames).toContain("todo_write");
+    expect(toolNames).toContain("tool_search");
+    // Retired redundant tools and deferred specialist tools stay out of default schema
+    expect(toolNames.some((n) => ["run_command", "mkdir", "jfind", "git_status", "git_diff", "git_commit", "git_log", "think"].includes(n))).toBe(false);
+    expect(toolNames.some((n) => ["ast_grep", "ast_edit", "lsp", "gh", "eval", "wait", "manage_task"].includes(n))).toBe(false);
     expect(toolNames.some((n) => n.startsWith("browser_") || n.startsWith("computer_") || n === "load_plugin_tools")).toBe(false);
+  });
+
+  it("activates deferred specialist tools on demand via tool_search and executes them on the next turn", async () => {
+    const { baseUrl, requests } = await startServer((idx, _body, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      if (idx === 0) {
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "tc_search", type: "function", function: { name: "tool_search", arguments: '{"activate":["eval"]}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      if (idx === 1) {
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "tc_eval", type: "function", function: { name: "eval", arguments: '{"code":"6 * 7"}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      res.end(sseChunk({ role: "assistant", content: "Computed 42." }) + sseChunk({}, "stop") + "data: [DONE]\n\n");
+    });
+
+    const events: AgentEvent[] = [];
+    const agent = createPiHarnessAgent({
+      preset: "harness",
+      baseUrl,
+      apiKey: "fixture",
+      model: "test-model",
+      workspacePath: workspace,
+      mode: "full_access",
+      nativeCapabilityEnabled: () => false,
+    });
+
+    await agent.run([{ role: "user", content: "Activate eval and run 6 * 7" }], (e) => events.push(e), { returnPartialOnFailure: true });
+
+    const turn1Tools: string[] = (requests[0]?.tools ?? []).map((t: any) => t.function.name);
+    const turn2Tools: string[] = (requests[1]?.tools ?? []).map((t: any) => t.function.name);
+    expect(turn1Tools).not.toContain("eval");
+    expect(turn2Tools).toContain("eval");
+    const evalResult = events.find((e) => e.type === "tool_result" && e.toolCallId === "tc_eval");
+    expect(evalResult?.type === "tool_result" && evalResult.isError).toBe(false);
+    expect(evalResult?.type === "tool_result" && String(evalResult.result)).toContain("42");
+  });
+
+  it("supports atomic multi-edit and returns closest-line hints when edit target mismatches", async () => {
+    await writeFile(path.join(workspace, "demo.ts"), "const alpha = 1;\nconst beta = 2;\nconst gamma = 3;\n", "utf8");
+    const { baseUrl } = await startServer((idx, _body, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      if (idx === 0) {
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "tc_read", type: "function", function: { name: "read", arguments: '{"path":"demo.ts"}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      if (idx === 1) {
+        // Intentional near-miss edit to verify closest-line hint
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "tc_miss", type: "function", function: { name: "edit", arguments: '{"path":"demo.ts","old_content":"const beta = 999;","new_content":"const beta = 20;"}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      if (idx === 2) {
+        // Atomic multi-edit
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{
+              index: 0,
+              id: "tc_batch",
+              type: "function",
+              function: {
+                name: "edit",
+                arguments: JSON.stringify({
+                  path: "demo.ts",
+                  edits: [
+                    { old_content: "const alpha = 1;", new_content: "const alpha = 10;" },
+                    { old_content: "const gamma = 3;", new_content: "const gamma = 30;" },
+                  ],
+                }),
+              },
+            }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      res.end(sseChunk({ role: "assistant", content: "Updated." }) + sseChunk({}, "stop") + "data: [DONE]\n\n");
+    });
+
+    const events: AgentEvent[] = [];
+    const agent = createPiHarnessAgent({
+      preset: "harness",
+      baseUrl,
+      apiKey: "fixture",
+      model: "test-model",
+      workspacePath: workspace,
+      mode: "full_access",
+      nativeCapabilityEnabled: () => false,
+    });
+
+    await agent.run([{ role: "user", content: "Edit demo.ts" }], (e) => events.push(e), { returnPartialOnFailure: true });
+
+    const missResult = events.find((e) => e.type === "tool_result" && e.toolCallId === "tc_miss");
+    expect(missResult?.type === "tool_result" && missResult.isError).toBe(true);
+    expect(missResult?.type === "tool_result" && String(missResult.result)).toContain("Closest match around lines");
+    expect(missResult?.type === "tool_result" && String(missResult.result)).toContain("const beta = 2;");
+    expect(await readFile(path.join(workspace, "demo.ts"), "utf8")).toBe("const alpha = 10;\nconst beta = 2;\nconst gamma = 30;\n");
+  });
+
+  it("supports granular todo_write operations (add, update, remove, clear) in addition to full replacement", async () => {
+    const { baseUrl } = await startServer((idx, _body, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      if (idx === 0) {
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "t1", type: "function", function: { name: "todo_write", arguments: '{"operation":"add","id":"step-1","content":"Build engine","status":"in_progress"}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      if (idx === 1) {
+        res.end(
+          sseChunk({
+            role: "assistant",
+            tool_calls: [{ index: 0, id: "t2", type: "function", function: { name: "todo_write", arguments: '{"operation":"update","id":"step-1","status":"completed"}' } }],
+          }) + sseChunk({}, "tool_calls") + "data: [DONE]\n\n",
+        );
+        return;
+      }
+      res.end(sseChunk({ role: "assistant", content: "Todos tracked." }) + sseChunk({}, "stop") + "data: [DONE]\n\n");
+    });
+
+    const todoUpdates: any[] = [];
+    const agent = createPiHarnessAgent({
+      preset: "harness",
+      baseUrl,
+      apiKey: "fixture",
+      model: "test-model",
+      workspacePath: workspace,
+      mode: "full_access",
+      nativeCapabilityEnabled: () => false,
+    });
+
+    await agent.run([{ role: "user", content: "Track todos" }], (e) => {
+      if (e.type === "todo_update") todoUpdates.push(e.todos);
+    }, { returnPartialOnFailure: true });
+
+    expect(todoUpdates).toHaveLength(2);
+    expect(todoUpdates[0]).toEqual([{ id: "step-1", content: "Build engine", status: "in_progress" }]);
+    expect(todoUpdates[1]).toEqual([{ id: "step-1", content: "Build engine", status: "completed" }]);
   });
 });

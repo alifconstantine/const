@@ -16,6 +16,13 @@ import { createWorkspaceTools } from "./workspace-tools.js";
 export type { HarnessStopReason } from "./progress.js";
 export type { HarnessEngineEvent, HarnessPendingQuestion, HarnessPhase, HarnessRunEnd } from "./session.js";
 export { createPiHarnessAgent, PiHarnessAgent } from "./desktop-runtime.js";
+export {
+  DEFERRED_SPECIALIST_TOOLS,
+  RETIRED_REDUNDANT_TOOLS,
+  createToolSearchDefinition,
+  executeToolSearch,
+  resolveHarnessToolDefinitions,
+} from "./tool-registry.js";
 
 export interface HarnessEngineOptions {
   model: Model<"openai-completions">;

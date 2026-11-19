@@ -52,52 +52,12 @@
 				"./packages/agent/src/*"
 			],
 
-			"@const/session-backend-sqlite-node": ["./packages/session-backends/sqlite-node/src/index.ts"],
-			"@earendil-works/pi-session-backend-sqlite-node": ["./packages/session-backends/sqlite-node/src/index.ts"],
-
-			"@const/coding-agent": ["./packages/coding-agent/src/index.ts"],
-			"@const/coding-agent/experimental/plugin": ["./packages/coding-agent/src/experimental/plugin.ts"],
-			"@const/coding-agent/hooks": ["./packages/coding-agent/src/core/hooks/index.ts"],
-			"@const/coding-agent/*": ["./packages/coding-agent/src/*"],
-			"@earendil-works/pi-coding-agent": ["./packages/coding-agent/src/index.ts"],
-			"@earendil-works/pi-coding-agent/experimental/plugin": [
-				"./packages/coding-agent/src/experimental/plugin.ts"
-			],
-			"@earendil-works/pi-coding-agent/hooks": ["./packages/coding-agent/src/core/hooks/index.ts"],
-			"@earendil-works/pi-coding-agent/*": ["./packages/coding-agent/src/*"],
-
-			"@const/protocol": ["./packages/protocol/src/index.ts"],
-			"@const/protocol/*": ["./packages/protocol/src/*"],
-			"@earendil-works/pi-protocol": ["./packages/protocol/src/index.ts"],
-			"@earendil-works/pi-protocol/*": ["./packages/protocol/src/*"],
-
-			"@const/client": ["./packages/client/src/index.ts"],
-			"@const/client/unix": ["./packages/client/src/unix.ts"],
-			"@const/client/*": ["./packages/client/src/*"],
-			"@earendil-works/pi-client": ["./packages/client/src/index.ts"],
-			"@earendil-works/pi-client/unix": ["./packages/client/src/unix.ts"],
-			"@earendil-works/pi-client/*": ["./packages/client/src/*"],
-
-			"@const/server": ["./packages/server/src/index.ts"],
-			"@const/server/unix": ["./packages/server/src/transports/unix/index.ts"],
-			"@const/server/*": ["./packages/server/src/*"],
-			"@earendil-works/pi-server": ["./packages/server/src/index.ts"],
-			"@earendil-works/pi-server/unix": ["./packages/server/src/transports/unix/index.ts"],
-			"@earendil-works/pi-server/*": ["./packages/server/src/*"],
-
-			"typebox": ["./node_modules/typebox"],
-
-			"@const/tui": ["./packages/tui/src/index.ts"],
-			"@const/tui/*": ["./packages/tui/src/*"],
-			"@earendil-works/pi-tui": ["./packages/tui/src/index.ts"],
-			"@earendil-works/pi-tui/*": ["./packages/tui/src/*"]
+			"typebox": ["./node_modules/typebox"]
 		}
 	},
 	"include": [
 		"packages/*/src/**/*",
-		"packages/*/test/**/*",
-		"packages/session-backends/*/src/**/*",
-		"packages/session-backends/*/test/**/*"
+		"packages/*/test/**/*"
 	],
 	"exclude": ["**/dist/**", "node_modules", "packages/harness-engine"]
 }

@@ -278,10 +278,58 @@ export function performFuzzyEdit(
     }
   }
 
+  const closestHint = findClosestBlockHint(fileLines, oldLines);
   return {
     success: false,
-    error: `Could not find target 'old_content' in file (${fileLines.length} lines total). Exact, whitespace-normalized, and indentation-tolerant matching all failed.`,
+    error: `Could not find target 'old_content' in file (${fileLines.length} lines total). Exact, whitespace-normalized, and indentation-tolerant matching all failed.${closestHint ? `\n${closestHint}` : ""}`,
   };
+}
+
+function lineTokenSet(line: string): Set<string> {
+  const tokens = line.toLowerCase().match(/[a-z0-9_$-]{2,}/g);
+  return new Set(tokens ?? []);
+}
+
+function findClosestBlockHint(fileLines: readonly string[], oldLines: readonly string[]): string {
+  const anchors = oldLines.map(normalizeLineWhitespace).filter((l) => l.length >= 3);
+  if (anchors.length === 0 || fileLines.length === 0) return "";
+  const primary = anchors[0]!;
+  const primaryTokens = lineTokenSet(primary);
+  if (primaryTokens.size === 0) return "";
+
+  let bestIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < fileLines.length; i++) {
+    const candidate = normalizeLineWhitespace(fileLines[i]!);
+    if (!candidate) continue;
+    let score = 0;
+    if (candidate === primary) {
+      score = 1;
+    } else if (candidate.includes(primary) || primary.includes(candidate)) {
+      score = 0.75;
+    } else {
+      const candTokens = lineTokenSet(candidate);
+      if (candTokens.size === 0) continue;
+      let shared = 0;
+      for (const tok of primaryTokens) {
+        if (candTokens.has(tok)) shared++;
+      }
+      score = (2 * shared) / (primaryTokens.size + candTokens.size);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+
+  if (bestIdx === -1 || bestScore < 0.4) return "";
+  const start = Math.max(0, bestIdx - 2);
+  const end = Math.min(fileLines.length, bestIdx + Math.min(Math.max(oldLines.length, 3), 8) + 2);
+  const excerpt = fileLines
+    .slice(start, end)
+    .map((line, offset) => `  L${start + offset + 1}: ${line.slice(0, 160)}`)
+    .join("\n");
+  return `Closest match around lines ${start + 1}-${end}:\n${excerpt}`;
 }
 
 function escapeRegExp(string: string): string {

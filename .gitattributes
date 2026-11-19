@@ -1,2 +1,8 @@
 # Catalog manifests hash the exact JSON bytes; preserve LF on Windows checkouts.
 packages/ai/src/providers/data/*.json text eol=lf
+
+# Exclude vendored skills, bundled plugins, and generated assets from GitHub language stats.
+.agents/** linguist-vendored
+apps/harness/desktop/plugins/** linguist-vendored
+apps/*/public/_astro/** linguist-generated
+apps/harness/web/public/assets/particles/** linguist-vendored

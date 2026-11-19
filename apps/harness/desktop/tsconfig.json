@@ -13,8 +13,6 @@
       "@const/agent/*": ["../../../packages/agent/src/const/*"],
       "@const/ai": ["../../../packages/ai/src/index.ts"],
       "@const/ai/*": ["../../../packages/ai/src/*"],
-      "@const/coding-agent": ["../../../packages/coding-agent/src/index.ts"],
-      "@const/coding-agent/*": ["../../../packages/coding-agent/src/*"],
       "@const/backend/_generated/*": ["../../../packages/backend/convex/_generated/*"],
       "@const/backend/*": ["../../../packages/backend/convex/*"]
     }
