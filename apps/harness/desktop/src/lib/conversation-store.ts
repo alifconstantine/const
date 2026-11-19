@@ -216,12 +216,18 @@ function persistConversationCache(list: ConversationItem[]): void {
 
 /** Cache a hydrated host record without writing it back to the host. */
 export function cacheConversation(conversation: ConversationItem): void {
-  const list = loadConversations();
+  const list = cachedConversations ?? loadConversations();
   const index = list.findIndex(item => item.id === conversation.id);
   if (index < 0) list.push(conversation);
   else list[index] = conversation;
   cachedConversations = list;
   persistConversationCache(list);
+}
+
+/** Read one record without normalizing every conversation and its messages. */
+export function findCachedConversation(id: string): ConversationItem | undefined {
+  if (!cachedConversations) loadConversations();
+  return cachedConversations?.find(item => item.id === id);
 }
 
 /**

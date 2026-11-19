@@ -312,6 +312,8 @@ export function createDesktopBridge(
       ipcRenderer.invoke("tasks:kill", taskId, conversationId),
     getBackgroundTaskLogs: (taskId: string, conversationId: string) =>
       ipcRenderer.invoke("tasks:get-output", taskId, conversationId),
+    getBackgroundTaskLogSnapshot: (taskId: string, conversationId: string) =>
+      ipcRenderer.invoke("tasks:get-output", taskId, conversationId, true),
     killSubAgent: (agentId: string, conversationId: string) =>
       ipcRenderer.invoke("subagents:kill", agentId, conversationId),
     onBackgroundTaskEvent: (callback: (event: any) => void) => {

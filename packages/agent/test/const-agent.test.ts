@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -388,30 +388,35 @@ describe("Permission Modes & Workspace-Write Security", () => {
     expect(set.has("run_python")).toBe(false);
   });
 
-  it("ConstAgent dynamically updates mode and auto-resolves pending approvals on full_access", () => {
+  it("ConstAgent dynamically updates mode and auto-resolves pending approvals on full_access", async () => {
     const agent = createConstAgent({
+      baseUrl: "http://fixture.invalid/v1",
       apiKey: "test",
       model: "test-model",
       workspacePath: wsDir,
-      mode: "ask_before_changes",
+      mode: "request_review",
     });
 
-    expect(agent.mode).toBe("ask_before_changes");
+    expect(agent.mode).toBe("request_review");
 
-    let resolvedDecision: string | null = null;
-    (agent as any).pendingApprovals.set("test_appr_1", (res: any) => {
-      resolvedDecision = res.decision;
-    });
-
-    // Switch to full access
-    agent.updateMode("full_access");
-    expect(agent.mode).toBe("full_access");
-    expect(resolvedDecision).toBe("allow_once");
-    expect((agent as any).pendingApprovals.size).toBe(0);
-
-    // Switch back to ask before changes
-    agent.updateMode("ask_before_changes");
-    expect(agent.mode).toBe("ask_before_changes");
+    const request = vi.fn()
+      .mockImplementationOnce(async () => new Response(
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"mode-change","type":"function","function":{"name":"write","arguments":"{\\"path\\":\\"mode-change.txt\\",\\"content\\":\\"allowed\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n',
+      ))
+      .mockImplementation(async () => new Response('data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'));
+    vi.stubGlobal("fetch", request);
+    const decisions: string[] = [];
+    try {
+      await agent.run([{ role: "user", content: "Write the fixture." }], event => {
+        if (event.type === "approval_request") agent.updateMode("full_access");
+        if (event.type === "approval_resolved") decisions.push(event.decision);
+      });
+      expect(decisions).toEqual(["allow_once"]);
+      expect(await fs.readFile(path.join(wsDir, "mode-change.txt"), "utf8")).toBe("allowed");
+      expect(agent.mode).toBe("full_access");
+      agent.updateMode("ask_before_changes");
+      expect(agent.mode).toBe("ask_before_changes");
+    } finally { vi.unstubAllGlobals(); }
   });
 });
 

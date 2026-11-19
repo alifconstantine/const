@@ -10,10 +10,6 @@ try {
 }
 
 const ROOT = path.resolve(__dirname, "..");
-const FAVICON_SVG_PATH = path.join(ROOT, "apps/learn/web/public/favicon.svg");
-
-// 1. SVGs
-const CIRCLE_SVG = fs.readFileSync(FAVICON_SVG_PATH, "utf-8");
 
 const SQUIRCLE_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
@@ -93,9 +89,8 @@ function createIco(pngBuffersWithSizes) {
 }
 
 async function buildDesktopIcons() {
-  console.log("==> Building Desktop Windows/Linux icons for Learn and Harness...");
+  console.log("==> Building Desktop Windows/Linux icons for Harness...");
   const desktopDirs = [
-    path.join(ROOT, "apps/learn/desktop/build"),
     path.join(ROOT, "apps/harness/desktop/build"),
   ];
 
@@ -125,9 +120,8 @@ async function buildDesktopIcons() {
     console.log(`    ✓ ${path.relative(ROOT, desktopBuildDir)}: icon.png, icon-1024.png, icon.ico`);
   }
 
-  // Also copy to public/icon.png for favicon in both desktop apps
+  // Also copy to public/icon.png for favicon in desktop app
   const publicDirs = [
-    path.join(ROOT, "apps/learn/desktop/public"),
     path.join(ROOT, "apps/harness/desktop/public"),
   ];
   for (const pDir of publicDirs) {
@@ -139,122 +133,9 @@ async function buildDesktopIcons() {
   }
 }
 
-async function buildAndroidIcons() {
-  console.log("==> Building Android Mobile icons...");
-  const resDir = path.join(ROOT, "apps/learn/mobile/android/app/src/main/res");
-
-  // 1. ic_launcher_background.xml
-  const valuesDir = path.join(resDir, "values");
-  const bgXmlPath = path.join(valuesDir, "ic_launcher_background.xml");
-  fs.writeFileSync(
-    bgXmlPath,
-    `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#141413</color>\n</resources>\n`,
-    "utf-8"
-  );
-  console.log("    ✓ updated ic_launcher_background.xml -> #141413");
-
-  // 2. Mipmap launcher icons
-  const densities = [
-    { name: "mdpi", launcher: 48, fg: 108 },
-    { name: "hdpi", launcher: 72, fg: 162 },
-    { name: "xhdpi", launcher: 96, fg: 216 },
-    { name: "xxhdpi", launcher: 144, fg: 324 },
-    { name: "xxxhdpi", launcher: 192, fg: 432 },
-  ];
-
-  for (const d of densities) {
-    const targetDir = path.join(resDir, `mipmap-${d.name}`);
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-
-    // ic_launcher.png (squircle)
-    const squircleBuf = await sharp(Buffer.from(SQUIRCLE_SVG))
-      .resize(d.launcher, d.launcher)
-      .png()
-      .toBuffer();
-    fs.writeFileSync(path.join(targetDir, "ic_launcher.png"), squircleBuf);
-
-    // ic_launcher_round.png (circle)
-    const roundBuf = await sharp(Buffer.from(CIRCLE_SVG))
-      .resize(d.launcher, d.launcher)
-      .png()
-      .toBuffer();
-    fs.writeFileSync(path.join(targetDir, "ic_launcher_round.png"), roundBuf);
-
-    // ic_launcher_foreground.png (adaptive foreground)
-    const fgBuf = await sharp(Buffer.from(FOREGROUND_SVG))
-      .resize(d.fg, d.fg)
-      .png()
-      .toBuffer();
-    fs.writeFileSync(path.join(targetDir, "ic_launcher_foreground.png"), fgBuf);
-
-    console.log(`    ✓ mipmap-${d.name}: launcher(${d.launcher}x${d.launcher}), fg(${d.fg}x${d.fg})`);
-  }
-
-  // Remove leftover vector drawable that might override mipmap adaptive foreground
-  const obsoleteVectorFg = path.join(resDir, "drawable-v24/ic_launcher_foreground.xml");
-  if (fs.existsSync(obsoleteVectorFg)) {
-    fs.unlinkSync(obsoleteVectorFg);
-    console.log("    ✓ removed obsolete robot-head drawable-v24/ic_launcher_foreground.xml");
-  }
-
-  // 3. Splash screens
-  console.log("==> Building Android Splash Screens...");
-  const splashTargets = [
-    { dir: "drawable", w: 480, h: 320 },
-    { dir: "drawable-port-mdpi", w: 320, h: 480 },
-    { dir: "drawable-port-hdpi", w: 480, h: 800 },
-    { dir: "drawable-port-xhdpi", w: 720, h: 1280 },
-    { dir: "drawable-port-xxhdpi", w: 960, h: 1600 },
-    { dir: "drawable-port-xxxhdpi", w: 1280, h: 1920 },
-    { dir: "drawable-land-mdpi", w: 480, h: 320 },
-    { dir: "drawable-land-hdpi", w: 800, h: 480 },
-    { dir: "drawable-land-xhdpi", w: 1280, h: 720 },
-    { dir: "drawable-land-xxhdpi", w: 1600, h: 960 },
-    { dir: "drawable-land-xxxhdpi", w: 1920, h: 1280 },
-  ];
-
-  for (const s of splashTargets) {
-    const dirPath = path.join(resDir, s.dir);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-
-    // Emblem size: roughly 26% of shortest dimension
-    const emblemSize = Math.max(72, Math.round(Math.min(s.w, s.h) * 0.26));
-    const emblemPng = await sharp(Buffer.from(CIRCLE_SVG))
-      .resize(emblemSize, emblemSize)
-      .png()
-      .toBuffer();
-
-    const splashBuf = await sharp({
-      create: {
-        width: s.w,
-        height: s.h,
-        channels: 4,
-        background: { r: 20, g: 20, b: 19, alpha: 1 }, // #141413
-      },
-    })
-      .composite([
-        {
-          input: emblemPng,
-          top: Math.round((s.h - emblemSize) / 2),
-          left: Math.round((s.w - emblemSize) / 2),
-        },
-      ])
-      .png()
-      .toBuffer();
-
-    fs.writeFileSync(path.join(dirPath, "splash.png"), splashBuf);
-    console.log(`    ✓ ${s.dir}/splash.png (${s.w}x${s.h}, emblem ${emblemSize}px)`);
-  }
-}
-
 async function main() {
   try {
     await buildDesktopIcons();
-    await buildAndroidIcons();
     console.log("\nAll icons generated successfully!");
   } catch (err) {
     console.error("Fatal error generating icons:", err);

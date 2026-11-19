@@ -274,6 +274,8 @@ export interface TranslationDictionary {
     sendMessage: string;
     workedFor: string;
     workingFor: string;
+    working: string;
+    waitingForBackground: string;
     turnIndicatorRunning: string;
     turnIndicatorFinished: string;
     questionCardTitle: string;
@@ -1004,6 +1006,8 @@ export interface TranslationDictionary {
     outside: string;
   };
   toast: {
+    agentStalled: string;
+    agentTurnLimit: string;
     imagePreparationFailed: string;
     requestTooLarge: string;
     taskCompleted: string;

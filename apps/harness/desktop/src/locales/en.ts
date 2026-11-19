@@ -288,6 +288,8 @@ export const en: TranslationDictionary = {
     sendMessage: "Send message",
     workedFor: "Worked for",
     workingFor: "Working for",
+    working: "Working…",
+    waitingForBackground: "Waiting for background work…",
     turnIndicatorRunning: "Processing response...",
     turnIndicatorFinished: "Execution finished",
     questionCardTitle: "Const has a few questions",
@@ -1019,6 +1021,8 @@ export const en: TranslationDictionary = {
     outside: "Outside",
   },
   toast: {
+    agentStalled: "The agent stopped after repeating the same actions without progress. You can continue with a different approach.",
+    agentTurnLimit: "The agent reached the turn limit for this run. Send a follow-up to continue.",
     imagePreparationFailed: "The image could not be prepared for the model. Convert it to PNG or JPEG, or crop it, then try again. The original file is unchanged.",
     requestTooLarge: "The image input or request is too large for this gateway. Resize or crop the images, inspect fewer images at once, or shorten the input, then continue. Your original files and chat history are saved.",
     taskCompleted: "Task completed",

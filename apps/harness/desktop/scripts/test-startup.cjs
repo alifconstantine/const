@@ -2,20 +2,18 @@ const { mkdtempSync, mkdirSync, rmSync, existsSync, realpathSync } = require("no
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
-const { stageOmp } = require("./stage-omp.cjs");
 
 async function main() {
   const root = path.resolve(__dirname, "..");
   if (!existsSync(path.join(root, "dist-electron/main.js"))) {
     throw new Error("Run the desktop build before test:startup.");
   }
-  const omp = await stageOmp(process.platform, process.arch);
   const tempRoot = realpathSync.native(tmpdir());
   const temporary = mkdtempSync(path.join(tempRoot, "const-startup-test-"));
   try {
     const home = path.join(temporary, "home");
     mkdirSync(home);
-    const env = { ...process.env, CONST_HARNESS_OMP_PATH: omp, HOME: home, USERPROFILE: home, XDG_DATA_HOME: path.join(temporary, "data"),
+    const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_DATA_HOME: path.join(temporary, "data"),
       XDG_CONFIG_HOME: path.join(temporary, "config"), XDG_CACHE_HOME: path.join(temporary, "cache") };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.VITE_DEV_SERVER_URL;

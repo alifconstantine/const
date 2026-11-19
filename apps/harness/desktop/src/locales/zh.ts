@@ -288,6 +288,8 @@ export const zh: TranslationDictionary = {
     sendMessage: "发送消息",
     workedFor: "耗时",
     workingFor: "正在执行",
+    working: "正在执行…",
+    waitingForBackground: "正在等待后台任务…",
     turnIndicatorRunning: "正在处理响应...",
     turnIndicatorFinished: "执行完成",
     questionCardTitle: "Const 需要确认一些问题",
@@ -1019,6 +1021,8 @@ export const zh: TranslationDictionary = {
     outside: "项目外",
   },
   toast: {
+    agentStalled: "智能体反复执行相同操作且没有进展，已停止。你可以换一种方法继续。",
+    agentTurnLimit: "智能体已达到本次运行的轮次上限。发送一条后续消息即可继续。",
     imagePreparationFailed: "无法为模型准备此图片。请将其转换为 PNG 或 JPEG，或裁剪后重试。原始文件未更改。",
     requestTooLarge: "图片输入或请求超过了此网关的大小限制。请缩小或裁剪图片、减少一次检查的图片数量，或缩短输入后继续。原始文件和聊天记录已保留。",
     taskCompleted: "任务已完成",

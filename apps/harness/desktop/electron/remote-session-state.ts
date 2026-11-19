@@ -68,11 +68,11 @@ export function updateRemoteSessionState(live: RemoteSessionState, event: any): 
     live.tools = [...live.tools.slice(-19), name];
   }
   if (event.type === "tool_result") {
-    for (const tool of [...last.toolCalls, ...steps]) {
-      if (tool.id === event.toolCallId || tool.toolCallId === event.toolCallId) {
-        Object.assign(tool, { result: event.result, isError: event.isError, durationMs: event.durationMs });
-      }
-    }
+    const result = { result: event.result, isError: event.isError, durationMs: event.durationMs };
+    const call = last.toolCalls.findLast((tool: any) => tool.id === event.toolCallId);
+    const step = steps.findLast((item: any) => item.type === "tool" && (item.id === event.toolCallId || item.toolCallId === event.toolCallId));
+    if (call) Object.assign(call, result);
+    if (step) Object.assign(step, result);
     if (event.toolName === "ask_question") delete live.questions;
   }
   if (event.type === "file_mutation" && event.record) {
@@ -93,6 +93,17 @@ export function updateRemoteSessionState(live: RemoteSessionState, event: any): 
     finishThought();
     Object.assign(last, archiveAssistantCommentary(last, last.content, now));
     last.content = event.error || "";
+    last.durationMs = Math.max(0, now - last.timestamp);
+    for (const step of last.traceSteps) {
+      if (step.type === "tool" && step.result === undefined) {
+        Object.assign(step, { result: last.content, isError: true, durationMs: Math.max(0, now - step.startTime) });
+      }
+    }
+    for (const call of last.toolCalls) {
+      if (call.result === undefined) Object.assign(call, { result: last.content, isError: true });
+    }
+    delete live.approval;
+    delete live.questions;
     live.status = "error";
   }
   if (event.type === "done") {

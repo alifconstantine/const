@@ -288,6 +288,8 @@ export const id: TranslationDictionary = {
     sendMessage: "Kirim pesan",
     workedFor: "Bekerja selama",
     workingFor: "Sedang bekerja",
+    working: "Sedang bekerja…",
+    waitingForBackground: "Menunggu pekerjaan latar belakang…",
     turnIndicatorRunning: "Sedang memproses respons...",
     turnIndicatorFinished: "Eksekusi selesai",
     questionCardTitle: "Const memiliki beberapa pertanyaan",
@@ -1019,6 +1021,8 @@ export const id: TranslationDictionary = {
     outside: "Luar Proyek",
   },
   toast: {
+    agentStalled: "Agen berhenti karena mengulang aksi yang sama tanpa kemajuan. Kamu bisa melanjutkan dengan pendekatan lain.",
+    agentTurnLimit: "Agen mencapai batas giliran untuk sesi ini. Kirim pesan lanjutan untuk meneruskan tugas.",
     imagePreparationFailed: "Gambar belum dapat disiapkan untuk model. Konversikan ke PNG atau JPEG, atau potong gambar, lalu coba lagi. File asli tidak diubah.",
     requestTooLarge: "Input gambar atau permintaan terlalu besar untuk gateway ini. Perkecil atau potong gambar, periksa lebih sedikit gambar sekaligus, atau ringkas input, lalu lanjutkan. File asli dan riwayat chat tetap tersimpan.",
     taskCompleted: "Tugas selesai",

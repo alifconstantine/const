@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Terminal, Square, Loader2 } from "lucide-react";
 import type { RightPaneTab } from "./types";
+import type { BackgroundTaskItem } from "../../vite-env";
 import { useTranslation } from "../../lib/i18n";
 import { ScrollArea, toast } from "@const/ui";
+
+const MAX_LOG_LINES = 3000;
 
 interface TaskOutputTabProps {
   tab: RightPaneTab;
@@ -12,49 +15,75 @@ interface TaskOutputTabProps {
 export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [status, setStatus] = useState<BackgroundTaskItem["status"]>();
+  const isRunning = status === "running";
+  const statusText = status === "running" ? t("common.running")
+    : status === "completed" ? t("common.completed")
+    : status === "failed" ? t("common.failed")
+    : status === "killed" ? t("common.stopped") : "";
   const scrollRef = useRef<HTMLDivElement>(null);
   const taskId = tab.taskId || tab.id;
 
   useEffect(() => {
     let disposed = false;
+    let revision = 0;
+    let ready = false;
+    let sawStatusEvent = false;
+    let pending: string[] = [];
+    let pendingRevision: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setLogs([]);
-    setIsRunning(false);
-    if (window.electron?.getBackgroundTaskLogs && taskId && tab.conversationId) {
-      window.electron.getBackgroundTaskLogs(taskId, tab.conversationId!).then((initialLogs) => {
-        if (!disposed && initialLogs && initialLogs.length > 0) {
-          setLogs(initialLogs);
+    setStatus(undefined);
+    const conversationId = tab.conversationId;
+    if (!conversationId) return;
+    const flush = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      const remaining = pendingRevision === undefined ? pending.length : Math.max(0, pendingRevision - revision);
+      const newLines = remaining > 0 ? pending.slice(-remaining) : [];
+      if (pendingRevision !== undefined) revision = Math.max(revision, pendingRevision);
+      pending = [];
+      pendingRevision = undefined;
+      if (newLines.length) setLogs(previous => [...previous, ...newLines].slice(-MAX_LOG_LINES));
+    };
+    const unsubscribe = window.electron?.onBackgroundTaskEvent?.(event => {
+      if (event.taskId !== taskId || event.conversationId !== conversationId) return;
+      if (event.type === "output" && event.data !== undefined) {
+        pending.push(...event.data.split("\n"));
+        if (pending.length > MAX_LOG_LINES) pending = pending.slice(-MAX_LOG_LINES);
+        pendingRevision = event.outputRevision;
+        if (ready && timer === undefined) timer = setTimeout(flush, 75);
+      } else if (event.type === "status" && event.status) {
+        sawStatusEvent = true;
+        if (ready) flush();
+        setStatus(event.status);
+      }
+    });
+    void (async () => {
+      try {
+        const snapshot = await window.electron?.getBackgroundTaskLogSnapshot?.(taskId, conversationId);
+        if (disposed) return;
+        if (snapshot && !Array.isArray(snapshot)) {
+          setLogs(snapshot.logs.slice(-MAX_LOG_LINES));
+          revision = snapshot.outputRevision;
+          if (!sawStatusEvent) setStatus(snapshot.status);
+        } else {
+          const initialLogs = Array.isArray(snapshot) ? snapshot : await window.electron?.getBackgroundTaskLogs?.(taskId, conversationId);
+          if (!disposed && initialLogs) setLogs(initialLogs.slice(-MAX_LOG_LINES));
+          const tasks = await window.electron?.listBackgroundTasks?.(conversationId);
+          if (!disposed && !sawStatusEvent) setStatus(tasks?.find(task => task.id === taskId)?.status);
         }
-      }).catch(() => {});
-    }
-
-    if (window.electron?.listBackgroundTasks && tab.conversationId) {
-      window.electron.listBackgroundTasks(tab.conversationId).then((tasks) => {
-        const found = tasks.find((t) => t.id === taskId);
-        if (!disposed && found) {
-          setIsRunning(found.status === "running");
-        }
-      }).catch(() => {});
-    }
-
-    if (window.electron?.onBackgroundTaskEvent) {
-      const unsubscribe = window.electron.onBackgroundTaskEvent((event) => {
-        if (event.taskId === taskId && event.conversationId === tab.conversationId) {
-          if (event.type === "output" && event.data !== undefined) {
-            setLogs((prev) => {
-              const next = [...prev, event.data!];
-              return next.length > 3000 ? next.slice(-3000) : next;
-            });
-          } else if (event.type === "status") {
-            if (event.status && event.status !== "running") {
-              setIsRunning(false);
-            }
-          }
-        }
-      });
-      return () => { disposed = true; unsubscribe(); };
-    }
-    return () => { disposed = true; };
+      } catch {
+        // Live output remains usable if the initial snapshot cannot be loaded.
+      } finally {
+        if (!disposed) { ready = true; flush(); }
+      }
+    })();
+    return () => {
+      disposed = true;
+      if (timer !== undefined) clearTimeout(timer);
+      unsubscribe?.();
+    };
   }, [taskId, tab.conversationId]);
 
   useEffect(() => {
@@ -66,13 +95,13 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
   const handleStop = async () => {
     try {
       if (onStopTask) await onStopTask(taskId, tab.conversationId);
-      else if (tab.conversationId && await window.electron?.killBackgroundTask?.(taskId, tab.conversationId)) setIsRunning(false);
+      else if (tab.conversationId && await window.electron?.killBackgroundTask?.(taskId, tab.conversationId)) setStatus("killed");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("common.failed"));
     }
   };
 
-  const command = tab.command || tab.title || "Background Task";
+  const command = tab.command || tab.title || t("rightPane.taskOutput");
 
   return (
     <div className="flex-1 w-full h-full bg-[#141414] text-[#d4d4d4] flex flex-col min-h-0 font-sans select-none">
@@ -102,11 +131,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
               <Square className="w-3 h-3 fill-current" />
               <span>{t("rightPane.stopTask")}</span>
             </button>
-          ) : (
-            <span className="text-xs text-[#777777] px-2 py-0.5 rounded bg-white/5">
-              {t("rightPane.taskStopped")}
-            </span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -118,7 +143,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
         <div className="text-[#888888] pb-2 mb-2 border-b border-[#222222] flex items-center justify-between">
           <span>$ {command}</span>
           <span className="text-[11px] text-[#555555]">
-            {isRunning ? t("common.active") : t("rightPane.taskStopped")}
+            {statusText}
           </span>
         </div>
 

@@ -101,6 +101,7 @@ import {
   pinConversation,
   initConversationStore,
   refreshConversationsFromDisk,
+  findCachedConversation,
   generateFallbackTitle,
   generateAiTitle,
   normalizeUiMessages,
@@ -2562,19 +2563,18 @@ export function AuthenticatedContent({
       }
 
       if (isTelemetryEvent(event)) {
-        const stored = loadConversations();
-        const target = stored.find(c => c.id === targetConvoId);
+        const target = findCachedConversation(targetConvoId);
         const previous = telemetryByConversationRef.current.get(targetConvoId) ?? target?.telemetry ?? telemetryForHistory(target?.messages ?? targetMsgs);
         const telemetry = reduceTelemetry(previous, event);
         telemetryByConversationRef.current.set(targetConvoId, telemetry);
-        setTelemetryRevision(revision => revision + 1);
+        if (targetConvoId === conversationIdRef.current) setTelemetryRevision(revision => revision + 1);
         if (target) {
-          target.telemetry = telemetry;
-          if (telemetry.context) target.contextUsage = telemetry.context;
-          cacheConversation(target);
+          cacheConversation({ ...target, telemetry, contextUsage: telemetry.context ?? target.contextUsage });
         }
-        for (const request of Object.values(telemetry.requests)) {
-          if (request.totalTokens !== undefined && request !== previous?.requests[request.requestId]) localDb.recordModelRequest(targetConvoId, request).catch(() => {});
+        const requestIds = event.agent?.requests ? Object.keys(event.agent.requests) : event.requestId ? [event.requestId] : [];
+        for (const requestId of requestIds) {
+          const request = telemetry.requests[requestId];
+          if (request?.totalTokens !== undefined && request !== previous?.requests[requestId]) localDb.recordModelRequest(targetConvoId, request).catch(() => {});
         }
       }
 
@@ -2880,9 +2880,9 @@ export function AuthenticatedContent({
           });
         }
       } else if (event.type === "task_stopped") {
-        if (event.taskId) {
+        if (event.taskId && targetConvoId === conversationIdRef.current) {
           setBackgroundJobs((prev) => prev.map(task => task.id === event.taskId && task.status === "running"
-            ? { ...task, status: event.code === 0 ? "completed" : "failed" } : task));
+            ? { ...task, status: event.code === null ? "killed" : event.code === 0 ? "completed" : "failed" } : task));
         }
       } else if (event.type === "subagent_started") {
         if (event.agent) {

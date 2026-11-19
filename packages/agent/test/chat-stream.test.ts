@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { abortableDelay, consumeChatStream } from "../src/const/chat-stream.js";
+import { abortableDelay, consumeChatStream, ReasoningOnlyTimeoutError } from "../src/const/chat-stream.js";
 
 const bytes = new TextEncoder();
 const signal = () => new AbortController().signal;
@@ -86,5 +86,21 @@ describe("chat stream completion", () => {
       cancel() { clearInterval(heartbeat); },
     });
     await expect(consumeChatStream(body, () => {}, signal(), 1000, 10)).rejects.toThrow("generation timed out");
+  });
+  it("aborts continuous reasoning-only streams at reasoningOnlyMs without waiting for totalMs", async () => {
+    let thinker: ReturnType<typeof setInterval>;
+    const cancel = vi.fn(() => clearInterval(thinker));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        thinker = setInterval(() => {
+          controller.enqueue(bytes.encode('data: {"choices":[{"delta":{"reasoning_content":"still thinking "}}]}\n\n'));
+        }, 2);
+      },
+      cancel,
+    });
+    await expect(consumeChatStream(body, () => {}, signal(), 500, 5_000, 500, 25)).rejects.toBeInstanceOf(
+      ReasoningOnlyTimeoutError,
+    );
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

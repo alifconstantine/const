@@ -1,6 +1,6 @@
 # Tool call Const Harness dan oh-my-pi
 
-Harness Desktop memakai binary oh-my-pi `18.20.3` untuk chat utama, side chat, scheduled task dan subagent yang dibuat dari sesi tersebut. OMP menangani turn model, retry provider, compaction, steering dan Todo. Electron tetap memiliki workspace, event chat, persetujuan, dan penyimpanan percakapan. Runtime memuat ulang riwayat yang sudah disimpan Harness saat pengguna melanjutkan percakapan. [RPC oh-my-pi](https://github.com/can1357/oh-my-pi/blob/v18.20.3/docs/rpc.md)
+Dokumen ini mencatat percobaan integrasi binary oh-my-pi `18.20.3` pada commit `c9e10727`. Runtime Harness Desktop sekarang memakai `@const/agent`. Guard loop, hasil parsial, dan tes kompatibilitas sesi tetap menjadi bagian dari engine Const. [RPC oh-my-pi](https://github.com/can1357/oh-my-pi/blob/v18.20.3/docs/rpc.md)
 
 ## Inventaris tool
 
@@ -35,4 +35,4 @@ OMP memulai proses baru per run. Pada benchmark loop, request kedelapan sempat d
 
 ## Pengembangan
 
-`pnpm --filter @const/harness-desktop dev` menyiapkan binary dan memeriksa SHA-256. Packaging menyalin binary yang cocok dengan platform dan arsitektur beserta lisensi MIT. Jalankan build desktop dan `pnpm --filter @const/harness-desktop test:startup` untuk menguji proses Electron dan binary OMP yang dipin dengan server model lokal.
+Jalankan build desktop dan `pnpm --filter @const/harness-desktop test:startup` untuk menguji engine Const lewat Electron dengan server model lokal. Batas 200 pada integrasi tersebut berasal dari host Harness dan menghitung turn model. Loop utama oh-my-pi memeriksa tool call dan pesan yang masih perlu diproses. Harness sekarang memakai pengaman siklus tanpa progres dan menghormati batas turn yang diberikan pemanggil.

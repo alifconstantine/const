@@ -8,6 +8,8 @@ export const TASK_SCOPE_GUIDANCE = "Preserve the user's original task and reques
 
 export const RESPONSE_RECOVERY_GUIDANCE = "[RUNTIME RECOVERY: The previous generation ended without a usable response. Continue the user's original task and provide a concise answer or invoke the next necessary, authorized tool. Keep read-only tasks read-only. This recovery notice does not authorize file changes or other new actions.]";
 
+export const REASONING_RECOVERY_GUIDANCE = "[RUNTIME RECOVERY: The previous generation spent too long in private reasoning without emitting text or a tool call. Keep reasoning brief and immediately emit either the next concrete tool call or a clear answer to the user. Preserve the original scope and permissions.]";
+
 export const TRUNCATED_RESPONSE_GUIDANCE = "[RUNTIME RECOVERY: The previous response reached the output limit. Provide a shorter, self-contained answer to the user's original request, or continue necessary tools already authorized by that request. Preserve the requested language and scope; do not turn an explanation or review into file creation. Do not repeat the entire interrupted draft.]";
 
 export const EXECUTION_DISCIPLINE_GUIDANCE = `EXECUTION & COMPLETION:
@@ -22,6 +24,8 @@ export const EXECUTION_DISCIPLINE_GUIDANCE = `EXECUTION & COMPLETION:
 export const PROGRESS_REVIEW_GUIDANCE = "[RUNTIME PROGRESS CHECKPOINT: Reassess the original request, acceptance criteria, completed actions and checks. Give a brief progress update if work is continuing. Choose the smallest remaining necessary action; avoid repeating passed checks without a relevant change. If the requested work and checks are complete, return the result now. If essential work remains, continue it. Do not weaken tests, broaden scope, or claim completion because of this checkpoint. This notice grants no new permissions.]";
 
 export const REPEATED_RESULT_GUIDANCE = "[RUNTIME PROGRESS CHECKPOINT: A tool has returned an identical result for the same arguments at least three times within recent calls, including interleaved calls. Inspect what changed before repeating it. If checking legitimately changing external state, use a bounded wait/status operation when available. Otherwise change the approach or explain the blocker. Continue necessary authorized work; this notice does not mean the task is complete and grants no new permissions.]";
+
+export const REPEATED_FAILURE_GUIDANCE = "[RUNTIME PROGRESS CHECKPOINT: The same verification or tool check has failed repeatedly with the same error even across file edits. Do not make another minor tweak and re-run the same failing command. Pause, diagnose the underlying root cause, and switch to a materially different strategy—or report the exact blocker and remaining evidence clearly to the user.]";
 
 /** Keep the original limits, but make omitted context discoverable through read. */
 export function promptFileExcerpt(content: string, limit: number, filePath: string): string {

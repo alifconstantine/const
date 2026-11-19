@@ -7,12 +7,11 @@ Const adalah ekosistem produk AI untuk membuat sesuatu, memahami materi, dan men
 | Produk                                    | Untuk apa                                                                                                                            | Source                                   |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | [Harness](https://harness.const.web.id)   | Workbench desktop untuk coding, riset, dan pekerjaan kreatif: percakapan, file proyek, tools, browser, dan review dalam satu tempat. | [apps/harness](apps/harness/README.md)   |
-| [Learn](https://learn.const.web.id)       | Workspace belajar berbasis sumber, percakapan, dan artefak seperti kuis, flashcard, mind map, laporan, dan presentasi.               | [apps/learn](apps/learn/README.md)       |
 | [Router](https://router.const.web.id)     | Gateway AI dengan API kompatibel OpenAI, model combos, API keys, kuota, kredit, dan log penggunaan.                                  | [apps/router](apps/router/README.md)     |
 | [Accounts](https://accounts.const.web.id) | Identitas dan sign-in bersama untuk layanan Const serta alur OAuth integrasi yang didukung.                                          | [apps/accounts](apps/accounts/README.md) |
 | [Const](https://const.web.id)             | Portal pengenalan ekosistem.                                                                                                         | [apps/landing](apps/landing/README.md)   |
 
-Harness menyimpan workspace secara lokal. Penggunaan model, tools, dan layanan yang terhubung tetap dapat mengirim konteks ke penyedia terkait. Learn memiliki aplikasi desktop, client mobile Android, dan situs pengenalan; ketersediaan installer mengikuti rilis yang dipublikasikan.
+Harness menyimpan workspace secara lokal. Penggunaan model, tools, dan layanan yang terhubung tetap dapat mengirim konteks ke penyedia terkait.
 
 ## Di dalam monorepo
 
@@ -35,9 +34,7 @@ Jalankan produk yang dibutuhkan, bukan semua workspace sekaligus:
 pnpm --filter @const/landing dev
 pnpm --filter @const/accounts dev
 pnpm --filter @const/router dev
-pnpm --filter @const/learn-web dev
 pnpm --filter @const/harness-desktop dev
-pnpm --filter @const/learn-desktop dev
 ```
 
 Layanan terhubung memerlukan konfigurasi backend dan kredensial masing-masing. Backend dapat dijalankan dengan `pnpm --filter @const/backend dev` setelah deployment Convex dan autentikasinya dikonfigurasi. Jangan menaruh secret di source atau README.

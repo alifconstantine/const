@@ -7,8 +7,6 @@
     "**/dist": true,
     "**/dist-electron": true,
     "**/release": true,
-    "apps/learn/mobile/android/app/build": true,
-    "apps/learn/mobile/android/.gradle": true,
     "**/*.tsbuildinfo": true
   },
   "files.watcherExclude": {
@@ -19,7 +17,6 @@
     "**/.next/**": true,
     "**/.turbo/**": true,
     "**/dist/**": true,
-    "**/release/**": true,
-    "apps/learn/mobile/android/app/build/**": true
+    "**/release/**": true
   }
 }

@@ -1152,6 +1152,7 @@ export class SubAgentManager {
         const childConfig: AgentConfig = {
           baseUrl: context.parentConfig.baseUrl,
           apiKey: context.parentConfig.apiKey,
+          preset: context.parentConfig.preset,
           model: item.model || context.parentConfig.model,
           contextWindow: !item.model || item.model === context.parentConfig.model ? context.parentConfig.contextWindow : undefined,
           normalizeImage: context.parentConfig.normalizeImage,
@@ -1180,10 +1181,9 @@ export class SubAgentManager {
           externalToolHandler: agentDef.readOnly ? undefined : context.parentConfig.externalToolHandler,
           nativeCapabilityEnabled: context.parentConfig.nativeCapabilityEnabled,
           deferNativeTools: context.parentConfig.deferNativeTools,
-          createChildAgent: context.parentConfig.createChildAgent,
         };
 
-        const childAgent = childConfig.createChildAgent?.(childConfig) ?? new ConstAgent(childConfig);
+        const childAgent = new ConstAgent(childConfig);
         this.childAgents.set(item.id, childAgent);
 
         // CRITICAL FIX 1: Wire abortController directly to childAgent.abort()

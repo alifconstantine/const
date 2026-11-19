@@ -143,6 +143,32 @@ describe("payload recovery and terminal outcomes", () => {
     await expect(agent.run(source, () => {})).resolves.toMatchObject([{ role: "user" }, { role: "assistant", content: "Verified" }]);
   });
 
+  it("recovers a 413 caused by a large completed tool result without replaying the tool", async () => {
+    const requests: string[] = [];
+    const toolOutput = "prefix\n" + "x".repeat(100_000) + "\nsuffix";
+    const execute = vi.fn(async () => ({ result: toolOutput, isError: false }));
+    const name = "mcp_fixture_output";
+    vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+      requests.push(String(init.body));
+      if (requests.length === 1) {
+        const delta = { tool_calls: [{ index: 0, id: "large-result", type: "function", function: { name, arguments: "{}" } }] };
+        return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: "tool_calls" }] })}\n\ndata: [DONE]\n\n`);
+      }
+      if (requests.length === 2) return new Response("Payload too large", { status: 413 });
+      return complete();
+    }));
+    const agent = new ConstAgent({ ...config, mode: "full_access", tools: [],
+      externalTools: async () => [{ type: "function", function: { name, description: "Return a large result", parameters: {} } }],
+      externalToolHandler: execute });
+    const result = await agent.run([{ role: "user", content: "Inspect the fixture." }], () => {});
+    expect(execute).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(3);
+    expect(Buffer.byteLength(requests[2]!)).toBeLessThan(Buffer.byteLength(requests[1]!));
+    expect(JSON.parse(requests[2]!).messages.find((m: AgentMessage) => m.role === "tool"))
+      .toMatchObject({ tool_call_id: "large-result", content: expect.stringContaining("Tool result excerpted") });
+    expect(result.find(message => message.role === "tool")?.content).toBe(toolOutput);
+  });
+
   it("does not replay a rejected request when normalization makes no size progress", async () => {
     const fetch = vi.fn(async () => new Response("Too large", { status: 413 }));
     vi.stubGlobal("fetch", fetch);

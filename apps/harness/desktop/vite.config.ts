@@ -26,6 +26,8 @@ export default defineConfig({
           },
           resolve: {
             alias: [
+              { find: "@const/harness-engine", replacement: path.resolve(__dirname, "../../../packages/harness-engine/src/index.ts") },
+              { find: "@const/agent/const", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
               { find: "@const/agent/token-meter", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/token-meter.ts") },
               { find: "@const/agent", replacement: path.resolve(__dirname, "../../../packages/agent/src/const/index.ts") },
               { find: "@const/remote", replacement: path.resolve(__dirname, "../../../packages/remote/src") },

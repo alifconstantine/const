@@ -1,11 +1,25 @@
-import { isContextWindowError, isPermanentQuotaResponse, isUnsupportedImageError } from "./model-retry.js";
+import {
+  downgradeThinkingLevel,
+  isContextWindowError,
+  isNonRetryable503Response,
+  isNonRetryableModelError,
+  isPermanentQuotaResponse,
+  isRouterBudgetLimitError,
+  isUnsupportedImageError,
+} from "./model-retry.js";
 import { fitRequestHistory } from "./request-history.js";
-import { RESPONSE_PRESENTATION_GUIDANCE } from "./prompt-guidance.js";
-import { EXECUTION_DISCIPLINE_GUIDANCE, PROGRESS_REVIEW_GUIDANCE, REPEATED_RESULT_GUIDANCE } from "./prompt-guidance.js";
+import {
+  EXECUTION_DISCIPLINE_GUIDANCE,
+  PROGRESS_REVIEW_GUIDANCE,
+  REASONING_RECOVERY_GUIDANCE,
+  REPEATED_FAILURE_GUIDANCE,
+  REPEATED_RESULT_GUIDANCE,
+  RESPONSE_PRESENTATION_GUIDANCE,
+} from "./prompt-guidance.js";
 import { RunProgress, toolArgumentSignature } from "./run-progress.js";
 import { TodoTracker } from "./todo-tracker.js";
 import { isTodoTool } from "./todo-state.js";
-import { consumeChatStream, abortableDelay } from "./chat-stream.js";
+import { consumeChatStream, abortableDelay, ReasoningOnlyTimeoutError } from "./chat-stream.js";
 import { AgentRequestError, createRequestPreparer, PAYLOAD_ERROR_MESSAGE, requestBodyBudget } from "./request-payload.js";
 
 import fs from "node:fs";
@@ -18,11 +32,11 @@ import type {
   AgentEvent,
   AgentMessage,
   ToolCall,
-  ApprovalDecision,
   ApprovalResponseData,
   NativeToolDefinition,
   AgentOutcome,
   AgentErrorCategory,
+  RequestDiagnostics,
 } from "./types.js";
 import {
   CONST_DEFAULT_TOOLS,
@@ -42,7 +56,7 @@ import { ToolAuthorization } from "./tool-authorization.js";
 import { appendToolObservations, disableToolObservationImages, imageContentForModel, UNAVAILABLE_TOOL_VISION, type ToolObservation } from "./tool-observations.js";
 import { buildToolGuidance, LANGUAGE_GUIDANCE, TASK_SCOPE_GUIDANCE, promptFileExcerpt, RESPONSE_RECOVERY_GUIDANCE, TRUNCATED_RESPONSE_GUIDANCE } from "./prompt-guidance.js";
 
-function parseToolArguments(rawArgs: any): Record<string, any> {
+export function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
   if (typeof rawArgs === "object") return rawArgs;
   if (typeof rawArgs !== "string") return {};
@@ -306,7 +320,8 @@ export function extractFallbackToolCalls(content: string, declaredTools?: Readon
 
 export function compactHistoryForContext(
   messages: AgentMessage[],
-  preserveRecentCount = 4
+  preserveRecentCount = 4,
+  shrinkToolResults = false,
 ): AgentMessage[] {
   if (!messages || messages.length === 0) {
     return messages;
@@ -322,6 +337,18 @@ export function compactHistoryForContext(
   }
 
   return messages.map((m, index) => {
+    if (shrinkToolResults) {
+      if (m.role === "tool" && typeof m.content === "string" && m.content.length > 1_024) {
+        return { ...m, content: `${m.content.slice(0, 512)}\n\n[Tool result excerpted after a payload limit. Original result: ${m.content.length} characters.]\n\n${m.content.slice(-384)}` };
+      }
+      if (m.role === "assistant" && typeof m.thinking === "string" && m.thinking.length > 0 && index < latestAssistantIndex) {
+        return { ...m, thinking: undefined };
+      }
+      if (m.toolObservationId && Array.isArray(m.content) && index < latestAssistantIndex) {
+        const textParts = m.content.filter((part: any) => part.type === "text").map((part: any) => part.text).join("\n");
+        return { ...m, content: `${textParts}\n[Earlier visual tool observation omitted after payload limit.]`.trim() };
+      }
+    }
     // Every result of the newest tool batch must reach the model at least once,
     // including batches larger than preserveRecentCount.
     if ((m.role === "tool" || m.toolObservationId) && index > latestAssistantIndex) return m;
@@ -603,7 +630,7 @@ interface FetchRetryOptions {
   onRetry?: (attempt: number, maxRetries: number, reason: string) => void;
 }
 
-async function fetchWithRetry(
+export async function fetchWithRetry(
   url: string,
   init: RequestInit,
   options: FetchRetryOptions = {}
@@ -628,12 +655,12 @@ async function fetchWithRetry(
       });
       clearTimeout(headerTimer);
 
-      // Transient HTTP errors: 429 (Rate limit) or 5xx server errors
+      // Transient HTTP errors: 429 (non-permanent quota) or 5xx server errors (excluding deterministic Router 503 price/budget rejections)
       const isTransientHttp =
         (response.status === 429 && !(await isPermanentQuotaResponse(response))) ||
         response.status === 500 ||
         response.status === 502 ||
-        response.status === 503 ||
+        (response.status === 503 && !(await isNonRetryable503Response(response))) ||
         response.status === 504 ||
         response.status === 529;
 
@@ -698,7 +725,6 @@ export class ConstAgent {
 
   constructor(config: AgentConfig) {
     this.config = {
-      maxTurns: 200,
       workspacePath: process.cwd(),
       ...config,
     };
@@ -726,7 +752,10 @@ export class ConstAgent {
   }
 
   public get maxTurns(): number {
-    return this.config.maxTurns || 200;
+    const configured = this.config.maxTurns;
+    if (typeof configured === "number" && Number.isFinite(configured) && configured >= 1) return Math.floor(configured);
+    if (this.config.sessionKind === "companion") return 4;
+    return this.config.preset === "harness" ? Infinity : 200;
   }
 
   private steeringQueue: Array<{ content: string; attachments?: any[]; timestamp: number; instructionId?: string; sourceSideChatId?: string }> = [];
@@ -760,12 +789,12 @@ export class ConstAgent {
       }
     } catch {}
     this.authorization.denyPending("Agent execution was cancelled by user.");
-    this.isRunning = false;
   }
 
   public async run(
     messages: AgentMessage[],
-    onEvent: (event: AgentEvent) => void
+    onEvent: (event: AgentEvent) => void,
+    options: { returnPartialOnFailure?: boolean } = {},
   ): Promise<AgentMessage[]> {
     if (this.isRunning) {
       throw new Error("Agent is already running a session");
@@ -799,6 +828,24 @@ export class ConstAgent {
     let payloadRecoveryAttempted = false;
     let payloadRecoveryLimit: number | undefined;
     let rejectedPayloadBytes: number | undefined;
+    const recoverPayload = (diagnostics: RequestDiagnostics): boolean => {
+      if (payloadRecoveryAttempted || !diagnostics.requestBytes) return false;
+      const canShrinkImages = (diagnostics.imageBytes ?? 0) > 0 && (Boolean(this.config.normalizeImage) || conversationHistory.some(m => Boolean(m.toolObservationId) && Array.isArray(m.content)));
+      const canShrinkText = conversationHistory.some(message =>
+        (message.role === "tool" && typeof message.content === "string" && message.content.length > 1_024) ||
+        (message.role === "assistant" && typeof message.thinking === "string" && message.thinking.length > 0),
+      );
+      if (!canShrinkImages && !canShrinkText) return false;
+      payloadRecoveryAttempted = true;
+      lastRecovery = "payload";
+      rejectedPayloadBytes = diagnostics.requestBytes;
+      // Retain the gateway's configured limit and only dispatch a strictly smaller retry.
+      payloadRecoveryLimit = canShrinkImages ? Math.floor(diagnostics.requestBytes * 0.65) : diagnostics.requestBytes - 1;
+      if (canShrinkText) {
+        onEvent({ type: "status", status: "thinking", message: "Request too large. Retrying with shorter tool output excerpts." });
+      }
+      return true;
+    };
     let requestSequence = 0;
     let activeRequest: ReturnType<typeof trackLlmRequest> | undefined;
     let contextRecoveryAttempted = false;
@@ -807,7 +854,7 @@ export class ConstAgent {
     const emitContext = () => {
       const breakdown = calculateContextBreakdown({
         systemPrompt: contextSystemPrompt, tools: contextTools,
-        messages: fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4)),
+        messages: fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4, payloadRecoveryAttempted)),
       });
       onEvent({ type: "context_update", model: this.config.model, updatedAt: Date.now(), systemPromptTokens: breakdown.systemTokens,
         toolsTokens: breakdown.toolsTokens, messagesTokens: breakdown.messageTokens,
@@ -818,6 +865,8 @@ export class ConstAgent {
     let consecutiveDraftCutoffs = 0;
     let recoveryInstruction = "";
     let consecutiveEmptyRetries = 0;
+    let effectiveThinkingLevel = this.config.thinkingLevel;
+    let reasoningDowngradedForTurn = false;
     const recoverContext = (error: string): boolean => {
       if (contextRecoveryAttempted || !isContextWindowError(error)) return false;
       contextRecoveryAttempted = true;
@@ -826,7 +875,7 @@ export class ConstAgent {
       return true;
     };
     const MAX_EMPTY_RETRIES = this.config.sessionKind === "companion" ? 1 : 2;
-    const maxTurns = this.config.maxTurns || 200;
+    const maxTurns = this.maxTurns;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
     const progress = new RunProgress();
@@ -937,7 +986,11 @@ export class ConstAgent {
         const progressCheckpoint = isCompanion ? undefined : progress.checkpoint(currentTurn);
         if (progressCheckpoint) {
           onEvent({ type: "progress_checkpoint", ...progressCheckpoint });
-          turnInstructions.push(progressCheckpoint.kind === "repeated_result" ? REPEATED_RESULT_GUIDANCE : PROGRESS_REVIEW_GUIDANCE);
+          turnInstructions.push(
+            progressCheckpoint.kind === "repeated_result"
+              ? (progress.hasRepeatedVerificationFailure() ? REPEATED_FAILURE_GUIDANCE : REPEATED_RESULT_GUIDANCE)
+              : PROGRESS_REVIEW_GUIDANCE,
+          );
           if (todoEnabled && todos.summary()) turnInstructions.push(todos.summary());
         }
         const planReview = todoEnabled ? todos.midRunReminder() : undefined;
@@ -955,12 +1008,13 @@ export class ConstAgent {
         if (pluginInstructions) turnInstructions.push(pluginInstructions);
         if (recoveryInstruction) turnInstructions.push(recoveryInstruction);
         if (this.config.softTurnBudget && currentTurn >= this.config.softTurnBudget) {
-          turnInstructions.push(`[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns, hard limit: ${maxTurns} turns). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`);
+          const hardLimit = Number.isFinite(maxTurns) ? `, hard limit: ${maxTurns} turns` : "";
+          turnInstructions.push(`[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns${hardLimit}). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`);
         }
 
         contextSystemPrompt = systemPrompt;
         contextTools = requestTools;
-        const historyForContext = fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4));
+        const historyForContext = fitRequestHistory(compactHistoryForContext(conversationHistory, contextRecoveryAttempted ? 0 : 4, payloadRecoveryAttempted));
         // Request-only reminders preserve the stable prefix and never become human instructions in stored history.
         const requestHistory: AgentMessage[] = [...historyForContext, ...(turnInstructions.length ? [{ role: "system" as const, content: turnInstructions.join("\n\n") }] : [])];
 
@@ -1054,7 +1108,8 @@ export class ConstAgent {
           throw new Error("User cancelled agent execution.");
         }
 
-        const prepared = await prepareRequest({
+        const configuredBodyLimit = requestBodyBudget(endpoint, this.config.requestBodyLimitBytes);
+        const payload = {
               model: this.config.model,
               messages: formattedMessages,
               ...(requestTools.length ? { tools: requestTools } : {}),
@@ -1064,20 +1119,31 @@ export class ConstAgent {
               ...(useMaxCompletionTokensOnly
                 ? { max_completion_tokens: resolvedMaxTokens }
                 : { max_tokens: resolvedMaxTokens }),
-              ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
+              ...(effectiveThinkingLevel && effectiveThinkingLevel !== "off"
                 ? {
-                    reasoning: this.config.thinkingLevel,
-                    reasoning_effort: this.config.thinkingLevel,
+                    reasoning: effectiveThinkingLevel,
+                    reasoning_effort: effectiveThinkingLevel,
                   }
                 : {}),
-        }, { endpoint, runId, signal,
-          limitBytes: payloadRecoveryLimit ?? requestBodyBudget(endpoint, this.config.requestBodyLimitBytes),
-          recovery: payloadRecoveryAttempted ? "payload" : contextRecoveryAttempted ? "context" : undefined });
+        };
+        let prepared: Awaited<ReturnType<typeof prepareRequest>>;
+        try {
+          const bodyLimit = Math.min(configuredBodyLimit ?? Infinity, payloadRecoveryLimit ?? Infinity);
+          prepared = await prepareRequest(payload, { endpoint, runId, signal,
+            limitBytes: Number.isFinite(bodyLimit) ? bodyLimit : undefined,
+            recovery: payloadRecoveryAttempted ? "payload" : contextRecoveryAttempted ? "context" : undefined });
+        } catch (error) {
+          if (error instanceof AgentRequestError && error.category === "payload" && error.diagnostics && recoverPayload(error.diagnostics)) {
+            currentTurn--;
+            continue;
+          }
+          throw error;
+        }
         if (rejectedPayloadBytes !== undefined && prepared.diagnostics.requestBytes >= rejectedPayloadBytes) {
           throw new AgentRequestError(PAYLOAD_ERROR_MESSAGE, "payload", 413);
         }
         Object.assign(prepared.diagnostics, {
-          thinkingLevel: this.config.thinkingLevel || "provider_default", maxOutputTokens: resolvedMaxTokens,
+          thinkingLevel: (effectiveThinkingLevel as any) || "provider_default", maxOutputTokens: resolvedMaxTokens,
           toolNames: requestTools.map(tool => tool.function.name), loadedNativePlugins: [...loadedNativePlugins], retryCount: 0,
         });
         onEvent({ type: "request_prepared", ...prepared.diagnostics });
@@ -1117,11 +1183,7 @@ export class ConstAgent {
           if (response.status === 413) {
             request.updateDiagnostics({ errorCategory: "payload" });
             request.finish("failed");
-            if (!payloadRecoveryAttempted && prepared.diagnostics.imageBytes > 0 && this.config.normalizeImage) {
-              payloadRecoveryAttempted = true;
-              lastRecovery = "payload";
-              rejectedPayloadBytes = prepared.diagnostics.requestBytes;
-              payloadRecoveryLimit = Math.floor(prepared.diagnostics.requestBytes * 0.65);
+            if (recoverPayload(prepared.diagnostics)) {
               currentTurn--;
               continue;
             }
@@ -1137,12 +1199,10 @@ export class ConstAgent {
 
           const explicitVisionRejection = !modelSupportsImages || isUnsupportedImageError(cleanMessage);
 
+          const isHtmlGatewayError = cleanMessage.includes("<!DOCTYPE") || cleanMessage.includes("<html");
           if (
-            cleanMessage.includes("<!DOCTYPE") ||
-            cleanMessage.includes("<html") ||
-            response.status === 502 ||
-            response.status === 503 ||
-            response.status === 504
+            isHtmlGatewayError ||
+            (!cleanMessage.trim() && (response.status === 502 || response.status === 503 || response.status === 504))
           ) {
             cleanMessage =
               `Const Engine server gateway error (${response.status}). Upstream connection timed out or is temporarily unreachable.`;
@@ -1180,8 +1240,17 @@ export class ConstAgent {
             continue;
           }
 
-          throw new AgentRequestError(`Const error (${response.status}): ${cleanMessage}`,
-            isContextWindowError(cleanMessage) ? "context" : response.status >= 500 || response.status === 429 ? "transport" : "model", response.status);
+          throw new AgentRequestError(
+            `Const error (${response.status}): ${cleanMessage}`,
+            isContextWindowError(cleanMessage)
+              ? "context"
+              : isRouterBudgetLimitError(cleanMessage) || isNonRetryableModelError(cleanMessage)
+                ? "model"
+                : response.status >= 500 || response.status === 429
+                  ? "transport"
+                  : "model",
+            response.status,
+          );
         }
 
         if (!response.body) {
@@ -1248,23 +1317,57 @@ export class ConstAgent {
           }, signal);
         } catch (streamErr: any) {
           if (turnContent) onEvent({ type: "token_reset" });
-          request.updateDiagnostics({ errorCategory: signal.aborted ? "cancelled" : isContextWindowError(streamErr?.message ?? "") ? "context" : "transport" });
+          const errMsg = streamErr?.message || "";
+          const nonRetryable = isNonRetryableModelError(errMsg);
+          request.updateDiagnostics({
+            errorCategory: signal.aborted
+              ? "cancelled"
+              : isContextWindowError(errMsg)
+                ? "context"
+                : nonRetryable
+                  ? "model"
+                  : "transport",
+          });
           request.finish(signal.aborted || this._isCancelled ? "cancelled" : "failed");
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
           }
-          if (recoverContext(streamErr?.message || "")) {
+          if (nonRetryable) {
+            throw new AgentRequestError(errMsg, "model");
+          }
+          if (recoverContext(errMsg)) {
             currentTurn--;
             continue;
           }
-          if (turnThinking && !turnContent) {
-            if (consecutivePlanningTurns >= 1) throw streamErr;
+          const isReasoningOnlyFailure =
+            streamErr instanceof ReasoningOnlyTimeoutError ||
+            Boolean(turnThinking && !turnContent && toolCallsMap.size === 0);
+          if (isReasoningOnlyFailure) {
+            if (consecutivePlanningTurns >= 1) {
+              throw new AgentRequestError(
+                errMsg || "Model spent too long reasoning without producing a response or tool call.",
+                "transport",
+              );
+            }
             consecutivePlanningTurns++;
-            conversationHistory.push({ role: "assistant", content: "", thinking: turnThinking.slice(-16000), timestamp: Date.now() });
-            recoveryInstruction = RESPONSE_RECOVERY_GUIDANCE;
+            const downgraded = downgradeThinkingLevel(effectiveThinkingLevel);
+            if (downgraded && !reasoningDowngradedForTurn) {
+              effectiveThinkingLevel = downgraded;
+              reasoningDowngradedForTurn = true;
+            }
+            recoveryInstruction = REASONING_RECOVERY_GUIDANCE;
+            currentTurn--;
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: downgraded
+                ? `Model spent too long reasoning without output. Retrying once with reduced reasoning effort (${downgraded})...`
+                : "Model stream ended during reasoning without output. Retrying once with a direct prompt...",
+            });
+            await abortableDelay(800, signal);
+            continue;
           }
 
-          const errMsg = streamErr?.message || "";
           const isVisionError = !modelSupportsImages || isUnsupportedImageError(errMsg);
 
           const msgWithImages = [...conversationHistory].reverse().find(
@@ -1331,6 +1434,11 @@ export class ConstAgent {
         payloadRecoveryAttempted = false;
         payloadRecoveryLimit = undefined;
         rejectedPayloadBytes = undefined;
+        consecutivePlanningTurns = 0;
+        if (reasoningDowngradedForTurn) {
+          effectiveThinkingLevel = this.config.thinkingLevel;
+          reasoningDowngradedForTurn = false;
+        }
 
         if (turnFinishReason === "length" && toolCallsMap.size) {
           toolCallsMap.clear();
@@ -1654,6 +1762,22 @@ export class ConstAgent {
           }
           const parsedArgs = parseToolArguments(tc.function.arguments);
           const argsHash = toolArgumentSignature(parsedArgs);
+          const activeTool = activeTools.find(tool => tool.function.name === tc.function.name);
+          const stopOnCycle = (result: unknown, isError: boolean) => {
+            if (!progress.record(tc.function.name, parsedArgs, result, isError)) return;
+            assistantMsg.tool_calls = toolCalls.slice(0, tcIdx + 1);
+            onEvent({ type: "progress_checkpoint", ...progress.checkpoint(currentTurn)! });
+            throw new AgentRequestError("The agent stopped after repeating a tool cycle without progress.", "stalled");
+          };
+
+          if ((isCompanion || this.config.preset === "harness") && !activeTool) {
+            const result = "Tool not found in this session. Use an available tool or the declared connected-app MCP tools; use mcp_search_tools to discover them when available.";
+            onEvent({ type: "tool_call", toolCallId: tc.id, toolName: tc.function.name, args: parsedArgs });
+            onEvent({ type: "tool_result", toolCallId: tc.id, toolName: tc.function.name, result, isError: true });
+            conversationHistory.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: result, isError: true, timestamp: Date.now() });
+            stopOnCycle(result, true);
+            continue;
+          }
 
           // Consecutive Doom Loop Detection (OpenCode & Pi alignment)
           const recentCalls = toolCallHistory.slice(-DOOM_LOOP_THRESHOLD);
@@ -1665,7 +1789,7 @@ export class ConstAgent {
             recentCalls.slice(-2).every((entry) => entry.name === tc.function.name && entry.argsHash === argsHash && entry.isError);
 
           // Benign exploration tools like ls, read, find, grep shouldn't be blocked unless spammed consecutively
-          const isDoomLoop = (isIdenticalConsecutive || lastFailedConsecutive) && (
+          const isDoomLoop = (isIdenticalConsecutive || lastFailedConsecutive) && !["wait", "managetask", "agentstatus"].includes(normalizeToolName(tc.function.name)) && (
             tc.function.name === "bash" || tc.function.name === "powershell" || tc.function.name === "edit" || isIdenticalConsecutive
           );
 
@@ -1701,6 +1825,7 @@ export class ConstAgent {
               isError: true,
             });
 
+            stopOnCycle(loopWarning, true);
             continue;
           }
 
@@ -1713,13 +1838,16 @@ export class ConstAgent {
 
           const { allowOutsideWorkspace, waitingMs, rejection } = await this.authorization.authorize(
             tc, parsedArgs, workspacePath,
-            activeTools.find(tool => tool.function.name === tc.function.name), signal, onEvent,
+            activeTool, signal, onEvent,
           );
           if (rejection) {
             onEvent({ type: "tool_result", toolCallId: tc.id, toolName: tc.function.name, result: rejection.text, durationMs: 0, waitingMs, isError: true });
             conversationHistory.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: rejection.text, timestamp: Date.now() });
             recordToolCall({ name: tc.function.name, argsHash, isError: true });
-            if (rejection.decision === "skip") continue;
+            if (rejection.decision === "skip") {
+              if (!signal.aborted) stopOnCycle(rejection.text, true);
+              continue;
+            }
 
             for (const skipped of toolCalls.slice(tcIdx + 1)) {
               const result = "[ACTION CANCELLED]: An earlier action in this batch was rejected by the user. Replan using their feedback before proposing further actions.";
@@ -1859,7 +1987,6 @@ export class ConstAgent {
             timestamp: Date.now(),
           });
 
-          progress.record(tc.function.name, parsedArgs, result, Boolean(isError));
           todos.record(tc.function.name, Boolean(isError));
           recordToolCall({
             name: tc.function.name,
@@ -1881,6 +2008,7 @@ export class ConstAgent {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
           }
+          stopOnCycle(result, Boolean(isError));
 
           // If user steered with a new message while this tool was running:
           // Safely stop remaining scheduled tool calls in this turn so the agent can pivot immediately
@@ -1997,7 +2125,7 @@ export class ConstAgent {
       }
 
       emitContext();
-      if (reachedTurnLimit) throw new AgentRequestError(fallbackContent, "model");
+      if (reachedTurnLimit) throw new AgentRequestError(fallbackContent, "turn_limit");
       outcome = "completed";
       onEvent({
         type: "done",
@@ -2015,7 +2143,8 @@ export class ConstAgent {
         errorCategory = "transport";
         onEvent({ type: "error", error: error.message, category: errorCategory });
         onEvent({ type: "status", status: "error", message: error.message });
-        throw error;
+        if (!options.returnPartialOnFailure) throw error;
+        return conversationHistory;
       }
       const isAborted =
         this._isCancelled ||
@@ -2034,7 +2163,7 @@ export class ConstAgent {
       } else {
         onEvent({ type: "error", error: err.message, category: errorCategory });
         onEvent({ type: "status", status: "error", message: err.message });
-        throw err;
+        if (!options.returnPartialOnFailure) throw err;
       }
       return conversationHistory;
     } finally {

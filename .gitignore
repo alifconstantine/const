@@ -57,7 +57,6 @@ dist/
 dist-electron/
 release/
 build/
-!apps/learn/desktop/build/
 !apps/harness/desktop/build/
 *.tsbuildinfo
 __pycache__/

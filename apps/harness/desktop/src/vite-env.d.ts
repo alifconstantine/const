@@ -498,6 +498,9 @@ declare global {
       listBackgroundTasks?: (conversationId: string) => Promise<BackgroundTaskItem[]>;
       killBackgroundTask?: (taskId: string, conversationId: string) => Promise<boolean>;
       getBackgroundTaskLogs?: (taskId: string, conversationId: string) => Promise<string[]>;
+      getBackgroundTaskLogSnapshot?: (taskId: string, conversationId: string) => Promise<{
+        logs: string[]; status?: BackgroundTaskItem["status"]; outputRevision: number;
+      }>;
       killSubAgent?: (agentId: string, conversationId: string) => Promise<boolean>;
       onBackgroundTaskEvent?: (
         callback: (event: {
@@ -505,7 +508,8 @@ declare global {
           taskId: string;
           conversationId?: string;
           data?: string;
-          status?: string;
+          outputRevision?: number;
+          status?: BackgroundTaskItem["status"];
           code?: number | null;
         }) => void
       ) => () => void;

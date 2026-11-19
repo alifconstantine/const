@@ -50,7 +50,7 @@ export interface NormalizedModelImage {
 
 export type ModelImageNormalizer = (dataUrl: string, options: ModelImageOptions, signal: AbortSignal) => Promise<NormalizedModelImage>;
 export type AgentOutcome = "completed" | "failed" | "cancelled";
-export type AgentErrorCategory = "payload" | "image" | "context" | "transport" | "cancelled" | "model";
+export type AgentErrorCategory = "payload" | "image" | "context" | "transport" | "cancelled" | "model" | "stalled" | "turn_limit";
 
 export interface RequestDiagnostics {
   runId: string;
@@ -280,7 +280,7 @@ export interface AgentEventMap {
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string; category?: AgentErrorCategory };
   todo_update: { todos: TodoItem[]; toolCallId?: string };
-  ask_question: { toolCallId: string; questions: QuestionItem[] };
+  ask_question: { toolCallId: string; questions: QuestionItem[]; requestId?: string };
   task_started: { task: BackgroundTaskItem };
   task_stopped: { taskId: string; code: number | null };
   subagent_started: { agent: SubAgentItem };
@@ -348,8 +348,6 @@ export interface AgentConfig {
   imageConfig?: any;
   speechHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
   imageHandler?: (args: Record<string, any>, workspacePath: string) => Promise<{ result: any; isError: boolean }>;
-  /** Reuse the embedding application's engine for nested coding tasks. */
-  createChildAgent?: (config: AgentConfig) => CodingAgentRuntime;
 }
 
 export interface CodingAgentRuntime {

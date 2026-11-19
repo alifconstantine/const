@@ -288,6 +288,8 @@ export const es: TranslationDictionary = {
     sendMessage: "Enviar mensaje",
     workedFor: "Trabajó durante",
     workingFor: "Trabajando durante",
+    working: "Trabajando…",
+    waitingForBackground: "Esperando el trabajo en segundo plano…",
     turnIndicatorRunning: "Procesando respuesta...",
     turnIndicatorFinished: "Ejecución completada",
     questionCardTitle: "Const tiene algunas preguntas",
@@ -1019,6 +1021,8 @@ export const es: TranslationDictionary = {
     outside: "Fuera de proyecto",
   },
   toast: {
+    agentStalled: "El agente se detuvo tras repetir las mismas acciones sin avanzar. Puedes continuar con otro enfoque.",
+    agentTurnLimit: "El agente alcanzó el límite de turnos de esta ejecución. Envía otro mensaje para continuar.",
     imagePreparationFailed: "No se pudo preparar la imagen para el modelo. Conviértela a PNG o JPEG, o recórtala e inténtalo de nuevo. El archivo original no se ha modificado.",
     requestTooLarge: "Las imágenes o la solicitud superan el límite de tamaño de esta pasarela. Reduce o recorta las imágenes, revisa menos imágenes a la vez o acorta la entrada y continúa. Los archivos originales y el historial del chat se conservan.",
     taskCompleted: "Tarea completada",

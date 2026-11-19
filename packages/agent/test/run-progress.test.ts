@@ -34,6 +34,22 @@ describe("run progress checkpoints", () => {
     expect(progress.checkpoint(4)).toBeUndefined();
   });
 
+  it("detects repeated identical verification failures across file edits and stalls after one redirect", () => {
+    const progress = new RunProgress();
+    // Edit -> Fail #1
+    expect(progress.record("write", { path: "app.ts", content: "v1" }, "saved", false)).toBe(false);
+    expect(progress.record("bash", { command: "npm test" }, "Exit code 1\nPID: 101\nAssertionError: broken", true)).toBe(false);
+    expect(progress.checkpoint(2)).toBeUndefined();
+    // Edit -> Fail #2 (different PID, same failure) -> triggers checkpoint
+    expect(progress.record("write", { path: "app.ts", content: "v2" }, "saved", false)).toBe(false);
+    expect(progress.record("bash", { command: "npm test" }, "Exit code 1\nPID: 202\nAssertionError: broken", true)).toBe(false);
+    expect(progress.hasRepeatedVerificationFailure()).toBe(true);
+    expect(progress.checkpoint(4)).toEqual({ kind: "repeated_result", turn: 4, toolName: "bash", count: 2 });
+    // Edit -> Fail #3 -> hard stop!
+    expect(progress.record("write", { path: "app.ts", content: "v3" }, "saved", false)).toBe(false);
+    expect(progress.record("bash", { command: "npm test" }, "Exit code 1\nPID: 303\nAssertionError: broken", true)).toBe(true);
+  });
+
   it("reviews long runs periodically without stopping later work", () => {
     const progress = new RunProgress(3);
     expect(progress.checkpoint(2)).toBeUndefined();
@@ -60,7 +76,9 @@ describe("run progress checkpoints", () => {
       vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
         const body = JSON.parse(String(init.body)); requests.push(body);
         const index = calls++;
-        const delta = index < 21 ? { tool_calls: [{ index: 0, id: `call-${index}`, type: "function", function: { name: "read", arguments: JSON.stringify({ path: index % 2 ? "a.txt" : "b.txt" }) } }] } : { content: "Both files inspected." };
+        // The model changes its read strategy after the first repeated-cycle reminder.
+        const args = { path: index % 2 ? "a.txt" : "b.txt", ...(index >= 6 && { limit: index }) };
+        const delta = index < 21 ? { tool_calls: [{ index: 0, id: `call-${index}`, type: "function", function: { name: "read", arguments: JSON.stringify(args) } }] } : { content: "Both files inspected." };
         return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: index < 21 ? "tool_calls" : "stop" }] })}\n\ndata: [DONE]\n\n`, { headers: { "content-type": "text/event-stream" } });
       }));
       const agent = createConstAgent({ baseUrl: "http://fixture.invalid/v1", apiKey: "fixture", model: "fixture", workspacePath: dir, mode: "full_access", maxTurns: 30 });
@@ -75,4 +93,33 @@ describe("run progress checkpoints", () => {
       expect(calls).toBe(22);
     } finally { vi.unstubAllGlobals(); await fs.rm(dir, { recursive: true, force: true }); }
   });
+
+  it("finishes a progressing Harness run after turn 200 and honors explicit turn limits", async () => {
+    let calls = 0;
+    const action = "mcp_fixture_step";
+    const execute = vi.fn(async (_name, args) => ({ result: `Verified step ${args.index}`, isError: false }));
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      const index = ++calls;
+      const delta = index <= 201 ? { tool_calls: [{ index: 0, id: `call-${index}`, type: "function",
+        function: { name: action, arguments: JSON.stringify({ index }) } }] } : { content: "All steps verified." };
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: index <= 201 ? "tool_calls" : "stop" }] })}\n\ndata: [DONE]\n\n`);
+    }));
+    try {
+      const config = {
+        baseUrl: "http://fixture.invalid/v1", apiKey: "fixture", model: "fixture",
+        preset: "harness" as const, mode: "full_access" as const, tools: [],
+        externalTools: async () => [{ type: "function" as const, function: { name: action, description: "Verify a step", parameters: {} } }],
+        externalToolHandler: execute,
+      };
+      const messages = [{ role: "user" as const, content: "Verify the steps." }];
+      const history = await createConstAgent(config).run(messages, () => {});
+      expect(calls).toBe(202);
+      expect(execute).toHaveBeenCalledTimes(201);
+      expect(history.at(-1)?.content).toBe("All steps verified.");
+
+      calls = 0;
+      await expect(createConstAgent({ ...config, maxTurns: 2 }).run(messages, () => {})).rejects.toMatchObject({ category: "turn_limit" });
+      expect(calls).toBe(2);
+    } finally { vi.unstubAllGlobals(); }
+  }, 25_000);
 });

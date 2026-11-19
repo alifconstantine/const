@@ -168,6 +168,8 @@ export function ExecutionTrace({
     return onlyDraft ? [...result, ...traceSteps] : result;
   }, [traceSteps, thinking, toolCalls, durationMs]);
   const firstVisible = Math.max(0, steps.length - visibleCount);
+  const activeStep = steps.at(-1);
+  const waitingForBackground = activeStep?.type === "tool" && activeStep.name === "wait" && activeStep.result === undefined;
 
   const hasContent = steps.length > 0 || mutations.length > 0 || isExecuting;
   if (!hasContent) return null;
@@ -376,7 +378,7 @@ export function ExecutionTrace({
           {isExecuting && !pendingApprovalToolCallId && (
             <div className="flex items-center gap-2 text-xs text-[#a9a9a9] dark:text-[#777777] py-1">
               <Loader2 className="w-3 h-3 animate-spin text-[#e79737] dark:text-[#ff7a00]" />
-              <span>Working...</span>
+              <span>{waitingForBackground ? t("workbench.waitingForBackground") : t("workbench.working")}</span>
             </div>
           )}
         </div>

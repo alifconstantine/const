@@ -8,6 +8,7 @@
       "@/*": ["./src/*"],
       "@const/ui": ["../../../packages/ui/src/index.ts"],
       "@const/ui/*": ["../../../packages/ui/src/*"],
+      "@const/harness-engine": ["../../../packages/harness-engine/src/index.ts"],
       "@const/agent": ["../../../packages/agent/src/const/index.ts"],
       "@const/agent/*": ["../../../packages/agent/src/const/*"],
       "@const/ai": ["../../../packages/ai/src/index.ts"],

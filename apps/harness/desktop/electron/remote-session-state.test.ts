@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createRemoteSessionState, updateRemoteSessionState } from "./remote-session-state";
 
+test("a failed run closes pending tool and approval state in snapshots for renderer reload", () => {
+  const live = createRemoteSessionState([{ role: "user", content: "Start" }], "run");
+  updateRemoteSessionState(live, { type: "tool_call", toolCallId: "tool-1", toolName: "write" });
+  updateRemoteSessionState(live, { type: "approval_request", approvalId: "approval-1" });
+  updateRemoteSessionState(live, { type: "error", error: "Connection interrupted." });
+  const assistant = live.messages.at(-1);
+  assert.equal(live.approval, undefined);
+  assert.equal(live.status, "error");
+  assert.equal(assistant.traceSteps[0].isError, true);
+  assert.equal(assistant.traceSteps[0].result, "Connection interrupted.");
+  assert.equal(assistant.toolCalls[0].isError, true);
+  assert.ok(assistant.durationMs >= 0);
+});
+
 test("host snapshots preserve separate progress updates and final text through JSON reload", () => {
   const live = createRemoteSessionState([{ role: "user", content: "Research" }], "run");
   for (const [index, content] of ["I'll inspect the workspace.", "The sources are readable.\n\nI'll compare the figures."].entries()) {

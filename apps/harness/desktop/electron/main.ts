@@ -25,7 +25,10 @@ import { randomUUID } from "node:crypto";
 import { TerminalSessions } from "./terminal-sessions";
 import { resolveTerminalDirectory } from "./terminal-directory";
 import {
-  OmpAgent,
+  createPiHarnessAgent,
+  type PiHarnessAgent,
+} from "@const/harness-engine";
+import {
   rollbackFileMutation,
   getMutationHistory,
   killProcessTree,
@@ -43,7 +46,6 @@ import {
   extractPdfText,
   extractDocumentText,
 } from "@const/agent";
-import { ompExecutable } from "./omp-executable";
 import { WorkingDirectories, workingDirectoryInstructions } from "./working-directories";
 import { requireConversationId, updateSessionMode } from "./session-ownership";
 import { ConversationDatabase, type ConversationRecord } from "./database";
@@ -86,11 +88,15 @@ import type { AgentSessionEnded } from "../src/lib/agent-outcomes";
 import { monitorMainRenderer } from "./renderer-health";
 import { rendererHealthStrings } from "../../shared/renderer-health-strings";
 
+// Legacy Electron webview Browser Use & Computer Use are disabled during the Pi core engine
+// migration phase and will be replaced natively by agent-browser and agent-desktop.
+const LEGACY_AUTOMATION_ENABLED = process.env.CONST_ENABLE_LEGACY_AUTOMATION === "1";
+
 registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
-  if (config.enableBrowserUse === false) {
+  if (!LEGACY_AUTOMATION_ENABLED || config.enableBrowserUse === false) {
     return {
-      result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+      result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
       isError: true,
     };
   }
@@ -99,9 +105,9 @@ registerGlobalBrowserToolHandler(async (toolName, args, context) => {
 
 registerGlobalComputerToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
-  if (config.enableComputerUse === false) {
+  if (!LEGACY_AUTOMATION_ENABLED || config.enableComputerUse === false) {
     return {
-      result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+      result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
       isError: true,
     };
   }
@@ -212,8 +218,8 @@ const defaultUserConfig: UserConfig = {
   activeModel: DEFAULT_ROUTER_MODEL_ID,
   activeProvider: "const",
   workspaceMemoryEnabled: true,
-  enableComputerUse: true,
-  enableBrowserUse: true,
+  enableComputerUse: false,
+  enableBrowserUse: false,
   defaultProjectLocation: "",
   language: "en",
   defaultPermission: "ask_before_changes",
@@ -311,7 +317,7 @@ function loadUserConfig(): UserConfig {
         merged.providers.const.baseUrl = process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1";
       }
 
-      computerController.setEnabled(merged.enableComputerUse !== false);
+      computerController.setEnabled(LEGACY_AUTOMATION_ENABLED && merged.enableComputerUse !== false);
     return merged;
     }
   } catch (err) {
@@ -334,7 +340,7 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
     },
   };
   if (config.enableComputerUse !== undefined) {
-    computerController.setEnabled(config.enableComputerUse);
+    computerController.setEnabled(LEGACY_AUTOMATION_ENABLED && config.enableComputerUse);
   }
   for (const [name, enabled] of [["browser-use", config.enableBrowserUse], ["computer-use", config.enableComputerUse]] as const) {
     if (enabled === undefined) continue;
@@ -1365,7 +1371,7 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   interface ActiveAgentSession {
     runId: string;
-    agent: OmpAgent;
+    agent: PiHarnessAgent;
     conversationId: string;
     workspacePath: string;
     model: string;
@@ -1641,8 +1647,9 @@ app.whenReady().then(() => {
     return globalTaskManager.killTask(taskId, requireConversationId(conversationId));
   });
 
-  handleDesktopIpc("tasks:get-output", async (_event, taskId: string, conversationId: string) => {
+  handleDesktopIpc("tasks:get-output", async (_event, taskId: string, conversationId: string, snapshot = false) => {
     const task = globalTaskManager.getTask(taskId, requireConversationId(conversationId));
+    if (snapshot) return { logs: task?.logs.slice(-3000) ?? [], status: task?.status, outputRevision: task?.outputRevision ?? 0 };
     return task ? task.logs : [];
   });
 
@@ -1731,7 +1738,7 @@ app.whenReady().then(() => {
       personalizationParts.push(workingDirectoryInstructions(targetWorkspace, path.join(constBrainDir, convoId)));
       const systemPrompt = personalizationParts.join("\n\n");
 
-      const agent = new OmpAgent({
+      const agent = createPiHarnessAgent({
         preset: "harness",
         sessionKind: payload.sessionKind === "companion" ? "companion" : "main",
         runId,
@@ -1743,14 +1750,14 @@ app.whenReady().then(() => {
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
-        nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
+        nativeCapabilityEnabled: (name) => LEGACY_AUTOMATION_ENABLED && marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
         inputTypes: modelDef?.inputTypes,
         systemPrompt,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
-        maxTurns: payload.sessionKind === "companion" ? 4 : payload.maxTurns ?? 200,
+        maxTurns: payload.sessionKind === "companion" ? 4 : payload.maxTurns,
         contextWindow: getModelContextLimit(model, payload.contextWindow ?? modelDef?.contextWindow),
         onAskQuestion: (toolCallId, questions) => {
           return new Promise((resolve) => {
@@ -1774,9 +1781,9 @@ app.whenReady().then(() => {
         },
         browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (cfg.enableBrowserUse === false) {
+          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableBrowserUse === false) {
             return {
-              result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+              result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
               isError: true,
             };
           }
@@ -1784,15 +1791,15 @@ app.whenReady().then(() => {
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (cfg.enableComputerUse === false) {
+          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableComputerUse === false) {
             return {
-              result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+              result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
               isError: true,
             };
           }
           return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
-      }, ompExecutable());
+      });
 
       const agentSession: ActiveAgentSession = {
         runId,
@@ -1864,7 +1871,7 @@ app.whenReady().then(() => {
             }
             if (agentEvent.type === "approval_request") snapshot.status = "waiting_approval";
             if (agentEvent.type === "ask_question") snapshot.status = "waiting_question";
-            if (agentEvent.type === "error") snapshot.status = "error";
+            if (agentEvent.type === "error") { snapshot.status = "error"; snapshot.activeTool = undefined; }
             if (agentEvent.type === "done") snapshot.status = "done";
             if (agentEvent.type === "steer_message" && agentEvent.message?.instructionId) {
               const instruction = agentSession.sideInstructions.get(agentEvent.message.instructionId);
@@ -1887,7 +1894,8 @@ app.whenReady().then(() => {
                 } catch (error) { console.warn("[Electron Main] Failed to checkpoint plan:", error); }
               }
             }
-          }
+          },
+          { returnPartialOnFailure: true },
         );
 
         streamBatcher.flush();
@@ -2752,7 +2760,7 @@ app.whenReady().then(() => {
       const targetWorkspace = await workingDirectories.resolve(task.workspacePath, convoId, config.defaultProjectLocation);
 
       // Scheduled tasks run autonomously in the background with full access
-      const agent = new OmpAgent({
+      const agent = createPiHarnessAgent({
         preset: "harness",
         baseUrl,
         normalizeImage: normalizeModelImage,
@@ -2761,19 +2769,18 @@ app.whenReady().then(() => {
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
-        nativeCapabilityEnabled: (name) => marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
+        nativeCapabilityEnabled: (name) => LEGACY_AUTOMATION_ENABLED && marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
         systemPrompt: workingDirectoryInstructions(targetWorkspace, path.join(constBrainDir, convoId)),
         mode: "full_access",
         thinkingLevel: "medium",
-        maxTurns: 200,
         browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (cfg.enableBrowserUse === false) {
+          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableBrowserUse === false) {
             return {
-              result: "Browser Use is currently disabled in Settings. Please turn on 'Enable Browser Use' in Settings > Computer Use to allow browser automation tools.",
+              result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
               isError: true,
             };
           }
@@ -2781,15 +2788,15 @@ app.whenReady().then(() => {
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (cfg.enableComputerUse === false) {
+          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableComputerUse === false) {
             return {
-              result: "Computer Use is currently disabled in Settings. Please turn on 'Enable Computer Use' in Settings > Computer Use to allow desktop automation tools.",
+              result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
               isError: true,
             };
           }
           return computerController.executeTool(toolName, args, { ...context, sessionId: convoId });
         },
-      }, ompExecutable());
+      });
 
       const taskName = task.name || task.title || "Scheduled Task";
       const taskPrompt = task.prompt || task.instructions || "";
@@ -2818,7 +2825,7 @@ app.whenReady().then(() => {
           if (agentEvent.type === "run_end" && agentEvent.outcome !== "completed") scheduledFailure = agentEvent.error || "Scheduled task stopped before completion.";
           scheduledStream.forward(agentEvent);
           conversationDb.appendTranscriptEvent(convoId, agentEvent);
-        });
+        }, { returnPartialOnFailure: true });
 
         try {
           conversationDb.saveConversation({

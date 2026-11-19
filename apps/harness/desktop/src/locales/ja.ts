@@ -288,6 +288,8 @@ export const ja: TranslationDictionary = {
     sendMessage: "メッセージを送信",
     workedFor: "実行時間",
     workingFor: "実行中",
+    working: "実行中…",
+    waitingForBackground: "バックグラウンド処理を待機中…",
     turnIndicatorRunning: "応答を処理中...",
     turnIndicatorFinished: "実行が完了しました",
     questionCardTitle: "Constからの確認事項",
@@ -1019,6 +1021,8 @@ export const ja: TranslationDictionary = {
     outside: "プロジェクト外",
   },
   toast: {
+    agentStalled: "同じ操作を繰り返しても進展がなかったため、エージェントは停止しました。別の方法で続けられます。",
+    agentTurnLimit: "エージェントが今回の実行のターン上限に達しました。続けるにはメッセージを送信してください。",
     imagePreparationFailed: "モデル用の画像を準備できませんでした。PNGまたはJPEGへの変換、または切り抜きを行ってから再試行してください。元のファイルは変更されていません。",
     requestTooLarge: "画像入力またはリクエストがこのゲートウェイの上限を超えています。画像の縮小や切り抜き、一度に確認する画像数の削減、または入力の短縮を行ってから続けてください。元のファイルとチャット履歴は保存されています。",
     taskCompleted: "タスクが完了しました",

@@ -99,5 +99,5 @@
 		"packages/session-backends/*/src/**/*",
 		"packages/session-backends/*/test/**/*"
 	],
-	"exclude": ["**/dist/**", "node_modules"]
+	"exclude": ["**/dist/**", "node_modules", "packages/harness-engine"]
 }

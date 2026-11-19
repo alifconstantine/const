@@ -1,3 +1,12 @@
+/** Raised when a model streams only private reasoning for too long without producing text or tool calls. */
+export class ReasoningOnlyTimeoutError extends Error {
+  readonly isReasoningOnlyTimeout = true;
+  constructor(message = "Model spent too long reasoning without producing output or tool calls.") {
+    super(message);
+    this.name = "ReasoningOnlyTimeoutError";
+  }
+}
+
 /** Consume OpenAI-compatible SSE without treating a dropped connection as success. */
 export async function consumeChatStream(
   body: ReadableStream<Uint8Array>,
@@ -6,6 +15,7 @@ export async function consumeChatStream(
   idleMs = 35_000,
   totalMs = 600_000,
   firstTokenMs = Math.min(totalMs, Math.max(idleMs * 2, 75_000)),
+  reasoningOnlyMs = Math.min(totalMs, 90_000),
 ) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -13,8 +23,10 @@ export async function consumeChatStream(
   let terminal = false;
   let doneMarker = false;
   let hasSemanticChunk = false;
+  let hasVisibleOutput = false;
   let firstTokenExpired = false;
   let semanticStalled = false;
+  let reasoningOnlyExpired = false;
   const deadline = new AbortController();
   const totalTimer = setTimeout(() => deadline.abort(), totalMs);
   let firstTokenTimer: ReturnType<typeof setTimeout> | undefined =
@@ -26,6 +38,15 @@ export async function consumeChatStream(
           }
         }, firstTokenMs)
       : undefined;
+  let reasoningOnlyTimer: ReturnType<typeof setTimeout> | undefined =
+    reasoningOnlyMs > 0 && reasoningOnlyMs < totalMs
+      ? setTimeout(() => {
+          if (hasSemanticChunk && !hasVisibleOutput) {
+            reasoningOnlyExpired = true;
+            deadline.abort();
+          }
+        }, reasoningOnlyMs)
+      : undefined;
   const semanticIdleMs = Math.max(idleMs * 3, 120_000);
   let semanticTimer: ReturnType<typeof setTimeout> | undefined;
   const resetSemanticTimer = () => {
@@ -35,6 +56,14 @@ export async function consumeChatStream(
         semanticStalled = true;
         deadline.abort();
       }, semanticIdleMs);
+    }
+  };
+  const markVisibleOutput = () => {
+    if (hasVisibleOutput) return;
+    hasVisibleOutput = true;
+    if (reasoningOnlyTimer) {
+      clearTimeout(reasoningOnlyTimer);
+      reasoningOnlyTimer = undefined;
     }
   };
   const markSemanticProgress = () => {
@@ -54,6 +83,7 @@ export async function consumeChatStream(
     const data = value.slice(5).trim();
     if (!data) return;
     if (data === "[DONE]") {
+      markVisibleOutput();
       markSemanticProgress();
       terminal = true;
       doneMarker = true;
@@ -68,22 +98,26 @@ export async function consumeChatStream(
     }
     const choice = chunk.choices?.[0];
     const delta = choice?.delta || choice?.message;
-    if (
-      chunk.usage ||
-      chunk.choices?.some((c: any) => c.finish_reason != null) ||
-      Boolean(
-        delta &&
-          (delta.content ||
-            delta.reasoning_content ||
-            delta.reasoning ||
-            delta.thought ||
-            delta.thinking ||
-            (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0)),
-      )
-    ) {
+    const hasFinish = Boolean(chunk.choices?.some((c: any) => c.finish_reason != null));
+    const hasActionableDelta = Boolean(
+      delta &&
+        (delta.content ||
+          (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0)),
+    );
+    const hasReasoningDelta = Boolean(
+      delta &&
+        (delta.reasoning_content ||
+          delta.reasoning ||
+          delta.thought ||
+          delta.thinking),
+    );
+    if (hasFinish || hasActionableDelta) {
+      markVisibleOutput();
+    }
+    if (chunk.usage || hasFinish || hasActionableDelta || hasReasoningDelta) {
       markSemanticProgress();
     }
-    if (chunk.choices?.some((c: any) => c.finish_reason != null)) terminal = true;
+    if (hasFinish) terminal = true;
     onChunk(chunk);
   };
   try {
@@ -97,11 +131,13 @@ export async function consumeChatStream(
           new Promise<never>((_resolve, reject) => {
             abort = () => reject(signal.aborted
               ? new DOMException("The operation was aborted.", "AbortError")
-              : firstTokenExpired
-                ? new Error("Model stream timed out waiting for first token. Please retry.")
-                : semanticStalled
-                  ? new Error("Model stream stalled without token progress. Please retry.")
-                  : new Error("Model generation timed out before completion. Retry or select another model."));
+              : reasoningOnlyExpired
+                ? new ReasoningOnlyTimeoutError()
+                : firstTokenExpired
+                  ? new Error("Model stream timed out waiting for first token. Please retry.")
+                  : semanticStalled
+                    ? new Error("Model stream stalled without token progress. Please retry.")
+                    : new Error("Model generation timed out before completion. Retry or select another model."));
             if (streamSignal.aborted) { abort(); return; }
             streamSignal.addEventListener("abort", abort, { once: true });
             timer = setTimeout(() => reject(new Error("Model stream stalled. Please retry.")), idleMs);
@@ -126,6 +162,7 @@ export async function consumeChatStream(
   } finally {
     clearTimeout(totalTimer);
     if (firstTokenTimer) clearTimeout(firstTokenTimer);
+    if (reasoningOnlyTimer) clearTimeout(reasoningOnlyTimer);
     if (semanticTimer) clearTimeout(semanticTimer);
     // A timed out read must close the upstream body as well as its local timer.
     void reader.cancel().catch(() => {});

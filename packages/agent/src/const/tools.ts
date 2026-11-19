@@ -1764,6 +1764,8 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
                   type: "string",
                   description: "Concise description of the task or milestone.",
                 },
+                id: { type: "string", description: "Stable ID for this item across updates, when available." },
+                phase: { type: "string", description: "Optional name of the phase that contains this item." },
                 status: {
                   type: "string",
                   enum: ["pending", "in_progress", "completed"],
@@ -4919,6 +4921,7 @@ export type BackgroundTaskListener = (event: {
   taskId: string;
   conversationId?: string;
   data?: string;
+  outputRevision?: number;
   status?: "running" | "completed" | "failed" | "killed";
   code?: number | null;
 }) => void;
@@ -4986,9 +4989,10 @@ export class BackgroundProcessManager {
             if (p > 0 && p < 65536) task.port = p;
           }
 
-          this.emit({ type: "output", taskId, data: line });
         }
       }
+      const output = lines.filter(Boolean);
+      if (output.length) this.emit({ type: "output", taskId, data: output.join("\n"), outputRevision: task.outputRevision });
     };
 
     child.stdout?.on("data", (data) => appendLog(data.toString()));
@@ -4997,13 +5001,14 @@ export class BackgroundProcessManager {
     const onAbort = () => { this.killTask(taskId, task.conversationId); };
     child.on("close", (code) => {
       options?.signal?.removeEventListener("abort", onAbort);
-      task.status = task.status === "killed" ? "killed" : (code === 0 ? "completed" : "failed");
+      const previousStatus = task.status;
+      task.status = previousStatus === "killed" ? "killed" : (code === 0 ? "completed" : "failed");
       task.exitCode = code;
       task.logs.push(`[Process exited with code ${code}]`);
       try {
         fsSync.appendFileSync(logFilePath, `[Process exited with code ${code}]\n`, "utf8");
       } catch {}
-      this.emit({ type: "status", taskId, status: task.status, code });
+      if (previousStatus === "running") this.emit({ type: "status", taskId, status: task.status, code });
     });
 
     child.on("error", (err) => {
@@ -5126,6 +5131,24 @@ export class BackgroundProcessManager {
     return () => this.listeners.delete(cb);
   }
 
+  public waitForActivity(taskIds: ReadonlySet<string>, timeoutMs: number, signal?: AbortSignal): Promise<string | undefined> {
+    if (signal?.aborted) return Promise.resolve(undefined);
+    return new Promise(resolve => {
+      const finish = (taskId?: string) => {
+        clearTimeout(timer);
+        unsubscribe();
+        signal?.removeEventListener("abort", abort);
+        resolve(taskId);
+      };
+      const abort = () => finish();
+      const unsubscribe = this.subscribe(event => {
+        if (taskIds.has(event.taskId)) finish(event.taskId);
+      });
+      const timer = setTimeout(finish, timeoutMs);
+      signal?.addEventListener("abort", abort, { once: true });
+    });
+  }
+
   private emit(event: Parameters<BackgroundTaskListener>[0]) {
     event = { ...event, conversationId: this.tasks.get(event.taskId)?.conversationId };
     for (const listener of this.listeners) {
@@ -5224,19 +5247,8 @@ export async function executeWaitTool(
       };
     }
 
-    // Wait until background shell task settles or new log arrives or timeout
-    const initialLogCount = task.outputRevision;
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeoutMs) {
-      if (signal?.aborted) {
-        return { result: "[Wait aborted by signal]", isError: false };
-      }
-      const currentStatus: string = task.status;
-      if (currentStatus !== "running" || task.outputRevision > initialLogCount) {
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 250));
-    }
+    await globalTaskManager.waitForActivity(new Set([task.id]), timeoutMs, signal);
+    if (signal?.aborted) return { result: "[Wait aborted by signal]", isError: false };
 
     const durationSec = Math.round((Date.now() - task.startTime) / 1000);
     const output = task.logs.slice(-10).join("\n") || `Status: ${task.status}`;
@@ -5307,34 +5319,11 @@ export async function executeWaitTool(
     };
   }
 
-  const startTime = Date.now();
-  const initialLogCounts = new Map(
-    runningTasks.map((t) => [t.id, globalTaskManager.getTask(t.id, conversationId)?.outputRevision || 0])
-  );
-  let activeTask: BackgroundTaskItem = firstRunning;
-
-  while (Date.now() - startTime < timeoutMs) {
-    if (signal?.aborted) {
-      return { result: "[Wait aborted by signal]", isError: false };
-    }
-    const currentList = globalTaskManager.listTasks(conversationId);
-    const settledOrNew = currentList.find((t) => {
-      if (!initialLogCounts.has(t.id)) return false;
-      if (t.status !== "running") return true;
-      const currentTaskObj = globalTaskManager.getTask(t.id, conversationId);
-      const curCount = currentTaskObj?.outputRevision || 0;
-      const prevCount = initialLogCounts.get(t.id) || 0;
-      return curCount > prevCount;
-    });
-    if (settledOrNew) {
-      activeTask = settledOrNew;
-      break;
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-
+  const changedId = await globalTaskManager.waitForActivity(new Set(runningTasks.map(task => task.id)), timeoutMs, signal);
+  if (signal?.aborted) return { result: "[Wait aborted by signal]", isError: false };
+  const taskObj = globalTaskManager.getTask(changedId ?? firstRunning.id, conversationId);
+  const activeTask = taskObj ?? firstRunning;
   const durationSec = Math.round((Date.now() - activeTask.startTime) / 1000);
-  const taskObj = globalTaskManager.getTask(activeTask.id, conversationId);
   const output = taskObj?.logs.slice(-8).join("\n") || `Status: ${activeTask.status}`;
   return {
     result: `<task-result id="${activeTask.id}" name="${activeTask.name || ""}" status="${activeTask.status}" duration="${durationSec}s">\n<output>\n${output}\n</output>\n</task-result>`,
