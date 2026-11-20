@@ -2,216 +2,274 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import type { ChildProcess, spawn } from "node:child_process";
-import { DesktopScriptRuntimeHost } from "../../../apps/harness/desktop/electron/computer/desktop-script-runtime-host";
-import { ComputerSnapshotStore } from "../../../apps/harness/desktop/electron/computer/computer-snapshot-store";
-import { ComputerController } from "../../../apps/harness/desktop/electron/computer/computer-controller";
-import { encodeMacRequest, decodeMacResponse } from "../../../apps/harness/desktop/electron/computer/macos-runtime-protocol";
-import type { BridgeRequest, ComputerSnapshot } from "../../../apps/harness/desktop/electron/computer/computer-types";
+import { AgentDesktopRunner } from "../../../apps/harness/desktop/electron/computer/agent-desktop-runner";
+import {
+  AgentDesktopController,
+  normalizeKeyCombo,
+} from "../../../apps/harness/desktop/electron/computer/agent-desktop-controller";
 
-class FakeProcess extends EventEmitter {
+class FakeChild extends EventEmitter {
   stdout = new PassThrough();
   stderr = new PassThrough();
-  writes: Array<BridgeRequest> = [];
-  stdin = new Writable({ write: (chunk, _encoding, done) => { this.writes.push(JSON.parse(String(chunk))); done(); } });
-  kill = vi.fn(() => { queueMicrotask(() => this.emit("close", 0, null)); return true; });
-  line(value: unknown) { this.stdout.write(JSON.stringify(value) + "\n"); }
-  reply(index = 0) { this.line({ ok: true, requestId: this.writes[index]!.requestId }); }
+  stdinData = "";
+  stdin = new Writable({
+    write: (chunk, _enc, done) => {
+      this.stdinData += String(chunk);
+      done();
+    },
+  });
+  kill = vi.fn(() => {
+    queueMicrotask(() => this.emit("close", 1, "SIGKILL"));
+    return true;
+  });
+
+  respondJson(payload: unknown, code = 0) {
+    this.stdout.write(JSON.stringify(payload) + "\n");
+    this.stdout.end();
+    this.stderr.end();
+    queueMicrotask(() => this.emit("close", code, null));
+  }
 }
 
-const hosts: DesktopScriptRuntimeHost[] = [];
-function runtime(ready = true, platform: NodeJS.Platform = "win32") {
-  const children: FakeProcess[] = [];
-  const launch = vi.fn(() => {
-    const child = new FakeProcess(); children.push(child);
-    if (ready) queueMicrotask(() => child.line({ ready: true }));
+interface SpawnCall {
+  binary: string;
+  args: string[];
+  env: Record<string, string | undefined>;
+  child: FakeChild;
+}
+
+const runners: AgentDesktopRunner[] = [];
+
+function createMockRunner(options?: {
+  autoReply?: (call: SpawnCall) => unknown;
+  defaultTimeoutMs?: number;
+  maxOutputBytes?: number;
+}) {
+  const calls: SpawnCall[] = [];
+  const spawnMock = vi.fn((binary: string, args: string[], opts: any) => {
+    const child = new FakeChild();
+    const call: SpawnCall = { binary, args, env: opts?.env ?? {}, child };
+    calls.push(call);
+    if (options?.autoReply) {
+      queueMicrotask(() => {
+        const reply = options.autoReply!(call);
+        if (reply !== undefined) child.respondJson(reply);
+      });
+    }
     return child as unknown as ChildProcess;
   });
-  const host = new DesktopScriptRuntimeHost("fixture", { platform, spawn: launch as unknown as typeof spawn, requestTimeoutMs: 100, startupTimeoutMs: 100, idleTimeoutMs: 500 });
-  hosts.push(host);
-  return { host, children, launch };
+
+  const runner = new AgentDesktopRunner({
+    binaryPath: "/mock/agent-desktop",
+    stateRoot: "/mock/state",
+    defaultTimeoutMs: options?.defaultTimeoutMs ?? 5_000,
+    maxOutputBytes: options?.maxOutputBytes ?? 1024 * 1024,
+    spawnImpl: spawnMock as unknown as typeof spawn,
+  });
+  runners.push(runner);
+  return { runner, calls, spawnMock };
 }
-const flush = () => vi.advanceTimersByTimeAsync(0);
-afterEach(() => { for (const host of hosts.splice(0)) host.dispose(); vi.useRealTimers(); });
 
-describe("desktop runtime lifecycle", () => {
-  it.each(["win32", "linux", "darwin"] as const)("uses the %s launch protocol", async platform => {
-    vi.useFakeTimers(); const { host, children, launch } = runtime(true, platform);
-    const request = host.request({ tool: "handshake" }); await flush();
-    const args = launch.mock.calls[0] as unknown as [string, string[], unknown];
-    if (platform === "darwin") {
-      expect(args[1]).toEqual(["--stdio-agent", "--parent-pid", String(process.pid)]);
-      expect(children[0]!.writes[0]).toMatchObject({ id: 1, method: "handshake" });
-      children[0]!.line({ id: 1, ok: true, result: { platform: "darwin" } });
-      expect(await request).toMatchObject({ ok: true, capabilities: { platform: "darwin" } });
-    } else {
-      expect(args[1]).toContain("-Serve");
-      if (platform === "linux") expect(args[0]).toBe("python3");
-      if (platform === "win32") expect(args[1]).toContain("-STA");
-      children[0]!.reply(); await request;
-    }
-  });
-  it("waits for the previous response before sending the next request", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime();
-    const first = host.request({ tool: "handshake" }); const second = host.request({ tool: "list_apps" });
-    await flush(); expect(children[0]!.writes).toHaveLength(1);
-    children[0]!.reply(); await first; await flush();
-    expect(children[0]!.writes).toHaveLength(2); children[0]!.reply(1); await second;
-  });
-
-  it("rejects startup exit and queued callers instead of leaving promises pending", async () => {
-    vi.useFakeTimers(); const { host, children, launch } = runtime(false);
-    const settled = Promise.allSettled([host.request({ tool: "handshake" }), host.request({ tool: "click" })]);
-    await flush(); children[0]!.stderr.write("startup failed"); children[0]!.emit("close", 1, null);
-    expect((await settled).map(item => item.status)).toEqual(["rejected", "rejected"]); expect(launch).toHaveBeenCalledTimes(1);
-  });
-  it("preserves a Linux startup diagnostic before the ready announcement", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime(false, "linux");
-    const request = host.request({ tool: "handshake" });
-    const rejected = expect(request).rejects.toThrow("missing desktop session");
-    await flush(); children[0]!.line({ ok: false, error: "missing desktop session" });
-    await rejected;
-  });
-
-  it("kills a timed-out helper and never replays the action or abandoned queue", async () => {
-    vi.useFakeTimers(); const { host, children, launch } = runtime();
-    const settled = Promise.allSettled([host.request({ tool: "click" }), host.request({ tool: "type_text" })]);
-    await flush(); await vi.advanceTimersByTimeAsync(101);
-    const results = await settled;
-    expect(results.every(item => item.status === "rejected")).toBe(true);
-    expect(children[0]!.writes.map(item => item.tool)).toEqual(["click"]);
-    expect(children[0]!.kill).toHaveBeenCalledTimes(1); expect(launch).toHaveBeenCalledTimes(1);
-  });
-
-  it("rejects mismatched response IDs and starts a fresh helper only on a new request", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime();
-    const first = host.request({ tool: "click" }); const failed = expect(first).rejects.toThrow("did not match");
-    await flush(); children[0]!.line({ ok: true, requestId: 999 }); await failed;
-    const second = host.request({ tool: "get_app_state" }); await flush();
-    expect(children).toHaveLength(2); children[1]!.reply(); await second;
-  });
-
-  it("settles startup and queued requests when disposed", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime(false);
-    const settled = Promise.allSettled([host.request({ tool: "handshake" }), host.request({ tool: "click" })]);
-    await flush(); host.dispose(); expect((await settled).every(item => item.status === "rejected")).toBe(true);
-    children[0]!.line({ ready: true }); expect(children[0]!.writes).toHaveLength(0);
-    await expect(host.request({ tool: "handshake" })).rejects.toThrow("disposed");
-  });
-
-  it("terminates a helper when its input pipe fails before the process exits", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime();
-    const request = host.request({ tool: "get_app_state" });
-    const failed = expect(request).rejects.toThrow("pipe failed");
-    await flush(); children[0]!.stdin.emit("error", new Error("pipe failed"));
-    await failed;
-    expect(children[0]!.kill).toHaveBeenCalledTimes(1);
-  });
-
-  it("bounds the response buffer and reclaims an idle helper", async () => {
-    vi.useFakeTimers(); const { host, children } = runtime();
-    const first = host.request({ tool: "handshake" }); await flush(); children[0]!.reply(); await first; await flush();
-    await vi.advanceTimersByTimeAsync(501); expect(children[0]!.kill).toHaveBeenCalledTimes(1);
-    const second = host.request({ tool: "get_app_state" }); const failed = expect(second).rejects.toThrow("buffer limit");
-    await flush(); children[1]!.stdout.write("x".repeat(8 * 1024 * 1024 + 1)); await failed;
-  });
-});
-
-describe("macOS native RPC adapter", () => {
-  it("translates flat bridge arguments into native methods and element selectors", () => {
-    expect(encodeMacRequest({ tool: "drag", requestId: 5, app: "pid:42", session: "one", fromElement: { index: 7 }, toElement: { index: 8 }, from_x: 10, from_y: 20, to_x: 30, to_y: 40, windowId: 99 })).toMatchObject({
-      id: 5, method: "drag", params: { app: "pid:42", session: "one", fromElementIndex: 7, toElementIndex: 8, fromX: 10, fromY: 20, toX: 30, toY: 40, windowId: 99 },
-    });
-    expect(encodeMacRequest({ tool: "click", requestId: 6, element: { index: 9 }, click_count: 2, mouse_button: "right" })).toMatchObject({ method: "click", params: { elementIndex: 9, clickCount: 2, mouseButton: "right" } });
-  });
-  it("normalizes native windows, Retina screenshots, and sparse element indices", () => {
-    const result = decodeMacResponse({ id: 1, ok: true, result: { snapshot: { id: "s1", app: { name: "Editor", pid: 42 }, window: { id: 99, x: 30, y: 40, width: 800, height: 600, title: "Document" }, treeText: '0 window Document\n\t7 text field Input', elements: [{ index: 0 }, { index: 7 }], elementCount: 2 }, screenshot: { data: "aW1hZ2U=", width: 1600, height: 1200, scale: 2 } } }, { tool: "get_app_state" });
-    expect(result.snapshot).toMatchObject({ windowId: 99, windowBounds: { x: 30, y: 40, width: 800, height: 600 }, screenshotScale: 2, screenshotPngBase64: "aW1hZ2U=", elements: [{ index: 0 }, { index: 7 }] });
-  });
-  it("preserves permission errors and delivered actions whose window closed", () => {
-    expect(decodeMacResponse({ id: 1, ok: false, error: { code: "permission_denied", message: "Grant Accessibility" } }, { tool: "click" })).toMatchObject({ ok: false, error: "permission_denied: Grant Accessibility" });
-    expect(decodeMacResponse({ id: 2, ok: true, result: { action: { verification: { state: "unverified" } }, observationError: "window closed" } }, { tool: "hotkey" })).toMatchObject({ ok: true, observationError: "window closed", action: { verification: { state: "unverified" } } });
-    expect(() => decodeMacResponse({ id: 3, ok: true, result: {} }, { tool: "get_app_state" })).toThrow("no snapshot");
-  });
-});
-
-const snapshot = (pid = 10, windowId = 100): ComputerSnapshot => ({ app: { name: `App${pid}`, pid }, windowId, windowBounds: { x: 0, y: 0, width: 800, height: 600 }, elements: [{ index: 1, name: "Editor" }], screenshotPngBase64: "aW1hZ2U=", screenshotWidth: 800, screenshotHeight: 600, screenshotScale: 1 });
-
-describe("desktop snapshot targeting", () => {
-  it("isolates app, session, and window aliases and never caches image data", () => {
-    const store = new ComputerSnapshotStore(); store.remember("one", "editor", snapshot());
-    expect(store.current("one", "pid:10")?.screenshotPngBase64).toBeNull();
-    expect(store.current("two", "editor")).toBeUndefined(); expect(store.current("one", "other")).toBeUndefined();
-    expect(store.current("one", "editor", 101)).toBeUndefined();
-    store.remember("one", "editor", snapshot(10, 101));
-    expect(store.current("one", "editor", 100)?.windowId).toBe(100);
-    expect(store.current("one", "editor", 101)?.windowId).toBe(101);
-  });
-  it("expires old snapshots and bounds retained entries", () => {
-    let now = 1; const store = new ComputerSnapshotStore(() => now, 100, 2);
-    for (const pid of [10, 11, 12]) store.remember("one", `App${pid}`, snapshot(pid));
-    expect(store.current("one", "App10")).toBeUndefined();
-    now = 102; expect(store.current("one", "App12")).toBeUndefined();
-  });
-});
-
-describe("desktop controller", () => {
-  function fixture() {
-    const request = vi.fn(async (_request: BridgeRequest) => ({ ok: true, snapshot: snapshot(), action: { path: "synthetic", verification: { state: "unverified", reason: "synthetic_input" } } }));
-    return { request, controller: new ComputerController({ request, dispose: vi.fn() }) };
+afterEach(() => {
+  for (const runner of runners.splice(0)) {
+    runner.dispose();
   }
-  it("requires observation of the matching app/window and rejects absent element indices", async () => {
-    const { request, controller } = fixture(); await controller.getAppState("App10");
-    await expect(controller.click("App11", { elementIndex: 1 })).rejects.toThrow("snapshot_required");
-    await expect(controller.click("App10", { elementIndex: 1, windowId: 999 })).rejects.toThrow("snapshot_required");
-    await expect(controller.click("App10", { elementIndex: 99 })).rejects.toThrow("stale_element");
-    expect(request).toHaveBeenCalledTimes(1);
+  vi.useRealTimers();
+});
+
+describe("AgentDesktopRunner lifecycle & safety", () => {
+  it("serializes concurrent commands and places global flags before the subcommand", async () => {
+    const { runner, calls } = createMockRunner();
+    const first = runner.run(["snapshot", "--app", "Notepad"], { session: "h_one" });
+    const second = runner.run(["click", "@s1:e2"], { session: "h_one", headed: true });
+
+    await Promise.resolve();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.args).toEqual(["--session", "h_one", "snapshot", "--app", "Notepad"]);
+    expect(calls[0]!.env.AGENT_DESKTOP_HOME).toBe("/mock/state");
+
+    calls[0]!.child.respondJson({ ok: true, command: "snapshot", data: { snapshot_id: "s1" } });
+    expect((await first).ok).toBe(true);
+
+    await Promise.resolve();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.args).toEqual(["--session", "h_one", "--headed", "click", "@s1:e2"]);
+    calls[1]!.child.respondJson({ ok: true, command: "click", data: {} });
+    expect((await second).ok).toBe(true);
   });
-  it("pins actions to the observed PID/window and preserves unverified status plus images", async () => {
-    const { request, controller } = fixture();
-    const state = await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "one" });
-    expect(state.images?.[0]?.data).toBe("aW1hZ2U=");
-    const result = await controller.executeTool("computer_type_text", { app: "App10", text: "Hai" }, { sessionId: "one" });
-    expect(request.mock.calls.at(-1)?.[0]).toMatchObject({ app: "pid:10", windowId: 100, tool: "type_text" });
-    expect(result.result).toContain('"state":"unverified"'); expect(result.result).not.toContain("successfully"); expect(result.images).toHaveLength(1);
-  });
-  it("keeps another chat from taking focus until the owner releases desktop control", async () => {
-    const { request, controller } = fixture();
-    await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "one" });
-    const blocked = await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "two" });
-    expect(blocked.isError).toBe(true); expect(blocked.result).toContain("desktop_busy"); expect(request).toHaveBeenCalledTimes(1);
-    controller.releaseSession("one");
-    const allowed = await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "two" }); expect(allowed.isError).toBe(false);
-    controller.releaseSession("two");
-  });
-  it("does not silently report an app list when the bridge returned an error", async () => {
-    const controller = new ComputerController({ request: async () => ({ ok: false, error: "permission denied" }), dispose() {} });
-    await expect(controller.listApps()).rejects.toThrow("permission denied");
-  });
-  it("invalidates cached elements when an action was delivered but post-action observation failed", async () => {
-    let actionRequests = 0;
-    const controller = new ComputerController({
-      request: async request => {
-        if (request.tool === "get_app_state") return { ok: true, snapshot: snapshot() };
-        actionRequests++;
-        return { ok: true, action: { verification: { state: "unverified", reason: "post_action_observation_failed" } }, observationError: "window closed" };
-      }, dispose() {},
+
+  it("pipes text via stdin without leaking values into process argv", async () => {
+    const { runner, calls } = createMockRunner({
+      autoReply: () => ({ ok: true, command: "set-value", data: {} }),
     });
-    await controller.executeTool("computer_get_app_state", { app: "App10" });
-    const result = await controller.executeTool("computer_hotkey", { app: "App10", key: "Alt+F4" });
-    expect(result.isError).toBe(false); expect(result.result).toContain("window closed");
-    const next = await controller.executeTool("computer_click", { app: "App10", elementIndex: 1 });
-    expect(next.isError).toBe(true); expect(next.result).toContain("snapshot_required"); expect(actionRequests).toBe(1);
+    const secret = "super-secret-value-123";
+    const res = await runner.run(["set-value", "@s1:e5", "--stdin"], { stdin: secret });
+    expect(res.ok).toBe(true);
+    expect(calls[0]!.args).not.toContain(secret);
+    expect(calls[0]!.child.stdinData).toBe(secret);
   });
-  it("disposes the active worker on cancellation and never delivers a pre-cancelled call", async () => {
-    const abort = new AbortController();
-    const dispose = vi.fn();
-    const request = vi.fn(async () => {
-      abort.abort(); return { ok: false, error: "cancelled" };
+
+  it("kills a timed-out child process and rejects cleanly", async () => {
+    vi.useFakeTimers();
+    const { runner, calls } = createMockRunner({ defaultTimeoutMs: 1_000 });
+    const pending = runner.run(["snapshot", "--app", "HungApp"], { timeoutMs: 1_000 });
+    const rejected = expect(pending).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(1_050);
+    await rejected;
+    expect(calls[0]!.child.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels an in-flight command when AbortSignal fires", async () => {
+    const { runner, calls } = createMockRunner();
+    const ac = new AbortController();
+    const pending = runner.run(["wait", "5000"], { signal: ac.signal });
+    await Promise.resolve();
+    ac.abort();
+    await expect(pending).rejects.toThrow("aborted");
+    expect(calls[0]!.child.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it("enforces stdout buffer limit and rejects oversized output", async () => {
+    const { runner, calls } = createMockRunner({ maxOutputBytes: 128 });
+    const pending = runner.run(["snapshot"]);
+    await Promise.resolve();
+    calls[0]!.child.stdout.write("x".repeat(256));
+    await expect(pending).rejects.toThrow("buffer limit");
+    expect(calls[0]!.child.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects calls after dispose()", async () => {
+    const { runner } = createMockRunner();
+    runner.dispose();
+    await expect(runner.run(["status"])).rejects.toThrow("disposed");
+  });
+});
+
+describe("AgentDesktopController tool routing & session isolation", () => {
+  it("normalizes cross-platform keyboard chords accurately", () => {
+    expect(normalizeKeyCombo("CmdOrCtrl+S", "win32")).toBe("ctrl+s");
+    expect(normalizeKeyCombo("CmdOrCtrl+S", "linux")).toBe("ctrl+s");
+    expect(normalizeKeyCombo("CmdOrCtrl+S", "darwin")).toBe("cmd+s");
+    expect(normalizeKeyCombo("Ctrl+Shift+Enter", "win32")).toBe("ctrl+shift+return");
+    expect(normalizeKeyCombo("Esc", "win32")).toBe("escape");
+  });
+
+  it("isolates sessions with an exclusive desktop lock until releaseSession", async () => {
+    const { runner } = createMockRunner({
+      autoReply: () => ({ ok: true, command: "list-apps", data: [{ name: "Notepad", pid: 42 }] }),
     });
-    const controller = new ComputerController({ request, dispose });
-    await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "one", signal: abort.signal });
-    expect(dispose).toHaveBeenCalledTimes(1);
-    await controller.executeTool("computer_get_app_state", { app: "App10" }, { sessionId: "one", signal: abort.signal });
-    expect(request).toHaveBeenCalledTimes(1);
+    const controller = new AgentDesktopController(runner, "win32");
+
+    const first = await controller.executeTool("computer_list_apps", {}, { sessionId: "conv-a" });
+    expect(first.isError).toBe(false);
+    expect(first.result).toContain("Notepad");
+
+    const blocked = await controller.executeTool("computer_list_apps", {}, { sessionId: "conv-b" });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.result).toContain("in use by another conversation");
+
+    controller.releaseSession("conv-a");
+    const allowed = await controller.executeTool("computer_list_apps", {}, { sessionId: "conv-b" });
+    expect(allowed.isError).toBe(false);
+  });
+
+  it("formats compact accessibility snapshots without automatic screenshots", async () => {
+    const { runner, calls } = createMockRunner({
+      autoReply: () => ({
+        ok: true,
+        command: "snapshot",
+        data: {
+          snapshot_id: "s1234",
+          app: "Notepad",
+          ref_count: 2,
+          window: { id: "win-1", title: "Untitled - Notepad" },
+          tree: {
+            role: "window",
+            name: "Untitled - Notepad",
+            children: [
+              { ref_id: "@s1234:e1", role: "document", name: "Text Editor", value: "hello", states: ["focused"] },
+              { ref_id: "@s1234:e2", role: "button", name: "Save", bounds: { x: 10, y: 20, width: 80, height: 30 } },
+            ],
+          },
+        },
+      }),
+    });
+    const controller = new AgentDesktopController(runner, "win32");
+
+    const res = await controller.executeTool(
+      "computer_snapshot",
+      { app: "Notepad", includeBounds: true },
+      { sessionId: "s1" },
+    );
+    expect(res.isError).toBe(false);
+    expect(res.images).toBeUndefined();
+    expect(calls[0]!.args).toEqual([
+      "--session",
+      "h_s1",
+      "snapshot",
+      "--app",
+      "Notepad",
+      "-i",
+      "--compact",
+      "--include-bounds",
+    ]);
+    expect(res.result).toContain("snapshot_id: s1234");
+    expect(res.result).toContain('@s1234:e1 document "Text Editor" value="hello" [focused]');
+    expect(res.result).toContain('@s1234:e2 button "Save" @(10,20 80x30)');
+  });
+
+  it("routes headless click, headed double-click, coordinate click, set_value, and paste_text", async () => {
+    const { runner, calls } = createMockRunner({
+      autoReply: () => ({ ok: true, data: { disposition: { delivery: "delivered" } } }),
+    });
+    const controller = new AgentDesktopController(runner, "win32");
+
+    await controller.executeTool("computer_click", { ref: "@s1:e3" }, { sessionId: "c1" });
+    expect(calls[0]!.args).toEqual(["--session", "h_c1", "click", "@s1:e3"]);
+
+    await controller.executeTool("computer_click", { ref: "@s1:e3", clickCount: 2 }, { sessionId: "c1" });
+    expect(calls[1]!.args).toEqual(["--session", "h_c1", "--headed", "double-click", "@s1:e3"]);
+
+    await controller.executeTool("computer_click", { x: 420, y: 180, button: "right" }, { sessionId: "c1" });
+    expect(calls[2]!.args).toEqual([
+      "--session",
+      "h_c1",
+      "--headed",
+      "mouse-click",
+      "--xy=420,180",
+      "--button",
+      "right",
+    ]);
+
+    await controller.executeTool("computer_set_value", { ref: "@s1:e4", value: "abc" }, { sessionId: "c1" });
+    expect(calls[3]!.args).toEqual(["--session", "h_c1", "set-value", "@s1:e4", "--stdin"]);
+    expect(calls[3]!.child.stdinData).toBe("abc");
+
+    await controller.executeTool("computer_paste_text", { text: "line1\nline2", app: "Notepad" }, { sessionId: "c1" });
+    expect(calls[4]!.args).toEqual(["--session", "h_c1", "clipboard-set", "--stdin"]);
+    expect(calls[4]!.child.stdinData).toBe("line1\nline2");
+    expect(calls[5]!.args).toEqual(["--session", "h_c1", "--headed", "press", "ctrl+v", "--app", "Notepad"]);
+  });
+
+  it("surfaces structured recovery guidance on STALE_REF errors", async () => {
+    const { runner } = createMockRunner({
+      autoReply: () => ({
+        ok: false,
+        command: "click",
+        error: {
+          code: "STALE_REF",
+          message: "Ref @s1:e9 is no longer present",
+          suggestion: "Take a fresh snapshot and retry",
+          recovery: { strategy: "resnapshot", requires_fresh_snapshot: true, retryable: true },
+          disposition: { delivery: "not_delivered", retry: "safe" },
+        },
+      }),
+    });
+    const controller = new AgentDesktopController(runner, "win32");
+    const res = await controller.executeTool("computer_click", { ref: "@s1:e9" });
+    expect(res.isError).toBe(true);
+    expect(res.result).toContain("STALE_REF");
+    expect(res.result).toContain("Take a fresh snapshot");
+    expect(res.result).toContain("fresh_snapshot_required=true");
   });
 });

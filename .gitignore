@@ -60,6 +60,4 @@ build/
 !apps/harness/desktop/build/
 *.tsbuildinfo
 __pycache__/
-apps/harness/desktop/native/computer-use-macos/.build/
-apps/harness/desktop/native/computer-use-macos/bin/
 .icon-probe/

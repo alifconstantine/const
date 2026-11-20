@@ -60,13 +60,14 @@ ${platform === "win32" ? "- On Windows, prefer 'powershell' when available for n
   if (names.has("browser_evaluate") || deferredBrowser) {
     sections.push("BROWSER VERIFICATION: Collect related, independent DOM measurements in one browser_evaluate call. After an interaction or animation, wait for an observable completion condition with a deadline before asserting the result. Match responsive, touch and reduced-motion assertions to the actual viewport and input environment. A fixed sleep or a screenshot by itself does not prove an interaction passed. Report which environments and checks were actually exercised.");
   }
-  if (names.has("computer_get_app_state")) {
+  if (names.has("computer_snapshot") || names.has("computer_get_app_state")) {
     sections.push(`NATIVE COMPUTER USE (DESKTOP AUTOMATION) PROTOCOL:
 - Use the declared computer tools for native app interaction. Never simulate mouse/keyboard input, window activation, OCR, or screenshot capture using terminal scripts.
-- Discover the target app/window with the available listing tools, then inspect it with 'computer_get_app_state'. Choose controls from the current accessibility tree or screenshot; use window-local coordinates with the supplied screenshot scale.
-- Use app-specific keyboard shortcuts only when supported by the observed app/state. Do not assume one search or send shortcut works in every app.
+- Discover running apps/windows with 'computer_list_apps' / 'computer_list_windows' (or launch via 'computer_launch_app'), then inspect controls using 'computer_snapshot' (or 'computer_find'). Always act using qualified snapshot refs (e.g. '@sXXXX:e5'); re-snapshot if a ref goes stale or after UI transitions.
+- Semantic ref actions ('computer_click', 'computer_set_value', 'computer_scroll') are headless by default and do not steal focus. Use 'computer_window' with action 'restore' if a target window is minimized, and use 'computer_screenshot' only when visual verification or a saved screenshot is needed.
+- Prefer 'computer_wait' over blind delays. Use app-specific keyboard shortcuts only when supported by the observed app/state.
 - For messaging: open the intended chat, verify the recipient in its header (including the self-chat label when requested), enter the requested message, and submit only when the user requested sending it. Inspect the resulting state for evidence that it was sent.
-- Input delivery alone does not prove the intended outcome. If vision is unavailable and the tree is insufficient, report the outcome as unverified. After a timeout, inspect before retrying to avoid duplicate actions.
+- Input delivery alone does not prove the intended outcome. Verify the resulting accessibility state before claiming success, and inspect before retrying after a timeout or ambiguous error.
 - Browser tools operate on browser pages, not native app windows or screenshot files.`);
   }
   if (names.has("browser_snapshot")) {

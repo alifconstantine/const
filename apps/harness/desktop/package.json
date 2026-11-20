@@ -7,8 +7,8 @@
     "test:updates": "tsx --test electron/app-updates.test.ts && node scripts/test-remote-workspace.cjs --updates",
     "test:updates:preview": "vite --config tests/app-updates.vite.ts",
     "clean": "node -e \"const fs=require('fs'); ['dist','dist-electron'].forEach(d => fs.rmSync(d, {recursive:true, force:true}));\"",
-    "dev": "node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && vite",
-    "build": "pnpm clean && node scripts/build-computer-use-macos.cjs && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
+    "dev": "node scripts/copy-excalidraw-assets.cjs && vite",
+    "build": "pnpm clean && node scripts/copy-excalidraw-assets.cjs && tsc && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
     "check-types": "tsc --noEmit",
     "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
@@ -26,6 +26,7 @@
     "test:side-chat": "node scripts/test-side-chat.cjs",
     "test:window-branding": "node scripts/test-window-branding.cjs",
     "test:browser": "tsx --test electron/browser/agent-browser-controller.test.ts",
+    "test:computer": "tsx --test electron/computer/agent-desktop-controller.test.ts",
     "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/working-directories.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && tsx --test electron/browser/agent-browser-controller.test.ts",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
@@ -36,7 +37,6 @@
     "package:linux": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --linux AppImage pacman",
     "package:linux:appimage": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --linux AppImage",
     "package:linux:pacman": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --linux pacman",
-    "build:native": "node scripts/build-computer-use-macos.cjs",
     "package:mac": "node scripts/copy-excalidraw-assets.cjs && tsc && vite build && electron-builder --mac --x64 --arm64",
     "build:remote": "node scripts/copy-excalidraw-assets.cjs && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build --config vite.remote.config.ts",
     "generate:intelligence-prompt": "node scripts/generate-intelligence-prompt.cjs"
@@ -58,6 +58,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "agent-browser": "0.43.0",
+    "agent-desktop": "1.3.1",
     "convex": "^1.45.0",
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
@@ -111,7 +112,8 @@
     "asarUnpack": [
       "node_modules/node-pty/**",
       "node_modules/agent-browser/**",
-      "node_modules/@agent-browser/**"
+      "node_modules/@agent-browser/**",
+      "node_modules/agent-desktop/**"
     ],
     "extraResources": [
       {
@@ -135,14 +137,6 @@
         "filter": [
           "**/*"
         ]
-      },
-      {
-        "from": "native",
-        "to": "native",
-        "filter": [
-          "**/*",
-          "!computer-use-macos/**"
-        ]
       }
     ],
     "win": {
@@ -159,19 +153,12 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "category": "Development"
     },
-    "beforePack": "scripts/before-pack.cjs",
     "mac": {
       "target": [
         "dmg"
       ],
       "category": "public.app-category.developer-tools",
-      "minimumSystemVersion": "14.0",
-      "extraResources": [
-        {
-          "from": "native/computer-use-macos/bin/${arch}/ConstComputerUse.app",
-          "to": "native/computer-use-macos/ConstComputerUse.app"
-        }
-      ]
+      "minimumSystemVersion": "14.0"
     }
   }
 }

@@ -129,6 +129,9 @@ importers:
       agent-browser:
         specifier: 0.43.0
         version: 0.43.0
+      agent-desktop:
+        specifier: 1.3.1
+        version: 1.3.1
       convex:
         specifier: ^1.45.0
         version: 1.45.0(react@19.2.8)
@@ -4566,6 +4569,13 @@ packages:
   agent-browser@0.43.0:
     resolution: {integrity: sha512-TExwnZAW39fUBDJhUPrw8KKGmcjzBo7FxNqoP2/usHG1ODsjGI2jAWq3+Q6I5JYyBMjePFEsj8KGB68mALtglA==}
     engines: {node: '>=22.0.0'}
+    hasBin: true
+
+  agent-desktop@1.3.1:
+    resolution: {integrity: sha512-5pBKkFkdB/VIAWRfqoA8lYp5/fenfxUHI15Pc4k8Nn2LmLxxo1PkAb0WLypknyOCczuIwuzFp/rZHGGawEV+hw==}
+    engines: {node: '>=18'}
+    cpu: [arm64, x64]
+    os: [darwin, win32, linux]
     hasBin: true
 
   ahooks@3.9.7:
@@ -12838,6 +12848,8 @@ snapshots:
       '@agent-browser/cli-linux-x64-gnu': 0.43.0
       '@agent-browser/cli-linux-x64-musl': 0.43.0
       '@agent-browser/cli-win32-x64-msvc': 0.43.0
+
+  agent-desktop@1.3.1: {}
 
   ahooks@3.9.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:

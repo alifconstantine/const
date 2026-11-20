@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Bot,
   Globe,
+  Monitor,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -1489,11 +1490,12 @@ const SubAgentTraceItem = React.memo(function SubAgentTraceItem({
 });
 
 // ---------------------------------------------------------------------------
-// Generic Tool Item fallback (including browser_* native tools)
+// Generic Tool Item fallback (including browser_* and computer_* native tools)
 // ---------------------------------------------------------------------------
 const GenericToolItem = React.memo(function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
   const toolName = tool.name ?? "";
   const isBrowserTool = toolName.startsWith("browser_");
+  const isComputerTool = toolName.startsWith("computer_");
   let targetArg = "";
   if (tool.args) {
     if (typeof tool.args === "string") {
@@ -1521,6 +1523,39 @@ const GenericToolItem = React.memo(function GenericToolItem({ tool }: { tool: Tr
       } else if (tool.args.compact) {
         targetArg = "compact";
       }
+    } else if (isComputerTool) {
+      const ref = tool.args.ref || tool.args.fromRef || tool.args.element || "";
+      const app = tool.args.app || "";
+      if (tool.args.action && (app || ref)) {
+        targetArg = `${tool.args.action} ${ref || app}`.trim();
+      } else if (tool.args.key) {
+        targetArg = app ? `${tool.args.key} (${app})` : String(tool.args.key);
+      } else if (ref && (tool.args.value !== undefined || tool.args.text !== undefined)) {
+        const preview = String(tool.args.value ?? tool.args.text ?? "").slice(0, 40);
+        targetArg = `${ref} → "${preview}"`;
+      } else if (tool.args.name || tool.args.role || tool.args.text) {
+        const parts = [
+          app,
+          tool.args.role ? `role=${tool.args.role}` : "",
+          tool.args.name ? `"${String(tool.args.name).slice(0, 32)}"` : "",
+          !tool.args.name && tool.args.text ? `"${String(tool.args.text).slice(0, 32)}"` : "",
+        ].filter(Boolean);
+        targetArg = parts.join(" ");
+      } else if (ref) {
+        targetArg = ref;
+      } else if (app) {
+        targetArg = tool.args.surface ? `${app} (${tool.args.surface})` : app;
+      } else if (tool.args.direction) {
+        targetArg = `${tool.args.direction} (${tool.args.amount ?? 3})`;
+      } else if (tool.args.x !== undefined && tool.args.y !== undefined) {
+        targetArg = `(${tool.args.x}, ${tool.args.y})`;
+      } else if (tool.args.action) {
+        targetArg = String(tool.args.action);
+      } else if (tool.args.event || tool.args.window) {
+        targetArg = String(tool.args.event || tool.args.window);
+      } else if (tool.args.surface) {
+        targetArg = String(tool.args.surface);
+      }
     } else {
       targetArg =
         tool.args.query ||
@@ -1535,12 +1570,16 @@ const GenericToolItem = React.memo(function GenericToolItem({ tool }: { tool: Tr
 
   const displayName = isBrowserTool
     ? toolName.replace(/^browser_/, "browser ").replace(/_/g, " ")
-    : toolName;
+    : isComputerTool
+      ? toolName.replace(/^computer_/, "computer ").replace(/_/g, " ")
+      : toolName;
 
   return (
     <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none">
       {isBrowserTool ? (
         <Globe className="w-3.5 h-3.5 text-blue-400/80 shrink-0" />
+      ) : isComputerTool ? (
+        <Monitor className="w-3.5 h-3.5 text-emerald-400/80 shrink-0" />
       ) : (
         <Layers className="w-3.5 h-3.5 text-[#777777] shrink-0" />
       )}

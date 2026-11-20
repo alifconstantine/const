@@ -914,7 +914,7 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Native Computer Use Tool Definitions (Desktop GUI Automation)
+// Native Computer Use Tool Definitions (Desktop GUI Automation via agent-desktop)
 // ---------------------------------------------------------------------------
 
 export const COMPUTER_LIST_APPS_TOOL: NativeToolDefinition = {
@@ -922,10 +922,15 @@ export const COMPUTER_LIST_APPS_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_list_apps",
     description:
-      "Lists visible and running local desktop applications (PID, process name, window titles) available for GUI automation and observation.",
+      "Lists visible running local desktop applications (name, PID, bundle ID, window count) available for GUI automation.",
     parameters: {
       type: "object",
-      properties: {},
+      properties: {
+        app: {
+          type: "string",
+          description: "Optional case-insensitive filter by application name.",
+        },
+      },
     },
   },
 };
@@ -935,52 +940,139 @@ export const COMPUTER_LIST_WINDOWS_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_list_windows",
     description:
-      "Lists all visible top-level windows for a specific target desktop application (by name, executable, bundle ID, or pid:<number>).",
+      "Lists visible top-level desktop windows with window IDs, titles, focus/minimized state, and screen bounds.",
     parameters: {
       type: "object",
       properties: {
         app: {
           type: "string",
-          description:
-            "The target application name, executable name, bundle identifier, or 'pid:<number>' from computer_list_apps.",
+          description: "Optional application name filter (from computer_list_apps).",
         },
       },
-      required: ["app"],
     },
   },
 };
 
-export const COMPUTER_GET_APP_STATE_TOOL: NativeToolDefinition = {
+export const COMPUTER_SNAPSHOT_TOOL: NativeToolDefinition = {
   type: "function",
   function: {
-    name: "computer_get_app_state",
+    name: "computer_snapshot",
     description:
-      "Inspects a visible desktop app window: extracts its complete Accessibility Tree with numbered element indexes and attaches a visual window screenshot to the next model request and saves a reference copy to disk. Always use this instead of writing custom PowerShell/OCR scripts.",
+      "Captures a structured accessibility tree snapshot of a desktop application window or OS surface with qualified element refs (e.g. `@s8f3k2p9:e5`). Accessibility-first (no automatic screenshot). Use `skeleton: true` for large apps, `root` to drill into a container ref, or `computer_screenshot` only when visual inspection is needed.",
     parameters: {
       type: "object",
       properties: {
         app: {
           type: "string",
-          description: "Target application selector (name, bundleId, or pid:<number>).",
+          description: "Target application name (e.g. 'Notepad', 'Calculator', 'Finder').",
         },
         windowId: {
-          type: "number",
-          description: "Optional window ID from computer_list_windows.",
+          type: "string",
+          description: "Optional window ID from computer_list_windows to disambiguate multiple windows.",
         },
-        windowIndex: {
-          type: "number",
-          description: "Optional window index if windowId is not available.",
+        root: {
+          type: "string",
+          description: "Optional qualified ref (`@sXXXX:eN`) to snapshot only that subtree.",
         },
-        noScreenshot: {
+        surface: {
+          type: "string",
+          enum: [
+            "window",
+            "focused",
+            "menu",
+            "menubar",
+            "sheet",
+            "popover",
+            "alert",
+            "desktop",
+            "taskbar",
+            "start-menu",
+            "system-tray",
+            "action-center",
+            "notification-center",
+            "dock",
+            "toolbar",
+          ],
+          description: "Optional surface to inspect (default: 'window'; use 'focused' for active window).",
+        },
+        interactiveOnly: {
           type: "boolean",
-          description: "If true, skips screenshot capture to save tokens/bandwidth.",
+          description: "If true (default), return interactive controls only to keep context compact.",
+        },
+        compact: {
+          type: "boolean",
+          description: "If true (default), collapse single-child unnamed wrapper nodes.",
+        },
+        skeleton: {
+          type: "boolean",
+          description: "If true, return a shallow overview with children_count on large containers.",
+        },
+        includeBounds: {
+          type: "boolean",
+          description: "If true, include absolute screen bounds (x, y, width, height) for coordinate fallbacks.",
+        },
+        maxDepth: {
+          type: "number",
+          description: "Maximum traversal depth (default: 10).",
         },
         restoreWindow: {
           type: "boolean",
-          description: "If true (default), unminimizes and brings the window to the front before inspecting.",
+          description: "If true, restore a minimized window before snapshotting.",
+        },
+        timeoutMs: {
+          type: "number",
+          description: "Optional observation deadline in ms (default: 3000; raise for slow Electron/Chromium apps).",
         },
       },
-      required: ["app"],
+    },
+  },
+};
+
+export const COMPUTER_FIND_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_find",
+    description:
+      "Searches desktop UI elements by role, name, value, text, native ID, or state and returns actionable qualified refs (`@sXXXX:eN`). Faster than full snapshots when looking for a specific button, input, or label.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: { type: "string", description: "Target application name." },
+        windowId: { type: "string", description: "Optional window ID from computer_list_windows." },
+        root: { type: "string", description: "Optional subtree root ref (`@sXXXX:eN`)." },
+        surface: { type: "string", description: "Optional surface (default: 'window')." },
+        role: { type: "string", description: "Accessibility role (e.g. 'button', 'textfield', 'checkbox', 'menuitem', 'document')." },
+        name: { type: "string", description: "Accessible name or label substring (case-insensitive)." },
+        text: { type: "string", description: "Text in name, value, title, or description." },
+        value: { type: "string", description: "Current element value to match." },
+        nativeId: { type: "string", description: "Native AutomationId / AXIdentifier." },
+        exact: { type: "boolean", description: "Require exact case-insensitive match." },
+        state: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional state filters (e.g. ['focused=true'], ['enabled=true']).",
+        },
+        first: { type: "boolean", description: "Return only the first match." },
+        limit: { type: "number", description: "Maximum number of matches to return (default: 50)." },
+      },
+    },
+  },
+};
+
+export const COMPUTER_SCREENSHOT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_screenshot",
+    description:
+      "Captures a PNG screenshot of a desktop application window or display and saves it to disk. Use only when visual layout verification or a saved screenshot artifact is explicitly needed.",
+    parameters: {
+      type: "object",
+      properties: {
+        app: { type: "string", description: "Optional application name to capture its window." },
+        windowId: { type: "string", description: "Optional window ID from computer_list_windows." },
+        screen: { type: "number", description: "Optional display index (0 = primary monitor) when capturing a full display." },
+        filename: { type: "string", description: "Optional short label for the saved PNG filename." },
+      },
     },
   },
 };
@@ -990,47 +1082,64 @@ export const COMPUTER_CLICK_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_click",
     description:
-      "Clicks a UI element by its numeric elementIndex from computer_get_app_state, or by window-local x,y coordinates from the screenshot. Always use this instead of executing terminal mouse scripts.",
+      "Clicks or invokes a semantic action on a desktop UI element using its qualified snapshot ref (`@sXXXX:eN`), or falls back to absolute screen coordinates (`x`, `y`). Headless semantic click by default; physical input is used automatically for double/triple click, hover, or coordinates.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
+        ref: {
           type: "string",
-          description: "Target application selector.",
+          description: "Qualified ref from computer_snapshot or computer_find (e.g. '@s8f3k2p9:e5'). Preferred over coordinates.",
         },
-        elementIndex: {
-          type: "number",
-          description: "The numeric element index from the latest accessibility tree (recommended).",
+        action: {
+          type: "string",
+          enum: [
+            "click",
+            "double_click",
+            "triple_click",
+            "right_click",
+            "hover",
+            "focus",
+            "toggle",
+            "check",
+            "uncheck",
+            "expand",
+            "collapse",
+            "clear",
+            "scroll_to",
+            "select",
+          ],
+          description: "Semantic ref action (default: 'click'). Use 'select' with `option` for dropdown/list items.",
+        },
+        option: {
+          type: "string",
+          description: "Option label to choose when `action` is 'select'.",
         },
         x: {
           type: "number",
-          description: "Window-local X coordinate (use only when elementIndex is unavailable).",
+          description: "Absolute screen X coordinate (use only when `ref` is unavailable or ambiguous).",
         },
         y: {
           type: "number",
-          description: "Window-local Y coordinate (use only when elementIndex is unavailable).",
+          description: "Absolute screen Y coordinate (use only when `ref` is unavailable or ambiguous).",
         },
-        mouseButton: {
+        button: {
           type: "string",
           enum: ["left", "right", "middle"],
-          description: "Mouse button to click (default: 'left').",
+          description: "Mouse button (default: 'left').",
         },
         clickCount: {
           type: "number",
-          description: "Number of clicks: 1 for single-click, 2 for double-click (default: 1).",
+          description: "Click count: 1 (single), 2 (double), or 3 (triple).",
         },
         modifiers: {
           type: "string",
-          description: "Optional keyboard modifier chord held during click (e.g. 'CmdOrCtrl', 'Shift', 'Alt').",
+          description: "Optional modifier keys held during coordinate click (e.g. 'ctrl', 'shift', 'alt').",
         },
-        noScreenshot: {
+        headed: {
           type: "boolean",
-          description: "If true, skips post-action screenshot.",
+          description: "Set true to force physical cursor click and window focus.",
         },
       },
-      required: ["app"],
     },
   },
 };
@@ -1040,59 +1149,51 @@ export const COMPUTER_SET_VALUE_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_set_value",
     description:
-      "Directly sets the text or value of an editable UI element (text box, combo box, slider) via accessibility patterns without typing delays.",
+      "Directly sets the text or value of an editable UI element (text box, document, combo box, slider) via headless accessibility attribute without moving focus or cursor.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
+        ref: {
           type: "string",
-          description: "Target application selector.",
-        },
-        elementIndex: {
-          type: "number",
-          description: "The numeric element index of the editable field.",
+          description: "Qualified ref (`@sXXXX:eN`) of the editable element.",
         },
         value: {
           type: "string",
-          description: "The exact value or text to set.",
-        },
-        noScreenshot: {
-          type: "boolean",
-          description: "If true, skips post-action screenshot.",
+          description: "The exact text or value to set.",
         },
       },
-      required: ["app", "elementIndex", "value"],
+      required: ["ref", "value"],
     },
   },
 };
 
-export const COMPUTER_TYPE_TEXT_TOOL: NativeToolDefinition = {
+export const COMPUTER_TYPE_TOOL: NativeToolDefinition = {
   type: "function",
   function: {
-    name: "computer_type_text",
+    name: "computer_type",
     description:
-      "Synthesizes keyboard typing into the currently focused element of the target window. Ensure the control is focused via computer_click or computer_hotkey first. Never execute PowerShell SendKeys scripts.",
+      "Types text into a target desktop UI element ref using physical keystrokes. Prefer `computer_set_value` for direct headless input or `computer_paste_text` for long multiline content.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
+        ref: {
           type: "string",
-          description: "Target application selector.",
+          description: "Qualified ref (`@sXXXX:eN`) of the text target.",
         },
         text: {
           type: "string",
-          description: "The string of characters to type.",
+          description: "Text to type.",
         },
-        noScreenshot: {
-          type: "boolean",
-          description: "If true, skips post-action screenshot.",
+        app: {
+          type: "string",
+          description: "Optional application name fallback if `ref` is omitted and a control is already focused.",
+        },
+        intervalMs: {
+          type: "number",
+          description: "Optional delay between keystrokes in milliseconds (1–2000).",
         },
       },
-      required: ["app", "text"],
+      required: ["text"],
     },
   },
 };
@@ -1102,55 +1203,28 @@ export const COMPUTER_PRESS_KEY_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_press_key",
     description:
-      "Presses a single navigation or control key (e.g. 'Return', 'Enter', 'Escape', 'Tab', 'Backspace', 'Delete', 'Up', 'Down', 'Left', 'Right', 'Space').",
+      "Presses a key or keyboard shortcut chord (e.g. 'return', 'escape', 'tab', 'CmdOrCtrl+S', 'ctrl+a', 'ctrl+shift+p'). `CmdOrCtrl` automatically maps to `ctrl` on Windows/Linux and `cmd` on macOS.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
-          type: "string",
-          description: "Target application selector.",
-        },
         key: {
           type: "string",
-          description: "Key name to press (e.g. 'Return', 'Tab', 'Escape', 'Down').",
+          description: "Key name or chord (e.g. 'return', 'escape', 'CmdOrCtrl+F', 'ctrl+c', 'alt+left').",
         },
-        noScreenshot: {
-          type: "boolean",
-          description: "If true, skips post-action screenshot.",
-        },
-      },
-      required: ["app", "key"],
-    },
-  },
-};
-
-export const COMPUTER_HOTKEY_TOOL: NativeToolDefinition = {
-  type: "function",
-  function: {
-    name: "computer_hotkey",
-    description:
-      "Sends a keyboard shortcut chord combining modifier(s) and a key (e.g. 'CmdOrCtrl+F', 'Ctrl+N', 'Alt+F4', 'Ctrl+S'). Essential for focusing search or opening new chats in modern apps like WhatsApp or browsers.",
-    parameters: {
-      type: "object",
-      properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
         app: {
           type: "string",
-          description: "Target application selector.",
+          description: "Optional target application name to focus/deliver the key to.",
         },
-        key: {
+        windowId: {
           type: "string",
-          description: "Key combination chord string (e.g. 'CmdOrCtrl+A', 'Ctrl+Shift+P').",
+          description: "Optional window ID from computer_list_windows.",
         },
-        noScreenshot: {
+        force: {
           type: "boolean",
-          description: "If true, skips post-action screenshot.",
+          description: "Set true only if explicitly required to send an OS-guarded shortcut.",
         },
       },
-      required: ["app", "key"],
+      required: ["key"],
     },
   },
 };
@@ -1160,26 +1234,28 @@ export const COMPUTER_PASTE_TEXT_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_paste_text",
     description:
-      "Pastes text into the focused element via system clipboard and standard paste shortcut. Preferred for long bodies of text or code blocks.",
+      "Writes text to the system clipboard and pastes it via the OS paste shortcut (`ctrl+v` / `cmd+v`). Ideal for long text, Unicode, or code blocks.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
-          type: "string",
-          description: "Target application selector.",
-        },
         text: {
           type: "string",
           description: "Text to paste.",
         },
-        noScreenshot: {
-          type: "boolean",
-          description: "If true, skips post-action screenshot.",
+        ref: {
+          type: "string",
+          description: "Optional qualified ref (`@sXXXX:eN`) to focus before pasting.",
+        },
+        app: {
+          type: "string",
+          description: "Optional target application name.",
+        },
+        windowId: {
+          type: "string",
+          description: "Optional window ID from computer_list_windows.",
         },
       },
-      required: ["app", "text"],
+      required: ["text"],
     },
   },
 };
@@ -1189,43 +1265,33 @@ export const COMPUTER_SCROLL_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_scroll",
     description:
-      "Scrolls a scrollable container or window up, down, left, or right.",
+      "Scrolls a scrollable element by its qualified ref (`@sXXXX:eN`), or scrolls the mouse wheel at absolute screen coordinates (`x`, `y`).",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
-        app: {
+        ref: {
           type: "string",
-          description: "Target application selector.",
+          description: "Qualified ref (`@sXXXX:eN`) of the scrollable container.",
         },
         direction: {
           type: "string",
           enum: ["up", "down", "left", "right"],
           description: "Direction to scroll.",
         },
-        pages: {
+        amount: {
           type: "number",
-          description: "Amount to scroll in page increments (default: 1).",
-        },
-        elementIndex: {
-          type: "number",
-          description: "Optional element index to scroll within.",
+          description: "Scroll units/lines (default: 3).",
         },
         x: {
           type: "number",
-          description: "Optional window-local X position to hover before scrolling.",
+          description: "Optional absolute screen X coordinate when scrolling without `ref`.",
         },
         y: {
           type: "number",
-          description: "Optional window-local Y position to hover before scrolling.",
-        },
-        noScreenshot: {
-          type: "boolean",
-          description: "If true, skips post-action screenshot.",
+          description: "Optional absolute screen Y coordinate when scrolling without `ref`.",
         },
       },
-      required: ["app", "direction"],
+      required: ["direction"],
     },
   },
 };
@@ -1235,25 +1301,151 @@ export const COMPUTER_DRAG_TOOL: NativeToolDefinition = {
   function: {
     name: "computer_drag",
     description:
-      "Drags mouse from a source element or coordinate to a destination element or coordinate.",
+      "Drags from a source element ref or absolute screen coordinates to a destination element ref or coordinates.",
     parameters: {
       type: "object",
       properties: {
-        windowId: { type: "number", description: "Optional target window ID from computer_list_windows." },
-        windowIndex: { type: "number", description: "Optional target window index when windowId is unavailable." },
+        fromRef: { type: "string", description: "Source qualified ref (`@sXXXX:eN`)." },
+        toRef: { type: "string", description: "Destination qualified ref (`@sXXXX:eN`)." },
+        fromX: { type: "number", description: "Source absolute screen X coordinate." },
+        fromY: { type: "number", description: "Source absolute screen Y coordinate." },
+        toX: { type: "number", description: "Destination absolute screen X coordinate." },
+        toY: { type: "number", description: "Destination absolute screen Y coordinate." },
+        durationMs: { type: "number", description: "Optional drag duration in milliseconds." },
+      },
+    },
+  },
+};
+
+export const COMPUTER_LAUNCH_APP_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_launch_app",
+    description:
+      "Launches a local desktop application by name, executable path, or bundle ID (e.g. 'notepad', 'calc', 'explorer', 'Calculator') and waits for its window to activate.",
+    parameters: {
+      type: "object",
+      properties: {
         app: {
           type: "string",
-          description: "Target application selector.",
+          description: "Application name, executable name/path, or macOS bundle ID.",
         },
-        fromElementIndex: { type: "number", description: "Source element index." },
-        toElementIndex: { type: "number", description: "Destination element index." },
-        fromX: { type: "number", description: "Source X coordinate." },
-        fromY: { type: "number", description: "Source Y coordinate." },
-        toX: { type: "number", description: "Destination X coordinate." },
-        toY: { type: "number", description: "Destination Y coordinate." },
-        noScreenshot: { type: "boolean", description: "If true, skips post-action screenshot." },
+        args: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional command-line arguments passed to the launched app.",
+        },
+        cwd: {
+          type: "string",
+          description: "Optional working directory for the launched process.",
+        },
+        activate: {
+          type: "boolean",
+          description: "If true (default), bring the app window forward and wait until ready.",
+        },
+        timeoutMs: {
+          type: "number",
+          description: "Launch timeout in milliseconds (default: 30000).",
+        },
       },
       required: ["app"],
+    },
+  },
+};
+
+export const COMPUTER_WINDOW_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_window",
+    description:
+      "Manages an application window: focus, restore (unminimize), minimize, maximize, resize, move, or gracefully close an app.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["focus", "restore", "minimize", "maximize", "resize", "move", "close"],
+          description: "Window operation to perform.",
+        },
+        app: { type: "string", description: "Target application name." },
+        windowId: { type: "string", description: "Optional window ID from computer_list_windows." },
+        title: { type: "string", description: "Optional partial window title match (for 'focus')." },
+        width: { type: "number", description: "Target width in pixels (required for 'resize')." },
+        height: { type: "number", description: "Target height in pixels (required for 'resize')." },
+        x: { type: "number", description: "Target screen X coordinate (required for 'move')." },
+        y: { type: "number", description: "Target screen Y coordinate (required for 'move')." },
+        force: { type: "boolean", description: "Force terminate app when action is 'close' (default: false)." },
+      },
+      required: ["action"],
+    },
+  },
+};
+
+export const COMPUTER_WAIT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_wait",
+    description:
+      "Waits for a UI condition instead of blind sleeping: element predicate, window title, text appearance, desktop lifecycle event, or a short bounded delay.",
+    parameters: {
+      type: "object",
+      properties: {
+        element: { type: "string", description: "Qualified ref (`@sXXXX:eN`) to wait on." },
+        predicate: {
+          type: "string",
+          enum: ["exists", "enabled", "visible", "actionable", "value"],
+          description: "Element wait predicate.",
+        },
+        value: { type: "string", description: "Expected value when predicate is 'value'." },
+        window: { type: "string", description: "Window title substring to wait for." },
+        text: { type: "string", description: "Text to wait for in the app's accessibility tree." },
+        event: {
+          type: "string",
+          enum: [
+            "window-opened",
+            "window-closed",
+            "app-launched",
+            "app-terminated",
+            "focus-changed",
+            "surface-appeared",
+            "surface-dismissed",
+          ],
+          description: "Desktop lifecycle event to wait for.",
+        },
+        app: { type: "string", description: "Optional application name scope." },
+        windowId: { type: "string", description: "Optional window ID scope." },
+        ms: { type: "number", description: "Bounded wait duration in milliseconds (use only when no semantic condition applies)." },
+        timeoutMs: { type: "number", description: "Maximum wait timeout in milliseconds (default: 15000)." },
+      },
+    },
+  },
+};
+
+export const COMPUTER_CLIPBOARD_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "computer_clipboard",
+    description:
+      "Reads, writes, or clears the local system clipboard.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["get", "set", "clear"],
+          description: "Clipboard operation.",
+        },
+        text: {
+          type: "string",
+          description: "UTF-8 text to write when action is 'set'.",
+        },
+        format: {
+          type: "string",
+          enum: ["text", "auto", "image", "file-urls"],
+          description: "Clipboard format when action is 'get' (default: 'text').",
+        },
+      },
+      required: ["action"],
     },
   },
 };
@@ -1261,15 +1453,20 @@ export const COMPUTER_DRAG_TOOL: NativeToolDefinition = {
 export const NATIVE_COMPUTER_TOOLS: NativeToolDefinition[] = [
   COMPUTER_LIST_APPS_TOOL,
   COMPUTER_LIST_WINDOWS_TOOL,
-  COMPUTER_GET_APP_STATE_TOOL,
+  COMPUTER_SNAPSHOT_TOOL,
+  COMPUTER_FIND_TOOL,
+  COMPUTER_SCREENSHOT_TOOL,
   COMPUTER_CLICK_TOOL,
   COMPUTER_SET_VALUE_TOOL,
-  COMPUTER_TYPE_TEXT_TOOL,
+  COMPUTER_TYPE_TOOL,
   COMPUTER_PRESS_KEY_TOOL,
-  COMPUTER_HOTKEY_TOOL,
   COMPUTER_PASTE_TEXT_TOOL,
   COMPUTER_SCROLL_TOOL,
   COMPUTER_DRAG_TOOL,
+  COMPUTER_LAUNCH_APP_TOOL,
+  COMPUTER_WINDOW_TOOL,
+  COMPUTER_WAIT_TOOL,
+  COMPUTER_CLIPBOARD_TOOL,
 ];
 
 

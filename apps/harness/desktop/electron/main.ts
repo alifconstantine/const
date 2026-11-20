@@ -64,7 +64,7 @@ import {
   agentBrowserController as browserController,
   type ControlState,
 } from "./browser/agent-browser-controller";
-import { computerController } from "./computer/computer-controller";
+import { agentDesktopController as computerController } from "./computer/agent-desktop-controller";
 import { marketplaceService } from "./marketplace-service";
 import { McpStore } from "./mcp/store";
 import { McpService } from "./mcp/service";
@@ -92,9 +92,9 @@ import { monitorMainRenderer } from "./renderer-health";
 import { rendererHealthStrings } from "../../shared/renderer-health-strings";
 
 // Native Browser Use is powered by `agent-browser` (Phase 1).
-// Legacy Computer Use remains disabled until Phase 2 (`agent-desktop`).
+// Native Computer Use is powered by `agent-desktop` (Phase 2).
 const NATIVE_BROWSER_ENABLED = process.env.CONST_DISABLE_NATIVE_BROWSER !== "1";
-const LEGACY_AUTOMATION_ENABLED = process.env.CONST_ENABLE_LEGACY_AUTOMATION === "1";
+const NATIVE_COMPUTER_ENABLED = process.env.CONST_DISABLE_NATIVE_COMPUTER !== "1";
 
 registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
@@ -109,9 +109,9 @@ registerGlobalBrowserToolHandler(async (toolName, args, context) => {
 
 registerGlobalComputerToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
-  if (!LEGACY_AUTOMATION_ENABLED || config.enableComputerUse === false) {
+  if (!NATIVE_COMPUTER_ENABLED || config.enableComputerUse === false) {
     return {
-      result: "Computer Use is temporarily disabled during the native migration phase (planned replacement: agent-desktop).",
+      result: "Computer Use is disabled in settings.",
       isError: true,
     };
   }
@@ -324,7 +324,7 @@ function loadUserConfig(): UserConfig {
         merged.providers.const.baseUrl = process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1";
       }
 
-      computerController.setEnabled(LEGACY_AUTOMATION_ENABLED && merged.enableComputerUse !== false);
+      computerController.setEnabled(NATIVE_COMPUTER_ENABLED && merged.enableComputerUse !== false);
     return merged;
     }
   } catch (err) {
@@ -347,7 +347,7 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
     },
   };
   if (config.enableComputerUse !== undefined) {
-    computerController.setEnabled(LEGACY_AUTOMATION_ENABLED && config.enableComputerUse);
+    computerController.setEnabled(NATIVE_COMPUTER_ENABLED && config.enableComputerUse);
   }
   for (const [name, enabled] of [["browser-use", config.enableBrowserUse], ["computer-use", config.enableComputerUse]] as const) {
     if (enabled === undefined) continue;
@@ -1775,7 +1775,7 @@ app.whenReady().then(() => {
           if (name === "browser-use") {
             return NATIVE_BROWSER_ENABLED && enabledInMarketplace && cfg.enableBrowserUse !== false;
           }
-          return LEGACY_AUTOMATION_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
+          return NATIVE_COMPUTER_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
         },
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
@@ -1817,9 +1817,9 @@ app.whenReady().then(() => {
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableComputerUse === false) {
+          if (!NATIVE_COMPUTER_ENABLED || cfg.enableComputerUse === false) {
             return {
-              result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
+              result: "Computer Use is disabled in settings.",
               isError: true,
             };
           }
@@ -2801,7 +2801,7 @@ app.whenReady().then(() => {
           if (name === "browser-use") {
             return NATIVE_BROWSER_ENABLED && enabledInMarketplace && cfg.enableBrowserUse !== false;
           }
-          return LEGACY_AUTOMATION_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
+          return NATIVE_COMPUTER_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
         },
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
@@ -2821,9 +2821,9 @@ app.whenReady().then(() => {
         },
         computerHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableComputerUse === false) {
+          if (!NATIVE_COMPUTER_ENABLED || cfg.enableComputerUse === false) {
             return {
-              result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
+              result: "Computer Use is disabled in settings.",
               isError: true,
             };
           }

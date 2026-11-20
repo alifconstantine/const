@@ -10,15 +10,20 @@ type AutomationConfig = Record<ToggleKey, boolean>;
 const COMPUTER_TOOLS = [
   ["computer_list_apps", "computerToolListApps"],
   ["computer_list_windows", "computerToolListWindows"],
-  ["computer_get_app_state", "computerToolAppState"],
+  ["computer_snapshot", "computerToolAppState"],
+  ["computer_find", "computerToolFind"],
+  ["computer_screenshot", "computerToolScreenshot"],
   ["computer_click", "computerToolClick"],
   ["computer_set_value", "computerToolSetValue"],
-  ["computer_type_text", "computerToolTypeText"],
+  ["computer_type", "computerToolTypeText"],
   ["computer_press_key", "computerToolPressKey"],
-  ["computer_hotkey", "computerToolHotkey"],
   ["computer_paste_text", "computerToolPasteText"],
   ["computer_scroll", "computerToolScroll"],
   ["computer_drag", "computerToolDrag"],
+  ["computer_launch_app", "computerToolLaunchApp"],
+  ["computer_window", "computerToolWindow"],
+  ["computer_wait", "computerToolWait"],
+  ["computer_clipboard", "computerToolClipboard"],
 ] as const;
 
 export function ComputerUseSettings() {

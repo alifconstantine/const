@@ -786,6 +786,8 @@ export interface TranslationDictionary {
     computerToolListApps: string;
     computerToolListWindows: string;
     computerToolAppState: string;
+    computerToolFind: string;
+    computerToolScreenshot: string;
     computerToolClick: string;
     computerToolSetValue: string;
     computerToolTypeText: string;
@@ -794,6 +796,10 @@ export interface TranslationDictionary {
     computerToolPasteText: string;
     computerToolScroll: string;
     computerToolDrag: string;
+    computerToolLaunchApp: string;
+    computerToolWindow: string;
+    computerToolWait: string;
+    computerToolClipboard: string;
     computerSafetyNotice: string;
     computerSafetyDesc: string;
     memory: string;

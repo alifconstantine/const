@@ -6,6 +6,7 @@ allowBuilds:
   '@google/genai': true
   '@openuidev/lang-core': false
   agent-browser: false
+  agent-desktop: true
   canvas: true
   core-js: false
   electron-winstaller: true
