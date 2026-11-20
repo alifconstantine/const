@@ -17,26 +17,42 @@ export function MediaPreviewTab({ name, filePath, kind, source, workspacePath }:
   const showText = kind === "document" || (kind === "pdf" && pdfText);
   const [url, setUrl] = useState<string>();
   const [failed, setFailed] = useState(false);
+  const [fallbackUsed, setFallbackUsed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const resolvedPath = filePath && !/^(?:[A-Za-z]:[\\/]|\/|\\\\)/.test(filePath) && workspacePath
+    ? `${workspacePath.replace(/[\\/]$/, "")}/${filePath}` : filePath;
+
+  const tryDataUrlFallback = () => {
+    if (fallbackUsed || !resolvedPath || !window.electron?.readAsDataUrl) {
+      setFailed(true);
+      return;
+    }
+    setFallbackUsed(true);
+    void window.electron.readAsDataUrl(resolvedPath).then(result => {
+      const safe = result.success ? safeMediaUrl(result.dataUrl, kind) : undefined;
+      if (safe) setUrl(safe);
+      else setFailed(true);
+    }).catch(() => setFailed(true));
+  };
+
   useEffect(() => {
     let disposed = false;
     setUrl(undefined);
     setFailed(false);
+    setFallbackUsed(false);
     if (showText) return;
     const inline = safeMediaUrl(source?.base64, kind) || safeMediaUrl(source?.url, kind);
-    const path = filePath && !/^(?:[A-Za-z]:[\\/]|\/|\\\\)/.test(filePath) && workspacePath
-      ? `${workspacePath.replace(/[\\/]$/, "")}/${filePath}` : filePath;
     if (inline) { setUrl(inline); return; }
-    if (path && !isRemote) { setUrl(localMediaUrl(path)); return; }
-    if (!path || !window.electron?.readAsDataUrl) { setFailed(true); return; }
-    void window.electron.readAsDataUrl(path).then(result => {
+    if (resolvedPath && !isRemote) { setUrl(localMediaUrl(resolvedPath)); return; }
+    if (!resolvedPath || !window.electron?.readAsDataUrl) { setFailed(true); return; }
+    void window.electron.readAsDataUrl(resolvedPath).then(result => {
       if (disposed) return;
       const safe = result.success ? safeMediaUrl(result.dataUrl, kind) : undefined;
       if (safe) setUrl(safe);
       else setFailed(true);
     }).catch(() => { if (!disposed) setFailed(true); });
     return () => { disposed = true; };
-  }, [filePath, workspacePath, source?.base64, source?.url, kind, showText, isRemote, attempt]);
+  }, [resolvedPath, source?.base64, source?.url, kind, showText, isRemote, attempt]);
 
   return <section data-media-preview={kind} className="flex h-full min-h-0 flex-col bg-white text-[#262626] dark:bg-[#161616] dark:text-white [&_button]:outline-none [&_button]:focus-visible:bg-black/5 dark:[&_button]:focus-visible:bg-white/10">
     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm font-medium shrink-0">
@@ -55,10 +71,10 @@ export function MediaPreviewTab({ name, filePath, kind, source, workspacePath }:
       </div>
     : !url ? <div role="status" aria-label={t("common.loading")} className="flex-1 grid place-items-center"><Loader2 className="size-5 animate-spin text-[#969696]" /></div>
     : <div className="flex flex-1 min-h-0 items-center justify-center overflow-hidden p-4">
-        {kind === "image" && <img src={url} alt={name} onError={() => setFailed(true)} className="max-h-full max-w-full object-contain" />}
-        {kind === "video" && <video src={url} controls preload="metadata" onError={() => setFailed(true)} className="max-h-full max-w-full" aria-label={name} />}
-        {kind === "audio" && <audio src={url} controls preload="metadata" onError={() => setFailed(true)} className="w-full" aria-label={name} />}
-        {kind === "pdf" && <embed src={url} type="application/pdf" title={name} onError={() => setFailed(true)} className="h-full w-full rounded-xl border-0 bg-white" />}
+        {kind === "image" && <img src={url} alt={name} onError={tryDataUrlFallback} className="max-h-full max-w-full object-contain" />}
+        {kind === "video" && <video src={url} controls preload="metadata" onError={tryDataUrlFallback} className="max-h-full max-w-full" aria-label={name} />}
+        {kind === "audio" && <audio src={url} controls preload="metadata" onError={tryDataUrlFallback} className="w-full" aria-label={name} />}
+        {kind === "pdf" && <embed src={url} type="application/pdf" title={name} onError={tryDataUrlFallback} className="h-full w-full rounded-xl border-0 bg-white" />}
       </div>}
   </section>;
 }

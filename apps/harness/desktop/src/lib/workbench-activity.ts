@@ -42,7 +42,9 @@ export function mediaKind(name: string, type?: string): MediaKind | null {
 }
 
 export function localMediaUrl(path: string): string {
-  return `const-file://${encodeURI(path.replace(/\\/g, "/")).replace(/[?#]/g, character => encodeURIComponent(character))}`;
+  const normalized = path.replace(/\\/g, "/");
+  const prefixed = normalized.startsWith("/") ? normalized : `/${normalized}`;
+  return `const-file://local${encodeURI(prefixed).replace(/[?#]/g, character => encodeURIComponent(character))}`;
 }
 
 export function safeMediaUrl(value: string | undefined, kind: MediaKind): string | undefined {

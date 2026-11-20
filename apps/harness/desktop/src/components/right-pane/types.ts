@@ -54,3 +54,13 @@ export interface BrowserSelectedElement {
   htmlSnippet?: string;
   url: string;
 }
+
+export interface BrowserScreenshotAttachment {
+  dataUrl: string;
+  base64: string;
+  mimeType: string;
+  filename: string;
+  url: string;
+  title: string;
+  copiedToClipboard?: boolean;
+}

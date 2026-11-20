@@ -13,7 +13,7 @@ import { PersistentBrowserStack } from "./persistent-browser-stack";
 import { SubagentTab } from "./subagent-tab";
 import { SideChatTab } from "./side-chat-tab";
 import { TrajectoryTab } from "./trajectory-tab";
-import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
+import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement, BrowserScreenshotAttachment } from "./types";
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 import type { ConversationItem } from "../../lib/conversation-store";
 import { useTranslation } from "../../lib/i18n";
@@ -45,6 +45,7 @@ interface RightPaneProps {
   onStopTask?: (taskId: string, conversationId?: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onSelectElementForChat?: (element: BrowserSelectedElement) => void;
+  onAttachScreenshotToChat?: (screenshot: BrowserScreenshotAttachment) => void;
   onDraggingChange?: (isDragging: boolean) => void;
   subagents?: SubAgentItem[];
   onKillAgent?: (agentId: string) => void;
@@ -84,6 +85,7 @@ export const RightPane = memo(function RightPane({
   onStopTask,
   onUpdateTab,
   onSelectElementForChat,
+  onAttachScreenshotToChat,
   onDraggingChange,
   subagents,
   onKillAgent,
@@ -183,8 +185,10 @@ export const RightPane = memo(function RightPane({
         return (
           <BrowserTab
             tab={tab}
+            isActive={!isOpeningNewTab && tab.id === activeTabId && tabs.some((item) => item.id === tab.id)}
             onUpdateTab={onUpdateTab}
             onSelectElementForChat={onSelectElementForChat}
+            onAttachScreenshotToChat={onAttachScreenshotToChat}
           />
         );
       default:

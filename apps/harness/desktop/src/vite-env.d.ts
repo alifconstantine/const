@@ -515,11 +515,58 @@ declare global {
       ) => () => void;
       browser?: {
         remoteInput?: (input: any) => Promise<any>;
+        openSession?: (payload: {
+          tabId: string;
+          url?: string;
+          conversationId?: string;
+          viewport?: { width: number; height: number; mobile?: boolean };
+          navigateIfDifferent?: boolean;
+        }) => Promise<{
+          tabId: string;
+          label: string;
+          url: string;
+          title: string;
+          streamUrl: string | null;
+          streamPort: number | null;
+          canGoBack: boolean;
+          canGoForward: boolean;
+          viewport: { width: number; height: number };
+          control?: {
+            conversationId?: string;
+            tabId?: string;
+            status?: "idle" | "running" | "paused";
+            holder: "bot" | "human";
+            since: string;
+            requested: boolean;
+            reason?: string;
+          };
+        }>;
+        closeSession?: (tabId: string) => Promise<boolean>;
+        getStreamInfo?: () => Promise<{ streamUrl: string | null; streamPort: number | null }>;
+        goBack?: (tabId?: string) => Promise<{ url: string; title: string; canGoBack: boolean; canGoForward: boolean }>;
+        goForward?: (tabId?: string) => Promise<{ url: string; title: string; canGoBack: boolean; canGoForward: boolean }>;
+        reload?: (tabId?: string, ignoreCache?: boolean) => Promise<{ url: string; title: string; canGoBack: boolean; canGoForward: boolean }>;
+        setViewport?: (payload: { tabId?: string; width: number; height: number; mobile?: boolean }) => Promise<{ width: number; height: number }>;
+        setZoom?: (payload: { tabId?: string; factor: number }) => Promise<{ zoomFactor: number }>;
+        inspectPoint?: (payload: { tabId?: string; x: number; y: number }) => Promise<any>;
+        captureToChat?: (tabId?: string) => Promise<{
+          dataUrl: string;
+          base64: string;
+          mimeType: string;
+          filename: string;
+          url: string;
+          title: string;
+          copiedToClipboard: boolean;
+        }>;
+        resetSession?: () => Promise<{ ok: boolean }>;
         registerTab: (tabId: string, guestContentsId: number, conversationId?: string) => Promise<boolean>;
         unregisterTab: (tabId: string, guestContentsId?: number) => Promise<boolean>;
         setActiveTab: (tabId: string, conversationId?: string) => Promise<boolean>;
         listTabs?: (conversationId?: string) => Promise<any[]>;
-        getControl: (tabId?: string) => Promise<{
+        getControl: (tabId?: string, conversationId?: string) => Promise<{
+          conversationId?: string;
+          tabId?: string;
+          status?: "idle" | "running" | "paused";
           holder: "bot" | "human";
           since: string;
           requested: boolean;

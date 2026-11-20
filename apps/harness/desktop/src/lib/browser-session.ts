@@ -1,8 +1,11 @@
 export const BROWSER_PARTITION = "persist:const_browser";
 
-/** Storage belongs to a conversation, even when two previews use the same origin. */
-export function browserPartition(conversationId?: string): string {
-  return conversationId ? `${BROWSER_PARTITION}_session_${encodeURIComponent(conversationId)}` : BROWSER_PARTITION;
+/**
+ * All Harness workspaces and conversations intentionally share one persistent
+ * browser session/profile so logins (Google, GitHub, etc.) carry over everywhere.
+ */
+export function browserPartition(_conversationId?: string): string {
+  return BROWSER_PARTITION;
 }
 
 export function isBrowserPartition(partition: string): boolean {

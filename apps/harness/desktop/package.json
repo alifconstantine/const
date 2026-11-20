@@ -25,8 +25,8 @@
     "test:payload": "node scripts/test-model-payload.cjs && tsx --test src/lib/agent-outcomes.test.ts",
     "test:side-chat": "node scripts/test-side-chat.cjs",
     "test:window-branding": "node scripts/test-window-branding.cjs",
-    "test:browser": "node scripts/test-browser.cjs",
-    "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/working-directories.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && node scripts/test-browser.cjs",
+    "test:browser": "tsx --test electron/browser/agent-browser-controller.test.ts",
+    "test:isolation": "pnpm --filter @const/agent exec vitest --run test/session-isolation.test.ts test/service-readiness.test.ts test/background-jobs.test.ts test/checkpoint-rollback.test.ts test/subagent.test.ts && tsx --test electron/working-directories.test.ts electron/remote-database.test.ts src/lib/browser-pane-state.test.ts && tsx --test electron/browser/agent-browser-controller.test.ts",
     "test:intelligence-ui": "tsx --test src/components/intelligence-ui/*.test.ts",
     "test:intelligence-ui:preview": "vite --config tests/vite.config.ts",
     "test:intelligence-ui:live": "tsx tests/intelligence-ui.live.ts",
@@ -42,10 +42,10 @@
     "generate:intelligence-prompt": "node scripts/generate-intelligence-prompt.cjs"
   },
   "dependencies": {
-    "@const/harness-engine": "workspace:*",
-    "@const/harness-shared": "workspace:*",
     "@const/agent": "workspace:*",
     "@const/backend": "workspace:*",
+    "@const/harness-engine": "workspace:*",
+    "@const/harness-shared": "workspace:*",
     "@const/remote": "workspace:*",
     "@const/ui": "workspace:*",
     "@excalidraw/excalidraw": "0.18.0",
@@ -57,6 +57,7 @@
     "@thesvg/react": "^3.3.13",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
+    "agent-browser": "0.43.0",
     "convex": "^1.45.0",
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
@@ -107,7 +108,11 @@
       "dist-electron/**/*",
       "build/**/*"
     ],
-    "asarUnpack": ["node_modules/node-pty/**"],
+    "asarUnpack": [
+      "node_modules/node-pty/**",
+      "node_modules/agent-browser/**",
+      "node_modules/@agent-browser/**"
+    ],
     "extraResources": [
       {
         "from": "build",

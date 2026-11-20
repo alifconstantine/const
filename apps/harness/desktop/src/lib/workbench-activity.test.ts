@@ -58,5 +58,5 @@ test("media URLs reject active content and encode local path delimiters", () => 
   assert.equal(safeMediaUrl("https://example.test/untrusted.html", "pdf"), undefined);
   assert.equal(safeMediaUrl("data:image/svg+xml,<svg/>", "image"), "data:image/svg+xml,<svg/>");
   assert.equal(safeMediaUrl("data:application/pdf;base64,JVBERg==", "pdf"), "data:application/pdf;base64,JVBERg==");
-  assert.equal(localMediaUrl("C:\\Images\\my file#1?.png"), "const-file://C:/Images/my%20file%231%3F.png");
+  assert.equal(localMediaUrl("C:\\Images\\my file#1?.png"), "const-file://local/C:/Images/my%20file%231%3F.png");
 });

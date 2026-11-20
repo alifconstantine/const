@@ -60,7 +60,10 @@ import {
   type ScheduledTaskItem,
   type ScheduledTaskSchedule,
 } from "./scheduled-tasks";
-import { browserController, type ControlState } from "./browser-controller";
+import {
+  agentBrowserController as browserController,
+  type ControlState,
+} from "./browser/agent-browser-controller";
 import { computerController } from "./computer/computer-controller";
 import { marketplaceService } from "./marketplace-service";
 import { McpStore } from "./mcp/store";
@@ -88,15 +91,16 @@ import type { AgentSessionEnded } from "../src/lib/agent-outcomes";
 import { monitorMainRenderer } from "./renderer-health";
 import { rendererHealthStrings } from "../../shared/renderer-health-strings";
 
-// Legacy Electron webview Browser Use & Computer Use are disabled during the Pi core engine
-// migration phase and will be replaced natively by agent-browser and agent-desktop.
+// Native Browser Use is powered by `agent-browser` (Phase 1).
+// Legacy Computer Use remains disabled until Phase 2 (`agent-desktop`).
+const NATIVE_BROWSER_ENABLED = process.env.CONST_DISABLE_NATIVE_BROWSER !== "1";
 const LEGACY_AUTOMATION_ENABLED = process.env.CONST_ENABLE_LEGACY_AUTOMATION === "1";
 
 registerGlobalBrowserToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
-  if (!LEGACY_AUTOMATION_ENABLED || config.enableBrowserUse === false) {
+  if (!NATIVE_BROWSER_ENABLED || config.enableBrowserUse === false) {
     return {
-      result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
+      result: "Browser Use is disabled in settings.",
       isError: true,
     };
   }
@@ -107,14 +111,17 @@ registerGlobalComputerToolHandler(async (toolName, args, context) => {
   const config = loadUserConfig();
   if (!LEGACY_AUTOMATION_ENABLED || config.enableComputerUse === false) {
     return {
-      result: "Computer Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-desktop).",
+      result: "Computer Use is temporarily disabled during the native migration phase (planned replacement: agent-desktop).",
       isError: true,
     };
   }
   return computerController.executeTool(toolName, args, context);
 });
 
-app.on("before-quit", () => computerController.shutdown());
+app.on("before-quit", () => {
+  void browserController.shutdown();
+  computerController.shutdown();
+});
 app.on("before-quit", () => { void remoteDaemon.stop(false); });
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
@@ -792,9 +799,20 @@ app.whenReady().then(() => {
   // Register const-file:// protocol handler for rendering local media & brain attachments safely
   protocol.handle("const-file", (request) => {
     try {
-      let rawPath = decodeURIComponent(request.url.replace(/^const-file:\/\//, ""));
-      if (process.platform === "win32" && /^\/[a-zA-Z]:/.test(rawPath)) {
-        rawPath = rawPath.slice(1);
+      let rawPath = decodeURIComponent(request.url.replace(/^const-file:\/\//i, ""));
+      // Support explicit host form: const-file://local/C:/... or const-file://local/Users/...
+      if (/^local\//i.test(rawPath)) {
+        rawPath = rawPath.slice("local".length);
+      }
+      if (process.platform === "win32") {
+        // Strip leading slash before Windows drive letter: /C:/... -> C:/...
+        if (/^\/[a-zA-Z]:/.test(rawPath)) {
+          rawPath = rawPath.slice(1);
+        } else if (/^\/?[a-zA-Z]\//.test(rawPath)) {
+          // Chromium strips ':' from standard-scheme URLs like const-file://C:/Users/... -> const-file://c/Users/...
+          const cleaned = rawPath.replace(/^\//, "");
+          rawPath = `${cleaned[0]!.toUpperCase()}:${cleaned.slice(1)}`;
+        }
       }
       if (fs.existsSync(rawPath)) {
         return net.fetch(pathToFileURL(rawPath).toString());
@@ -1605,6 +1623,7 @@ app.whenReady().then(() => {
       if (instruction.status === "queued") recordSideReceipt(instruction.sideChatId, instructionId, "expired", session.runId);
     }
     computerController.releaseSession(session.conversationId);
+    browserController.notifyAgentRunEnded(session.conversationId);
     for (const [id, question] of pendingQuestions) {
       if (question.runId !== session.runId) continue;
       pendingQuestions.delete(id);
@@ -1750,7 +1769,14 @@ app.whenReady().then(() => {
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
-        nativeCapabilityEnabled: (name) => LEGACY_AUTOMATION_ENABLED && marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
+        nativeCapabilityEnabled: (name) => {
+          const enabledInMarketplace = marketplaceService.nativeEnabled(name, targetWorkspace);
+          const cfg = loadUserConfig();
+          if (name === "browser-use") {
+            return NATIVE_BROWSER_ENABLED && enabledInMarketplace && cfg.enableBrowserUse !== false;
+          }
+          return LEGACY_AUTOMATION_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
+        },
         conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
         inputTypes: modelDef?.inputTypes,
@@ -1781,9 +1807,9 @@ app.whenReady().then(() => {
         },
         browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableBrowserUse === false) {
+          if (!NATIVE_BROWSER_ENABLED || cfg.enableBrowserUse === false) {
             return {
-              result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
+              result: "Browser Use is disabled in settings.",
               isError: true,
             };
           }
@@ -2769,7 +2795,14 @@ app.whenReady().then(() => {
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,
         externalToolHandler: (name, args, signal) => mcpService.execute(name, args, targetWorkspace, signal, convoId),
-        nativeCapabilityEnabled: (name) => LEGACY_AUTOMATION_ENABLED && marketplaceService.nativeEnabled(name, targetWorkspace) && loadUserConfig()[name === "browser-use" ? "enableBrowserUse" : "enableComputerUse"] !== false,
+        nativeCapabilityEnabled: (name) => {
+          const enabledInMarketplace = marketplaceService.nativeEnabled(name, targetWorkspace);
+          const cfg = loadUserConfig();
+          if (name === "browser-use") {
+            return NATIVE_BROWSER_ENABLED && enabledInMarketplace && cfg.enableBrowserUse !== false;
+          }
+          return LEGACY_AUTOMATION_ENABLED && enabledInMarketplace && cfg.enableComputerUse !== false;
+        },
         conversationId: convoId,
         inputTypes: modelDef?.inputTypes,
         workspacePath: targetWorkspace,
@@ -2778,9 +2811,9 @@ app.whenReady().then(() => {
         thinkingLevel: "medium",
         browserHandler: async (toolName, args, context) => {
           const cfg = loadUserConfig();
-          if (!LEGACY_AUTOMATION_ENABLED || cfg.enableBrowserUse === false) {
+          if (!NATIVE_BROWSER_ENABLED || cfg.enableBrowserUse === false) {
             return {
-              result: "Browser Use is temporarily disabled during the Pi engine phase (planned native replacement: agent-browser).",
+              result: "Browser Use is disabled in settings.",
               isError: true,
             };
           }
@@ -2940,7 +2973,7 @@ app.whenReady().then(() => {
   );
 
   // ---------------------------------------------------------------------------
-  // Browser Control IPC Handlers (OpenBot / oh-my-pi architecture)
+  // Native Browser Control IPC Handlers (agent-browser daemon + shared profile)
   // ---------------------------------------------------------------------------
   browserController.setCallbacks({
     onStateChange: (state: ControlState) => {
@@ -2948,18 +2981,105 @@ app.whenReady().then(() => {
         sendDesktopEvent(win.webContents, "browser:control-changed", state);
       }
     },
-    onAiAction: (action: { type: string; details?: any }) => {
+    onAiAction: (action) => {
       if (win && !win.isDestroyed()) {
         sendDesktopEvent(win.webContents, "browser:ai-action", action);
       }
     },
-    onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean; conversationId?: string }) => {
+    onOpenTabRequest: (payload: { url: string; tabId?: string; newTab?: boolean; conversationId?: string }) => {
       if (win && !win.isDestroyed()) {
         sendDesktopEvent(win.webContents, "browser:open-tab-request", payload);
         return payload.tabId || "browser-tab-default";
       }
-      return null;
+      return undefined;
     },
+    onStopAgent: (conversationId?: string) => {
+      if (conversationId) {
+        activeSessions.get(conversationId)?.agent.abort();
+        return;
+      }
+      for (const session of activeSessions.values()) {
+        session.agent.abort();
+      }
+    },
+  });
+
+  handleDesktopIpc(
+    "browser:open-session",
+    async (
+      _event,
+      payload: {
+        tabId: string;
+        url?: string;
+        conversationId?: string;
+        viewport?: { width: number; height: number; mobile?: boolean };
+        navigateIfDifferent?: boolean;
+      },
+    ) => {
+      return await browserController.inSession(payload.conversationId, () =>
+        browserController.openOrActivateTab(payload.tabId, {
+          url: payload.url,
+          conversationId: payload.conversationId,
+          viewport: payload.viewport,
+          navigateIfDifferent: payload.navigateIfDifferent,
+        }),
+      );
+    },
+  );
+
+  handleDesktopIpc("browser:close-session", async (_event, tabId: string) => {
+    return await browserController.closeTab(tabId);
+  });
+
+  handleDesktopIpc("browser:get-stream-info", async () => {
+    return browserController.getStreamInfo();
+  });
+
+  handleDesktopIpc("browser:back", async (_event, tabId?: string) => {
+    return await browserController.forTab(tabId, () => browserController.goBack(tabId));
+  });
+
+  handleDesktopIpc("browser:forward", async (_event, tabId?: string) => {
+    return await browserController.forTab(tabId, () => browserController.goForward(tabId));
+  });
+
+  handleDesktopIpc("browser:reload", async (_event, tabId?: string, ignoreCache?: boolean) => {
+    return await browserController.forTab(tabId, () => browserController.reload(tabId, Boolean(ignoreCache)));
+  });
+
+  handleDesktopIpc(
+    "browser:set-viewport",
+    async (_event, payload: { tabId?: string; width: number; height: number; mobile?: boolean }) => {
+      return await browserController.forTab(payload?.tabId, () =>
+        browserController.setViewport(payload?.tabId, payload.width, payload.height, Boolean(payload.mobile)),
+      );
+    },
+  );
+
+  handleDesktopIpc(
+    "browser:set-zoom",
+    async (_event, payload: { tabId?: string; factor: number }) => {
+      return await browserController.forTab(payload?.tabId, () =>
+        browserController.setZoom(payload?.tabId, payload.factor),
+      );
+    },
+  );
+
+  handleDesktopIpc(
+    "browser:inspect-point",
+    async (_event, payload: { tabId?: string; x: number; y: number }) => {
+      return await browserController.forTab(payload?.tabId, () =>
+        browserController.inspectPoint(payload?.tabId, payload.x, payload.y),
+      );
+    },
+  );
+
+  handleDesktopIpc("browser:capture-to-chat", async (_event, tabId?: string) => {
+    return await browserController.forTab(tabId, () => browserController.captureToClipboardAndChat(tabId));
+  });
+
+  handleDesktopIpc("browser:reset-session", async () => {
+    return await browserController.resetSession();
   });
 
   handleDesktopIpc(
@@ -2995,20 +3115,28 @@ app.whenReady().then(() => {
   });
   handleDesktopIpc("browser:remote-input", async (_event, input: any) => browserController.forTab(input?.tabId, () => browserController.remoteInput(input)));
 
-  handleDesktopIpc("browser:get-control", async (_event, tabId?: string) => {
+  handleDesktopIpc("browser:get-control", async (_event, tabId?: string, conversationId?: string) => {
+    if (conversationId) {
+      return browserController.getControl(conversationId);
+    }
     return browserController.forTab(tabId, () => browserController.getControl());
   });
 
   handleDesktopIpc("browser:take-control", async (_event, tabId?: string) => {
-    return browserController.forTab(tabId, () => browserController.takeControl());
+    return browserController.forTab(tabId, () => browserController.takeControl(tabId));
   });
 
   handleDesktopIpc("browser:release-control", async (_event, tabId?: string) => {
-    return browserController.forTab(tabId, () => browserController.releaseControl());
+    return browserController.forTab(tabId, () => browserController.releaseControl(tabId));
   });
 
   handleDesktopIpc("browser:supply-secret", async (_event, text: string, tabId?: string) => {
-    return await browserController.forTab(tabId, () => browserController.supplySecret(text));
+    // Users now enter passwords/OTP directly into the live page while paused; keep IPC shim safe.
+    if (typeof text === "string" && text.length) {
+      await browserController.forTab(tabId, () => browserController.paste({ tabId, text }));
+      return { success: true, characters: text.length };
+    }
+    return { success: false, characters: 0 };
   });
 
   handleDesktopIpc("browser:navigate", async (_event, url: string, options?: any) => {

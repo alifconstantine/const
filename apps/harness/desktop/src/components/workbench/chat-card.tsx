@@ -375,6 +375,9 @@ interface ChatCardProps {
   onModelChange?: (model: ModelItem) => void;
   onOpenSettings?: (tab?: string) => void;
   initialPrompt?: string;
+  /** External attachment pushed from another pane (e.g. Browser screenshot button). */
+  incomingAttachment?: AttachedFile | null;
+  onConsumeIncomingAttachment?: () => void;
   /** Model ID or name to restore when switching to an existing conversation. */
   initialModel?: string;
   mode?: "request_review" | "ask_before_changes" | "full_access";
@@ -419,6 +422,8 @@ export function ChatCard({
   onModelChange,
   onOpenSettings,
   initialPrompt,
+  incomingAttachment,
+  onConsumeIncomingAttachment,
   initialModel,
   mode: controlledMode,
   onModeChange,
@@ -488,6 +493,24 @@ export function ChatCard({
       }
     }
   }, [initialPrompt]);
+
+  useEffect(() => {
+    if (!incomingAttachment) return;
+    setAttachments((prev) => {
+      if (prev.some((item) => item.id === incomingAttachment.id)) return prev;
+      if (prev.length >= MAX_ATTACHMENTS) {
+        toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
+        return prev;
+      }
+      const nextImageIndex =
+        incomingAttachment.type === "image"
+          ? prev.filter((item) => item.type === "image").length + 1
+          : incomingAttachment.imageIndex;
+      return [...prev, { ...incomingAttachment, imageIndex: nextImageIndex }];
+    });
+    if (!remote?.mobile) editorRef.current?.focus();
+    onConsumeIncomingAttachment?.();
+  }, [incomingAttachment, onConsumeIncomingAttachment, remote?.mobile]);
 
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 

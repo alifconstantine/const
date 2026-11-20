@@ -69,7 +69,7 @@ import { SkillsSettings } from "./components/settings/skills-settings";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { resolveConversationHistory } from "./lib/conversation-routing";
-import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
+import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement, type BrowserScreenshotAttachment } from "./components/right-pane";
 import { BottomPanel } from "./components/bottom-panel";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
@@ -1237,6 +1237,37 @@ export function AuthenticatedContent({
       next[index] = { ...prev[index]!, ...updates };
       return next;
     });
+  }, []);
+
+  const [pendingBrowserAttachment, setPendingBrowserAttachment] = useState<AttachedFile | null>(null);
+
+  const handleAttachScreenshotToChat = useCallback(async (screenshot: BrowserScreenshotAttachment) => {
+    const byteLength = Math.floor((screenshot.base64.length * 3) / 4);
+    let savedPath: string | undefined;
+    try {
+      const saved = await window.electron?.saveAttachment?.({
+        conversationId: conversationIdRef.current,
+        name: screenshot.filename,
+        base64: screenshot.dataUrl,
+      });
+      if (saved?.path) savedPath = saved.path;
+    } catch {
+      // Fallback to inline dataUrl attachment if disk save fails.
+    }
+    setPendingBrowserAttachment({
+      id: `shot_${crypto.randomUUID()}`,
+      name: screenshot.filename,
+      size: byteLength,
+      type: "image",
+      url: screenshot.dataUrl,
+      base64: screenshot.dataUrl,
+      path: savedPath,
+    });
+    toast.success(
+      screenshot.copiedToClipboard
+        ? "Screenshot copied & attached to chat"
+        : "Screenshot attached to chat",
+    );
   }, []);
 
   const handleSelectElementForChat = (element: BrowserSelectedElement) => {
@@ -4404,6 +4435,8 @@ export function AuthenticatedContent({
                   onProjectChange={setSafeCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
+                  incomingAttachment={pendingBrowserAttachment}
+                  onConsumeIncomingAttachment={() => setPendingBrowserAttachment(null)}
                   onModelChange={handleModelChange}
                   mode={currentMode}
                   onModeChange={handleModeChange}
@@ -4621,6 +4654,8 @@ export function AuthenticatedContent({
                       onProjectChange={setSafeCurrentProject}
                       onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                       initialPrompt={editingPrompt}
+                      incomingAttachment={pendingBrowserAttachment}
+                      onConsumeIncomingAttachment={() => setPendingBrowserAttachment(null)}
                       onModelChange={handleModelChange}
                       mode={currentMode}
                       onModeChange={handleModeChange}
@@ -4757,6 +4792,7 @@ export function AuthenticatedContent({
                   onStopTask={handleStopBackgroundTask}
                   onUpdateTab={handleUpdateTab}
                   onSelectElementForChat={handleSelectElementForChat}
+                  onAttachScreenshotToChat={handleAttachScreenshotToChat}
                   subagents={activeSubAgents || EMPTY_SUBAGENTS}
                   onKillAgent={handleKillSubAgent}
                   parentMessages={messages}

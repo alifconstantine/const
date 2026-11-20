@@ -324,6 +324,29 @@ export function createDesktopBridge(
     browser: {
       remoteInput: (input: any) =>
         ipcRenderer.invoke("browser:remote-input", input),
+      openSession: (payload: {
+        tabId: string;
+        url?: string;
+        conversationId?: string;
+        viewport?: { width: number; height: number; mobile?: boolean };
+        navigateIfDifferent?: boolean;
+      }) => ipcRenderer.invoke("browser:open-session", payload),
+      closeSession: (tabId: string) =>
+        ipcRenderer.invoke("browser:close-session", tabId),
+      getStreamInfo: () => ipcRenderer.invoke("browser:get-stream-info"),
+      goBack: (tabId?: string) => ipcRenderer.invoke("browser:back", tabId),
+      goForward: (tabId?: string) => ipcRenderer.invoke("browser:forward", tabId),
+      reload: (tabId?: string, ignoreCache?: boolean) =>
+        ipcRenderer.invoke("browser:reload", tabId, ignoreCache),
+      setViewport: (payload: { tabId?: string; width: number; height: number; mobile?: boolean }) =>
+        ipcRenderer.invoke("browser:set-viewport", payload),
+      setZoom: (payload: { tabId?: string; factor: number }) =>
+        ipcRenderer.invoke("browser:set-zoom", payload),
+      inspectPoint: (payload: { tabId?: string; x: number; y: number }) =>
+        ipcRenderer.invoke("browser:inspect-point", payload),
+      captureToChat: (tabId?: string) =>
+        ipcRenderer.invoke("browser:capture-to-chat", tabId),
+      resetSession: () => ipcRenderer.invoke("browser:reset-session"),
       registerTab: (tabId: string, guestContentsId: number, conversationId?: string) =>
         ipcRenderer.invoke("browser:register-tab", { tabId, guestContentsId, conversationId }),
       unregisterTab: (tabId: string, guestContentsId?: number) =>
@@ -331,7 +354,10 @@ export function createDesktopBridge(
       setActiveTab: (tabId: string, conversationId?: string) =>
         ipcRenderer.invoke("browser:set-active-tab", tabId, conversationId),
       listTabs: (conversationId?: string) => ipcRenderer.invoke("browser:list-tabs", conversationId),
-      getControl: (tabId?: string) => ipcRenderer.invoke("browser:get-control", tabId),
+      getControl: (tabId?: string, conversationId?: string) =>
+        conversationId !== undefined
+          ? ipcRenderer.invoke("browser:get-control", tabId, conversationId)
+          : ipcRenderer.invoke("browser:get-control", tabId),
       takeControl: (tabId?: string) => ipcRenderer.invoke("browser:take-control", tabId),
       releaseControl: (tabId?: string) => ipcRenderer.invoke("browser:release-control", tabId),
       supplySecret: (text: string, tabId?: string) =>
