@@ -174,7 +174,7 @@ export class AgentBrowserDaemon {
     this.profileDir = options.profileDir || path.join(baseDir, "browser-profile");
     this.downloadDir = options.downloadDir || path.join(baseDir, "browser-downloads");
     this.chromeArgs = options.chromeArgs?.length ? [...options.chromeArgs] : [...DEFAULT_CHROME_ARGS];
-    this.streamQuality = options.streamQuality ?? 82;
+    this.streamQuality = options.streamQuality ?? 72;
     this.executablePath = options.executablePath;
   }
 
@@ -195,8 +195,8 @@ export class AgentBrowserDaemon {
   public getStreamUrl(options?: { maxFps?: number; pacing?: "ack" | "push" }): string | null {
     const port = this.getStreamPort();
     if (!port) return null;
-    const maxFps = options?.maxFps ?? 30;
-    const pacing = options?.pacing ?? "ack";
+    const maxFps = options?.maxFps ?? 0;
+    const pacing = options?.pacing ?? "push";
     return `ws://127.0.0.1:${port}/?pacing=${pacing}&maxFps=${maxFps}`;
   }
 

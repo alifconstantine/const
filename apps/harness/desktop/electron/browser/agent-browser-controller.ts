@@ -191,7 +191,7 @@ export class AgentBrowserController {
 
   public getStreamInfo(): { streamUrl: string | null; streamPort: number | null } {
     return {
-      streamUrl: this.daemon.getStreamUrl({ maxFps: 15, pacing: "ack" }),
+      streamUrl: this.daemon.getStreamUrl({ maxFps: 0, pacing: "push" }),
       streamPort: this.daemon.getStreamPort(),
     };
   }

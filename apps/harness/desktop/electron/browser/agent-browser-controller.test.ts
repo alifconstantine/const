@@ -17,6 +17,7 @@ function startLocalTestServer(): Promise<{ server: http.Server; url: string }> {
           <html><head><title>Workspace A</title></head>
           <body style="margin:0;padding:24px;font-family:sans-serif">
             <h1 id="heading">Hello Harness</h1>
+            <input id="email" type="text" style="width:240px;height:32px;display:block;margin-bottom:12px" />
             <button id="set-cookie" onclick="document.cookie='const_shared_auth=logged_in; path=/'; localStorage.setItem('const_user','alif'); document.getElementById('status').textContent='Logged In';">Sign In</button>
             <p id="status">Guest</p>
           </body></html>`);
@@ -140,29 +141,83 @@ test("agent-browser native controller: shared session, tab isolation, stream, in
     assert.ok(inspected, "Expected inspectPoint to return element metadata");
     assert.equal(inspected.url, `${url}/page-a`);
 
-    // 4. Verify live WebSocket stream delivers at least one JPEG frame
-    const receivedFrame = await new Promise<boolean>((resolve) => {
+    // 4. Verify live WebSocket stream delivers JPEG frames, accepts human keyboard typing, and resizes live!
+    const wsCheck = await new Promise<{ gotFrame: boolean; gotResizedFrame: boolean }>((resolve) => {
       const ws = new WebSocket(sessA.streamUrl!);
+      let gotFrame = false;
+      let gotResizedFrame = false;
+      let sentTyping = false;
+      let sentResize = false;
       const timer = setTimeout(() => {
         ws.close();
-        resolve(false);
-      }, 6_000);
+        resolve({ gotFrame, gotResizedFrame });
+      }, 8_000);
+
       ws.on("message", (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
           if (msg.type === "frame" && typeof msg.data === "string" && msg.data.length > 50) {
-            clearTimeout(timer);
-            ws.close();
-            resolve(true);
+            gotFrame = true;
+            if (typeof msg.seq === "number") {
+              ws.send(JSON.stringify({ type: "ack", seq: msg.seq }));
+            }
+            if (!sentTyping) {
+              sentTyping = true;
+              // Focus #email via click at its center then type "ab@c" over WS keyboard protocol
+              void controller
+                .evaluate({ tabId: "tab-ws-1", script: "document.getElementById('email').focus(); true" })
+                .then(() => {
+                  for (const ch of ["a", "b", "@", "c"]) {
+                    ws.send(
+                      JSON.stringify({
+                        type: "input_keyboard",
+                        eventType: "keyDown",
+                        key: ch,
+                        code: ch === "@" ? "Digit2" : `Key${ch.toUpperCase()}`,
+                        text: ch,
+                        windowsVirtualKeyCode: ch === "@" ? 50 : ch.toUpperCase().charCodeAt(0),
+                        modifiers: ch === "@" ? 8 : 0,
+                      }),
+                    );
+                    ws.send(
+                      JSON.stringify({
+                        type: "input_keyboard",
+                        eventType: "keyUp",
+                        key: ch,
+                        code: ch === "@" ? "Digit2" : `Key${ch.toUpperCase()}`,
+                        windowsVirtualKeyCode: ch === "@" ? 50 : ch.toUpperCase().charCodeAt(0),
+                        modifiers: ch === "@" ? 8 : 0,
+                      }),
+                    );
+                  }
+                });
+            }
+            if (!sentResize) {
+              sentResize = true;
+              void controller.setViewport("tab-ws-1", 720, 540, false);
+            }
+            if (msg.metadata?.deviceWidth === 720 && msg.metadata?.deviceHeight === 540) {
+              gotResizedFrame = true;
+              clearTimeout(timer);
+              ws.close();
+              resolve({ gotFrame, gotResizedFrame });
+            }
           }
         } catch {}
       });
       ws.on("error", () => {
         clearTimeout(timer);
-        resolve(false);
+        resolve({ gotFrame, gotResizedFrame });
       });
     });
-    assert.equal(receivedFrame, true, "Expected live JPEG frame over agent-browser WebSocket stream");
+    assert.equal(wsCheck.gotFrame, true, "Expected live JPEG frame over agent-browser WebSocket stream");
+    assert.equal(wsCheck.gotResizedFrame, true, "Expected live resized 720x540 JPEG frame after setViewport");
+
+    const typedAndSize = (await controller.evaluate({
+      tabId: "tab-ws-1",
+      script: "document.getElementById('email').value + '|' + window.innerWidth + 'x' + window.innerHeight",
+    })) as { result?: string };
+    assert.equal(typedAndSize?.result, "ab@c|720x540", `Expected WS typing + resize to apply, got: ${typedAndSize?.result}`);
 
     // 5. Pause (browser_request_help) -> Continue (releaseControl) flow
     const helpPromise = controller.executeTool(

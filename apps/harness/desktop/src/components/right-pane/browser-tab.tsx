@@ -112,6 +112,45 @@ function cdpMouseButton(button: number): "left" | "middle" | "right" | "none" {
   return "none";
 }
 
+const KEY_INFO: Record<string, { text?: string; keyCode: number }> = {
+  Enter: { text: "\r", keyCode: 13 },
+  Tab: { text: "\t", keyCode: 9 },
+  Backspace: { text: "\b", keyCode: 8 },
+  Escape: { keyCode: 27 },
+  ArrowLeft: { keyCode: 37 },
+  ArrowUp: { keyCode: 38 },
+  ArrowRight: { keyCode: 39 },
+  ArrowDown: { keyCode: 40 },
+  Delete: { keyCode: 46 },
+  Home: { keyCode: 36 },
+  End: { keyCode: 35 },
+  PageUp: { keyCode: 33 },
+  PageDown: { keyCode: 34 },
+};
+
+function printableKeyCode(key: string): number {
+  if (key.length !== 1) return 0;
+  const code = key.charCodeAt(0);
+  if (code >= 65 && code <= 90) return code;
+  if (code >= 97 && code <= 122) return code - 32;
+  if (code >= 48 && code <= 57) return code;
+  switch (key) {
+    case " ": return 32;
+    case ";": case ":": return 186;
+    case "=": case "+": return 187;
+    case ",": case "<": return 188;
+    case "-": case "_": return 189;
+    case ".": case ">": return 190;
+    case "/": case "?": return 191;
+    case "`": case "~": return 192;
+    case "[": case "{": return 219;
+    case "\\": case "|": return 220;
+    case "]": case "}": return 221;
+    case "'": case "\"": return 222;
+    default: return 0;
+  }
+}
+
 interface InspectedOverlay {
   tag: string;
   id: string;
@@ -191,16 +230,29 @@ export function BrowserTab({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const remoteWebviewShimRef = useRef<any>(null);
+  const pendingMouseMoveRef = useRef<{ x: number; y: number; modifiers: number } | null>(null);
+  const mouseMoveRafRef = useRef<number | null>(null);
+  const pendingWheelRef = useRef<{ x: number; y: number; deltaX: number; deltaY: number; modifiers: number } | null>(null);
+  const wheelRafRef = useRef<number | null>(null);
   const remoteViewportSizeRef = useRef<{ width: number; height: number }>({ width: 1280, height: 800 });
+  const lastRequestedViewportRef = useRef<{ width: number; height: number; mobile: boolean } | null>(null);
   const lastNavigatedExternalUrlRef = useRef<string>(initialUrl);
+  const lastTabUrlPropRef = useRef<string>(initialUrl);
   const isAddressFocusedRef = useRef<boolean>(false);
+  const isElementPickerActiveRef = useRef<boolean>(false);
   const onUpdateTabRef = useRef(onUpdateTab);
   const controlStatusRef = useRef<BrowserControlState["status"]>("idle");
+  const [sessionReady, setSessionReady] = useState<boolean>(false);
+  const [canvasFrameSize, setCanvasFrameSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const mountedRef = useRef<boolean>(true);
 
   useEffect(() => {
     isAddressFocusedRef.current = isAddressFocused;
   }, [isAddressFocused]);
+
+  useEffect(() => {
+    isElementPickerActiveRef.current = isElementPickerActive;
+  }, [isElementPickerActive]);
 
   useEffect(() => {
     onUpdateTabRef.current = onUpdateTab;
@@ -276,8 +328,8 @@ export function BrowserTab({
       };
     }
     const rect = viewportHostRef.current?.getBoundingClientRect();
-    const width = Math.max(480, Math.round(rect?.width || 1024));
-    const height = Math.max(360, Math.round(rect?.height || 720));
+    const width = Math.max(320, Math.round(rect?.width || 1024));
+    const height = Math.max(240, Math.round(rect?.height || 720));
     return { width, height, mobile: false };
   }, [activePresetConfig]);
 
@@ -290,14 +342,16 @@ export function BrowserTab({
     let cancelled = false;
     setIsLoading(true);
     setLoadError(null);
+    setSessionReady(false);
 
     const vp = computeTargetViewport();
+    lastRequestedViewportRef.current = vp;
     remoteViewportSizeRef.current = { width: vp.width, height: vp.height };
 
     browserApi
       .openSession({
         tabId: tab.id,
-        url: currentUrl,
+        url: lastNavigatedExternalUrlRef.current || currentUrl,
         conversationId: tab.conversationId,
         viewport: vp,
         navigateIfDifferent: false,
@@ -305,14 +359,19 @@ export function BrowserTab({
       .then((info) => {
         if (cancelled || !mountedRef.current || !info) return;
         if (info.url) {
-          setCurrentUrl(info.url);
-          if (!isAddressFocused) setAddressBarInput(info.url);
           lastNavigatedExternalUrlRef.current = info.url;
+          setCurrentUrl(info.url);
+          if (!isAddressFocusedRef.current) setAddressBarInput(info.url);
         }
         setCanGoBack(Boolean(info.canGoBack));
         setCanGoForward(Boolean(info.canGoForward));
         if (info.viewport?.width && info.viewport?.height) {
           remoteViewportSizeRef.current = info.viewport;
+          lastRequestedViewportRef.current = {
+            width: info.viewport.width,
+            height: info.viewport.height,
+            mobile: vp.mobile,
+          };
         }
         if (info.control) {
           setControlState({
@@ -328,6 +387,7 @@ export function BrowserTab({
         if (info.title && info.title !== tab.title) {
           onUpdateTabRef.current?.(tab.id, { title: info.title, ...(info.url ? { url: info.url } : {}) });
         }
+        setSessionReady(true);
         setIsLoading(false);
       })
       .catch((err: any) => {
@@ -352,15 +412,21 @@ export function BrowserTab({
     };
   }, [remote, tab.id]);
 
-  // React to explicit parent-initiated URL changes when idle (avoid fighting agent clicks)
+  // React ONLY to explicit external `tab.url` prop changes when idle (never loop on Chrome-driven redirects!)
   useEffect(() => {
     if (typeof tab.url !== "string" || !isAllowedBrowserUrl(tab.url)) return;
-    if (tab.url === lastNavigatedExternalUrlRef.current || tab.url === currentUrl) return;
+    if (tab.url === lastTabUrlPropRef.current) return;
+    lastTabUrlPropRef.current = tab.url;
+
+    // If Chrome itself already navigated here (WS url event / openSession echo), do NOT re-navigate.
+    if (tab.url === lastNavigatedExternalUrlRef.current) return;
+
     lastNavigatedExternalUrlRef.current = tab.url;
     setCurrentUrl(tab.url);
     if (!isAddressFocusedRef.current) setAddressBarInput(tab.url);
-    // While the agent is driving the tab, tab.url updates are echoes from backend navigation; never re-navigate.
-    if (controlStatusRef.current === "running") return;
+
+    // Never re-navigate while the agent is driving or paused for human login/OAuth.
+    if (controlStatusRef.current !== "idle") return;
     if (!remote && isActive && window.electron?.browser?.navigate) {
       setLoadError(null);
       void window.electron.browser
@@ -376,20 +442,28 @@ export function BrowserTab({
         })
         .catch(() => {});
     }
-  }, [tab.url, tab.id, isActive, remote, currentUrl]);
+  }, [tab.url, tab.id, isActive, remote]);
 
-  // Sync Chromium viewport dimensions with panel resize / preset change
+  // Sync Chromium viewport dimensions continuously with panel resize / preset change
   useEffect(() => {
-    if (remote || !isActive || !window.electron?.browser?.setViewport) return;
+    if (remote || !isActive || !sessionReady || !window.electron?.browser?.setViewport) return;
     const host = viewportHostRef.current;
     if (!host) return;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const syncViewport = () => {
+    const syncViewport = (force = false) => {
       const vp = computeTargetViewport();
-      const prev = remoteViewportSizeRef.current;
-      if (Math.abs(prev.width - vp.width) < 4 && Math.abs(prev.height - vp.height) < 4) return;
-      remoteViewportSizeRef.current = { width: vp.width, height: vp.height };
+      const prev = lastRequestedViewportRef.current;
+      if (
+        !force &&
+        prev &&
+        Math.abs(prev.width - vp.width) < 3 &&
+        Math.abs(prev.height - vp.height) < 3 &&
+        prev.mobile === vp.mobile
+      ) {
+        return;
+      }
+      lastRequestedViewportRef.current = vp;
       void window.electron?.browser
         ?.setViewport?.({
           tabId: tab.id,
@@ -400,12 +474,12 @@ export function BrowserTab({
         .catch(() => {});
     };
 
-    syncViewport();
+    syncViewport(true);
 
     const observer = new ResizeObserver(() => {
       if (selectedPreset !== "responsive") return;
       clearTimeout(timer);
-      timer = setTimeout(syncViewport, 160);
+      timer = setTimeout(() => syncViewport(false), 110);
     });
     observer.observe(host);
 
@@ -413,7 +487,7 @@ export function BrowserTab({
       clearTimeout(timer);
       observer.disconnect();
     };
-  }, [remote, isActive, tab.id, selectedPreset, computeTargetViewport]);
+  }, [remote, isActive, sessionReady, tab.id, selectedPreset, computeTargetViewport]);
 
   // Live WebSocket connection to `agent-browser` StreamServer
   useEffect(() => {
@@ -426,6 +500,7 @@ export function BrowserTab({
     // Reuse one HTMLImageElement to decode JPEGs natively off-heap without per-frame V8 Uint8Array/Blob churn.
     const decoderImg = new Image();
 
+    const useAckPacing = streamUrl.includes("pacing=ack");
     const drawFrame = (frame: { data: string; seq?: number; width?: number; height?: number }): Promise<void> => {
       return new Promise((resolve) => {
         const canvas = canvasRef.current;
@@ -433,14 +508,14 @@ export function BrowserTab({
           resolve();
           return;
         }
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) {
           resolve();
           return;
         }
 
         const finish = () => {
-          if (!disposed && typeof frame.seq === "number" && wsRef.current?.readyState === WebSocket.OPEN) {
+          if (useAckPacing && !disposed && typeof frame.seq === "number" && wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: "ack", seq: frame.seq }));
           }
           resolve();
@@ -453,6 +528,7 @@ export function BrowserTab({
             if (canvas.width !== w || canvas.height !== h) {
               canvas.width = w;
               canvas.height = h;
+              setCanvasFrameSize({ width: w, height: h });
             }
             ctx.drawImage(decoderImg, 0, 0);
             if (frame.width && frame.height) {
@@ -510,11 +586,12 @@ export function BrowserTab({
               nextTitle = new URL(msg.url).hostname.replace(/^www\./, "");
             } catch {}
             onUpdateTabRef.current?.(tab.id, { url: msg.url, ...(nextTitle ? { title: nextTitle } : {}) });
-          } else if (msg.type === "status" && msg.metadata?.deviceWidth && msg.metadata?.deviceHeight) {
-            remoteViewportSizeRef.current = {
-              width: msg.metadata.deviceWidth,
-              height: msg.metadata.deviceHeight,
-            };
+          } else if (msg.type === "status") {
+            const vw = msg.viewportWidth ?? msg.metadata?.deviceWidth;
+            const vh = msg.viewportHeight ?? msg.metadata?.deviceHeight;
+            if (vw && vh) {
+              remoteViewportSizeRef.current = { width: vw, height: vh };
+            }
           }
         } catch {
           // Ignore invalid JSON frames.
@@ -789,7 +866,15 @@ export function BrowserTab({
     }
   };
 
-  // Canvas input handlers
+  // Clean up any pending rAF input throttles on unmount
+  useEffect(() => {
+    return () => {
+      if (mouseMoveRafRef.current !== null) cancelAnimationFrame(mouseMoveRafRef.current);
+      if (wheelRafRef.current !== null) cancelAnimationFrame(wheelRafRef.current);
+    };
+  }, []);
+
+  // Canvas input handlers (mouseMoved & wheel coalesced to rAF so high-Hz mice never saturate CDP)
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const pt = mapPointerToViewport(e.clientX, e.clientY);
     if (!pt) return;
@@ -813,21 +898,37 @@ export function BrowserTab({
       return;
     }
 
-    sendWsInput({
-      type: "input_mouse",
-      eventType: "mouseMoved",
-      x: pt.x,
-      y: pt.y,
-      button: "none",
-      clickCount: 0,
-      modifiers: cdpModifiersFromEvent(e),
-    });
+    pendingMouseMoveRef.current = { x: pt.x, y: pt.y, modifiers: cdpModifiersFromEvent(e) };
+    if (mouseMoveRafRef.current === null) {
+      mouseMoveRafRef.current = requestAnimationFrame(() => {
+        mouseMoveRafRef.current = null;
+        const next = pendingMouseMoveRef.current;
+        pendingMouseMoveRef.current = null;
+        if (!next) return;
+        sendWsInput({
+          type: "input_mouse",
+          eventType: "mouseMoved",
+          x: next.x,
+          y: next.y,
+          button: "none",
+          clickCount: 0,
+          modifiers: next.modifiers,
+        });
+      });
+    }
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    canvasRef.current?.focus();
+    canvasRef.current?.focus({ preventScroll: true });
     const pt = mapPointerToViewport(e.clientX, e.clientY);
     if (!pt) return;
+
+    // Drop any queued stale mouseMove so the press lands immediately at exact click coordinates.
+    if (mouseMoveRafRef.current !== null) {
+      cancelAnimationFrame(mouseMoveRafRef.current);
+      mouseMoveRafRef.current = null;
+      pendingMouseMoveRef.current = null;
+    }
 
     if (isElementPickerActive) {
       e.preventDefault();
@@ -890,58 +991,115 @@ export function BrowserTab({
     if (isElementPickerActive) return;
     const pt = mapPointerToViewport(e.clientX, e.clientY);
     if (!pt) return;
-    sendWsInput({
-      type: "input_mouse",
-      eventType: "mouseWheel",
-      x: pt.x,
-      y: pt.y,
-      deltaX: e.deltaX,
-      deltaY: e.deltaY,
-      modifiers: cdpModifiersFromEvent(e),
-    });
-  };
 
-  const handleCanvasKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
-    if (isElementPickerActive) return;
-    // Support Ctrl+V / Cmd+V pasting cleanly into focused inputs inside the page
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-      e.preventDefault();
-      void navigator.clipboard
-        .readText()
-        .then((text) => {
-          if (text) return window.electron?.browser?.paste?.({ tabId: tab.id, text });
-        })
-        .catch(() => {});
-      return;
+    // Normalize deltaMode (Windows wheel mice often emit DOM_DELTA_LINE = 1 with deltaY ~ 3)
+    const scale =
+      e.deltaMode === 1
+        ? 36
+        : e.deltaMode === 2
+          ? Math.max(400, remoteViewportSizeRef.current.height)
+          : 1;
+    const dx = e.deltaX * scale;
+    const dy = e.deltaY * scale;
+    const modifiers = cdpModifiersFromEvent(e);
+
+    if (pendingWheelRef.current) {
+      pendingWheelRef.current.x = pt.x;
+      pendingWheelRef.current.y = pt.y;
+      pendingWheelRef.current.deltaX += dx;
+      pendingWheelRef.current.deltaY += dy;
+      pendingWheelRef.current.modifiers = modifiers;
+    } else {
+      pendingWheelRef.current = { x: pt.x, y: pt.y, deltaX: dx, deltaY: dy, modifiers };
     }
 
-    if (e.key === "Tab" || e.key === "Backspace" || e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === " ") {
-      e.preventDefault();
+    if (wheelRafRef.current === null) {
+      wheelRafRef.current = requestAnimationFrame(() => {
+        wheelRafRef.current = null;
+        const next = pendingWheelRef.current;
+        pendingWheelRef.current = null;
+        if (!next) return;
+        sendWsInput({
+          type: "input_mouse",
+          eventType: "mouseWheel",
+          x: next.x,
+          y: next.y,
+          deltaX: next.deltaX,
+          deltaY: next.deltaY,
+          modifiers: next.modifiers,
+        });
+      });
     }
-
-    const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
-    sendWsInput({
-      type: "input_keyboard",
-      eventType: isPrintable ? "keyDown" : "rawKeyDown",
-      key: e.key,
-      code: e.code,
-      ...(isPrintable ? { text: e.key } : {}),
-      windowsVirtualKeyCode: e.keyCode || 0,
-      modifiers: cdpModifiersFromEvent(e),
-    });
   };
 
-  const handleCanvasKeyUp = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
-    if (isElementPickerActive) return;
-    sendWsInput({
-      type: "input_keyboard",
-      eventType: "keyUp",
-      key: e.key,
-      code: e.code,
-      windowsVirtualKeyCode: e.keyCode || 0,
-      modifiers: cdpModifiersFromEvent(e),
-    });
-  };
+  // Capture-phase window keyboard forwarding (matches agent-browser dashboard viewport.tsx)
+  // so no global Harness shortcut can hijack typing while the browser canvas is focused.
+  useEffect(() => {
+    if (remote || !isActive) return;
+
+    const dispatchKey = (e: KeyboardEvent, eventType: "keyDown" | "keyUp") => {
+      if (isElementPickerActiveRef.current) return;
+      if (document.activeElement !== canvasRef.current) return;
+
+      // Handle Ctrl+V / Cmd+V paste cleanly into focused inputs inside the page
+      if (eventType === "keyDown" && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        e.stopPropagation();
+        void navigator.clipboard
+          .readText()
+          .then((text) => {
+            if (text) return window.electron?.browser?.paste?.({ tabId: tab.id, text });
+          })
+          .catch(() => {});
+        return;
+      }
+
+      // Handle Ctrl+C / Cmd+C copy of selected text inside the page
+      if (eventType === "keyDown" && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        e.stopPropagation();
+        void window.electron?.browser
+          ?.evaluate?.({ tabId: tab.id, script: "window.getSelection()?.toString() || ''" })
+          .then((res: any) => {
+            const text = typeof res?.result === "string" ? res.result : "";
+            if (text) return navigator.clipboard.writeText(text);
+          })
+          .catch(() => {});
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const info = KEY_INFO[e.key];
+      const hasCommandModifier = e.ctrlKey || e.metaKey || e.altKey;
+      const text =
+        eventType === "keyDown" && !hasCommandModifier
+          ? info?.text ?? (Array.from(e.key).length === 1 ? e.key : undefined)
+          : undefined;
+      const keyCode = info?.keyCode ?? printableKeyCode(e.key);
+
+      sendWsInput({
+        type: "input_keyboard",
+        eventType,
+        key: e.key,
+        code: e.code,
+        ...(text !== undefined ? { text } : {}),
+        windowsVirtualKeyCode: keyCode,
+        modifiers: cdpModifiersFromEvent(e),
+      });
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => dispatchKey(e, "keyDown");
+    const onKeyUp = (e: KeyboardEvent) => dispatchKey(e, "keyUp");
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+    };
+  }, [remote, isActive, tab.id, sendWsInput]);
 
   // Compute overlay box scaled to rendered canvas CSS dimensions
   const overlayBoxStyle = useMemo(() => {
@@ -1272,11 +1430,20 @@ export function BrowserTab({
                 onMouseUp={handleCanvasMouseUp}
                 onContextMenu={(e) => e.preventDefault()}
                 onWheel={handleCanvasWheel}
-                onKeyDown={handleCanvasKeyDown}
-                onKeyUp={handleCanvasKeyUp}
-                className={`w-full h-full outline-none block ${
-                  isElementPickerActive ? "cursor-crosshair" : "cursor-default"
-                }`}
+                style={
+                  canvasFrameSize.width > 0 && canvasFrameSize.height > 0
+                    ? {
+                        aspectRatio: `${canvasFrameSize.width} / ${canvasFrameSize.height}`,
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        width: "auto",
+                        height: "auto",
+                      }
+                    : undefined
+                }
+                className={`outline-none block ${
+                  canvasFrameSize.width > 0 ? "" : "w-full h-full"
+                } ${isElementPickerActive ? "cursor-crosshair" : "cursor-default"}`}
               />
 
               {/* Cold-start subtle loading indicator until first WebSocket frame arrives */}
