@@ -987,7 +987,7 @@ export function ChatCard({
       id: selectedModel,
       name: displayName,
       provider: "const",
-      providerName: "ConstRouter",
+      providerName: "Const Router",
       supportsThinking: true,
       contextWindow: getModelContextLimit(selectedModel, contextUsage?.totalTokens),
     };
@@ -2425,24 +2425,8 @@ export function ChatCard({
                                   {filteredGroupedModels.map((group) => (
                                     <div key={group.providerId} className="flex flex-col">
                                       {/* Category Header */}
-                                      <div className="px-2.5 pt-2 pb-1 flex items-center justify-between gap-2 text-[10.5px] font-semibold text-[#71717a] uppercase tracking-wider select-none">
+                                      <div className="px-2.5 pt-2 pb-1 flex items-center text-[10.5px] font-semibold text-[#71717a] uppercase tracking-wider select-none">
                                         <span className="truncate">{group.providerName}</span>
-                                        <span
-                                          className={cn(
-                                            "px-1.5 py-0.5 rounded text-[9px] font-medium normal-case tracking-normal shrink-0",
-                                            group.authType === "router"
-                                              ? "bg-blue-500/10 text-blue-400"
-                                              : group.authType === "oauth"
-                                                ? "bg-emerald-500/10 text-emerald-400"
-                                                : "bg-neutral-500/15 text-neutral-400",
-                                          )}
-                                        >
-                                          {group.authType === "router"
-                                            ? "Native"
-                                            : group.authType === "oauth"
-                                              ? "Subscription"
-                                              : "API Key"}
-                                        </span>
                                       </div>
 
                                       {/* Model Items */}

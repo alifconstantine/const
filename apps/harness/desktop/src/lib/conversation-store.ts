@@ -645,6 +645,80 @@ export interface SideConversationItem {
 }
 
 const SIDE_STORAGE_PREFIX = "const_harness_side_chat_";
+const WORKSPACE_SIDE_STORAGE_PREFIX = "const_harness_ws_side_chats_";
+
+export function normalizeSideWorkspaceKey(project?: string): string {
+  const raw = (project || "").trim();
+  if (!raw || raw === "Outside Project" || raw === "[object Object]") return "outside_project";
+  return raw.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+export function loadWorkspaceSideConversations(project?: string): SideConversationItem[] {
+  const key = normalizeSideWorkspaceKey(project);
+  const byId = new Map<string, SideConversationItem>();
+
+  try {
+    const raw = localStorage.getItem(`${WORKSPACE_SIDE_STORAGE_PREFIX}${key}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item?.id) byId.set(item.id, item);
+        }
+      }
+    }
+  } catch {}
+
+  // Also merge any legacy parent-scoped side chats belonging to this workspace so nothing is ever lost
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const storageKey = localStorage.key(i);
+      if (!storageKey || !storageKey.startsWith(SIDE_STORAGE_PREFIX)) continue;
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) continue;
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) continue;
+      for (const item of list) {
+        if (!item?.id) continue;
+        if (normalizeSideWorkspaceKey(item.project) !== key) continue;
+        const existing = byId.get(item.id);
+        if (!existing || (item.updatedAt || 0) > (existing.updatedAt || 0)) {
+          byId.set(item.id, item);
+        }
+      }
+    }
+  } catch {}
+
+  return Array.from(byId.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+function saveToWorkspaceSideStore(sideConvo: SideConversationItem): void {
+  try {
+    const key = normalizeSideWorkspaceKey(sideConvo.project);
+    const list = loadWorkspaceSideConversations(sideConvo.project);
+    const idx = list.findIndex((c) => c.id === sideConvo.id);
+    if (idx >= 0) list[idx] = sideConvo;
+    else list.unshift(sideConvo);
+    // Keep up to 100 most recent side chats per workspace
+    const trimmed = list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 100);
+    localStorage.setItem(`${WORKSPACE_SIDE_STORAGE_PREFIX}${key}`, JSON.stringify(trimmed));
+  } catch {}
+}
+
+export function deleteWorkspaceSideConversation(
+  project: string | undefined,
+  sideId: string,
+  parentConversationId?: string
+): void {
+  try {
+    const key = normalizeSideWorkspaceKey(project);
+    const list = loadWorkspaceSideConversations(project).filter((c) => c.id !== sideId);
+    localStorage.setItem(`${WORKSPACE_SIDE_STORAGE_PREFIX}${key}`, JSON.stringify(list));
+  } catch {}
+  if (parentConversationId) {
+    deleteSideConversation(parentConversationId, sideId);
+  }
+}
 
 /** Apply host state without saving it back or keeping an older side-chat cache. */
 export function syncConversationUi(conversation: ConversationItem): void {
@@ -694,10 +768,17 @@ export function loadSideConversations(parentConversationId: string): SideConvers
 
 export function loadSideConversation(
   parentConversationId: string,
-  sideId: string
+  sideId: string,
+  project?: string
 ): SideConversationItem | null {
   const list = loadSideConversations(parentConversationId);
-  return list.find((c) => c.id === sideId) || null;
+  const direct = list.find((c) => c.id === sideId);
+  if (direct) return direct;
+  if (project !== undefined) {
+    const wsList = loadWorkspaceSideConversations(project);
+    return wsList.find((c) => c.id === sideId) || null;
+  }
+  return null;
 }
 
 export function saveSideConversation(sideConvo: SideConversationItem): void {
@@ -715,6 +796,7 @@ export function saveSideConversation(sideConvo: SideConversationItem): void {
       `${SIDE_STORAGE_PREFIX}${sideConvo.parentConversationId}`,
       JSON.stringify(list)
     );
+    saveToWorkspaceSideStore(updated);
     if (cachedConversations) {
       const parent = cachedConversations.find((c) => c.id === sideConvo.parentConversationId);
       if (parent) parent.sideConversations = list;

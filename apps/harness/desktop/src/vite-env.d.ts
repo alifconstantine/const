@@ -343,6 +343,7 @@ declare global {
         cancelLogin: (provider: string) => Promise<{ success: boolean }>;
         submitCode: (provider: string, codeOrUrl: string) => Promise<{ success: boolean }>;
         disconnect: (provider: string) => Promise<{ success: boolean }>;
+        fetchModels?: (provider?: string) => Promise<{ success: boolean; models?: any[]; error?: string }>;
         onLoginProgress: (callback: (progress: any) => void) => () => void;
       };
       sendMessage: (payload: {

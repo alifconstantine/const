@@ -1053,7 +1053,7 @@ async function resolveLlmExecutionRoute(
         `${meta.name} subscription is not signed in. Open Settings → Models and sign in with ${meta.shortName} first.`,
       );
     }
-    const preset = meta.models.find((m) => m.id === wireModel);
+    const preset = oauthSubscriptionManager.getCachedModels(subId).find((m) => m.id === wireModel);
     return {
       wireModel,
       displayModelId: `sub:${subId}/${wireModel}`,
@@ -1175,6 +1175,23 @@ async function resolveLlmExecutionRoute(
   handleDesktopIpc("oauth:disconnect", async (_event, provider: SubscriptionProviderId) => {
     oauthSubscriptionManager.disconnect(provider);
     return { success: true };
+  });
+
+  handleDesktopIpc("oauth:fetch-models", async (_event, provider?: SubscriptionProviderId) => {
+    try {
+      if (provider) {
+        const models = await oauthSubscriptionManager.fetchModels(provider);
+        return { success: true, models };
+      }
+      const results: Record<string, any[]> = {};
+      for (const p of oauthSubscriptionManager.listProviders()) {
+        if (!p.status.connected) continue;
+        results[p.id] = await oauthSubscriptionManager.getModels(p.id);
+      }
+      return { success: true, providers: results };
+    } catch (err: any) {
+      return { success: false, error: err?.message || String(err) };
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -1660,11 +1677,12 @@ async function resolveLlmExecutionRoute(
       protocol: "openai-completions" as const,
     }));
 
-    // Connected OAuth Subscription provider models (OpenAI Codex, Claude Pro/Max, Google Gemini CLI, GitHub Copilot)
+    // Connected OAuth Subscription provider models (fetched live from each signed-in provider)
     const subscriptionModels: any[] = [];
     for (const sub of oauthSubscriptionManager.listProviders()) {
       if (!sub.status.connected) continue;
-      for (const preset of sub.models) {
+      const discovered = await oauthSubscriptionManager.getModels(sub.id as SubscriptionProviderId);
+      for (const preset of discovered) {
         subscriptionModels.push({
           id: `sub:${sub.id}/${preset.id}`,
           rawModelId: preset.id,

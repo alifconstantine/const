@@ -2,17 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "../../lib/i18n";
 import { modelDisplayName } from "../../lib/model-identity";
 import { SubscriptionProvidersPanel } from "./subscription-providers-panel";
+import { BrandLogo, resolveBrandIconKey } from "./brand-icons";
 import {
   toast,
   cn,
-  ScrollArea,
-  DropdownMenu,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
   Select,
   SelectTrigger,
   SelectValue,
@@ -21,7 +14,6 @@ import {
 } from "@const/ui";
 import {
   Box,
-  Bot,
   Volume2,
   Image as ImageIcon,
   Video as VideoIcon,
@@ -31,7 +23,6 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  ChevronDown,
   Unplug,
   Play,
 } from "lucide-react";
@@ -52,11 +43,7 @@ import {
   saveImageConfig,
   saveVideoConfig,
   CONST_ROUTER_LLM_MODELS,
-  PRESET_LLM_PROVIDERS,
-  PRESET_SPEECH_PROVIDERS,
   POPULAR_SPEECH_VOICES,
-  PRESET_IMAGE_PROVIDERS,
-  PRESET_VIDEO_PROVIDERS,
   testEndpointPing,
   fetchRemoteModels,
   playSampleSpeechAudio,
@@ -137,9 +124,6 @@ export function ModelSettings({
   const [isAddingModel, setIsAddingModel] = useState(false);
   const [newModelId, setNewModelId] = useState("");
   const [newModelContext, setNewModelContext] = useState("");
-
-  // Preset picker modal dialog state
-  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
   // Speech testing state
   const [isPlayingSpeech, setIsPlayingSpeech] = useState(false);
@@ -464,78 +448,6 @@ export function ModelSettings({
     });
   };
 
-  // Add a Preset Adapter Provider (clean, no dummy models)
-  const handleAddPresetProvider = (preset: any) => {
-    const id = `${preset.id}-${Date.now()}`;
-    const newProvider = {
-      id,
-      name: preset.name,
-      baseUrl: preset.baseUrl,
-      apiKey: "",
-      protocol: preset.protocol,
-      models: [], // Clean, empty models list!
-      isCustom: false,
-    };
-
-    if (activeCategory === "llm") {
-      const activeProviderId = config.llm.activeProviderId || newProvider.id;
-      const updated = {
-        ...config.llm,
-        activeProviderId,
-        providers: [...config.llm.providers, newProvider as LlmProvider],
-      };
-      setConfig((prev) => ({ ...prev, llm: updated }));
-      saveLlmConfig(updated);
-    } else if (activeCategory === "speech") {
-      const activeProviderId = config.speech.activeProviderId || newProvider.id;
-      const updated = {
-        ...config.speech,
-        activeProviderId,
-        providers: [
-          ...config.speech.providers,
-          {
-            ...newProvider,
-            model: preset.defaultModel || "tts-1",
-            voice: preset.defaultVoice || "alloy",
-            speed: 1.0,
-          } as SpeechProvider,
-        ],
-      };
-      setConfig((prev) => ({ ...prev, speech: updated }));
-      saveSpeechConfig(updated);
-    } else if (activeCategory === "image") {
-      const activeProviderId = config.image.activeProviderId || newProvider.id;
-      const updated = {
-        ...config.image,
-        activeProviderId,
-        providers: [...config.image.providers, newProvider as ImageProvider],
-      };
-      setConfig((prev) => ({ ...prev, image: updated }));
-      saveImageConfig(updated);
-    } else if (activeCategory === "video") {
-      const activeProviderId = config.video.activeProviderId || newProvider.id;
-      const updated = {
-        ...config.video,
-        activeProviderId,
-        providers: [
-          ...config.video.providers,
-          {
-            ...newProvider,
-            defaultResolution: "1080p",
-            aspectRatio: "16:9",
-          } as VideoProvider,
-        ],
-      };
-      setConfig((prev) => ({ ...prev, video: updated }));
-      saveVideoConfig(updated);
-    }
-
-    setExpandedProviderId(newProvider.id);
-    setEditingProvider(JSON.parse(JSON.stringify(newProvider)));
-    setIsPresetModalOpen(false);
-    toast.success(t("settings.providerAdded"));
-  };
-
   // Add a Custom Provider
   const handleAddCustomProvider = () => {
     const id = `custom-${Date.now()}`;
@@ -652,15 +564,29 @@ export function ModelSettings({
           ? config.image.activeModelId
           : config.video.activeModelId;
 
-  // Preset providers options for active category
-  const activePresets =
+  const constRouterProvider =
+    config.llm.providers.find(
+      (p) => p.id === "const-router" || p.id === "const",
+    ) || config.llm.providers[0];
+
+  const displayedProviders =
     activeCategory === "llm"
-      ? PRESET_LLM_PROVIDERS
-      : activeCategory === "speech"
-        ? PRESET_SPEECH_PROVIDERS
-        : activeCategory === "image"
-          ? PRESET_IMAGE_PROVIDERS
-          : PRESET_VIDEO_PROVIDERS;
+      ? currentProviders.filter(
+          (p: any) => p.id !== "const-router" && p.id !== "const",
+        )
+      : currentProviders;
+
+  const handleSaveConstProvider = (updatedConst: LlmProvider) => {
+    const exists = config.llm.providers.some((p) => p.id === updatedConst.id);
+    const updatedProviders = exists
+      ? config.llm.providers.map((p) =>
+          p.id === updatedConst.id ? updatedConst : p,
+        )
+      : [updatedConst, ...config.llm.providers];
+    const updated = { ...config.llm, providers: updatedProviders };
+    setConfig((prev) => ({ ...prev, llm: updated }));
+    saveLlmConfig(updated);
+  };
 
   return (
     <div className="w-full min-w-0 flex flex-col space-y-5 pb-6 font-sans">
@@ -739,67 +665,43 @@ export function ModelSettings({
           </button>
         </div>
 
-        {/* Right Side: Add Provider Dropdown (exact height h-9) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t("settings.addProvider")}</span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-54 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
-          >
-            <DropdownMenuItem
-              onClick={() => setIsPresetModalOpen(true)}
-              className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-            >
-              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>{t("settings.chooseAdapterProvider")}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={handleAddCustomProvider}
-              className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-            >
-              <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              <span>{t("settings.addCustomProvider")}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Right Side: Add Custom Endpoint Button (exact height h-9) */}
+        <button
+          type="button"
+          onClick={handleAddCustomProvider}
+          className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{t("settings.customEndpoint")}</span>
+        </button>
       </div>
 
       {/* ===================================================================== */}
-      {/* ACCOUNT SUBSCRIPTIONS (OAUTH — CHATGPT, CLAUDE, GOOGLE, COPILOT)      */}
+      {/* CONST ROUTER + OAUTH PROVIDERS (LLM)                                  */}
       {/* ===================================================================== */}
       {activeCategory === "llm" && (
         <SubscriptionProvidersPanel
+          constProvider={constRouterProvider}
           activeModelId={config.llm.activeModelId}
-          onSelectSubscriptionModel={(fullModelId, providerId) =>
-            handleSetDefaultModel(fullModelId, providerId)
+          onSelectModel={(modelId, providerId) =>
+            handleSetDefaultModel(modelId, providerId)
           }
+          onSaveConstProvider={handleSaveConstProvider}
         />
       )}
 
       {/* ===================================================================== */}
-      {/* PROVIDERS & MODELS ACCORDION LIST                                     */}
+      {/* CUSTOM ENDPOINTS ACCORDION LIST                                       */}
       {/* ===================================================================== */}
       <div className="space-y-3">
-        {activeCategory === "llm" && currentProviders.length > 0 && (
+        {activeCategory === "llm" && displayedProviders.length > 0 && (
           <div className="px-1 pt-1">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Native Router &amp; API Key Providers (BYOK)
+              {t("settings.customEndpoint")}
             </h3>
-            <p className="text-[11.5px] text-muted-foreground mt-0.5">
-              Use built-in Const Router models, or connect OpenAI, Anthropic, Google AI Studio, DeepSeek, OpenRouter, Ollama, or any custom OpenAI-compatible API key.
-            </p>
           </div>
         )}
-        {currentProviders.length === 0 ? (
+        {displayedProviders.length === 0 && activeCategory !== "llm" ? (
           <div className="settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] py-12 px-6 flex flex-col items-center justify-center text-center select-none">
             {/* Category Icon */}
             <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white mb-3.5 ">
@@ -820,41 +722,30 @@ export function ModelSettings({
                 ? t("settings.noSpeechProviders")
                 : activeCategory === "image"
                   ? t("settings.noImageProviders")
-                  : activeCategory === "video"
-                    ? t("settings.noVideoProviders")
-                    : t("settings.noLlmProviders")}
+                  : t("settings.noVideoProviders")}
             </h3>
             <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1 leading-relaxed">
               {activeCategory === "speech"
                 ? t("settings.connectSpeechDesc")
                 : activeCategory === "image"
                   ? t("settings.connectImageDesc")
-                  : activeCategory === "video"
-                    ? t("settings.connectVideoDesc")
-                    : t("settings.connectLlmDesc")}
+                  : t("settings.connectVideoDesc")}
             </p>
 
             {/* Action Buttons */}
             <div className="flex items-center justify-center gap-2 mt-5">
               <button
                 type="button"
-                onClick={() => setIsPresetModalOpen(true)}
-                className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer "
+                onClick={handleAddCustomProvider}
+                className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{t("settings.chooseAdapter")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleAddCustomProvider}
-                className="h-8 px-3.5 rounded-xl bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
-              >
                 <span>{t("settings.customEndpoint")}</span>
               </button>
             </div>
           </div>
         ) : (
-          currentProviders.map((provider: any) => {
+          displayedProviders.map((provider: any) => {
             const isExpanded = expandedProviderId === provider.id;
 
             return (
@@ -875,6 +766,11 @@ export function ModelSettings({
                     aria-expanded={isExpanded}
                     className="flex items-center gap-2.5 min-w-0 text-left"
                   >
+                    {resolveBrandIconKey(provider.id || provider.name) && (
+                      <span className="w-7 h-7 rounded-lg bg-white dark:bg-[#1a1a1a] border border-black/8 dark:border-white/10 flex items-center justify-center shrink-0">
+                        <BrandLogo provider={provider.id || provider.name} className="w-4 h-4 text-foreground" />
+                      </span>
+                    )}
                     <span className="text-sm font-medium text-foreground truncate">
                       {provider.name}
                     </span>
@@ -1590,55 +1486,6 @@ export function ModelSettings({
           })
         )}
       </div>
-
-      {/* 3. Preset Adapter Picker Modal */}
-      {isPresetModalOpen && (
-        <Dialog open onOpenChange={setIsPresetModalOpen}>
-          <DialogContent
-            hideClose
-            aria-describedby={undefined}
-            className="bg-white dark:bg-[#222222] border-0 rounded-2xl w-[calc(100%-32px)] max-w-md p-5 space-y-4 gap-0"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm font-medium text-[#262626] dark:text-white">
-                {t("settings.addProviderAdapter")} (
-                {activeCategory.toUpperCase()})
-              </DialogTitle>
-              <button
-                type="button"
-                onClick={() => setIsPresetModalOpen(false)}
-                className="text-xs text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer"
-              >
-                {t("common.close")}
-              </button>
-            </div>
-
-            <ScrollArea className="max-h-72 pr-1">
-              <div className="space-y-2">
-                {activePresets.map((preset: any) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleAddPresetProvider(preset)}
-                    className="w-full text-left p-3 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] transition-colors flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="min-w-0 pr-3">
-                      <div className="text-xs font-semibold text-[#262626] dark:text-white">
-                        {preset.name}
-                      </div>
-                      <div className="text-[11px] text-[#737373] dark:text-[#969696] truncate max-w-xs">
-                        {preset.baseUrl}
-                      </div>
-                    </div>
-                    <Plus className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

@@ -9,13 +9,17 @@ export type SubscriptionProviderId =
   | "openai-codex"
   | "anthropic"
   | "google-gemini-cli"
-  | "github-copilot";
+  | "github-copilot"
+  | "openrouter"
+  | "xai-oauth"
+  | "kimi-code"
+  | "gitlab-duo";
 
 export interface SubscriptionModelPreset {
   id: string;
   name: string;
-  contextWindow: string;
-  maxOutput: string;
+  contextWindow?: string;
+  maxOutput?: string;
   supportsThinking?: boolean;
   thinkingLevels?: string[];
   inputTypes?: string[];
@@ -50,6 +54,10 @@ export interface StoredOAuthCredential {
   githubToken?: string;
   /** For GitHub Copilot: dynamic API endpoint returned by copilot_internal/v2/token. */
   apiBaseUrl?: string;
+  /** Models fetched live from the provider after connecting. */
+  discoveredModels?: SubscriptionModelPreset[];
+  /** Epoch ms when discoveredModels was last fetched. */
+  discoveredAt?: number;
   connectedAt: number;
   updatedAt: number;
 }
@@ -63,6 +71,7 @@ export interface PublicSubscriptionStatus {
   planType?: string;
   projectId?: string;
   expiresAt?: number;
+  discoveredAt?: number;
   connectedAt?: number;
 }
 
@@ -79,185 +88,88 @@ export interface SubscriptionLoginProgress {
 export const SUBSCRIPTION_PROVIDERS: Record<SubscriptionProviderId, SubscriptionProviderMeta> = {
   "openai-codex": {
     id: "openai-codex",
-    name: "OpenAI ChatGPT Plus / Pro",
-    shortName: "ChatGPT / Codex",
-    description: "Sign in with your ChatGPT Plus or Pro subscription via OpenAI Codex OAuth.",
+    name: "OpenAI",
+    shortName: "OpenAI",
+    description: "Sign in with your ChatGPT / OpenAI account.",
     protocol: "openai-codex",
     baseUrl: "https://chatgpt.com/backend-api/codex/responses",
     authFlow: "oauth-pkce",
     supportsManualCode: true,
-    models: [
-      {
-        id: "gpt-5.4",
-        name: "GPT-5.4 (Codex)",
-        contextWindow: "272K",
-        maxOutput: "128K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gpt-5.4-mini",
-        name: "GPT-5.4 Mini (Codex)",
-        contextWindow: "272K",
-        maxOutput: "128K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gpt-5.3-codex",
-        name: "GPT-5.3 Codex",
-        contextWindow: "272K",
-        maxOutput: "128K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gpt-5.3-codex-spark",
-        name: "GPT-5.3 Codex Spark",
-        contextWindow: "128K",
-        maxOutput: "32K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text"],
-      },
-    ],
+    models: [],
   },
   anthropic: {
     id: "anthropic",
-    name: "Anthropic Claude Pro / Max",
-    shortName: "Claude Pro / Max",
-    description: "Sign in with your Claude Pro or Max subscription via Anthropic OAuth.",
+    name: "Anthropic",
+    shortName: "Anthropic",
+    description: "Sign in with your Claude / Anthropic account.",
     protocol: "anthropic-messages",
     baseUrl: "https://api.anthropic.com/v1",
     authFlow: "oauth-pkce",
     supportsManualCode: true,
-    warning:
-      "Third-party OAuth access with Claude consumer subscriptions is subject to Anthropic's terms. Use an Anthropic API key (BYOK) if you require guaranteed commercial API terms.",
-    models: [
-      {
-        id: "claude-sonnet-4-6",
-        name: "Claude Sonnet 4.6",
-        contextWindow: "200K",
-        maxOutput: "64K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "claude-opus-4-6",
-        name: "Claude Opus 4.6",
-        contextWindow: "200K",
-        maxOutput: "64K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "claude-haiku-4-5-20251001",
-        name: "Claude Haiku 4.5",
-        contextWindow: "200K",
-        maxOutput: "16K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-    ],
+    models: [],
   },
   "google-gemini-cli": {
     id: "google-gemini-cli",
-    name: "Google Gemini (Cloud Code Assist)",
-    shortName: "Google Gemini",
-    description: "Sign in with your Google account via Gemini CLI / Cloud Code Assist OAuth.",
+    name: "Google",
+    shortName: "Google",
+    description: "Sign in with your Google account.",
     protocol: "google-gemini-cli",
     baseUrl: "https://cloudcode-pa.googleapis.com",
     authFlow: "oauth-pkce",
     supportsManualCode: true,
-    models: [
-      {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro",
-        contextWindow: "1M",
-        maxOutput: "65K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gemini-2.5-flash",
-        name: "Gemini 2.5 Flash",
-        contextWindow: "1M",
-        maxOutput: "65K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gemini-3-pro-preview",
-        name: "Gemini 3 Pro Preview",
-        contextWindow: "1M",
-        maxOutput: "65K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gemini-3-flash-preview",
-        name: "Gemini 3 Flash Preview",
-        contextWindow: "1M",
-        maxOutput: "65K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-    ],
+    models: [],
   },
   "github-copilot": {
     id: "github-copilot",
     name: "GitHub Copilot",
     shortName: "GitHub Copilot",
-    description: "Sign in with your GitHub Copilot subscription via official Device Code Flow.",
+    description: "Sign in with your GitHub account.",
     protocol: "github-copilot",
     baseUrl: "https://api.githubcopilot.com",
     authFlow: "device-code",
-    models: [
-      {
-        id: "gpt-5.4",
-        name: "GPT-5.4 (Copilot)",
-        contextWindow: "272K",
-        maxOutput: "64K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "claude-sonnet-4.6",
-        name: "Claude Sonnet 4.6 (Copilot)",
-        contextWindow: "200K",
-        maxOutput: "64K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro (Copilot)",
-        contextWindow: "1M",
-        maxOutput: "64K",
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high"],
-        inputTypes: ["text", "image"],
-      },
-      {
-        id: "gpt-4.1",
-        name: "GPT-4.1 (Copilot)",
-        contextWindow: "128K",
-        maxOutput: "32K",
-        inputTypes: ["text", "image"],
-      },
-    ],
+    models: [],
+  },
+  openrouter: {
+    id: "openrouter",
+    name: "OpenRouter",
+    shortName: "OpenRouter",
+    description: "Sign in with your OpenRouter account.",
+    protocol: "openai-completions",
+    baseUrl: "https://openrouter.ai/api/v1",
+    authFlow: "oauth-pkce",
+    supportsManualCode: true,
+    models: [],
+  },
+  "xai-oauth": {
+    id: "xai-oauth",
+    name: "xAI",
+    shortName: "xAI",
+    description: "Sign in with your xAI account.",
+    protocol: "openai-completions",
+    baseUrl: "https://api.x.ai/v1",
+    authFlow: "device-code",
+    models: [],
+  },
+  "kimi-code": {
+    id: "kimi-code",
+    name: "Kimi",
+    shortName: "Kimi",
+    description: "Sign in with your Kimi account.",
+    protocol: "openai-completions",
+    baseUrl: "https://api.kimi.com/coding/v1",
+    authFlow: "device-code",
+    models: [],
+  },
+  "gitlab-duo": {
+    id: "gitlab-duo",
+    name: "GitLab",
+    shortName: "GitLab",
+    description: "Sign in with your GitLab account.",
+    protocol: "openai-completions",
+    baseUrl: "https://cloud.gitlab.com/ai/v1/proxy/openai/v1",
+    authFlow: "oauth-pkce",
+    supportsManualCode: true,
+    models: [],
   },
 };
 
@@ -314,6 +226,23 @@ const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
 const GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const GITHUB_COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token";
+
+const OPENROUTER_AUTH_URL = "https://openrouter.ai/auth";
+const OPENROUTER_TOKEN_URL = "https://openrouter.ai/api/v1/auth/keys";
+const OPENROUTER_CALLBACK_PORT = 54549;
+
+const XAI_OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828";
+const XAI_DEVICE_CODE_URL = "https://auth.x.ai/oauth2/device/code";
+const XAI_TOKEN_URL = "https://auth.x.ai/oauth2/token";
+const XAI_USERINFO_URL = "https://auth.x.ai/oauth2/userinfo";
+
+const KIMI_OAUTH_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
+const KIMI_AUTH_BASE = (process.env.KIMI_CODE_OAUTH_HOST || process.env.KIMI_OAUTH_HOST || "https://auth.kimi.com").replace(/\/+$/, "");
+
+const GITLAB_CLIENT_ID = (process.env.GITLAB_CLIENT_ID || "da4edff2e6ebd2bc3208611e2768bc1c1dd7be791dc5ff26ca34ca9ee44f7d4b").trim();
+const GITLAB_AUTH_URL = "https://gitlab.com/oauth/authorize";
+const GITLAB_TOKEN_URL = "https://gitlab.com/oauth/token";
+const GITLAB_CALLBACK_PORT = 8080;
 
 function generatePkce(): { verifier: string; challenge: string; state: string } {
   const verifier = crypto.randomBytes(32).toString("base64url");
@@ -419,6 +348,7 @@ export class OAuthSubscriptionManager {
   private loaded = false;
   private activeLogins = new Map<SubscriptionProviderId, PendingLogin>();
   private refreshLocks = new Map<SubscriptionProviderId, Promise<StoredOAuthCredential>>();
+  private modelFetchLocks = new Map<SubscriptionProviderId, Promise<SubscriptionModelPreset[]>>();
 
   constructor(options: OAuthManagerOptions = {}) {
     this.storePath =
@@ -481,8 +411,14 @@ export class OAuthSubscriptionManager {
     this.ensureLoaded();
     return (Object.keys(SUBSCRIPTION_PROVIDERS) as SubscriptionProviderId[]).map((id) => ({
       ...SUBSCRIPTION_PROVIDERS[id],
+      models: this.cache[id]?.discoveredModels ?? [],
       status: this.getPublicStatus(id),
     }));
+  }
+
+  public getCachedModels(provider: SubscriptionProviderId): SubscriptionModelPreset[] {
+    this.ensureLoaded();
+    return this.cache[provider]?.discoveredModels ?? [];
   }
 
   public getPublicStatus(provider: SubscriptionProviderId): PublicSubscriptionStatus {
@@ -500,6 +436,7 @@ export class OAuthSubscriptionManager {
       planType: cred.planType,
       projectId: cred.projectId,
       expiresAt: cred.expiresAt,
+      discoveredAt: cred.discoveredAt,
       connectedAt: cred.connectedAt,
     };
   }
@@ -580,12 +517,23 @@ export class OAuthSubscriptionManager {
         cred = await this.loginGoogleGeminiCli(pending, onProgress);
       } else if (provider === "github-copilot") {
         cred = await this.loginGitHubCopilot(pending, onProgress);
+      } else if (provider === "openrouter") {
+        cred = await this.loginOpenRouter(pending, onProgress);
+      } else if (provider === "xai-oauth") {
+        cred = await this.loginXaiOAuth(pending, onProgress);
+      } else if (provider === "kimi-code") {
+        cred = await this.loginKimiCode(pending, onProgress);
+      } else if (provider === "gitlab-duo") {
+        cred = await this.loginGitLabDuo(pending, onProgress);
       } else {
         throw new Error(`Unsupported subscription provider: ${provider}`);
       }
 
       this.cache[provider] = cred;
       this.persist();
+      await this.fetchModels(provider).catch((err) => {
+        console.warn(`[OAuthSubscriptionManager] Initial model discovery failed for ${provider}:`, err?.message || err);
+      });
       onProgress?.({
         provider,
         status: "connected",
@@ -616,6 +564,7 @@ export class OAuthSubscriptionManager {
     expectedState: string;
     providerDisplayName: string;
     strictPort?: boolean;
+    skipStateCheck?: boolean;
   }): Promise<{ code: string; redirectUri: string }> {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -645,7 +594,7 @@ export class OAuthSubscriptionManager {
       opts.pending.submitManualCode = (rawInput: string) => {
         const parsed = parseAuthorizationCodeInput(rawInput);
         if (!parsed.code) return;
-        if (parsed.state && parsed.state !== opts.expectedState) {
+        if (!opts.skipStateCheck && parsed.state && parsed.state !== opts.expectedState) {
           finish(() => reject(new Error("OAuth state mismatch in pasted redirect URL.")));
           return;
         }
@@ -679,7 +628,7 @@ export class OAuthSubscriptionManager {
             res.end("Missing authorization code.");
             return;
           }
-          if (state && state !== opts.expectedState) {
+          if (!opts.skipStateCheck && state && state !== opts.expectedState) {
             res.writeHead(400, { "Content-Type": "text/plain" });
             res.end("OAuth state mismatch.");
             finish(() => reject(new Error("OAuth state mismatch.")));
@@ -744,7 +693,7 @@ export class OAuthSubscriptionManager {
       port: OPENAI_CALLBACK_PORT,
       callbackPath: OPENAI_CALLBACK_PATH,
       expectedState: pkce.state,
-      providerDisplayName: "OpenAI ChatGPT / Codex",
+      providerDisplayName: "OpenAI",
       strictPort: true,
     });
 
@@ -1172,6 +1121,280 @@ export class OAuthSubscriptionManager {
     };
   }
 
+  private async loginOpenRouter(
+    pending: PendingLogin,
+    onProgress?: (p: SubscriptionLoginProgress) => void,
+  ): Promise<StoredOAuthCredential> {
+    const pkce = generatePkce();
+    const redirectUri = `http://127.0.0.1:${OPENROUTER_CALLBACK_PORT}/callback`;
+    const params = new URLSearchParams({
+      callback_url: redirectUri,
+      code_challenge: pkce.challenge,
+      code_challenge_method: "S256",
+    });
+    const authUrl = `${OPENROUTER_AUTH_URL}?${params.toString()}`;
+
+    const codePromise = this.waitForLoopbackOrManualCode({
+      provider: "openrouter",
+      pending,
+      host: "127.0.0.1",
+      port: OPENROUTER_CALLBACK_PORT,
+      callbackPath: "/callback",
+      expectedState: pkce.state,
+      providerDisplayName: "OpenRouter",
+      skipStateCheck: true,
+    });
+
+    onProgress?.({
+      provider: "openrouter",
+      status: "awaiting_browser",
+      authUrl,
+      message: "Complete OpenRouter sign-in in your browser.",
+    });
+    await this.openExternalUrl?.(authUrl);
+
+    const { code } = await codePromise;
+    onProgress?.({ provider: "openrouter", status: "exchanging", message: "Exchanging OpenRouter PKCE code..." });
+
+    const tokenRes = await this.fetchImpl(OPENROUTER_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        code_verifier: pkce.verifier,
+        code_challenge_method: "S256",
+      }),
+      signal: pending.abort.signal,
+    });
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text().catch(() => "");
+      throw new Error(`OpenRouter token exchange failed (${tokenRes.status}): ${errText.slice(0, 200)}`);
+    }
+    const tokens: any = await tokenRes.json();
+    if (!tokens?.key) throw new Error("OpenRouter did not return an API key.");
+    const now = Date.now();
+    return {
+      provider: "openrouter",
+      accessToken: tokens.key,
+      expiresAt: now + 10 * 365 * 24 * 60 * 60 * 1000,
+      connectedAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private async loginXaiOAuth(
+    pending: PendingLogin,
+    onProgress?: (p: SubscriptionLoginProgress) => void,
+  ): Promise<StoredOAuthCredential> {
+    const deviceRes = await this.fetchImpl(XAI_DEVICE_CODE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({
+        client_id: XAI_OAUTH_CLIENT_ID,
+        scope: "openid profile email offline_access grok-cli:access api:access",
+      }).toString(),
+      signal: pending.abort.signal,
+    });
+    if (!deviceRes.ok) throw new Error(`xAI device code request failed (${deviceRes.status})`);
+    const dc: any = await deviceRes.json();
+    const verificationUri = dc.verification_uri_complete || dc.verification_uri || "https://auth.x.ai/activate";
+    const userCode = String(dc.user_code || "");
+    const deviceCode = String(dc.device_code || "");
+    let intervalMs = Math.max(3, Number(dc.interval) || 5) * 1000;
+    const deadline = Date.now() + (Number(dc.expires_in) || 600) * 1000;
+
+    onProgress?.({
+      provider: "xai-oauth",
+      status: "awaiting_device_code",
+      userCode,
+      verificationUri,
+      message: `Enter code ${userCode} on xAI to authorize.`,
+    });
+    await this.openExternalUrl?.(verificationUri);
+
+    while (Date.now() < deadline) {
+      if (pending.abort.signal.aborted) throw new Error("Sign-in cancelled.");
+      await new Promise((r) => setTimeout(r, intervalMs));
+      if (pending.abort.signal.aborted) throw new Error("Sign-in cancelled.");
+
+      const pollRes = await this.fetchImpl(XAI_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          device_code: deviceCode,
+          client_id: XAI_OAUTH_CLIENT_ID,
+        }).toString(),
+        signal: pending.abort.signal,
+      });
+      const pollData: any = await pollRes.json().catch(() => ({}));
+      if (pollData?.access_token) {
+        let email: string | undefined;
+        let accountId: string | undefined;
+        try {
+          const uiRes = await this.fetchImpl(XAI_USERINFO_URL, {
+            headers: { Authorization: `Bearer ${pollData.access_token}` },
+          });
+          if (uiRes.ok) {
+            const ui: any = await uiRes.json();
+            email = ui?.email;
+            accountId = ui?.sub;
+          }
+        } catch {}
+        const now = Date.now();
+        return {
+          provider: "xai-oauth",
+          accessToken: pollData.access_token,
+          refreshToken: pollData.refresh_token,
+          expiresAt: now + (Number(pollData.expires_in) || 3600) * 1000 - 300_000,
+          email,
+          accountId,
+          connectedAt: now,
+          updatedAt: now,
+        };
+      }
+      if (pollData?.error === "authorization_pending") continue;
+      if (pollData?.error === "slow_down") {
+        intervalMs += 5000;
+        continue;
+      }
+      if (pollData?.error) throw new Error(pollData.error_description || pollData.error);
+    }
+    throw new Error("xAI sign-in timed out.");
+  }
+
+  private async loginKimiCode(
+    pending: PendingLogin,
+    onProgress?: (p: SubscriptionLoginProgress) => void,
+  ): Promise<StoredOAuthCredential> {
+    const deviceRes = await this.fetchImpl(`${KIMI_AUTH_BASE}/api/oauth/device_authorization`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({ client_id: KIMI_OAUTH_CLIENT_ID }).toString(),
+      signal: pending.abort.signal,
+    });
+    if (!deviceRes.ok) throw new Error(`Kimi Code device code request failed (${deviceRes.status})`);
+    const dc: any = await deviceRes.json();
+    const verificationUri = dc.verification_uri_complete || dc.verification_uri || KIMI_AUTH_BASE;
+    const userCode = String(dc.user_code || "");
+    const deviceCode = String(dc.device_code || "");
+    let intervalMs = Math.max(3, Number(dc.interval) || 5) * 1000;
+    const deadline = Date.now() + (Number(dc.expires_in) || 600) * 1000;
+
+    onProgress?.({
+      provider: "kimi-code",
+      status: "awaiting_device_code",
+      userCode,
+      verificationUri,
+      message: `Enter code ${userCode} on Kimi to authorize.`,
+    });
+    await this.openExternalUrl?.(verificationUri);
+
+    while (Date.now() < deadline) {
+      if (pending.abort.signal.aborted) throw new Error("Sign-in cancelled.");
+      await new Promise((r) => setTimeout(r, intervalMs));
+      if (pending.abort.signal.aborted) throw new Error("Sign-in cancelled.");
+
+      const pollRes = await this.fetchImpl(`${KIMI_AUTH_BASE}/api/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          device_code: deviceCode,
+          client_id: KIMI_OAUTH_CLIENT_ID,
+        }).toString(),
+        signal: pending.abort.signal,
+      });
+      const pollData: any = await pollRes.json().catch(() => ({}));
+      if (pollData?.access_token) {
+        const claims = decodeJwtPayload(pollData.access_token);
+        const now = Date.now();
+        return {
+          provider: "kimi-code",
+          accessToken: pollData.access_token,
+          refreshToken: pollData.refresh_token,
+          expiresAt: now + (Number(pollData.expires_in) || 3600) * 1000 - 300_000,
+          accountId: claims?.user_id || claims?.sub,
+          connectedAt: now,
+          updatedAt: now,
+        };
+      }
+      if (pollData?.error === "authorization_pending") continue;
+      if (pollData?.error === "slow_down") {
+        intervalMs += 5000;
+        continue;
+      }
+      if (pollData?.error) throw new Error(pollData.error_description || pollData.error);
+    }
+    throw new Error("Kimi Code sign-in timed out.");
+  }
+
+  private async loginGitLabDuo(
+    pending: PendingLogin,
+    onProgress?: (p: SubscriptionLoginProgress) => void,
+  ): Promise<StoredOAuthCredential> {
+    const pkce = generatePkce();
+    const redirectUri = (process.env.GITLAB_REDIRECT_URI || `http://localhost:${GITLAB_CALLBACK_PORT}/callback`).trim();
+    const params = new URLSearchParams({
+      client_id: GITLAB_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "api",
+      state: pkce.state,
+      code_challenge: pkce.challenge,
+      code_challenge_method: "S256",
+    });
+    const authUrl = `${GITLAB_AUTH_URL}?${params.toString()}`;
+
+    const codePromise = this.waitForLoopbackOrManualCode({
+      provider: "gitlab-duo",
+      pending,
+      host: "localhost",
+      port: GITLAB_CALLBACK_PORT,
+      callbackPath: "/callback",
+      expectedState: pkce.state,
+      providerDisplayName: "GitLab Duo",
+    });
+
+    onProgress?.({
+      provider: "gitlab-duo",
+      status: "awaiting_browser",
+      authUrl,
+      message: "Complete GitLab Duo sign-in in your browser.",
+    });
+    await this.openExternalUrl?.(authUrl);
+
+    const { code } = await codePromise;
+    onProgress?.({ provider: "gitlab-duo", status: "exchanging", message: "Exchanging GitLab authorization code..." });
+
+    const tokenRes = await this.fetchImpl(GITLAB_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: GITLAB_CLIENT_ID,
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: pkce.verifier,
+      }).toString(),
+      signal: pending.abort.signal,
+    });
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text().catch(() => "");
+      throw new Error(`GitLab Duo token exchange failed (${tokenRes.status}): ${errText.slice(0, 200)}`);
+    }
+    const tokens: any = await tokenRes.json();
+    const now = Date.now();
+    return {
+      provider: "gitlab-duo",
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: now + (Number(tokens.expires_in) || 7200) * 1000 - 300_000,
+      connectedAt: now,
+      updatedAt: now,
+    };
+  }
+
   private async refreshCredential(
     provider: SubscriptionProviderId,
     cred: StoredOAuthCredential,
@@ -1260,6 +1483,430 @@ export class OAuthSubscriptionManager {
       };
     }
 
+    if (provider === "xai-oauth" && cred.refreshToken) {
+      const res = await this.fetchImpl(XAI_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: cred.refreshToken,
+          client_id: XAI_OAUTH_CLIENT_ID,
+        }).toString(),
+      });
+      if (!res.ok) throw new Error(`xAI token refresh failed (${res.status}). Please sign in again.`);
+      const tokens: any = await res.json();
+      return {
+        ...cred,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || cred.refreshToken,
+        expiresAt: now + (Number(tokens.expires_in) || 3600) * 1000 - 300_000,
+        updatedAt: now,
+      };
+    }
+
+    if (provider === "kimi-code" && cred.refreshToken) {
+      const res = await this.fetchImpl(`${KIMI_AUTH_BASE}/api/oauth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: cred.refreshToken,
+          client_id: KIMI_OAUTH_CLIENT_ID,
+        }).toString(),
+      });
+      if (!res.ok) throw new Error(`Kimi Code token refresh failed (${res.status}). Please sign in again.`);
+      const tokens: any = await res.json();
+      return {
+        ...cred,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || cred.refreshToken,
+        expiresAt: now + (Number(tokens.expires_in) || 3600) * 1000 - 300_000,
+        updatedAt: now,
+      };
+    }
+
+    if (provider === "gitlab-duo" && cred.refreshToken) {
+      const res = await this.fetchImpl(GITLAB_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: cred.refreshToken,
+          client_id: GITLAB_CLIENT_ID,
+        }).toString(),
+      });
+      if (!res.ok) throw new Error(`GitLab Duo token refresh failed (${res.status}). Please sign in again.`);
+      const tokens: any = await res.json();
+      return {
+        ...cred,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token || cred.refreshToken,
+        expiresAt: now + (Number(tokens.expires_in) || 7200) * 1000 - 300_000,
+        updatedAt: now,
+      };
+    }
+
     return cred;
+  }
+
+  private formatTokenCount(count?: number): string | undefined {
+    if (typeof count !== "number" || !Number.isFinite(count) || count <= 0) return undefined;
+    if (count >= 1_000_000) {
+      const m = Math.round((count / 1_000_000) * 10) / 10;
+      return `${Number.isInteger(m) ? m : m.toFixed(1)}M`;
+    }
+    if (count >= 1_000) {
+      return `${Math.round(count / 1_000)}K`;
+    }
+    return String(Math.round(count));
+  }
+
+  private dedupeModels(models: SubscriptionModelPreset[]): SubscriptionModelPreset[] {
+    const seen = new Set<string>();
+    const result: SubscriptionModelPreset[] = [];
+    for (const m of models) {
+      const id = String(m?.id || "").trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      result.push({ ...m, id, name: (m.name || id).trim() });
+    }
+    return result;
+  }
+
+  /**
+   * Returns cached live-discovered models if fresh (< 10 min), otherwise fetches live
+   * from the signed-in provider's API, falling back gracefully to stale cache on network errors.
+   */
+  public async getModels(provider: SubscriptionProviderId): Promise<SubscriptionModelPreset[]> {
+    this.ensureLoaded();
+    const cred = this.cache[provider];
+    if (!cred?.accessToken) return [];
+    const now = Date.now();
+    if (
+      Array.isArray(cred.discoveredModels) &&
+      cred.discoveredModels.length > 0 &&
+      typeof cred.discoveredAt === "number" &&
+      now - cred.discoveredAt < 10 * 60 * 1000
+    ) {
+      return cred.discoveredModels;
+    }
+    try {
+      return await this.fetchModels(provider);
+    } catch {
+      return cred.discoveredModels ?? [];
+    }
+  }
+
+  /**
+   * Fetches available models directly from the signed-in provider's API and persists them encrypted.
+   */
+  public async fetchModels(provider: SubscriptionProviderId): Promise<SubscriptionModelPreset[]> {
+    this.ensureLoaded();
+    const existingLock = this.modelFetchLocks.get(provider);
+    if (existingLock) return existingLock;
+
+    const task = (async (): Promise<SubscriptionModelPreset[]> => {
+      const cred = await this.getValidCredential(provider);
+      if (!cred) {
+        throw new Error(`${SUBSCRIPTION_PROVIDERS[provider].name} is not connected.`);
+      }
+
+      let discovered: SubscriptionModelPreset[] = [];
+      if (provider === "openai-codex") {
+        discovered = await this.fetchOpenAiCodexModels(cred);
+      } else if (provider === "anthropic") {
+        discovered = await this.fetchAnthropicModels(cred);
+      } else if (provider === "google-gemini-cli") {
+        discovered = await this.fetchGoogleGeminiModels(cred);
+      } else if (provider === "github-copilot") {
+        discovered = await this.fetchGitHubCopilotModels(cred);
+      } else {
+        discovered = await this.fetchOpenAiCompatibleOAuthModels(provider, cred);
+      }
+
+      const cleaned = this.dedupeModels(discovered);
+      const latest = this.cache[provider];
+      if (latest) {
+        this.cache[provider] = {
+          ...latest,
+          projectId: cred.projectId || latest.projectId,
+          discoveredModels: cleaned,
+          discoveredAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        this.persist();
+      }
+      return cleaned;
+    })().finally(() => {
+      this.modelFetchLocks.delete(provider);
+    });
+
+    this.modelFetchLocks.set(provider, task);
+    return task;
+  }
+
+  private async fetchOpenAiCodexModels(cred: StoredOAuthCredential): Promise<SubscriptionModelPreset[]> {
+    const endpoints = [
+      "https://chatgpt.com/backend-api/codex/models?client_version=0.169.0",
+      "https://chatgpt.com/backend-api/models?client_version=0.169.0",
+    ];
+    let lastError = "Failed to fetch OpenAI Codex models.";
+    for (const url of endpoints) {
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cred.accessToken}`,
+          Accept: "application/json",
+          originator: "omp",
+          version: "0.169.0",
+          ...(cred.accountId ? { "chatgpt-account-id": cred.accountId } : {}),
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        lastError = `OpenAI models fetch failed (${res.status}): ${txt.slice(0, 200)}`;
+        continue;
+      }
+      const data: any = await res.json().catch(() => ({}));
+      const rawModels: any[] = Array.isArray(data?.models)
+        ? data.models
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+      const mapped: SubscriptionModelPreset[] = rawModels
+        .filter((m) => m && (m.slug || m.id) && m.visibility !== "hidden" && m.supported_in_api !== false)
+        .map((m) => {
+          const id = String(m.slug || m.id).trim();
+          const name = String(m.display_name || m.title || m.name || id).trim();
+          const rawLevels: any[] = Array.isArray(m.supported_reasoning_levels) ? m.supported_reasoning_levels : [];
+          const thinkingLevels = rawLevels
+            .map((lvl) => (typeof lvl === "string" ? lvl : lvl?.effort || lvl?.level))
+            .filter((s): s is string => typeof s === "string" && s.length > 0);
+          const supportsThinking = thinkingLevels.length > 0 || Boolean(m.default_reasoning_level || m.supports_reasoning_summaries);
+          const inputModalities: string[] = Array.isArray(m.input_modalities)
+            ? m.input_modalities.filter((x: unknown): x is string => typeof x === "string")
+            : ["text"];
+          return {
+            id,
+            name,
+            contextWindow: this.formatTokenCount(Number(m.context_window ?? m.max_context_tokens ?? m.limits?.context_window)),
+            maxOutput: this.formatTokenCount(Number(m.max_output_tokens ?? m.limits?.max_output_tokens)),
+            supportsThinking,
+            ...(thinkingLevels.length > 0 ? { thinkingLevels } : {}),
+            inputTypes: inputModalities.length > 0 ? inputModalities : ["text"],
+          };
+        });
+      if (mapped.length > 0) return mapped;
+    }
+    throw new Error(lastError);
+  }
+
+  private async fetchAnthropicModels(cred: StoredOAuthCredential): Promise<SubscriptionModelPreset[]> {
+    const res = await this.fetchImpl("https://api.anthropic.com/v1/models?limit=100", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${cred.accessToken}`,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "oauth-2025-04-20",
+        "User-Agent": "claude-code/2.1.76",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`Anthropic models fetch failed (${res.status}): ${txt.slice(0, 200)}`);
+    }
+    const data: any = await res.json().catch(() => ({}));
+    const rawList: any[] = Array.isArray(data?.data) ? data.data : Array.isArray(data?.models) ? data.models : [];
+    return rawList
+      .filter((m) => m && m.id)
+      .map((m) => {
+        const id = String(m.id).trim();
+        const isReasoning = /claude-(?:3-7|sonnet-4|opus-4|haiku-4)/i.test(id) || Boolean(m.supports_thinking);
+        return {
+          id,
+          name: String(m.display_name || m.name || id).trim(),
+          contextWindow: this.formatTokenCount(Number(m.max_input_tokens ?? m.context_window ?? 200_000)),
+          maxOutput: this.formatTokenCount(Number(m.max_tokens ?? m.max_output_tokens ?? 64_000)),
+          supportsThinking: isReasoning,
+          ...(isReasoning ? { thinkingLevels: ["low", "medium", "high"] } : {}),
+          inputTypes: ["text", "image"],
+        };
+      });
+  }
+
+  private async fetchGoogleGeminiModels(cred: StoredOAuthCredential): Promise<SubscriptionModelPreset[]> {
+    if (!cred.projectId) {
+      cred.projectId = await this.discoverGoogleCodeAssistProject(cred.accessToken, AbortSignal.timeout(12_000)).catch(
+        () => undefined,
+      );
+    }
+    const headers = {
+      Authorization: `Bearer ${cred.accessToken}`,
+      "Content-Type": "application/json",
+      "User-Agent": "google-cloud-sdk vscode_cloudshelleditor/0.1",
+      "X-Goog-Api-Client": "gl-node/22.17.0",
+    };
+
+    const metaMap = new Map<string, any>();
+    try {
+      const availRes = await this.fetchImpl(`${GOOGLE_CODE_ASSIST_ENDPOINT}/v1internal:fetchAvailableModels`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(cred.projectId ? { project: cred.projectId } : {}),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (availRes.ok) {
+        const availData: any = await availRes.json().catch(() => ({}));
+        if (availData?.models && typeof availData.models === "object" && !Array.isArray(availData.models)) {
+          for (const [k, v] of Object.entries(availData.models)) {
+            metaMap.set(k.replace(/^models\//, ""), v);
+          }
+        } else if (Array.isArray(availData?.models)) {
+          for (const m of availData.models) {
+            const mid = String(m?.id || m?.modelId || m?.name || "").replace(/^models\//, "");
+            if (mid) metaMap.set(mid, m);
+          }
+        }
+      }
+    } catch {}
+
+    const quotaRes = await this.fetchImpl(`${GOOGLE_CODE_ASSIST_ENDPOINT}/v1internal:retrieveUserQuota`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(cred.projectId ? { project: cred.projectId } : {}),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    const quotaIds: string[] = [];
+    if (quotaRes.ok) {
+      const quotaData: any = await quotaRes.json().catch(() => ({}));
+      const buckets: any[] = Array.isArray(quotaData?.buckets) ? quotaData.buckets : [];
+      for (const b of buckets) {
+        const mid = typeof b?.modelId === "string" ? b.modelId.replace(/^models\//, "").trim() : "";
+        if (mid && !/embedding/i.test(mid) && !quotaIds.includes(mid)) {
+          quotaIds.push(mid);
+        }
+      }
+    } else if (metaMap.size === 0) {
+      const txt = await quotaRes.text().catch(() => "");
+      throw new Error(`Google models fetch failed (${quotaRes.status}): ${txt.slice(0, 200)}`);
+    }
+
+    const ids = quotaIds.length > 0 ? quotaIds : Array.from(metaMap.keys()).filter((id) => !/embedding/i.test(id));
+    return ids.map((id) => {
+      const m = metaMap.get(id) || {};
+      const displayName =
+        (typeof m.displayName === "string" && m.displayName.trim()) ||
+        id
+          .split("-")
+          .map((p) => (p.length > 0 ? p[0]!.toUpperCase() + p.slice(1) : p))
+          .join(" ");
+      const supportsThinking = Boolean(m.supportsThinking || /2\.5|3-/i.test(id));
+      return {
+        id,
+        name: displayName,
+        contextWindow: this.formatTokenCount(Number(m.maxTokens ?? m.inputTokenLimit ?? 1_048_576)),
+        maxOutput: this.formatTokenCount(Number(m.maxOutputTokens ?? m.outputTokenLimit ?? 65_536)),
+        supportsThinking,
+        ...(supportsThinking ? { thinkingLevels: ["low", "medium", "high"] } : {}),
+        inputTypes: ["text", "image"],
+      };
+    });
+  }
+
+  private async fetchGitHubCopilotModels(cred: StoredOAuthCredential): Promise<SubscriptionModelPreset[]> {
+    const base = (cred.apiBaseUrl || SUBSCRIPTION_PROVIDERS["github-copilot"].baseUrl).replace(/\/+$/, "");
+    const res = await this.fetchImpl(`${base}/models`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${cred.accessToken}`,
+        Accept: "application/json",
+        "Copilot-Integration-Id": "vscode-chat",
+        "Editor-Version": "vscode/1.100.0",
+        "Editor-Plugin-Version": "copilot-chat/0.26.7",
+        "User-Agent": "GitHubCopilotChat/0.26.7",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`GitHub Copilot models fetch failed (${res.status}): ${txt.slice(0, 200)}`);
+    }
+    const data: any = await res.json().catch(() => ({}));
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.models)
+          ? data.models
+          : [];
+    return rawList
+      .filter((m) => m && m.id && m.capabilities?.type !== "embeddings")
+      .map((m) => {
+        const id = String(m.id).trim();
+        const limits = m.capabilities?.limits || {};
+        const supports = m.capabilities?.supports || {};
+        const supportsThinking = Boolean(supports.thinking || /o1|o3|o4|sonnet|opus|gemini-2\.5|gemini-3|gpt-5/i.test(id));
+        return {
+          id,
+          name: String(m.name || m.display_name || id).trim(),
+          contextWindow: this.formatTokenCount(Number(limits.max_context_window_tokens ?? limits.max_prompt_tokens ?? 128_000)),
+          maxOutput: this.formatTokenCount(Number(limits.max_output_tokens ?? 16_384)),
+          supportsThinking,
+          inputTypes: supports.vision ? ["text", "image"] : ["text"],
+        };
+      });
+  }
+
+  private async fetchOpenAiCompatibleOAuthModels(
+    provider: SubscriptionProviderId,
+    cred: StoredOAuthCredential,
+  ): Promise<SubscriptionModelPreset[]> {
+    const meta = SUBSCRIPTION_PROVIDERS[provider];
+    const base = (cred.apiBaseUrl || meta.baseUrl).replace(/\/+$/, "");
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${cred.accessToken}`,
+      Accept: "application/json",
+    };
+    if (provider === "kimi-code") {
+      headers["User-Agent"] = "KimiCLI/1.3.0";
+    }
+    const res = await this.fetchImpl(`${base}/models`, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`${meta.name} models fetch failed (${res.status}): ${txt.slice(0, 200)}`);
+    }
+    const data: any = await res.json().catch(() => ({}));
+    const rawList: any[] = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.models)
+          ? data.models
+          : [];
+    return rawList
+      .filter((m) => m && (m.id || m.name))
+      .slice(0, 200)
+      .map((m) => {
+        const id = String(m.id || m.name).trim();
+        const inputModalities: string[] = Array.isArray(m.architecture?.input_modalities)
+          ? m.architecture.input_modalities
+          : ["text"];
+        return {
+          id,
+          name: String(m.name || m.display_name || id).trim(),
+          contextWindow: this.formatTokenCount(Number(m.context_length ?? m.context_window)),
+          maxOutput: this.formatTokenCount(Number(m.top_provider?.max_completion_tokens ?? m.max_output_tokens)),
+          supportsThinking: Boolean(m.supports_reasoning || /reasoning|think|r1|opus|sonnet-4|gpt-5|grok-4/i.test(id)),
+          inputTypes: inputModalities.length > 0 ? inputModalities : ["text"],
+        };
+      });
   }
 }

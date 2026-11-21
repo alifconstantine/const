@@ -6,8 +6,11 @@ import {
   RotateCcw,
   ThumbsUp,
   ThumbsDown,
+  History,
+  Plus,
+  Trash2,
 } from "lucide-react";
-import { ScrollArea, cn, toast } from "@const/ui";
+import { ScrollArea, Popover, PopoverTrigger, PopoverContent, cn, toast } from "@const/ui";
 import type { RightPaneTab } from "./types";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { ChatCard, type AttachedFile, cleanAttachmentsForPersistence } from "../workbench/chat-card";
@@ -20,11 +23,16 @@ import { assistantResponseToText, updateIntelligenceUiState } from "../intellige
 import type { IntelligenceUiState } from "../intelligence-ui/schema";
 import {
   loadSideConversation,
+  loadWorkspaceSideConversations,
   saveSideConversation,
-  deleteSideConversation,
+  deleteWorkspaceSideConversation,
   loadConversations,
   normalizeUiMessages,
+  generateFallbackTitle,
+  generateAiTitle,
+  formatRelativeTime,
   type ConversationItem,
+  type SideConversationItem,
 } from "../../lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
 import { DEFAULT_ROUTER_MODEL_ID } from "../../lib/router-models";
@@ -121,13 +129,43 @@ export function SideChatTab({
   }, [t]);
   const effectiveConversations = propConversations || loadConversations();
   const effectiveParentId = tab.parentConversationId || parentConversationId || "root";
-  const sideChatId = tab.id;
+  const workspaceProject = tab.project || "Outside Project";
+  const sideChatId = tab.sideChatId || tab.id;
+  const sideChatIdRef = useRef(sideChatId);
+  sideChatIdRef.current = sideChatId;
 
-  // Initialize messages from persisted side store
+  // Initialize messages from persisted side store (parent or workspace history)
   const [messages, setMessages] = useState<SideChatMessage[]>(() => {
-    const saved = loadSideConversation(effectiveParentId, sideChatId);
+    const saved = loadSideConversation(effectiveParentId, sideChatId, workspaceProject);
     return saved?.messages || [];
   });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [workspaceHistory, setWorkspaceHistory] = useState<SideConversationItem[]>(() =>
+    loadWorkspaceSideConversations(workspaceProject).filter((item) => Array.isArray(item.messages) && item.messages.length > 0),
+  );
+
+  const refreshWorkspaceHistory = useCallback(() => {
+    setWorkspaceHistory(
+      loadWorkspaceSideConversations(workspaceProject).filter(
+        (item) => Array.isArray(item.messages) && item.messages.length > 0,
+      ),
+    );
+  }, [workspaceProject]);
+
+  // Reload messages cleanly when switching threads via History or New SideChat
+  const prevSideChatIdRef = useRef(sideChatId);
+  useEffect(() => {
+    if (prevSideChatIdRef.current === sideChatId) return;
+    prevSideChatIdRef.current = sideChatId;
+    const saved = loadSideConversation(effectiveParentId, sideChatId, workspaceProject);
+    const loadedMsgs = saved?.messages || [];
+    messagesRef.current = loadedMsgs;
+    setMessages(loadedMsgs);
+    setIsExecuting(pendingSideSends.has(sideChatId));
+    if (saved?.model) setActiveModel(saved.model);
+    if (saved?.mode) setActiveMode(saved.mode);
+    refreshWorkspaceHistory();
+  }, [sideChatId, effectiveParentId, workspaceProject, refreshWorkspaceHistory]);
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -581,19 +619,58 @@ export function SideChatTab({
 
     const modelToUse = model || activeModel;
     const modeToUse = mode || activeMode;
+    const isFirstTurn = previousMessages.length === 0;
+    const threadTitle = isFirstTurn
+      ? (prompt.trim()
+          ? generateFallbackTitle(prompt.trim())
+          : attachments && attachments[0]
+            ? `Attachment: ${attachments[0].name}`
+            : tab.title || "Side chat")
+      : (tab.title || "Side chat");
+
+    if (isFirstTurn && threadTitle && threadTitle !== tab.title) {
+      onUpdateTab?.(tab.id, { title: threadTitle });
+    }
 
     // Persist immediately
     saveSideConversation({
       id: sideChatId,
       parentConversationId: effectiveParentId,
-      title: tab.title || "Side chat",
-      project: tab.project || "Outside Project",
+      title: threadTitle,
+      project: workspaceProject,
       model: modelToUse,
       mode: modeToUse,
       createdAt: tab.createdAt || Date.now(),
       updatedAt: Date.now(),
       messages: nextMessages,
     });
+    refreshWorkspaceHistory();
+
+    // Generate concise AI title on first user message (with user text fallback already saved above)
+    if (isFirstTurn && prompt.trim()) {
+      const targetSideId = sideChatId;
+      const targetParentId = effectiveParentId;
+      const targetProject = workspaceProject;
+      const authToken = localStorage.getItem("const_harness_auth_token") || undefined;
+      void generateAiTitle(
+        prompt.trim(),
+        (aiTitle) => {
+          const latest = loadSideConversation(targetParentId, targetSideId, targetProject);
+          if (latest) {
+            saveSideConversation({
+              ...latest,
+              title: aiTitle,
+            });
+          }
+          if (sideChatIdRef.current === targetSideId) {
+            onUpdateTab?.(tab.id, { title: aiTitle });
+          }
+          refreshWorkspaceHistory();
+        },
+        authToken,
+        modelToUse,
+      );
+    }
 
     setTimeout(() => scrollToBottom(true), 50);
 
@@ -754,28 +831,167 @@ export function SideChatTab({
     } catch { toast.error(t("toast.copyFailed")); }
   };
 
+  const handleNewSideChat = () => {
+    if (isExecuting) return;
+    const freshId = `side_conversation_${crypto.randomUUID()}`;
+    onUpdateTab?.(tab.id, {
+      sideChatId: freshId,
+      title: t("rightPane.sideChat") || "Side chat",
+    });
+    setIsHistoryOpen(false);
+  };
+
+  const handleSelectHistoryItem = (item: SideConversationItem) => {
+    if (isExecuting) return;
+    onUpdateTab?.(tab.id, {
+      sideChatId: item.id,
+      title: item.title || t("rightPane.sideChat") || "Side chat",
+    });
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteHistoryItem = (item: SideConversationItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteWorkspaceSideConversation(workspaceProject, item.id, item.parentConversationId);
+    if (item.id === sideChatId) {
+      commitMessages([]);
+      onUpdateTab?.(tab.id, { title: t("rightPane.sideChat") || "Side chat" });
+    }
+    refreshWorkspaceHistory();
+  };
+
   const handleClearChat = () => {
     if (messages.length === 0) return;
-    deleteSideConversation(effectiveParentId, sideChatId);
+    deleteWorkspaceSideConversation(workspaceProject, sideChatId, effectiveParentId);
     commitMessages([]);
+    onUpdateTab?.(tab.id, { title: t("rightPane.sideChat") || "Side chat" });
+    refreshWorkspaceHistory();
     toast.info(t("rightPane.sideChatCleared"));
   };
 
   return (
     <div className="flex-1 w-full h-full min-h-0 flex flex-col bg-[#ffffff] dark:bg-[#141414] text-[#1c1c1c] dark:text-[#ededed] overflow-hidden select-none">
-      {/* 1. Header Strip: Only Refresh / Clear Chat button */}
+      {/* 1. Header Strip: Status + Workspace SideChat History + New Chat + Clear */}
       <div className="h-8 px-3 pt-1 flex items-center justify-between shrink-0">
-        <span role="status" className="text-[10px] text-[#969696]">{isExecuting ? t(isRetrying ? "rightPane.sideRetrying" : "rightPane.sideWorking") : ""}</span>
-        <button
-          type="button"
-          onClick={handleClearChat}
-          disabled={messages.length === 0 || isExecuting}
-          className="p-1 rounded text-[#8e8e8e] hover:text-[#e11d48] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          title={t("rightPane.clearSideChat")}
-          aria-label={t("rightPane.clearSideChat")}
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
+        <span role="status" className="text-[10px] text-[#969696] truncate pr-2">
+          {isExecuting ? t(isRetrying ? "rightPane.sideRetrying" : "rightPane.sideWorking") : ""}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <Popover
+            open={isHistoryOpen}
+            onOpenChange={(open) => {
+              if (open) refreshWorkspaceHistory();
+              setIsHistoryOpen(open);
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={isExecuting}
+                className={cn(
+                  "p-1 rounded transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed",
+                  isHistoryOpen
+                    ? "text-[#1c1c1c] dark:text-white bg-black/8 dark:bg-white/10"
+                    : "text-[#8e8e8e] hover:text-[#1c1c1c] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5",
+                )}
+                title="Side chat history"
+                aria-label="Side chat history"
+              >
+                <History className="w-3.5 h-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={6}
+              className="w-72 p-1.5 rounded-xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] shadow-2xl z-[80]"
+            >
+              <div className="flex items-center justify-between px-2 py-1.5 border-b border-black/5 dark:border-white/5 mb-1">
+                <span className="text-[11px] font-medium text-[#525252] dark:text-[#a3a3a3]">
+                  Side chat history
+                </span>
+                <span className="text-[10px] text-[#8e8e8e] tabular-nums">
+                  {workspaceHistory.length}
+                </span>
+              </div>
+              {workspaceHistory.length === 0 ? (
+                <div className="py-5 px-3 text-center text-[11.5px] text-[#8e8e8e]">
+                  No side chat history in this workspace yet.
+                </div>
+              ) : (
+                <ScrollArea className="max-h-64">
+                  <div className="flex flex-col gap-0.5">
+                    {workspaceHistory.map((item) => {
+                      const isCurrent = item.id === sideChatId;
+                      const msgCount = item.messages?.filter((m: any) => m.role === "user").length || 0;
+                      return (
+                        <div
+                          key={item.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleSelectHistoryItem(item)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleSelectHistoryItem(item);
+                            }
+                          }}
+                          className={cn(
+                            "group flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors cursor-pointer",
+                            isCurrent
+                              ? "bg-black/8 dark:bg-white/10 text-[#1c1c1c] dark:text-white"
+                              : "text-[#3f3f46] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5",
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[12px] font-medium truncate leading-snug">
+                              {item.title || "Side chat"}
+                            </div>
+                            <div className="text-[10px] text-[#8e8e8e] flex items-center gap-1.5 mt-0.5 tabular-nums">
+                              <span>{formatRelativeTime(item.updatedAt || item.createdAt || Date.now())}</span>
+                              <span>·</span>
+                              <span>{msgCount} {msgCount === 1 ? "turn" : "turns"}</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteHistoryItem(item, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#8e8e8e] hover:text-[#e11d48] hover:bg-black/5 dark:hover:bg-white/10 transition-all shrink-0 cursor-pointer"
+                            title="Delete side chat"
+                            aria-label="Delete side chat"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          <button
+            type="button"
+            onClick={handleNewSideChat}
+            disabled={isExecuting || messages.length === 0}
+            className="p-1 rounded text-[#8e8e8e] hover:text-[#1c1c1c] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            title="New side chat"
+            aria-label="New side chat"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClearChat}
+            disabled={messages.length === 0 || isExecuting}
+            className="p-1 rounded text-[#8e8e8e] hover:text-[#e11d48] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            title={t("rightPane.clearSideChat")}
+            aria-label={t("rightPane.clearSideChat")}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* 2. Scrollable Messages Feed */}
@@ -935,14 +1151,15 @@ export function SideChatTab({
         </div>
       </ScrollArea>
 
-      {/* 3. Anchored Bottom Input Card with Responsive Icon-Only Toolbar */}
-      <div className="w-full px-2.5 pb-2.5 pt-1 bg-transparent shrink-0">
+      {/* 3. Anchored Bottom Input Card — aligned with Main Chat baseline */}
+      <div className="w-full px-3 pb-4 pt-2 bg-transparent shrink-0">
         <ChatCard
           conversationId={sideChatId}
           initialModel={activeModel}
           isolatedModel
           compact={true}
           forceIconOnly={true}
+          showContextUsage={false}
           isExecuting={isExecuting}
           onSendMessage={handleSendMessage}
           onAbort={handleAbort}
@@ -954,6 +1171,7 @@ export function SideChatTab({
           onOpenTrajectory={onOpenTrajectory}
           conversations={effectiveConversations}
         />
+        <div className="h-[28px] shrink-0" aria-hidden="true" />
       </div>
 
       {/* Media Lightbox Preview Modal */}

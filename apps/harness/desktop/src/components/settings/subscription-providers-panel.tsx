@@ -1,22 +1,39 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cn, toast } from "@const/ui";
 import {
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   ExternalLink,
-  KeyRound,
+  Eye,
+  EyeOff,
   Loader2,
+  LogIn,
   LogOut,
-  AlertTriangle,
+  Plus,
+  RefreshCw,
   X,
 } from "lucide-react";
-import { cn, toast } from "@const/ui";
+import { BrandLogo } from "./brand-icons";
+import {
+  CONST_ROUTER_LLM_MODELS,
+  fetchRemoteModels,
+  testEndpointPing,
+  type LlmModel,
+  type LlmProtocol,
+  type LlmProvider,
+} from "../../lib/models-config";
+import { modelDisplayName } from "../../lib/model-identity";
 
-interface SubscriptionModel {
+interface SubscriptionModelItem {
   id: string;
   name: string;
-  contextWindow: string;
-  maxOutput: string;
+  contextWindow?: string;
+  maxOutput?: string;
+  supportsThinking?: boolean;
+  thinkingLevels?: string[];
+  inputTypes?: string[];
 }
 
 interface SubscriptionProviderItem {
@@ -25,10 +42,10 @@ interface SubscriptionProviderItem {
   shortName: string;
   description: string;
   protocol: string;
+  baseUrl: string;
   authFlow: "oauth-pkce" | "device-code";
   supportsManualCode?: boolean;
-  warning?: string;
-  models: SubscriptionModel[];
+  models: SubscriptionModelItem[];
   status: {
     provider: string;
     connected: boolean;
@@ -37,12 +54,22 @@ interface SubscriptionProviderItem {
     orgName?: string;
     planType?: string;
     projectId?: string;
+    expiresAt?: number;
+    discoveredAt?: number;
+    connectedAt?: number;
   };
 }
 
 interface LoginProgressState {
   provider: string;
-  status: "starting" | "awaiting_browser" | "awaiting_device_code" | "exchanging" | "connected" | "error" | "cancelled";
+  status:
+    | "starting"
+    | "awaiting_browser"
+    | "awaiting_device_code"
+    | "exchanging"
+    | "connected"
+    | "error"
+    | "cancelled";
   authUrl?: string;
   userCode?: string;
   verificationUri?: string;
@@ -51,20 +78,143 @@ interface LoginProgressState {
 }
 
 export interface SubscriptionProvidersPanelProps {
+  constProvider?: LlmProvider;
   activeModelId?: string;
-  onSelectSubscriptionModel: (fullModelId: string, providerId: string) => void;
+  onSelectModel?: (modelId: string, providerId: string) => void;
+  onSaveConstProvider?: (updated: LlmProvider) => void;
+}
+
+function formatHostLabel(baseUrl?: string): string {
+  const raw = (baseUrl || "https://router.const.web.id/v1").trim();
+  try {
+    return new URL(raw).host || raw;
+  } catch {
+    return raw.replace(/^https?:\/\//i, "").replace(/\/.*$/, "") || "router.const.web.id";
+  }
 }
 
 export function SubscriptionProvidersPanel({
+  constProvider,
   activeModelId,
-  onSelectSubscriptionModel,
+  onSelectModel,
+  onSaveConstProvider,
 }: SubscriptionProvidersPanelProps) {
   const [providers, setProviders] = useState<SubscriptionProviderItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeLogin, setActiveLogin] = useState<LoginProgressState | null>(null);
   const [manualCodeInput, setManualCodeInput] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Expandable state for OAuth providers (only when connected)
+  const [expandedOAuthId, setExpandedOAuthId] = useState<string | null>(null);
+  const [fetchingOAuthIds, setFetchingOAuthIds] = useState<Record<string, boolean>>({});
+  const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
+  const autoFetchedOAuthRef = useRef<Set<string>>(new Set());
+
+  // Expandable state + configuration for Const Router at top
+  const [isConstExpanded, setIsConstExpanded] = useState(false);
+  const [constDraft, setConstDraft] = useState<LlmProvider | null>(constProvider ?? null);
+  const [constLiveModels, setConstLiveModels] = useState<LlmModel[]>(
+    constProvider?.models ?? CONST_ROUTER_LLM_MODELS,
+  );
+  const [isFetchingConstModels, setIsFetchingConstModels] = useState(false);
+  const [isTestingConstPing, setIsTestingConstPing] = useState(false);
+  const [showConstApiKey, setShowConstApiKey] = useState(false);
+  const [isAddingConstModel, setIsAddingConstModel] = useState(false);
+  const [newConstModelId, setNewConstModelId] = useState("");
+  const autoFetchedConstRef = useRef(false);
+
+  useEffect(() => {
+    if (constProvider) {
+      setConstDraft(constProvider);
+      if (constProvider.models && constProvider.models.length > 0 && !autoFetchedConstRef.current) {
+        setConstLiveModels(constProvider.models);
+      }
+    }
+  }, [constProvider]);
+
+  const handleFetchConstModels = useCallback(
+    async (opts?: { silent?: boolean; providerOverride?: LlmProvider }) => {
+      const target = opts?.providerOverride || constDraft || constProvider;
+      const baseUrl = (target?.baseUrl || "https://router.const.web.id/v1").trim();
+      setIsFetchingConstModels(true);
+      try {
+        // Prefer direct live /models query from Const Router gateway
+        const res = await fetchRemoteModels(baseUrl, target?.apiKey, target?.protocol);
+        let nextModels: LlmModel[] = [];
+
+        if (res.success && res.models && res.models.length > 0) {
+          const existingMap = new Map(
+            (target?.models || CONST_ROUTER_LLM_MODELS).map((m) => [m.id, m]),
+          );
+          nextModels = res.models.map((m) => {
+            const known = existingMap.get(m.id);
+            return {
+              id: m.id,
+              name: m.name || modelDisplayName(m.id, m.id),
+              contextWindow: known?.contextWindow || "128K",
+              maxOutput: known?.maxOutput || "32K",
+              supportsThinking: known?.supportsThinking,
+              thinkingLevels: known?.thinkingLevels,
+              inputTypes: known?.inputTypes,
+            };
+          });
+        } else {
+          // Also check Electron desktop bridge model discovery for Const Router
+          const getModelsApi = (window as any).electron?.getModels;
+          if (typeof getModelsApi === "function") {
+            const bridgeList = await getModelsApi();
+            const routerItems = Array.isArray(bridgeList)
+              ? bridgeList.filter(
+                  (m: any) =>
+                    m &&
+                    (m.authType === "router" || m.provider === "const" || m.provider === "const-router"),
+                )
+              : [];
+            if (routerItems.length > 0) {
+              nextModels = routerItems.map((m: any) => ({
+                id: m.id,
+                name: m.displayName || m.name || modelDisplayName(m.id, m.id),
+                contextWindow: m.contextWindow ? `${Math.round(m.contextWindow / 1000)}K` : "128K",
+                maxOutput: m.maxOutputTokens ? `${Math.round(m.maxOutputTokens / 1000)}K` : "32K",
+                supportsThinking: Boolean(m.supportsThinking),
+                thinkingLevels: m.thinkingLevels,
+                inputTypes: m.inputTypes,
+              }));
+            }
+          }
+        }
+
+        if (nextModels.length > 0) {
+          setConstLiveModels(nextModels);
+          if (target) {
+            const updated: LlmProvider = { ...target, models: nextModels };
+            setConstDraft(updated);
+            onSaveConstProvider?.(updated);
+          }
+          if (!opts?.silent) {
+            toast.success(`Fetched ${nextModels.length} models from Const Router`);
+          }
+        } else if (!opts?.silent) {
+          toast.error(res.error || "Could not fetch models from Const Router");
+        }
+      } catch (err: any) {
+        if (!opts?.silent) {
+          toast.error(err?.message || "Failed to fetch models from Const Router");
+        }
+      } finally {
+        setIsFetchingConstModels(false);
+      }
+    },
+    [constDraft, constProvider, onSaveConstProvider],
+  );
+
+  // Initial live fetch for Const Router models on mount
+  useEffect(() => {
+    if (autoFetchedConstRef.current) return;
+    autoFetchedConstRef.current = true;
+    void handleFetchConstModels({ silent: true });
+  }, [handleFetchConstModels]);
 
   const loadProviders = useCallback(async () => {
     const api = (window as any).electron?.oauth;
@@ -74,13 +224,55 @@ export function SubscriptionProvidersPanel({
     }
     try {
       const list = await api.listProviders();
-      if (Array.isArray(list)) setProviders(list);
+      if (Array.isArray(list)) {
+        setProviders(list);
+      }
     } catch {
-      // ignore
+      // Ignore transient errors outside Electron
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleFetchOAuthModels = useCallback(
+    async (providerId: string, opts?: { silent?: boolean }) => {
+      const api = (window as any).electron?.oauth;
+      if (!api?.fetchModels) return;
+      setFetchingOAuthIds((prev) => ({ ...prev, [providerId]: true }));
+      setOAuthErrors((prev) => {
+        const next = { ...prev };
+        delete next[providerId];
+        return next;
+      });
+      try {
+        const res = await api.fetchModels(providerId);
+        if (res?.success) {
+          await loadProviders();
+          const count = Array.isArray(res.models) ? res.models.length : 0;
+          if (!opts?.silent) {
+            toast.success(
+              count > 0 ? `Fetched ${count} models` : "Connected, no models returned",
+            );
+          }
+        } else {
+          const errMsg = res?.error || "Failed to fetch models";
+          setOAuthErrors((prev) => ({ ...prev, [providerId]: errMsg }));
+          if (!opts?.silent) {
+            toast.error(errMsg);
+          }
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || "Failed to fetch models";
+        setOAuthErrors((prev) => ({ ...prev, [providerId]: errMsg }));
+        if (!opts?.silent) {
+          toast.error(errMsg);
+        }
+      } finally {
+        setFetchingOAuthIds((prev) => ({ ...prev, [providerId]: false }));
+      }
+    },
+    [loadProviders],
+  );
 
   useEffect(() => {
     void loadProviders();
@@ -88,45 +280,72 @@ export function SubscriptionProvidersPanel({
     if (!api?.onLoginProgress) return;
     const unsub = api.onLoginProgress((progress: LoginProgressState) => {
       setActiveLogin(progress);
-      if (progress.status === "connected" || progress.status === "error" || progress.status === "cancelled") {
-        void loadProviders();
+      if (
+        progress.status === "connected" ||
+        progress.status === "error" ||
+        progress.status === "cancelled"
+      ) {
         if (progress.status === "connected") {
-          window.dispatchEvent(new CustomEvent("const:models-updated"));
-          setTimeout(() => setActiveLogin(null), 1500);
+          void loadProviders();
+          setExpandedOAuthId(progress.provider);
+          void handleFetchOAuthModels(progress.provider, { silent: true });
         }
+        setTimeout(() => {
+          setActiveLogin((curr) =>
+            curr?.provider === progress.provider && curr.status === progress.status ? null : curr,
+          );
+        }, 2500);
       }
     });
     return () => {
-      unsub?.();
+      try {
+        unsub?.();
+      } catch {}
     };
-  }, [loadProviders]);
+  }, [loadProviders, handleFetchOAuthModels]);
+
+  // If a provider is already signed in on disk with no discoveredModels cached yet, fetch live once
+  useEffect(() => {
+    for (const p of providers) {
+      if (
+        p.status.connected &&
+        p.models.length === 0 &&
+        !autoFetchedOAuthRef.current.has(p.id)
+      ) {
+        autoFetchedOAuthRef.current.add(p.id);
+        void handleFetchOAuthModels(p.id, { silent: true });
+      }
+    }
+  }, [providers, handleFetchOAuthModels]);
 
   const handleSignIn = async (provider: SubscriptionProviderItem) => {
     const api = (window as any).electron?.oauth;
     if (!api?.startLogin) {
-      toast.error("OAuth sign-in is only available in the desktop app.");
+      toast.error("Sign-in requires the Const Harness desktop runtime.");
       return;
     }
     setManualCodeInput("");
     setActiveLogin({
       provider: provider.id,
       status: "starting",
-      message: `Starting ${provider.name} sign-in...`,
+      message: `Opening ${provider.shortName} sign-in...`,
     });
     try {
       const res = await api.startLogin(provider.id);
       if (res?.success) {
         toast.success(`Connected to ${provider.shortName}`);
-        setExpandedId(provider.id);
         await loadProviders();
-        window.dispatchEvent(new CustomEvent("const:models-updated"));
-      } else if (res?.error && !String(res.error).toLowerCase().includes("cancel")) {
+        setExpandedOAuthId(provider.id);
+        setActiveLogin(null);
+      } else if (res?.error && !/cancel/i.test(res.error)) {
         toast.error(res.error);
+        setActiveLogin(null);
       }
     } catch (err: any) {
-      if (!String(err?.message || "").toLowerCase().includes("cancel")) {
-        toast.error(err?.message || "Sign-in failed");
+      if (!/cancel/i.test(String(err?.message || ""))) {
+        toast.error(err?.message || `Failed to connect ${provider.shortName}`);
       }
+      setActiveLogin(null);
     }
   };
 
@@ -134,57 +353,366 @@ export function SubscriptionProvidersPanel({
     const api = (window as any).electron?.oauth;
     await api?.cancelLogin?.(providerId);
     setActiveLogin(null);
-    setManualCodeInput("");
   };
 
   const handleSubmitManualCode = async (providerId: string) => {
     const api = (window as any).electron?.oauth;
     if (!manualCodeInput.trim() || !api?.submitCode) return;
     const res = await api.submitCode(providerId, manualCodeInput.trim());
-    if (res?.success) {
-      setManualCodeInput("");
-      toast.info("Submitting authorization code...");
+    if (!res?.success) {
+      toast.error("No pending sign-in session matched this authorization code.");
     } else {
-      toast.error("No active sign-in session waiting for a code.");
+      setManualCodeInput("");
     }
   };
 
-  const handleDisconnect = async (provider: SubscriptionProviderItem, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDisconnect = async (
+    provider: SubscriptionProviderItem,
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
     const api = (window as any).electron?.oauth;
     if (!api?.disconnect) return;
     await api.disconnect(provider.id);
+    if (expandedOAuthId === provider.id) {
+      setExpandedOAuthId(null);
+    }
+    autoFetchedOAuthRef.current.delete(provider.id);
     toast.success(`Disconnected ${provider.shortName}`);
     await loadProviders();
-    window.dispatchEvent(new CustomEvent("const:models-updated"));
   };
 
-  if (loading || providers.length === 0) return null;
+  const handleTestConstConnection = async () => {
+    const target = constDraft || constProvider;
+    if (!target?.baseUrl?.trim()) return;
+    setIsTestingConstPing(true);
+    const res = await testEndpointPing(target.baseUrl, target.apiKey, target.protocol);
+    setIsTestingConstPing(false);
+    if (res.success) {
+      toast.success(`Connected to Const Router (${res.latencyMs ?? 0}ms)`);
+    } else {
+      toast.error(res.error || "Failed to connect to Const Router");
+    }
+  };
+
+  const handleSaveConstConfig = () => {
+    if (!constDraft) return;
+    if (!constDraft.baseUrl.trim()) {
+      toast.error("Endpoint URL is required");
+      return;
+    }
+    const updated: LlmProvider = {
+      ...constDraft,
+      models: constLiveModels,
+    };
+    onSaveConstProvider?.(updated);
+    toast.success("Const Router configuration saved");
+    void handleFetchConstModels({ silent: true, providerOverride: updated });
+  };
+
+  const handleAddConstModel = () => {
+    const cleanId = newConstModelId.trim();
+    if (!cleanId) return;
+    if (constLiveModels.some((m) => m.id === cleanId)) {
+      toast.error("Model ID already in list");
+      return;
+    }
+    const added: LlmModel = {
+      id: cleanId,
+      name: modelDisplayName(cleanId, cleanId),
+      contextWindow: "128K",
+      maxOutput: "32K",
+    };
+    const nextModels = [...constLiveModels, added];
+    setConstLiveModels(nextModels);
+    if (constDraft) {
+      const updated: LlmProvider = { ...constDraft, models: nextModels };
+      setConstDraft(updated);
+      onSaveConstProvider?.(updated);
+    }
+    setNewConstModelId("");
+    setIsAddingConstModel(false);
+    toast.success("Model added");
+  };
+
+  const constHost = useMemo(
+    () => formatHostLabel(constDraft?.baseUrl || constProvider?.baseUrl),
+    [constDraft?.baseUrl, constProvider?.baseUrl],
+  );
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Account Subscriptions (OAuth)
-          </h3>
-          <p className="text-[11.5px] text-muted-foreground mt-0.5">
-            Sign in with your ChatGPT Plus/Pro, Claude Pro/Max, Google Gemini, or GitHub Copilot account — no API key needed.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-2">
+      {/* 1. Native Const Router — Always First & Connected */}
+      {constProvider && (
+        <div className="settings-surface rounded-xl bg-neutral-50 dark:bg-[#222222] transition-colors overflow-hidden">
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={isConstExpanded}
+            onClick={() => setIsConstExpanded((v) => !v)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setIsConstExpanded((v) => !v);
+              }
+            }}
+            className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-neutral-100/70 dark:hover:bg-[#282828] transition-colors"
+          >
+            <div className="min-w-0 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#1a1a1a] border border-black/8 dark:border-white/10 flex items-center justify-center shrink-0">
+                <BrandLogo provider="const-router" className="w-4 h-4" />
+              </div>
 
-      <div className="space-y-2">
-        {providers.map((provider) => {
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-medium text-foreground truncate">
+                    Const Router
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Connected
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
+                  {constHost}
+                  {constLiveModels.length > 0 ? ` · ${constLiveModels.length} models` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                title="Refresh models"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleFetchConstModels();
+                }}
+                disabled={isFetchingConstModels}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={cn("w-3.5 h-3.5", isFetchingConstModels && "animate-spin")}
+                />
+              </button>
+              <span className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground">
+                {isConstExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </span>
+            </div>
+          </div>
+
+          {isConstExpanded && constDraft && (
+            <div className="px-4 pb-4 pt-2 border-t border-border/50 space-y-4">
+              {/* Live-fetched Models List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11.5px] font-medium text-muted-foreground">
+                    Available Models ({constLiveModels.length})
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingConstModel((v) => !v)}
+                      className="h-7 px-2.5 rounded-lg border border-border hover:bg-secondary/70 text-[11px] font-medium text-foreground transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleFetchConstModels()}
+                      disabled={isFetchingConstModels}
+                      className="h-7 px-2.5 rounded-lg border border-border hover:bg-secondary/70 text-[11px] font-medium text-foreground transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={cn("w-3 h-3", isFetchingConstModels && "animate-spin")}
+                      />
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+                </div>
+
+                {isAddingConstModel && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newConstModelId}
+                      onChange={(e) => setNewConstModelId(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddConstModel();
+                        }
+                      }}
+                      placeholder="Model ID (e.g. gpt-5.4)"
+                      className="flex-1 h-8 px-2.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-foreground/40"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddConstModel}
+                      className="h-8 px-3 rounded-lg bg-foreground text-background text-[11.5px] font-medium cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+
+                {isFetchingConstModels && constLiveModels.length === 0 ? (
+                  <div className="py-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Fetching models from Const Router...</span>
+                  </div>
+                ) : constLiveModels.length === 0 ? (
+                  <div className="py-3 text-xs text-muted-foreground">
+                    No models loaded yet. Click Refresh to fetch from Const Router.
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto pr-0.5 space-y-1">
+                    {constLiveModels.map((m) => {
+                      const isActive = activeModelId === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => onSelectModel?.(m.id, constProvider.id)}
+                          className={cn(
+                            "w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
+                            isActive
+                              ? "bg-white dark:bg-[#2c2c2c] text-foreground ring-1 ring-black/10 dark:ring-white/15"
+                              : "hover:bg-white/70 dark:hover:bg-[#2a2a2a] text-foreground/90",
+                          )}
+                        >
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span className="text-[12.5px] font-medium truncate">
+                              {m.name || m.id}
+                            </span>
+                            {m.name && m.name !== m.id && (
+                              <span className="text-[11px] font-mono text-muted-foreground truncate">
+                                {m.id}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {m.contextWindow && (
+                              <span className="text-[11px] text-muted-foreground">
+                                {m.contextWindow}
+                              </span>
+                            )}
+                            {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Router Configuration */}
+              <div className="pt-3 border-t border-border/50 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground block">
+                      Gateway URL
+                    </label>
+                    <input
+                      type="text"
+                      value={constDraft.baseUrl}
+                      onChange={(e) =>
+                        setConstDraft({ ...constDraft, baseUrl: e.target.value })
+                      }
+                      placeholder="https://router.const.web.id/v1"
+                      className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-mono text-foreground outline-none focus:border-foreground/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground block">
+                      API Key Override (Optional)
+                    </label>
+                    <div className="relative flex items-center">
+                      <input
+                        type={showConstApiKey ? "text" : "password"}
+                        value={constDraft.apiKey || ""}
+                        onChange={(e) =>
+                          setConstDraft({ ...constDraft, apiKey: e.target.value })
+                        }
+                        placeholder="Uses Const session when empty"
+                        className="w-full h-8 pl-2.5 pr-8 rounded-lg border border-border bg-background text-xs font-mono text-foreground outline-none focus:border-foreground/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConstApiKey((v) => !v)}
+                        className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        {showConstApiKey ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleTestConstConnection()}
+                      disabled={isTestingConstPing}
+                      className="h-7 px-3 rounded-lg border border-border hover:bg-secondary/70 text-[11.5px] font-medium text-foreground transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isTestingConstPing && <Loader2 className="w-3 h-3 animate-spin" />}
+                      <span>Test Connection</span>
+                    </button>
+                    {constDraft.baseUrl !== "https://router.const.web.id/v1" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConstDraft({
+                            ...constDraft,
+                            baseUrl: "https://router.const.web.id/v1",
+                            protocol: "openai-completions" as LlmProtocol,
+                          })
+                        }
+                        className="h-7 px-2.5 rounded-lg text-[11.5px] text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        Reset URL
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveConstConfig}
+                    className="h-7 px-3.5 rounded-lg bg-foreground text-background text-[11.5px] font-medium hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. Connected & Sign-In Subscription Accounts (OAuth — OMP providers) */}
+      {!loading &&
+        providers.map((provider) => {
           const isConnected = provider.status.connected;
           const isLoggingIn =
             activeLogin?.provider === provider.id &&
-            ["starting", "awaiting_browser", "awaiting_device_code", "exchanging"].includes(activeLogin.status);
-          const isExpanded = expandedId === provider.id || isLoggingIn;
+            activeLogin.status !== "connected" &&
+            activeLogin.status !== "cancelled";
+          const isExpanded = isConnected && expandedOAuthId === provider.id;
+          const isFetching = Boolean(fetchingOAuthIds[provider.id]);
+          const fetchError = oauthErrors[provider.id];
+
           const identityLabel = [
-            provider.status.email,
-            provider.status.planType ? provider.status.planType.toUpperCase() : undefined,
-            provider.status.orgName,
+            provider.status.email || provider.status.orgName,
+            provider.status.planType,
           ]
             .filter(Boolean)
             .join(" · ");
@@ -192,59 +720,105 @@ export function SubscriptionProvidersPanel({
           return (
             <div
               key={provider.id}
-              className={cn(
-                "settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] transition-colors overflow-hidden border border-transparent",
-                isConnected && "border-emerald-500/20",
-              )}
+              className="settings-surface rounded-xl bg-neutral-50 dark:bg-[#222222] transition-colors overflow-hidden"
             >
-              {/* Header */}
-              <div className="p-4 flex flex-wrap items-center justify-between gap-3 select-none">
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(expandedId === provider.id ? null : provider.id)}
-                  className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer"
-                >
-                  <div
-                    className={cn(
-                      "w-2 h-2 rounded-full shrink-0",
-                      isConnected ? "bg-emerald-500" : "bg-neutral-400/50 dark:bg-neutral-600",
-                    )}
-                  />
+              <div
+                role={isConnected ? "button" : undefined}
+                tabIndex={isConnected ? 0 : undefined}
+                aria-expanded={isConnected ? isExpanded : undefined}
+                onClick={() => {
+                  if (!isConnected) return;
+                  const nextExpanded = !isExpanded;
+                  setExpandedOAuthId(nextExpanded ? provider.id : null);
+                  if (nextExpanded && provider.models.length === 0 && !isFetching) {
+                    void handleFetchOAuthModels(provider.id, { silent: true });
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (!isConnected) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    const nextExpanded = !isExpanded;
+                    setExpandedOAuthId(nextExpanded ? provider.id : null);
+                    if (nextExpanded && provider.models.length === 0 && !isFetching) {
+                      void handleFetchOAuthModels(provider.id, { silent: true });
+                    }
+                  }
+                }}
+                className={cn(
+                  "px-4 py-3 flex items-center justify-between gap-3 select-none transition-colors",
+                  isConnected &&
+                    "cursor-pointer hover:bg-neutral-100/70 dark:hover:bg-[#282828]",
+                )}
+              >
+                <div className="min-w-0 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#1a1a1a] border border-black/8 dark:border-white/10 flex items-center justify-center shrink-0">
+                    <BrandLogo provider={provider.id} className="w-4 h-4 text-foreground" />
+                  </div>
+
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-foreground truncate">{provider.name}</span>
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded-md text-[10.5px] font-medium shrink-0",
-                          isConnected
-                            ? "bg-emerald-500/15 text-emerald-500 dark:text-emerald-400"
-                            : "bg-secondary text-muted-foreground",
-                        )}
-                      >
-                        {isConnected ? "Connected" : "Subscription"}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-foreground truncate">
+                        {provider.name}
                       </span>
+                      {isConnected && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Connected
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
-                      {isConnected && identityLabel ? identityLabel : provider.description}
+                      {isConnected
+                        ? `${identityLabel || "Connected"}${
+                            provider.models.length > 0 ? ` · ${provider.models.length} models` : ""
+                          }`
+                        : provider.description}
                     </p>
                   </div>
-                </button>
+                </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   {isConnected ? (
-                    <button
-                      type="button"
-                      onClick={(e) => void handleDisconnect(provider, e)}
-                      className="h-8 px-3 rounded-xl border border-border/80 hover:border-rose-500/40 hover:text-rose-500 text-xs font-medium text-muted-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Disconnect</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        title="Refresh models"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleFetchOAuthModels(provider.id);
+                        }}
+                        disabled={isFetching}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          className={cn("w-3.5 h-3.5", isFetching && "animate-spin")}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => void handleDisconnect(provider, e)}
+                        className="h-8 px-3 rounded-lg border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>Disconnect</span>
+                      </button>
+                      <span className="w-5 h-5 flex items-center justify-center text-muted-foreground">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </span>
+                    </>
                   ) : isLoggingIn ? (
                     <button
                       type="button"
-                      onClick={() => void handleCancel(provider.id)}
-                      className="h-8 px-3 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleCancel(provider.id);
+                      }}
+                      className="h-8 px-3 rounded-lg border border-border hover:bg-secondary/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                       <span>Cancel</span>
@@ -252,148 +826,190 @@ export function SubscriptionProvidersPanel({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => void handleSignIn(provider)}
-                      className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleSignIn(provider);
+                      }}
+                      className="h-8 px-3.5 rounded-lg bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <KeyRound className="w-3.5 h-3.5" />
+                      <LogIn className="w-3.5 h-3.5" />
                       <span>Sign In</span>
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expandedId === provider.id ? null : provider.id)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors cursor-pointer"
-                    aria-label="Toggle models"
-                  >
-                    <ChevronDown className={cn("w-4 h-4 transition-transform", isExpanded && "rotate-180")} />
-                  </button>
                 </div>
               </div>
 
-              {/* Expanded Body */}
-              {isExpanded && (
-                <div className="px-4 pb-4 pt-1 border-t border-border/50 space-y-3">
-                  {provider.warning && (
-                    <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11.5px] text-amber-600 dark:text-amber-300 leading-relaxed">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span>{provider.warning}</span>
+              {/* Active Sign-In Progress Banner */}
+              {isLoggingIn && activeLogin && (
+                <div className="px-4 pb-3 pt-1">
+                  <div className="rounded-xl bg-white/80 dark:bg-[#191919] border border-border/70 p-3 space-y-2.5 text-xs">
+                    <div className="flex items-center gap-2 text-foreground font-medium">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      <span>{activeLogin.message || "Waiting for authentication..."}</span>
                     </div>
-                  )}
 
-                  {/* Active OAuth Progress UI */}
-                  {isLoggingIn && activeLogin && (
-                    <div className="rounded-xl bg-neutral-100 dark:bg-[#1a1a1a] border border-border/70 p-3 space-y-2.5">
-                      <div className="flex items-center gap-2 text-xs text-foreground">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
-                        <span>{activeLogin.message || "Waiting for authentication..."}</span>
-                      </div>
-
-                      {activeLogin.userCode && (
-                        <div className="flex items-center justify-between gap-2 rounded-lg bg-background/80 border border-border px-3 py-2">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                              One-Time Device Code
-                            </div>
-                            <div className="font-mono text-base font-semibold tracking-widest text-foreground">
-                              {activeLogin.userCode}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void navigator.clipboard.writeText(activeLogin.userCode || "");
-                                setCopiedCode(true);
-                                setTimeout(() => setCopiedCode(false), 1800);
-                              }}
-                              className="h-7 px-2.5 rounded-lg border border-border text-xs text-foreground hover:bg-secondary flex items-center gap-1 cursor-pointer"
-                            >
-                              {copiedCode ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedCode ? "Copied" : "Copy"}</span>
-                            </button>
-                            {activeLogin.verificationUri && (
-                              <button
-                                type="button"
-                                onClick={() => (window as any).electron?.openExternal?.(activeLogin.verificationUri)}
-                                className="h-7 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs flex items-center gap-1 cursor-pointer"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                <span>Open GitHub</span>
-                              </button>
+                    {activeLogin.status === "awaiting_device_code" && activeLogin.userCode && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Verification code:</span>
+                          <code className="px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-[#2a2a2a] font-mono text-sm font-semibold tracking-wider text-foreground">
+                            {activeLogin.userCode}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(activeLogin.userCode || "");
+                              setCopiedCode(true);
+                              setTimeout(() => setCopiedCode(false), 1500);
+                            }}
+                            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Copy code"
+                          >
+                            {copiedCode ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
                             )}
-                          </div>
+                          </button>
                         </div>
-                      )}
+                        {activeLogin.verificationUri && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              (window as any).electron?.openExternal?.(
+                                activeLogin.verificationUri!,
+                              )
+                            }
+                            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-foreground underline underline-offset-2 cursor-pointer"
+                          >
+                            Open browser <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
 
-                      {provider.supportsManualCode && activeLogin.status === "awaiting_browser" && (
+                    {activeLogin.status === "awaiting_browser" && provider.supportsManualCode && (
+                      <div className="space-y-2 pt-0.5">
+                        {activeLogin.authUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              (window as any).electron?.openExternal?.(activeLogin.authUrl!)
+                            }
+                            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 cursor-pointer"
+                          >
+                            Open authorization page again <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
                             value={manualCodeInput}
                             onChange={(e) => setManualCodeInput(e.target.value)}
-                            placeholder="Optional: paste redirect URL or code if callback didn't return automatically"
-                            className="flex-1 h-8 px-3 rounded-lg bg-background border border-border text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:ring-1 focus:ring-foreground/20"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void handleSubmitManualCode(provider.id);
+                            }}
+                            placeholder="Paste callback URL or authorization code if redirect didn't return automatically..."
+                            className="flex-1 h-8 px-2.5 rounded-lg border border-border bg-background text-xs font-mono text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-foreground/40"
                           />
                           <button
                             type="button"
                             onClick={() => void handleSubmitManualCode(provider.id)}
                             disabled={!manualCodeInput.trim()}
-                            className="h-8 px-3 rounded-lg bg-secondary hover:bg-secondary/80 text-xs font-medium text-foreground disabled:opacity-40 cursor-pointer"
+                            className="h-8 px-3 rounded-lg bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium disabled:opacity-40 cursor-pointer"
                           >
                             Submit
                           </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                  {/* Curated Subscription Models */}
-                  <div className="space-y-1">
-                    <div className="text-[11px] font-medium text-muted-foreground px-1">
-                      Available Subscription Models ({provider.models.length})
+              {/* Expanded Live-Fetched Models List for Connected Account */}
+              {isExpanded && (
+                <div className="px-4 pb-4 pt-2 border-t border-border/50 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11.5px] font-medium text-muted-foreground">
+                      Available Models ({provider.models.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleFetchOAuthModels(provider.id)}
+                      disabled={isFetching}
+                      className="h-7 px-2.5 rounded-lg border border-border hover:bg-secondary/70 text-[11px] font-medium text-foreground transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn("w-3 h-3", isFetching && "animate-spin")} />
+                      <span>Fetch Models</span>
+                    </button>
+                  </div>
+
+                  {isFetching && provider.models.length === 0 ? (
+                    <div className="py-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Fetching models from {provider.shortName}...</span>
                     </div>
-                    <div className="divide-y divide-border/40 rounded-xl bg-neutral-100/60 dark:bg-[#1b1b1b] overflow-hidden">
+                  ) : fetchError && provider.models.length === 0 ? (
+                    <div className="py-3 px-3 rounded-lg bg-destructive/10 text-destructive text-xs flex items-center justify-between gap-2">
+                      <span className="truncate">{fetchError}</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleFetchOAuthModels(provider.id)}
+                        className="shrink-0 underline font-medium cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : provider.models.length === 0 ? (
+                    <div className="py-3 text-xs text-muted-foreground">
+                      No models returned yet. Click Fetch Models to load models from your account.
+                    </div>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto pr-0.5 space-y-1">
                       {provider.models.map((m) => {
                         const fullId = `sub:${provider.id}/${m.id}`;
                         const isActive = activeModelId === fullId;
                         return (
-                          <div
-                            key={fullId}
-                            className="px-3 py-2 flex items-center justify-between gap-3 text-xs"
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => onSelectModel?.(fullId, provider.id)}
+                            className={cn(
+                              "w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
+                              isActive
+                                ? "bg-white dark:bg-[#2c2c2c] text-foreground ring-1 ring-black/10 dark:ring-white/15"
+                                : "hover:bg-white/70 dark:hover:bg-[#2a2a2a] text-foreground/90",
+                            )}
                           >
-                            <div className="min-w-0">
-                              <div className="font-medium text-foreground truncate">{m.name}</div>
-                              <div className="text-[10.5px] text-muted-foreground font-mono">
-                                {m.id} · ctx {m.contextWindow} · out {m.maxOutput}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              disabled={!isConnected}
-                              onClick={() => onSelectSubscriptionModel(fullId, provider.id)}
-                              className={cn(
-                                "h-7 px-2.5 rounded-lg text-[11px] font-medium transition-colors shrink-0",
-                                isActive
-                                  ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
-                                  : isConnected
-                                    ? "bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
-                                    : "bg-secondary/40 text-muted-foreground opacity-50 cursor-not-allowed",
+                            <div className="min-w-0 flex items-center gap-2">
+                              <span className="text-[12.5px] font-medium truncate">
+                                {m.name || m.id}
+                              </span>
+                              {m.name && m.name !== m.id && (
+                                <span className="text-[11px] font-mono text-muted-foreground truncate">
+                                  {m.id}
+                                </span>
                               )}
-                            >
-                              {isActive ? "Active" : "Use Model"}
-                            </button>
-                          </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {m.contextWindow && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {m.contextWindow}
+                                </span>
+                              )}
+                              {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                            </div>
+                          </button>
                         );
                       })}
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
-      </div>
     </div>
   );
 }

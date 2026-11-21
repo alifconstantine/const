@@ -900,35 +900,36 @@ export function AuthenticatedContent({
     } catch {}
   }, []);
 
-  // Minimum width protection for main content column (matching apps/learn protection)
-  const MIN_MAIN_CONTENT_WIDTH = 460;
+  // Minimum width protection for main content column while giving the right panel generous room
+  const MIN_MAIN_CONTENT_WIDTH = 380;
 
   const clampRightSidebarWidth = useCallback(
     (desiredWidth: number, sidebarOpen = isSidebarOpen) => {
       const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
       const effectiveSidebarWidth = sidebarOpen ? 256 : 0;
-      // Account for layout margins/paddings (~32px)
-      const maxAllowedByMain = Math.max(300, windowWidth - effectiveSidebarWidth - MIN_MAIN_CONTENT_WIDTH - 32);
+      const maxAllowedByMain = Math.max(360, windowWidth - effectiveSidebarWidth - MIN_MAIN_CONTENT_WIDTH - 24);
       const maxRightSidebarWidth = Math.min(
-        Math.max(Math.round(windowWidth * 0.55), 580),
-        850,
+        Math.max(Math.round(windowWidth * 0.72), 780),
+        1280,
         maxAllowedByMain
       );
-      return Math.min(Math.max(desiredWidth, 300), maxRightSidebarWidth);
+      return Math.min(Math.max(desiredWidth, 360), maxRightSidebarWidth);
     },
     [isSidebarOpen]
   );
 
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
-    const saved = localStorage.getItem("const_harness_right_sidebar_width");
-    const initial = saved ? Number(saved) : 480;
     const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const maxAllowed = Math.max(300, windowWidth - 256 - 460 - 32);
-    return Math.min(Math.max(initial, 300), maxAllowed);
+    const saved = localStorage.getItem("const_harness_right_sidebar_width_v2");
+    const defaultWidth = Math.max(600, Math.round(windowWidth * 0.46));
+    const initial = saved ? Number(saved) : defaultWidth;
+    const maxAllowed = Math.max(360, windowWidth - 256 - MIN_MAIN_CONTENT_WIDTH - 24);
+    const maxRight = Math.min(Math.max(Math.round(windowWidth * 0.72), 780), 1280, maxAllowed);
+    return Math.min(Math.max(initial, 360), maxRight);
   });
 
   useEffect(() => {
-    localStorage.setItem("const_harness_right_sidebar_width", String(rightSidebarWidth));
+    localStorage.setItem("const_harness_right_sidebar_width_v2", String(rightSidebarWidth));
   }, [rightSidebarWidth]);
 
   // Auto-save active conversation's right pane state (debounced to avoid frame drops on open/close)
@@ -3332,7 +3333,7 @@ export function AuthenticatedContent({
       const existingSideTab = rightPaneTabs.find((tab) => tab.type === "side_conversation");
       let targetTabId: string;
       if (existingSideTab) {
-        targetTabId = existingSideTab.id;
+        targetTabId = existingSideTab.sideChatId || existingSideTab.id;
         setActiveRightPaneTabId(existingSideTab.id);
         setIsOpeningNewTab(false);
         setIsRightSidebarOpen(true);
@@ -4807,6 +4808,7 @@ export function AuthenticatedContent({
               messages={messages}
               isExecuting={isExecuting}
               scrollContainerRef={chatScrollRef}
+              conversationTitle={conversationTitle}
             />}
 
             {/* In-Task Find Bar (Ctrl+F) */}
@@ -5066,7 +5068,7 @@ export function AuthenticatedContent({
             {/* Splitter resize handle in the 10px gap between Main Chat and SidePanel */}
             <div
               onMouseDown={handleMouseDownRightResize}
-              onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(480))}
+              onDoubleClick={() => setRightSidebarWidth(clampRightSidebarWidth(620))}
               className={cn(
                 "absolute top-0 bottom-0 cursor-col-resize select-none flex items-center justify-center z-25 overflow-hidden",
                 "motion-reduce:!transition-none",

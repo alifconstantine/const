@@ -85,7 +85,7 @@ test("OAuthSubscriptionManager encrypts stored credentials and auto-refreshes ex
     });
 
     const providers = manager.listProviders();
-    assert.equal(providers.length, 4);
+    assert.equal(providers.length, 8);
     assert.equal(manager.getPublicStatus("anthropic").connected, true);
     assert.equal(manager.getPublicStatus("anthropic").email, "user@anthropic.test");
 
@@ -101,6 +101,87 @@ test("OAuthSubscriptionManager encrypts stored credentials and auto-refreshes ex
 
     manager.disconnect("anthropic");
     assert.equal(manager.getPublicStatus("anthropic").connected, false);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("OAuthSubscriptionManager discovers live models from OpenAI Codex endpoint without hardcoded dummies", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "const-oauth-models-"));
+  const storePath = path.join(tmpDir, "oauth.enc");
+  const accessToken = makeJwt({
+    "https://api.openai.com/auth": {
+      chatgpt_account_id: "acct_live_1",
+      chatgpt_plan_type: "plus",
+    },
+    "https://api.openai.com/profile": {
+      email: "models@example.com",
+    },
+  });
+
+  const requestedUrls: string[] = [];
+  const mockFetch: typeof fetch = async (input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    requestedUrls.push(url);
+    return new Response(
+      JSON.stringify({
+        models: [
+          {
+            slug: "gpt-5.4-codex-live",
+            display_name: "GPT-5.4 Codex Live",
+            visibility: "list",
+            context_window: 272000,
+            max_output_tokens: 128000,
+            supported_reasoning_levels: [{ effort: "medium" }, { effort: "high" }],
+            input_modalities: ["text", "image"],
+          },
+          {
+            slug: "hidden-internal",
+            display_name: "Hidden Model",
+            visibility: "hidden",
+          },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  try {
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({
+        "openai-codex": {
+          provider: "openai-codex",
+          accessToken,
+          refreshToken: "rt_1",
+          expiresAt: Date.now() + 3600_000,
+          accountId: "acct_live_1",
+          email: "models@example.com",
+          planType: "plus",
+          connectedAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      }),
+    );
+
+    const manager = new OAuthSubscriptionManager({ storePath, fetchImpl: mockFetch });
+    // Before fetch, unconnected providers and unfetched cache have zero hardcoded dummy models
+    const before = manager.listProviders();
+    assert.equal(before.find((p) => p.id === "anthropic")?.models.length, 0);
+    assert.equal(before.find((p) => p.id === "openai-codex")?.shortName, "OpenAI");
+
+    const fetched = await manager.fetchModels("openai-codex");
+    assert.equal(requestedUrls.length, 1);
+    assert.ok(requestedUrls[0]!.includes("/codex/models?client_version=0.169.0"));
+    assert.equal(fetched.length, 1);
+    assert.equal(fetched[0]!.id, "gpt-5.4-codex-live");
+    assert.equal(fetched[0]!.name, "GPT-5.4 Codex Live");
+    assert.equal(fetched[0]!.contextWindow, "272K");
+
+    // Second getModels hit uses encrypted on-disk discoveredModels cache without extra fetch
+    const cached = await manager.getModels("openai-codex");
+    assert.equal(cached.length, 1);
+    assert.equal(requestedUrls.length, 1);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

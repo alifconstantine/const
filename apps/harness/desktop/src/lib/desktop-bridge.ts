@@ -140,6 +140,7 @@ export function createDesktopBridge(
       submitCode: (provider: string, codeOrUrl: string) =>
         ipcRenderer.invoke("oauth:submit-code", provider, codeOrUrl),
       disconnect: (provider: string) => ipcRenderer.invoke("oauth:disconnect", provider),
+      fetchModels: (provider?: string) => ipcRenderer.invoke("oauth:fetch-models", provider),
       onLoginProgress: (callback: (progress: any) => void) => {
         const handler = (_event: any, progress: any) => callback(progress);
         ipcRenderer.on("oauth:login-progress", handler);
