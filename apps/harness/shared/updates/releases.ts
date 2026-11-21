@@ -1,4 +1,5 @@
-export const GITHUB_RELEASES_API = "https://api.github.com/repos/alifconstantine/const/releases?per_page=100";
+export const RELEASES_REPOSITORY = "alifconstantine/const-harness-release";
+export const GITHUB_RELEASES_API = `https://api.github.com/repos/${RELEASES_REPOSITORY}/releases?per_page=100`;
 export const UPDATE_ORIGIN = "https://harness.const.web.id";
 export const RELEASES_API = `${UPDATE_ORIGIN}/api/app-updates`;
 export interface ReleaseAsset { name: string; url: string; size: number; sha256?: string }
@@ -39,7 +40,7 @@ export function isReleaseAssetUrl(value: string, tag: string, name: string): boo
     const url = new URL(value);
     return Boolean(releaseVersion(tag)) && !/[\\/]/.test(name)
       && url.origin === "https://github.com" && !url.search && !url.hash && !url.username && !url.password
-      && decodeURIComponent(url.pathname) === `/alifconstantine/const/releases/download/${tag}/${name}`;
+      && decodeURIComponent(url.pathname) === `/${RELEASES_REPOSITORY}/releases/download/${tag}/${name}`;
   } catch { return false; }
 }
 /** GitHub is shared with Const Learn: only stable Harness releases are eligible. */

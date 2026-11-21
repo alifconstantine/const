@@ -1,8 +1,9 @@
 const REPOSITORY = "https://github.com/alifconstantine/const";
+const RELEASES_REPOSITORY = "https://github.com/alifconstantine/const-harness-release";
 export const LINKS = {
   repository: REPOSITORY,
   docs: "/docs",
-  releases: `${REPOSITORY}/releases`,
+  releases: `${RELEASES_REPOSITORY}/releases`,
   changelog: `${REPOSITORY}/commits/main/apps/harness`,
   issues: `${REPOSITORY}/issues`,
   pulls: `${REPOSITORY}/pulls`,

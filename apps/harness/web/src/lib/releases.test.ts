@@ -6,7 +6,7 @@ const asset = (id: number, tag: string, name: string) => ({
   id,
   name,
   size: 100_000_000,
-  browser_download_url: `https://github.com/alifconstantine/const/releases/download/${tag}/${encodeURIComponent(name)}`,
+  browser_download_url: `https://github.com/alifconstantine/const-harness-release/releases/download/${tag}/${encodeURIComponent(name)}`,
 });
 const release = (version: string, names: string[], extra = {}) => {
   const tag = `harness-v${version}`;

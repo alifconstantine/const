@@ -11,7 +11,7 @@ import { updateFeed, updateDownload } from "../../web/src/lib/app-updates";
 const bytes = new TextEncoder().encode("test-only installer, never executed");
 const sha = createHash("sha256").update(bytes).digest("hex");
 const release = (version = "0.0.3", overrides = {}) => ({ tag_name: `harness-v${version}`, published_at: "2026-11-02T09:00:00Z", body: "## Fixes\n- Isolated workspace previews.",
-  assets: ["x64", "arm64"].map((arch, index) => ({ id: index + 42, name: `Const.Harness.Setup.${version}-${arch}.exe`, browser_download_url: `https://github.com/alifconstantine/const/releases/download/harness-v${version}/Const.Harness.Setup.${version}-${arch}.exe`, size: bytes.length, digest: `sha256:${sha}` })), ...overrides });
+  assets: ["x64", "arm64"].map((arch, index) => ({ id: index + 42, name: `Const.Harness.Setup.${version}-${arch}.exe`, browser_download_url: `https://github.com/alifconstantine/const-harness-release/releases/download/harness-v${version}/Const.Harness.Setup.${version}-${arch}.exe`, size: bytes.length, digest: `sha256:${sha}` })), ...overrides });
 
 test("release selection isolates Harness, stable versions, architecture and trusted assets", () => {
   const data = [release("99.0.0", { tag_name: "v99.0.0" }), release("9.0.0", { draft: true }), release("8.0.0", { prerelease: true }), release("0.0.9"), release("0.0.10")];
@@ -21,8 +21,8 @@ test("release selection isolates Harness, stable versions, architecture and trus
   assert.equal(selectRelease(data, { os: "android" })?.asset, undefined);
   assert.equal(compareVersions("0.0.2", "0.0.10"), -1);
   assert.equal(isReleaseAssetUrl("https://evil.test/update.exe", "harness-v0.0.3", "update.exe"), false);
-  assert.equal(isReleaseAssetUrl("https://user:secret@github.com/alifconstantine/const/releases/download/harness-v0.0.3/update.exe", "harness-v0.0.3", "update.exe"), false);
-  assert.equal(isReleaseAssetUrl("https://github.com/alifconstantine/const/releases/download/harness-v0.0.3/../update.exe", "harness-v0.0.3", "update.exe"), false);
+  assert.equal(isReleaseAssetUrl("https://user:secret@github.com/alifconstantine/const-harness-release/releases/download/harness-v0.0.3/update.exe", "harness-v0.0.3", "update.exe"), false);
+  assert.equal(isReleaseAssetUrl("https://github.com/alifconstantine/const-harness-release/releases/download/harness-v0.0.3/../update.exe", "harness-v0.0.3", "update.exe"), false);
   assert.equal(selectRelease([release("0.0.3", { assets: [{ name: "update.exe", browser_download_url: "javascript:alert(1)", size: 10 }] })], { os: "windows", arch: "x64" })?.asset, undefined);
 });
 

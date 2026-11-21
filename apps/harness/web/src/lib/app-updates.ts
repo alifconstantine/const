@@ -1,4 +1,4 @@
-import { GITHUB_RELEASES_API, isReleaseAssetUrl, releaseVersion, selectRelease, updateDownloadUrl, type UpdateTarget } from "../../../shared/updates/releases";
+import { GITHUB_RELEASES_API, RELEASES_REPOSITORY, isReleaseAssetUrl, releaseVersion, selectRelease, updateDownloadUrl, type UpdateTarget } from "../../../shared/updates/releases";
 
 export const updateCors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" };
 interface Options { token?: string; fetcher?: typeof fetch }
@@ -45,7 +45,7 @@ export async function updateDownload(request: Request, options: Options = {}) {
     if (!asset || typeof asset.name !== "string" || !/harness/i.test(asset.name) || /debug|unsigned/i.test(asset.name)
       || !/\.(exe|apk|dmg|pkg|AppImage|deb|rpm|pacman)$/i.test(asset.name)
       || !isReleaseAssetUrl(asset.browser_download_url, tag, asset.name)) return failure(404);
-    const response = await (options.fetcher || fetch)(`https://api.github.com/repos/alifconstantine/const/releases/assets/${id}`, {
+    const response = await (options.fetcher || fetch)(`https://api.github.com/repos/${RELEASES_REPOSITORY}/releases/assets/${id}`, {
       headers: githubHeaders(options.token, "application/octet-stream"), redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(20_000),
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
