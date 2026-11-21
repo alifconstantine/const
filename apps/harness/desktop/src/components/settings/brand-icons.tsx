@@ -96,12 +96,12 @@ export function BrandLogo({
     return (
       <>
         <img
-          src={`${base}const-logo-light-transparent.png`}
+          src={`${base}router-logo-light-transparent.svg`}
           alt=""
           className={cn("inline-block dark:hidden object-contain shrink-0", className)}
         />
         <img
-          src={`${base}const-logo-dark-transparent.png`}
+          src={`${base}router-logo-dark-transparent.svg`}
           alt=""
           className={cn("hidden dark:inline-block object-contain shrink-0", className)}
         />

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: en["meta.description"],
   applicationName: "Const Harness",
   icons: {
-    icon: { url: "/const-logo-dark.png", type: "image/png", sizes: "256x256" },
+    icon: { url: "/harness-logo-dark.svg", type: "image/svg+xml", sizes: "any" },
     shortcut: "/favicon.ico",
     apple: { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
   },

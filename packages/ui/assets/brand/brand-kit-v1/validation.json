@@ -1,0 +1,246 @@
+{
+  "passed": true,
+  "vector_svg_count": 59,
+  "export_png_count": 72,
+  "real_alpha_verified": true,
+  "const_accounts_symbols_identical": true,
+  "native_icons": {
+    "light": {
+      "ico_sizes": [
+        [
+          16,
+          16
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          96,
+          96
+        ],
+        [
+          128,
+          128
+        ],
+        [
+          256,
+          256
+        ]
+      ],
+      "icns_sizes": [
+        [
+          512,
+          512,
+          2
+        ],
+        [
+          512,
+          512,
+          1
+        ],
+        [
+          256,
+          256,
+          2
+        ],
+        [
+          256,
+          256,
+          1
+        ],
+        [
+          128,
+          128,
+          2
+        ],
+        [
+          128,
+          128,
+          1
+        ],
+        [
+          32,
+          32,
+          2
+        ],
+        [
+          16,
+          16,
+          2
+        ]
+      ]
+    },
+    "dark": {
+      "ico_sizes": [
+        [
+          16,
+          16
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          96,
+          96
+        ],
+        [
+          128,
+          128
+        ],
+        [
+          256,
+          256
+        ]
+      ],
+      "icns_sizes": [
+        [
+          512,
+          512,
+          2
+        ],
+        [
+          512,
+          512,
+          1
+        ],
+        [
+          256,
+          256,
+          2
+        ],
+        [
+          256,
+          256,
+          1
+        ],
+        [
+          128,
+          128,
+          2
+        ],
+        [
+          128,
+          128,
+          1
+        ],
+        [
+          32,
+          32,
+          2
+        ],
+        [
+          16,
+          16,
+          2
+        ]
+      ]
+    }
+  },
+  "source_trace_metrics": {
+    "const-symbol": {
+      "source": "sources/const-trajectory.png",
+      "source_region": [
+        70,
+        150,
+        470,
+        550
+      ],
+      "artwork_bounds_in_region": [
+        42,
+        54,
+        358,
+        368
+      ],
+      "raster_size": [
+        324,
+        322
+      ],
+      "raster_vector_silhouette_iou": 0.99692,
+      "path_count": 2
+    },
+    "harness-symbol": {
+      "source": "sources/harness-lift.png",
+      "source_region": [
+        470,
+        60,
+        1100,
+        555
+      ],
+      "artwork_bounds_in_region": [
+        30,
+        25,
+        595,
+        481
+      ],
+      "raster_size": [
+        573,
+        464
+      ],
+      "raster_vector_silhouette_iou": 0.997466,
+      "path_count": 1
+    },
+    "router-symbol": {
+      "source": "sources/router-presence.png",
+      "source_region": [
+        1050,
+        150,
+        1500,
+        555
+      ],
+      "artwork_bounds_in_region": [
+        42,
+        59,
+        403,
+        385
+      ],
+      "raster_size": [
+        369,
+        334
+      ],
+      "raster_vector_silhouette_iou": 0.997381,
+      "path_count": 1
+    }
+  }
+}

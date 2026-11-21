@@ -47,6 +47,7 @@ export function Navbar() {
       <div className="ch-header-inner">
         <Link href="/" className="ch-brand group" aria-label="Const Harness">
           <ConstLogoIcon
+            brand="harness"
             size="sm"
             variant={solidHeader ? "transparent" : "dark-transparent"}
             className="w-[26px] h-[26px] shrink-0 transition-transform group-hover:scale-105"

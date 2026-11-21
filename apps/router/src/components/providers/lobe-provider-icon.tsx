@@ -36,9 +36,9 @@ export function LobeProviderIcon({
 }: LobeProviderIconProps) {
   const normalized = providerId.toLowerCase().trim();
 
-  // Const built-in brand icon
+  // The built-in Const provider is the Router product.
   if (normalized === "const") {
-    return <ConstLogoIcon size="sm" className={cn("text-foreground", className)} />;
+    return <ConstLogoIcon brand="router" size="sm" className={cn("text-foreground", className)} />;
   }
 
   const slug = LOBE_PROVIDER_MAP[normalized] || normalized;

@@ -11,6 +11,8 @@ export type ConstLogoVariant =
   | "dark-transparent"
   | "light-transparent";
 
+export type ConstLogoBrand = "const" | "harness" | "router";
+
 export const CONST_BRAND_LOGOS = {
   light: "const-logo-light.png",
   lightTransparent: "const-logo-light-transparent.png",
@@ -32,11 +34,13 @@ export function ConstLogoIcon({
   size = "md",
   className = "",
   variant = "transparent",
+  brand = "const",
 }: {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
   className?: string;
   color?: string;
   variant?: ConstLogoVariant;
+  brand?: ConstLogoBrand;
 }) {
   let sizeClass = "w-8 h-8";
   if (size === "xs") sizeClass = "w-5 h-5";
@@ -50,6 +54,9 @@ export function ConstLogoIcon({
   const assetBase = typeof window !== "undefined" && window.location.protocol === "file:"
     ? "./"
     : "/";
+  // Keep the parent brand's existing PNG contract for the deferred Const site.
+  const assetPrefix = `${assetBase}${brand}-logo`;
+  const extension = brand === "const" ? "png" : "svg";
 
   if (variant === "dark") {
     return (
@@ -60,7 +67,7 @@ export function ConstLogoIcon({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-dark.png`}
+          src={`${assetPrefix}-dark.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -80,7 +87,7 @@ export function ConstLogoIcon({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-light.png`}
+          src={`${assetPrefix}-light.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -100,7 +107,7 @@ export function ConstLogoIcon({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-dark-transparent.png`}
+          src={`${assetPrefix}-dark-transparent.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -120,7 +127,7 @@ export function ConstLogoIcon({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-light-transparent.png`}
+          src={`${assetPrefix}-light-transparent.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -140,7 +147,7 @@ export function ConstLogoIcon({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-light.png`}
+          src={`${assetPrefix}-light.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -149,7 +156,7 @@ export function ConstLogoIcon({
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`${assetBase}const-logo-dark.png`}
+          src={`${assetPrefix}-dark.${extension}`}
           alt=""
           draggable={false}
           width={48}
@@ -170,7 +177,7 @@ export function ConstLogoIcon({
       {/* CSS follows the selected theme without waiting for client hydration. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`${assetBase}const-logo-light-transparent.png`}
+        src={`${assetPrefix}-light-transparent.${extension}`}
         alt=""
         draggable={false}
         width={48}
@@ -179,7 +186,7 @@ export function ConstLogoIcon({
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`${assetBase}const-logo-dark-transparent.png`}
+        src={`${assetPrefix}-dark-transparent.${extension}`}
         alt=""
         draggable={false}
         width={48}

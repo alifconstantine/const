@@ -23,7 +23,7 @@ export function LandingNavbar() {
       </a>
       <div className="router-container router-nav-inner">
         <Link href="/" className="router-brand" aria-label="Const Router home">
-          <ConstLogoIcon size="md" />
+          <ConstLogoIcon brand="router" size="md" />
           <span>
             Const<span className="router-brand-product">Router</span>
           </span>

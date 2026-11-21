@@ -407,7 +407,7 @@ export default function App() {
   return (
     <div className="mobile-shell">
       <header className="app-header safe-top-padding">
-        <ConstLogoIcon className="h-7 w-7" />
+        <ConstLogoIcon brand="harness" className="h-7 w-7" />
         <span className="text-base font-medium">Const Harness</span>
         <div className="ml-auto"><MobileUpdateControl /></div>
       </header>

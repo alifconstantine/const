@@ -5703,7 +5703,7 @@ export default function App() {
         <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
           {/* Brand Mark */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
+            <ConstLogoIcon brand="harness" size="sm" className="w-6 h-6 text-foreground shrink-0" />
             <div className="flex items-center gap-2">
               <span className="font-serif text-lg font-normal tracking-tight text-foreground">
                 Const

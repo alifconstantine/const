@@ -21,7 +21,7 @@ export default function GlobalError({
       <div className="w-full max-w-md p-8 rounded-3xl bg-card border border-border text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex flex-col items-center gap-3">
           <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center text-foreground">
-            <ConstLogoIcon size="md" className="w-7 h-7" />
+            <ConstLogoIcon brand="router" size="md" className="w-7 h-7" />
           </div>
           <div className="space-y-1">
             <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">

@@ -29,7 +29,7 @@ function Fixture() {
     (window as any).__updates = { setLanguage, setMobile, emit, installs: () => installed };
   }, []);
   return <div className="h-full bg-background text-foreground p-4"><header className={`flex items-center gap-2 ${mobile ? "w-full" : "w-64"}`}>
-    <ConstLogoIcon className="size-6"/><span className="flex-1 text-sm font-medium">Const Harness</span>
+    <ConstLogoIcon brand="harness" className="size-6"/><span className="flex-1 text-sm font-medium">Const Harness</span>
     <UpdateControl client={client} labels={updateStrings(language)} language={language} mobile={mobile} />
     {!mobile && <button type="button" aria-label="Collapse sidebar" className="size-7"><PanelLeft className="size-4"/></button>}
   </header><p className="mt-12 max-w-md text-sm text-muted-foreground">UI review fixture. Version 0.0.3 and its release notes are simulated. No file is downloaded or installed.</p></div>;

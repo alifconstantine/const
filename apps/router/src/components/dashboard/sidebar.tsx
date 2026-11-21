@@ -29,7 +29,7 @@ export function Sidebar({ onNavigate, className, isCollapsed = false, onToggleCo
   const pathname = usePathname();
   return <aside aria-label="Workspace navigation" className={cn("flex h-full w-full min-h-0 flex-col bg-sidebar text-sidebar-foreground", className)}>
     <div className={cn("flex h-20 shrink-0 items-center gap-2", isCollapsed ? "justify-center px-2" : "justify-between px-5")}>
-      {!isCollapsed && <Link href="/dashboard" onClick={onNavigate} className="flex min-w-0 items-center gap-2.5 text-foreground" aria-label="Const Router overview"><ConstLogoIcon size="sm" className="size-6 shrink-0" /><span className="text-base font-semibold tracking-tight">Const<span className="ml-1.5 font-normal text-muted-foreground">Router</span></span></Link>}
+      {!isCollapsed && <Link href="/dashboard" onClick={onNavigate} className="flex min-w-0 items-center gap-2.5 text-foreground" aria-label="Const Router overview"><ConstLogoIcon brand="router" size="sm" className="size-6 shrink-0" /><span className="text-base font-semibold tracking-tight">Const<span className="ml-1.5 font-normal text-muted-foreground">Router</span></span></Link>}
       {onToggleCollapse && <Button variant="ghost" size="icon" onClick={onToggleCollapse} aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"} className="size-8 shrink-0 text-muted-foreground">{isCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</Button>}
     </div>
     <ScrollArea className="min-h-0 flex-1">

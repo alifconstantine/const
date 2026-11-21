@@ -691,7 +691,7 @@ export function Sidebar({
             className="flex items-center gap-2"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
+            <ConstLogoIcon brand="harness" size="sm" className="w-5 h-5 text-foreground shrink-0" />
             <div className="flex items-baseline gap-1.5">
               {remote ? <span className="flex items-center gap-2 text-xs max-w-40 truncate" title={t(remote.online ? "remoteControl.mobileConnected" : "remoteControl.mobileDisconnected")}><span className={`w-1.5 h-1.5 shrink-0 rounded-full ${remote.online ? "bg-green-500" : "bg-[#969696]"}`} /><span className="truncate">{remote.deviceName}</span></span> : <><span className="font-serif text-base font-normal tracking-tight text-foreground">
                 Const

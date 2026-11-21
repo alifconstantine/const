@@ -210,6 +210,7 @@ export function WorkbenchPreview({ compact = false }: { compact?: boolean }) {
       <div className="ch-desk-sidebar-header">
         <div className="flex items-center gap-2 px-0.5">
           <ConstLogoIcon
+            brand="harness"
             size={18}
             variant={mounted && resolvedTheme === "dark" ? "dark-transparent" : "transparent"}
             className="w-[18px] h-[18px] shrink-0"

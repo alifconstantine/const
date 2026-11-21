@@ -179,7 +179,7 @@ function Workspace({ sessionId, convexUrl, accountsUrl, onExit, onDisconnect }: 
   if (gate !== "ready" || !token)
     return (
       <div className="remote-gate">
-        <ConstLogoIcon className="h-10 w-10" />
+        <ConstLogoIcon brand="harness" className="h-10 w-10" />
         <h1>{t(gate === "connecting" ? "connecting" : "connect")}</h1>
         <p>
           {t(

@@ -154,7 +154,7 @@ export default function DocsPage() {
     <div className="router-docs">
       <header className="router-docs-header">
         <Link href="/" className="router-brand" aria-label="Const Router home">
-          <ConstLogoIcon size="md" />
+          <ConstLogoIcon brand="router" size="md" />
           <span>
             Const<span className="router-brand-product">Router</span>
           </span>

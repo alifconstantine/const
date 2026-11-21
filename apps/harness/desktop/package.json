@@ -155,6 +155,7 @@
       "category": "Development"
     },
     "mac": {
+      "icon": "build/icon.icns",
       "target": [
         "dmg"
       ],

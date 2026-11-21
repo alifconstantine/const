@@ -8,7 +8,7 @@ export function LandingFooter() {
         <div className="router-footer-main">
           <div>
             <Link href="/" className="router-brand">
-              <ConstLogoIcon size="md" />
+              <ConstLogoIcon brand="router" size="md" />
               <span>
                 Const<span className="router-brand-product">Router</span>
               </span>

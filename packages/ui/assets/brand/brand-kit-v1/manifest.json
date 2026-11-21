@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "date": "2026-11-21",
+  "selection": {
+    "const": "Trajectory from attachment 1",
+    "accounts": "Identical Const symbol",
+    "harness": "Original approved Lift",
+    "router": "Three-ended Presence branch, explicitly confirmed by user"
+  },
+  "variants": {
+    "light": {
+      "ink": "#161616",
+      "background": "#fafaf8"
+    },
+    "dark": {
+      "ink": "#ffffff",
+      "background": "#161616"
+    },
+    "light-transparent": {
+      "ink": "#161616",
+      "background": "transparent alpha"
+    },
+    "dark-transparent": {
+      "ink": "#ffffff",
+      "background": "transparent alpha"
+    }
+  },
+  "layouts": [
+    "symbol",
+    "horizontal",
+    "stacked"
+  ],
+  "raster_sizes": {
+    "symbol": "1024 x 1024",
+    "horizontal": "2048 px wide, aspect ratio preserved",
+    "stacked": "1536 x 1536",
+    "dock": "16, 20, 24, 32, 40, 48, 64, 96, 128, 256, 512, 1024 px"
+  },
+  "master_format": "Actual Bezier path SVGs; no embedded PNGs and no external font dependencies",
+  "typography": {
+    "family": "Inter Variable",
+    "weight": 700,
+    "optical_size": 32,
+    "tracking_em": -0.01,
+    "source": "https://github.com/rsms/inter",
+    "license": "sources/fonts/Inter-LICENSE.txt",
+    "method": "Consistent clean outlined type; approved symbols retain their original silhouettes."
+  },
+  "method": "Deterministic raster-to-vector tracing and theme exports. Approved geometry preserved; no AI image regeneration.",
+  "deployment": "Accounts, Router and Harness assets are integrated by scripts/sync-brand-assets.py; the Const landing site is deferred.",
+  "source_sha256": {
+    "const-trajectory.png": "688ada53a0a0bfb41471fc12d67dff45cdc39f8ccc0fff025972bf7df5195eeb",
+    "harness-lift.png": "33ea70c003ae00493bd6b01d8406e0285a1df65e67a8d730c2a790c9702c76b3",
+    "router-presence.png": "6513c42bca3fbf6164a32c5c5b37974563af496c81dbefcb1dff7616f5541bb9"
+  },
+  "dependencies": {
+    "pillow": "13.0.0",
+    "vtracer": "0.6.15",
+    "resvg-py": "0.5.0",
+    "fonttools": "4.68.0",
+    "uharfbuzz": "0.57.0"
+  }
+}
