@@ -63,6 +63,7 @@ export interface VoiceDictationOptions {
   onCommit: (text: string) => void;
   onError: (message: string) => void;
   onTranscribingChange?: (busy: boolean) => void;
+  onDeviceEnded?: () => void;
 }
 
 export interface VoiceDictationController {
@@ -127,14 +128,24 @@ export async function startRealtimeVoiceDictation(
       const limit = Math.min(18, freqData.length);
       for (let i = 0; i < limit; i++) sum += freqData[i]!;
       const avg = limit > 0 ? sum / (limit * 255) : 0;
-      const normalized = avg < 0.03 ? 0 : Math.min(1, Math.pow(avg * 2.4, 0.85));
-      bars.shift();
-      bars.push(normalized);
+      const normalized = avg < 0.02 ? 0 : Math.min(1, Math.pow(avg * 2.6, 0.82));
+      bars.pop();
+      bars.unshift(normalized);
       opts.onLevels([...bars]);
     }
     rafId = requestAnimationFrame(updateWaveform);
   };
   rafId = requestAnimationFrame(updateWaveform);
+
+  const handleTrackEnded = () => {
+    if (!stopped) {
+      opts.onDeviceEnded?.();
+    }
+  };
+  const audioTracks = stream.getAudioTracks();
+  for (const track of audioTracks) {
+    track.addEventListener("ended", handleTrackEnded);
+  }
 
   // Utterance buffers & state
   let preSpeechRoll: Float32Array[] = [];
@@ -255,7 +266,10 @@ export async function startRealtimeVoiceDictation(
         silentGain.disconnect();
       } catch {}
       try {
-        stream.getTracks().forEach((t) => t.stop());
+        for (const track of audioTracks) {
+          track.removeEventListener("ended", handleTrackEnded);
+          track.stop();
+        }
       } catch {}
       try {
         await audioCtx.close();

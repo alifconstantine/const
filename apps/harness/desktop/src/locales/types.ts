@@ -272,6 +272,15 @@ export interface TranslationDictionary {
     attachFiles: string;
     stopExecution: string;
     sendMessage: string;
+    voiceInput: string;
+    voiceRecordingTooltip: string;
+    stopVoiceRecording: string;
+    finalizingVoice: string;
+    offlineTitle: string;
+    offlineDesc: string;
+    offlineDescLocal: string;
+    offlineRetry: string;
+    offlineChecking: string;
     workedFor: string;
     workingFor: string;
     working: string;
@@ -1076,6 +1085,14 @@ export interface TranslationDictionary {
     scheduledTaskFailedToDelete: string;
     scheduledTaskRunDeleted: string;
     scheduledTaskFailedToDeleteRun: string;
+    offlineCannotSend: string;
+    offlineVoiceUnavailable: string;
+    offlineSignInUnavailable: string;
+    networkDisconnected: string;
+    backOnline: string;
+    voiceInputFailed: string;
+    voiceTranscriptionFailed: string;
+    voiceDeviceDisconnected: string;
   };
   auth: {
     signInTitle: string;

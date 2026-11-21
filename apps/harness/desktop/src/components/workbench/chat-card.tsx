@@ -78,6 +78,14 @@ import {
   transcribeVoiceChunk,
   type VoiceDictationController,
 } from "../../lib/voice-dictation";
+import { useHasMicrophone } from "../../lib/audio-devices";
+import {
+  emitNetworkHint,
+  isActiveLlmLocal,
+  isActiveSttLocal,
+  isNetworkErrorText,
+  useNetworkStatus,
+} from "../../lib/network-status";
 
 
 function ComposerMenuContent(props: React.ComponentProps<typeof PopoverContent>) {
@@ -499,6 +507,8 @@ export function ChatCard({
   const [isContextOpen, setIsContextOpen] = useState(false);
 
   // Realtime Whisper Voice Dictation State
+  const hasMicrophone = useHasMicrophone();
+  const { isOnline } = useNetworkStatus();
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isFinalizingVoice, setIsFinalizingVoice] = useState(false);
   const [voiceLevels, setVoiceLevels] = useState<number[]>(() => new Array(10).fill(0));
@@ -1363,10 +1373,24 @@ export function ChatCard({
     }
   }, []);
 
+  useEffect(() => {
+    if (!hasMicrophone && isRecordingVoice && voiceControllerRef.current) {
+      toast.warning(t("toast.voiceDeviceDisconnected"));
+      void stopVoiceRecording();
+    }
+  }, [hasMicrophone, isRecordingVoice, stopVoiceRecording, t]);
+
   const handleToggleVoiceInput = useCallback(async () => {
     if (isTogglingVoiceRef.current) return;
     if (voiceControllerRef.current) {
       await stopVoiceRecording();
+      return;
+    }
+
+    if (!hasMicrophone) return;
+
+    if (!isOnline && !isActiveSttLocal()) {
+      toast.error(t("toast.offlineVoiceUnavailable"));
       return;
     }
 
@@ -1384,10 +1408,18 @@ export function ChatCard({
         onCommit: (text) => {
           editorRef.current?.setDictationSegment(text, true);
         },
+        onDeviceEnded: () => {
+          if (!voiceControllerRef.current) return;
+          toast.warning(t("toast.voiceDeviceDisconnected"));
+          void stopVoiceRecording();
+        },
         onError: (msg) => {
+          if (isNetworkErrorText(msg)) {
+            emitNetworkHint("offline");
+          }
           if (!hasShownError && msg) {
             hasShownError = true;
-            toast.error(msg);
+            toast.error(isNetworkErrorText(msg) ? t("toast.networkDisconnected") : msg);
           }
         },
       });
@@ -1395,11 +1427,12 @@ export function ChatCard({
       setIsRecordingVoice(true);
     } catch (err: any) {
       setIsRecordingVoice(false);
-      toast.error(err?.message || "Failed to start voice input.");
+      const errMsg = err?.message || "";
+      toast.error(errMsg || t("toast.voiceInputFailed"));
     } finally {
       isTogglingVoiceRef.current = false;
     }
-  }, [stopVoiceRecording]);
+  }, [hasMicrophone, isOnline, stopVoiceRecording, t]);
 
   const handleSend = async () => {
     if (voiceControllerRef.current) {
@@ -1407,6 +1440,11 @@ export function ChatCard({
     }
     let text = (editorRef.current?.getText() || prompt).trim();
     if (!text && attachments.length === 0) return;
+
+    if (!isOnline && !isActiveLlmLocal(selectedModel || undefined)) {
+      toast.error(t("toast.offlineCannotSend"));
+      return;
+    }
 
     const parsedCmd = !isolatedModel ? parseBuiltinSlashCommand(text) : null;
 
@@ -2675,20 +2713,41 @@ export function ChatCard({
 
               {/* 3. Voice Dictation & Send / Stop Generation Controls */}
               <div className="flex items-center gap-1.5 shrink-0">
-                {isRecordingVoice ? (
-                  <div
-                    className="h-7 px-2.5 rounded-full bg-[#0c2d48] dark:bg-[#0d2840] border border-[#38bdf8]/25 flex items-center gap-2 shrink-0 select-none"
-                    title="Recording voice input — click stop to finish"
-                  >
-                    <div className="flex items-center gap-[3px] h-4" aria-hidden="true">
-                      {voiceLevels.map((lvl, idx) => (
-                        <span
-                          key={idx}
-                          className="w-[2px] rounded-full bg-[#7dd3fc] transition-[height] duration-75"
-                          style={{ height: `${Math.round(3 + Math.max(0, Math.min(1, lvl || 0)) * 12)}px` }}
-                        />
-                      ))}
+                {(hasMicrophone || isRecordingVoice || isFinalizingVoice) && (
+                  isRecordingVoice ? (
+                    <div
+                      className="h-7 px-2.5 rounded-full bg-[#dbeafe] dark:bg-[#102647] flex items-center gap-2.5 shrink-0 select-none animate-in fade-in zoom-in-95 duration-150"
+                      title={t("workbench.voiceRecordingTooltip")}
+                    >
+                      <div className="flex items-center gap-[3.5px] h-4" aria-hidden="true">
+                        {voiceLevels.map((lvl, idx) => (
+                          <span
+                            key={idx}
+                            className="w-[3px] rounded-full bg-[#2563eb] dark:bg-[#60a5fa] transition-[height] duration-75"
+                            style={{ height: `${Math.round(3 + Math.max(0, Math.min(1, lvl || 0)) * 12)}px` }}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void handleToggleVoiceInput();
+                        }}
+                        className="w-3.5 h-3.5 rounded-[4px] bg-[#2563eb] hover:bg-[#1d4ed8] dark:bg-[#60a5fa] dark:hover:bg-[#93c5fd] cursor-pointer transition-colors shrink-0 active:scale-95"
+                        title={t("workbench.stopVoiceRecording")}
+                        aria-label={t("workbench.stopVoiceRecording")}
+                      />
                     </div>
+                  ) : isFinalizingVoice ? (
+                    <div
+                      className="h-7 px-2.5 rounded-full bg-[#dbeafe] dark:bg-[#102647] flex items-center justify-center shrink-0 animate-in fade-in duration-150"
+                      title={t("workbench.finalizingVoice")}
+                    >
+                      <Loader2 className="w-3.5 h-3.5 text-[#2563eb] dark:text-[#60a5fa] animate-spin" />
+                    </div>
+                  ) : (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2696,34 +2755,13 @@ export function ChatCard({
                         e.stopPropagation();
                         void handleToggleVoiceInput();
                       }}
-                      className="w-4 h-4 rounded-[4px] bg-[#7dd3fc] hover:bg-[#bae6fd] text-[#0c2d48] flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-95"
-                      title="Stop voice recording"
-                      aria-label="Stop voice recording"
+                      className="w-7 h-7 rounded-full hover:bg-[#3b82f6]/10 dark:hover:bg-white/10 text-[#737373] dark:text-[#9a9a9a] hover:text-[#2563eb] dark:hover:text-white flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-95"
+                      title={t("workbench.voiceInput")}
+                      aria-label={t("workbench.voiceInput")}
                     >
-                      <Square className="w-2 h-2 fill-current" />
+                      <Mic className="w-3.5 h-3.5" />
                     </button>
-                  </div>
-                ) : isFinalizingVoice ? (
-                  <div
-                    className="h-7 px-2.5 rounded-full bg-[#0c2d48] dark:bg-[#0d2840] border border-[#38bdf8]/25 flex items-center justify-center shrink-0"
-                    title="Finalizing transcription..."
-                  >
-                    <Loader2 className="w-3.5 h-3.5 text-[#7dd3fc] animate-spin" />
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void handleToggleVoiceInput();
-                    }}
-                    className="w-7 h-7 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#737373] dark:text-[#9a9a9a] hover:text-[#262626] dark:hover:text-white flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-95"
-                    title="Voice input (Whisper)"
-                    aria-label="Voice input"
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                  </button>
+                  )
                 )}
 
                 {isExecuting ? (
@@ -2748,7 +2786,7 @@ export function ChatCard({
                       <button
                         type="button"
                         onClick={handleSend}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
+                        className="w-7 h-7 rounded-full flex items-center justify-center select-none transition-all shrink-0 bg-[#3b82f6] hover:bg-[#2563eb] text-white cursor-pointer shadow-sm active:scale-95"
                         title={t("workbench.steerMessage")}
                         aria-label={t("workbench.steerMessage")}
                       >
@@ -2761,10 +2799,10 @@ export function ChatCard({
                     type="button"
                     onClick={handleSend}
                     disabled={!prompt.trim() && attachments.length === 0 && !isRecordingVoice}
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 ${
+                    className={`w-7 h-7 rounded-full flex items-center justify-center select-none transition-all shrink-0 ${
                       prompt.trim() || attachments.length > 0 || isRecordingVoice
-                        ? "bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
-                        : "bg-[#f0f0f2] dark:bg-[#48484e]/60 text-[#a9a9a9] dark:text-[#888888] cursor-not-allowed"
+                        ? "bg-[#3b82f6] hover:bg-[#2563eb] text-white cursor-pointer shadow-sm active:scale-95"
+                        : "bg-[#f0f0f2] dark:bg-[#3f3f46]/70 text-[#a9a9a9] dark:text-[#7a7a82] cursor-not-allowed"
                     }`}
                     title={t("workbench.sendMessage")}
                     aria-label={t("workbench.sendMessage")}

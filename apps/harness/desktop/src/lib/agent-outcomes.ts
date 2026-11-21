@@ -1,4 +1,5 @@
 import type { AgentErrorCategory, AgentOutcome } from "@const/agent";
+import { isNetworkErrorText } from "./network-status";
 
 export interface AgentSessionEnded {
   conversationId: string;
@@ -15,6 +16,7 @@ export function agentFailureText(failure: { error?: string; category?: string; e
   if (category === "image") return t("toast.imagePreparationFailed");
   if (category === "stalled") return t("toast.agentStalled");
   if (category === "turn_limit") return t("toast.agentTurnLimit");
+  if (isNetworkErrorText(failure.error)) return t("toast.networkDisconnected");
   return failure.error || t("toast.agentExecutionError");
 }
 

@@ -183,6 +183,9 @@ export function createDesktopBridge(
         category?: string;
       }) => ipcRenderer.invoke("models:fetch-remote", payload),
     },
+    network: {
+      checkOnline: (payload?: { probe?: boolean }) => ipcRenderer.invoke("network:check-online", payload),
+    },
     steerAgent: (payload: {
       conversationId: string;
       prompt: string;

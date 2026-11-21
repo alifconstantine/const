@@ -75,6 +75,13 @@ import type { BuiltinSlashCommandId } from "./lib/slash-commands";
 import { BottomPanel } from "./components/bottom-panel";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
+import { OfflineBanner } from "./components/workbench/offline-banner";
+import {
+  emitNetworkHint,
+  isActiveLlmLocal,
+  isNetworkErrorText,
+  useNetworkStatus,
+} from "./lib/network-status";
 import {
   useConversationWidth,
   getSavedTheme,
@@ -428,6 +435,7 @@ export function AuthenticatedContent({
   onSwitchAccount: () => void;
 }) {
   const remote = useRemoteRuntime();
+  const { isOnline, isChecking: isCheckingNetwork, recheck: recheckNetwork } = useNetworkStatus();
   const user = useQuery(api.auth.queries.currentUser, {});
   const [cachedUser, setCachedUser] = useState<any>(() => {
     try {
@@ -492,6 +500,15 @@ export function AuthenticatedContent({
   const { t } = useTranslation();
   const translateRef = useRef(t);
   translateRef.current = t;
+  const wasOfflineRef = useRef(!isOnline);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current) {
+      wasOfflineRef.current = false;
+      toast.success(translateRef.current("toast.backOnline"));
+    }
+  }, [isOnline]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => !remote?.mobile);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
@@ -2171,6 +2188,15 @@ export function AuthenticatedContent({
       return;
     }
 
+    const editModelKey =
+      conversations.find((c) => c.id === conversationId)?.model ||
+      activeModelItem?.id ||
+      activeModelItem?.name;
+    if (!isOnline && !isActiveLlmLocal(editModelKey)) {
+      toast.error(t("toast.offlineCannotSend"));
+      return;
+    }
+
     // 1. Gather all file mutations from this turn onwards that have not been rolled back
     const mutationsToRevert: FileMutationRecord[] = [];
     for (let i = messageIdx; i < messages.length; i++) {
@@ -2288,7 +2314,7 @@ export function AuthenticatedContent({
         activeSessionMessagesRef.current.delete(conversationId);
       }
     }
-  }, [isExecuting, t, conversationId, activeModelItem, currentProject, currentMode, token]);
+  }, [isExecuting, isOnline, t, conversationId, activeModelItem, currentProject, currentMode, token]);
 
   const renderMessageAttachment = useCallback((att: AttachedFile) => {
     return (
@@ -3204,6 +3230,9 @@ export function AuthenticatedContent({
 
         const errorText = agentFailureText(event, translateRef.current);
         const isUserCancelled = isAgentCancellation(event);
+        if (!isUserCancelled && isNetworkErrorText(event.error)) {
+          emitNetworkHint("offline");
+        }
 
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
@@ -3542,6 +3571,12 @@ export function AuthenticatedContent({
   }) => {
     const targetConvoId = explicitConvoId || conversationIdRef.current;
     if ((!prompt.trim() && (!attachments || attachments.length === 0)) || runningConvoIdsRef.current.has(targetConvoId) || sendingConversationsRef.current.has(targetConvoId) || stoppingConversationsRef.current.has(targetConvoId)) return;
+
+    if (!isOnline && !isActiveLlmLocal(model)) {
+      toast.error(t("toast.offlineCannotSend"));
+      return;
+    }
+
     sendingConversationsRef.current.add(targetConvoId);
 
     const existing = loadConversations().find((item) => item.id === targetConvoId);
@@ -3686,7 +3721,12 @@ export function AuthenticatedContent({
         }
       } catch (err: any) {
         if (!err.message?.toLowerCase().includes("cancelled") && !err.message?.toLowerCase().includes("abort")) {
-          toast.error(err.message || "Communication error with agent");
+          if (isNetworkErrorText(err?.message)) {
+            emitNetworkHint("offline");
+            toast.error(t("toast.networkDisconnected"));
+          } else {
+            toast.error(err.message || t("toast.communicationError"));
+          }
         }
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
@@ -4749,12 +4789,36 @@ export function AuthenticatedContent({
                 {messages.length === 0 ? (
           <div className="workspace-landing flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-hidden">
             {/* Centered Conversation Container */}
-            <div className={cn("relative flex flex-col items-center w-full max-w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
+            <div
+              className={cn(
+                "relative flex flex-col items-center w-full max-w-full z-10 transition-transform duration-200",
+                !isOnline ? "translate-y-0 sm:translate-y-2" : "translate-y-6 sm:translate-y-8",
+                landingWidthClass,
+              )}
+            >
 
               {/* Greeting Text */}
-              <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-[#262626] dark:text-[#d4d4d4] text-center mb-6 z-10 font-sans">
+              <h1
+                className={cn(
+                  "text-2xl sm:text-[28px] font-medium tracking-tight text-[#262626] dark:text-[#d4d4d4] text-center z-10 font-sans transition-[margin] duration-200",
+                  !isOnline ? "mb-4" : "mb-6",
+                )}
+              >
                 {greeting}
               </h1>
+
+              {!isOnline && (
+                <OfflineBanner
+                  isChecking={isCheckingNetwork}
+                  localModelAvailable={isActiveLlmLocal(
+                    conversations.find((c) => c.id === conversationId)?.model ||
+                      activeModelItem?.id ||
+                      activeModelItem?.name,
+                  )}
+                  onRetry={() => void recheckNetwork()}
+                  className="mb-3 z-10"
+                />
+              )}
 
               {/* Floating Chat Input Card */}
               <div className="w-full max-w-full z-10 min-w-0">
@@ -4951,6 +5015,19 @@ export function AuthenticatedContent({
                       <ChevronDown className="w-4 h-4 stroke-[2.5]" />
                     </button>
                   </div>
+                )}
+
+                {!isOnline && (
+                  <OfflineBanner
+                    isChecking={isCheckingNetwork}
+                    localModelAvailable={isActiveLlmLocal(
+                      conversations.find((c) => c.id === conversationId)?.model ||
+                        activeModelItem?.id ||
+                        activeModelItem?.name,
+                    )}
+                    onRetry={() => void recheckNetwork()}
+                    className="mb-2.5"
+                  />
                 )}
 
                 <SmoothCardMorph
@@ -5404,6 +5481,7 @@ export function AuthenticatedContent({
 
 export default function App() {
   const { t, language } = useTranslation();
+  const { isOnline, isChecking: isCheckingNetwork, recheck: recheckNetwork } = useNetworkStatus();
   const [token, setToken] = useState<string | null>(() => {
     return (
       localStorage.getItem("const_harness_auth_token") ||
@@ -5493,6 +5571,10 @@ export default function App() {
   }, [isWaitingAuth]);
 
   const handleSignIn = async () => {
+    if (!isOnline) {
+      toast.error(t("toast.offlineSignInUnavailable"));
+      return;
+    }
     setIsWaitingAuth(true);
     isWaitingAuthRef.current = true;
 
@@ -5642,6 +5724,13 @@ export default function App() {
             </p>
 
             <div className="mt-8 min-h-[148px]">
+              {!isOnline && (
+                <OfflineBanner
+                  isChecking={isCheckingNetwork}
+                  onRetry={() => void recheckNetwork()}
+                  className="mb-4"
+                />
+              )}
               {!isWaitingAuth ? (
                 <Button
                   onClick={handleSignIn}

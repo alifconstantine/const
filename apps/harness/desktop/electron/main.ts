@@ -2007,6 +2007,30 @@ async function resolveLlmExecutionRoute(
     }
   );
 
+  handleDesktopIpc("network:check-online", async (_event, payload?: { probe?: boolean }) => {
+    if (!net.isOnline()) return { online: false };
+    if (!payload?.probe) return { online: true };
+    const probeUrls = Array.from(
+      new Set([
+        (process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id")
+          .trim()
+          .replace(/\/v1\/?$/, "")
+          .replace(/\/+$/, ""),
+        "https://accounts.const.web.id",
+      ]),
+    );
+    try {
+      await Promise.any(
+        probeUrls.map((url) =>
+          fetch(url, { method: "HEAD", signal: AbortSignal.timeout(3500) }),
+        ),
+      );
+      return { online: true };
+    } catch {
+      return { online: false };
+    }
+  });
+
   handleDesktopIpc("agent:get-models", async () => {
     const config = loadUserConfig();
     const provCfg = config.providers["const"] || config.providers["const-engine"];

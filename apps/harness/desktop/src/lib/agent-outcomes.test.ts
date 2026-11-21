@@ -26,6 +26,7 @@ test("payload failures use the selected language in notifications and chat, pres
     assert.equal(agentFailureText({ category: "image" }, t), dictionary.toast.imagePreparationFailed);
     assert.equal(agentFailureText({ category: "stalled" }, t), dictionary.toast.agentStalled);
     assert.equal(agentFailureText({ category: "turn_limit" }, t), dictionary.toast.agentTurnLimit);
+    assert.equal(agentFailureText({ error: "getaddrinfo ENOTFOUND router.const.web.id", category: "transport" }, t), dictionary.toast.networkDisconnected);
     assert.equal(agentFailureText({ error: "Bad tool schema", category: "model" }, t), "Bad tool schema");
   }
 });

@@ -377,6 +377,9 @@ declare global {
           category?: string;
         }) => Promise<{ success: boolean; models?: Array<{ id: string; name: string }>; error?: string }>;
       };
+      network?: {
+        checkOnline: (payload?: { probe?: boolean }) => Promise<{ online: boolean }>;
+      };
       sendMessage: (payload: {
         messages: any[];
         model?: string;
