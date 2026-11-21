@@ -26,6 +26,18 @@ typography:
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: -0.01em
+  heading:
+    fontFamily: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
+    fontSize: 24px
+    fontWeight: 500
+    lineHeight: 1.25
+    letterSpacing: -0.01em
+  title-lg:
+    fontFamily: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
+    fontSize: 20px
+    fontWeight: 500
+    lineHeight: 1.25
+    letterSpacing: -0.01em
   title:
     fontFamily: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
     fontSize: 16px
@@ -76,12 +88,12 @@ spacing:
 
 components:
   chat-card:
-    outerBackground: "{colors.header-strip}"
-    outerBorder: "{colors.hairline}"
-    outerRounded: "{rounded.lg}"
-    headerPadding: "8px 14px 6px"
+    folderTabBackground: "{colors.header-strip}"
+    folderTabMinWidth: "144px"
+    folderTabMaxWidth: "320px"
+    folderTabRounded: "14px 12px 0 0"
     inputBackground: "{colors.field}"
-    inputBorder: "{colors.hairline}"
+    inputBorder: "none"
     inputRounded: "{rounded.lg}"
     inputPadding: "10px 14px"
     inputHeight: "28px"
@@ -105,7 +117,7 @@ components:
     iconColor: "{colors.ink}"
     secondaryTextColor: "{colors.text-muted}"
     hoverBackground: "{colors.field-hover}"
-    width: "224px"
+    width: "268px"
 
   top-toolbar:
     height: "44px"
@@ -127,7 +139,7 @@ The interface prioritizes **clarity, reading comfort, and zero visual noise**:
 - **Faint Accent & Placeholders (`#5d5d5d`)**: De-emphasized input hints and folder glyphs.
 - **Action Chips (`#969696` / `#ffffff`)**: Interactive utility controls.
 - **Seamless Paneling & Zero Divider Lines**: Panel headers, dropdowns, and popovers have **no dividing border lines** (no `border-b`, `border-t`, or `divide-y`). Elevation is achieved strictly through fill variations and hairline boundaries.
-- **Custom Radix ScrollArea**: Native browser scrollbars are prohibited; all scrollable views use `@const/ui`'s `ScrollArea`.
+- **Custom Radix ScrollArea**: Native browser scrollbars are prohibited; all scrollable views use the shared Radix `ScrollArea` component in `packages/ui/src/components/ui/scroll-area.tsx` with generous right gutter (`pr-3`) on dense sidebar lists.
 
 ---
 
@@ -172,7 +184,7 @@ Drop shadows on internal cards are strictly prohibited.
   - Raw filesystem paths inside code contexts
 
 ### 2. High-Contrast Reading Ink (`dark:text-white` / `#ffffff`)
-- In dark mode, do **not** render AI response paragraphs, headings, or list items in muted gray (`#d4d4d4` or `text-foreground/90`).
+- In dark mode, do **not** render AI response paragraphs, headings, or list items in muted gray (`#d4d4d4` or dimmed foreground opacity classes).
 - Always apply crisp white (`dark:text-white` / `#ffffff`) for:
   - AI markdown paragraphs (`<p>`), headings (`<h1>`–`<h4>`), and list items (`<li>`)
   - Bold / strong text (`<strong>`, `<b>`)
@@ -192,13 +204,14 @@ Drop shadows on internal cards are strictly prohibited.
 
 ### 2. Mandatory ScrollArea for All Scrollable Containers
 - **Strict Rule**: Raw browser scrollbars via native `overflow-y-auto` or `overflow-x-auto` are strictly **prohibited** on desktop interfaces (to prevent Windows' default boxy, white-tracked scrollbars with up/down arrows).
-- All scrollable viewports, lists, popover menus, dialog bodies, and sidebars MUST use the custom `ScrollArea` component (`@const/ui` / `packages/ui/src/components/ui/scroll-area.tsx`).
+- All scrollable viewports, lists, popover menus, dialog bodies, and sidebars MUST use the custom `ScrollArea` component (`packages/ui/src/components/ui/scroll-area.tsx`).
 - `ScrollArea` automatically hides native browser scrollbars (`[scrollbar-width:none]` and `[&::-webkit-scrollbar]:hidden`) and renders minimalist, dark-calibrated Radix thumbs with smooth interaction.
 
 ### 3. Panel Geometry & Layout
-- **Studio Sidebar**: Fixed 224px (`w-56`), `#2b2b2b`.
+- **Studio Sidebar**: Fixed `268px` (`w-[268px]`) in Const Harness Desktop with `pr-3` inner ScrollArea clearance; `#2b2b2b`.
 - **Floating Cards**: 16px/24px geometry (`rounded-2xl`).
 - **Multi-column Layouts**: Floating studio columns (Sources, Central Chat, and Studio/Tools) sit on the `#161616` canvas with hairline boundaries.
+- **Settings Modal**: Scales fluidly with `min(1260px, 92vw)` width and `min(860px, 88vh)` height, constraining form-based sections inside `max-w-3xl`.
 
 ### 4. Zero Default Browser Focus Outlines / Yellow Accent Rings on Dialogs & Cards
 - **Strict Rule**: All modal dialogs, alert dialogs, popovers, and floating sheets MUST have `outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0` applied on their content containers (`DialogPrimitive.Content`, `AlertDialogPrimitive.Content`).
@@ -322,9 +335,9 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 - **Do** use `font-sans` (`Inter`) for all button labels, pills, dropdowns, and counter badges.
 - **Do** render AI response text and active header pills in crisp `#ffffff` (`dark:text-white`) for crystal-clear readability.
 - **Do** keep panel headers, dropdowns, and popovers seamless and borderless — eliminate all dividing lines (`border-b`, `border-t`, `divide-y`).
-- **Do** always use `ScrollArea` (`@const/ui` / `packages/ui/src/components/ui/scroll-area.tsx`) for all scrollable containers and popover lists instead of raw `overflow-y-auto`.
+- **Do** always use `ScrollArea` (`packages/ui/src/components/ui/scroll-area.tsx`) for all scrollable containers and popover lists instead of raw `overflow-y-auto`.
 - **Do** always ensure dialog containers, popovers, and floating card wrappers have `outline-none focus:outline-none focus-visible:outline-none ring-0` to suppress unwanted OS/browser accent rings.
-- **Do** use `Layers` for the Artifacts tab and empty states.
+- **Do** use `Layers` for the Artifacts tab and empty states, `ListChecks` for Plan mode, and `Goal` for Goal mode.
 - **Do** wrap empty state icons in minimalist rounded squircles (`rounded-2xl`).
 - **Do** maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#ffffff` for primary reading text.
 - **Do** keep the browser chrome minimal and clean — toolbar contains only navigation, URL input, responsive presets, and options.
@@ -333,7 +346,7 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 
 ### Don't
 - **Don't** apply `font-mono` to UI buttons, project selectors, sources pills, or list numbers.
-- **Don't** use muddy or dim gray (`#969696` or `text-foreground/90`) for primary AI reading copy.
+- **Don't** use muddy or dim gray (`#969696` or low-opacity foreground utility classes) for primary AI reading copy.
 - **Don't** add horizontal dividing lines (`border-b`, `border-t`) under workspace headers or inside dropdown/popover menus.
 - **Don't** use raw native `overflow-y-auto` or `overflow-x-auto` which exposes Windows' default boxy/arrow scrollbars. Always use `ScrollArea`.
 - **Don't** allow default browser/OS focus rings (such as Chromium's 2px yellow/amber outline on Windows) to appear around modal dialogs, cards, or panels when clicked or opened.

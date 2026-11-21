@@ -23,7 +23,6 @@ import {
   Settings,
   Image as ImageIcon,
   AtSign,
-  SquarePen,
   Globe,
   X,
   Brain,
@@ -32,8 +31,8 @@ import {
   Box,
   Eye,
   PencilSparkles,
-  Lightbulb,
-  Target,
+  ListChecks,
+  Goal,
   Mic,
   Loader2,
 } from "lucide-react";
@@ -682,6 +681,7 @@ export function ChatCard({
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
   const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionNavOrigin, setMentionNavOrigin] = useState<"keyboard" | "pointer">("keyboard");
 
   const handleSerializedChange = useCallback((val: string) => {
     setPrompt(val);
@@ -689,7 +689,10 @@ export function ChatCard({
 
   const handleMentionTokenChange = useCallback((token: ActiveAtToken | null) => {
     setMentionToken(token);
-    if (!token) setMentionIndex(0);
+    if (!token) {
+      setMentionIndex(0);
+      setMentionNavOrigin("keyboard");
+    }
   }, []);
 
   useEffect(() => {
@@ -761,6 +764,7 @@ export function ChatCard({
   // Slash token state for SkillSlashPopover (Built-in Commands + Skills)
   const [slashToken, setSlashToken] = useState<ActiveSlashToken | null>(null);
   const [slashSkillIndex, setSlashSkillIndex] = useState(0);
+  const [slashNavOrigin, setSlashNavOrigin] = useState<"keyboard" | "pointer">("keyboard");
 
   const filteredCommands = useMemo(() => {
     if (!slashToken) return [];
@@ -1332,7 +1336,7 @@ export function ChatCard({
       const selectedDir = await window.electron.openDirectoryDialog();
       if (selectedDir) {
         setWorkspaces((prev) => {
-          const next = prev.includes(selectedDir) ? prev : [selectedDir, ...prev];
+          const next = [selectedDir, ...prev.filter((p) => p !== selectedDir)];
           localStorage.setItem("const_harness_workspaces", JSON.stringify(next));
           return next;
         });
@@ -1608,35 +1612,61 @@ export function ChatCard({
     Boolean(mentionToken) ||
     Boolean(slashToken);
 
+  const showFolderTabHeader = (!compact || showProjectHeader) && !(isExecuting && queuedMessages && queuedMessages.length > 0);
+  const hasTopQueueDock = Boolean(isExecuting && queuedMessages && queuedMessages.length > 0);
+
   return (
     <div
       ref={cardContainerRef}
       data-composer
       className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0"
     >
-      {/* Unified Card */}
-      <div
-        className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
-          compact && !showProjectHeader ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
-        }`}
-      >
-        {/* Top Header Strip: Choose Project (Visible in landing view or when showProjectHeader is true) */}
-        {(!compact || showProjectHeader) && (
-          <div data-workspace-selector className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
+      {/* Unified Seamless Composer (Folder Tab + Borderless Surface Elevation) */}
+      <div className="w-full max-w-full flex flex-col select-none min-w-0">
+        {/* Top Folder Tab: Dynamic width adjusted to Project name with min/max bounds + smooth concave fillet */}
+        {showFolderTabHeader && (
+          <div
+            data-workspace-selector
+            className={cn(
+              "self-start relative max-w-[calc(100%-24px)] flex items-end",
+              isProjectOpen ? "z-30" : "z-10"
+            )}
+          >
             <Popover open={isProjectOpen} onOpenChange={(open) => {
               if (open) { closeAllMenus(); setSearchWorkspace(""); }
               setIsProjectOpen(open);
             }}>
               <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
-                title={currentProject}
-              >
-                <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
-                <span className="truncate max-w-[200px] sm:max-w-[320px]">{displayProjectName}</span>
-                <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
-              </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "group/tab relative inline-flex items-center justify-between gap-2 h-8 w-fit min-w-[144px] max-w-[min(320px,calc(100vw-48px))] px-3 rounded-tl-[14px] rounded-tr-[12px] text-[13px] font-sans transition-colors cursor-pointer outline-none",
+                    "bg-[#ebebf0] hover:bg-[#e3e3ea] text-[#525252] hover:text-[#161616]",
+                    "dark:bg-[#212123] dark:hover:bg-[#27272a] dark:text-[#b0b0b5] dark:hover:text-white",
+                    isProjectOpen && "bg-[#e3e3ea] text-[#161616] dark:bg-[#27272a] dark:text-white",
+                    currentProject && currentProject !== "Outside Project" && "text-[#262626] dark:text-[#e5e5e5]"
+                  )}
+                  title={currentProject}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Folder className="w-3.5 h-3.5 text-[#888888] dark:text-[#7a7a80] group-hover/tab:text-[#262626] dark:group-hover/tab:text-[#d4d4d4] shrink-0 transition-colors" />
+                    <span className="truncate font-medium tracking-[-0.005em]">{displayProjectName}</span>
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-[#888888] dark:text-[#737378] group-hover/tab:text-[#262626] dark:group-hover/tab:text-[#d4d4d4] shrink-0 transition-colors" />
+                  {/* Seamless right-foot concave fillet connecting folder tab to input surface */}
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 12 12"
+                    className={cn(
+                      "w-3 h-3 absolute -right-[11.5px] bottom-0 pointer-events-none transition-colors",
+                      isProjectOpen
+                        ? "text-[#e3e3ea] dark:text-[#27272a]"
+                        : "text-[#ebebf0] group-hover/tab:text-[#e3e3ea] dark:text-[#212123] dark:group-hover/tab:text-[#27272a]"
+                    )}
+                  >
+                    <path d="M0 0 C0 6.627 5.373 12 12 12 L0 12 Z" fill="currentColor" />
+                  </svg>
+                </button>
               </PopoverTrigger>
 
               {/* Choose Project Dropdown Popover */}
@@ -1694,7 +1724,7 @@ export function ChatCard({
                                   <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
                                   <div className="flex flex-col text-left truncate">
                                     <span className="truncate">{wsName}</span>
-                                    <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] truncate">{ws}</span>
+                                    <span className="text-[11px] text-[#a9a9a9] dark:text-[#777777] truncate">{ws}</span>
                                   </div>
                                 </div>
                                 {currentProject === ws && (
@@ -1743,32 +1773,30 @@ export function ChatCard({
           </div>
         )}
 
-        {/* Queued Messages Dock attached directly above AI input card, matching Screenshot */}
-        {isExecuting && queuedMessages && queuedMessages.length > 0 && (
+        {/* Queued Messages Dock attached directly above AI input card */}
+        {hasTopQueueDock && (
           <QueueDock
-            items={queuedMessages}
+            items={queuedMessages!}
             onSteerItem={onSteerMessage || (() => {})}
             onRemoveItem={onRemoveQueuedMessage || (() => {})}
             onEditItem={onEditQueuedMessage}
-            className={compact ? "max-w-full rounded-t-2xl" : "rounded-t-2xl -mx-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]"}
+            className="w-full max-w-full rounded-t-2xl"
           />
         )}
 
-        {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
+        {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with borderless fill elevation */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={cn(
-            "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors min-w-0 relative",
-            compact && !showProjectHeader
-              ? isExecuting && queuedMessages && queuedMessages.length > 0
-                ? "max-w-full rounded-b-2xl rounded-t-none border-t border-[#e2e2e4] dark:border-[#383838]"
-                : "max-w-full rounded-2xl"
-              : isExecuting && queuedMessages && queuedMessages.length > 0
-                ? "rounded-b-2xl rounded-t-none border border-[#e2e2e4] dark:border-[#383838] border-t-0 -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]"
-                : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
-            isDraggingOver && "ring-2 ring-primary/60 border-primary dark:border-primary/80 bg-primary/5",
+            "w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:shadow-none flex flex-col justify-between transition-colors min-w-0 relative",
+            hasTopQueueDock
+              ? "rounded-b-2xl rounded-t-none border-t border-[#e2e2e4]/80 dark:border-[#383838]/70"
+              : showFolderTabHeader
+                ? "rounded-tr-2xl rounded-b-2xl rounded-tl-none"
+                : "rounded-2xl",
+            isDraggingOver && "ring-2 ring-primary/60 bg-primary/5",
             isAnyBottomMenuOpen ? "z-30" : "z-10"
           )}
         >
@@ -1778,9 +1806,13 @@ export function ChatCard({
               <MentionPopover
                 candidates={mentionCandidates}
                 selectedIndex={mentionIndex}
+                selectionOrigin={mentionNavOrigin}
                 onSelect={handleSelectMentionCandidate}
                 onDrill={handleDrillDirectory}
-                onHover={(idx) => setMentionIndex(idx)}
+                onHover={(idx) => {
+                  setMentionNavOrigin("pointer");
+                  setMentionIndex(idx);
+                }}
               />
             )}
 
@@ -1790,10 +1822,14 @@ export function ChatCard({
                 commands={filteredCommands}
                 skills={filteredSkills}
                 selectedIndex={slashSkillIndex}
+                selectionOrigin={slashNavOrigin}
                 query={slashToken.query}
                 onSelectCommand={handleSelectCommand}
                 onSelect={handleSelectSkill}
-                onHover={(idx) => setSlashSkillIndex(idx)}
+                onHover={(idx) => {
+                  setSlashNavOrigin("pointer");
+                  setSlashSkillIndex(idx);
+                }}
                 onOpenSettings={() => onOpenSettings?.("skills")}
               />
             )}
@@ -1829,7 +1865,7 @@ export function ChatCard({
                                   className="w-full h-full object-cover block"
                                 />
                                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                  <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                                  <p className="text-[11px] text-white font-medium truncate leading-tight px-0.5">
                                     {file.name}
                                   </p>
                                 </div>
@@ -1844,11 +1880,11 @@ export function ChatCard({
                                   autoPlay
                                   loop
                                 />
-                                <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                                <span className="absolute bottom-1 right-1 text-[11px] font-medium text-white bg-black/60 px-1.5 py-0.5 rounded font-sans">
                                   Video
                                 </span>
                                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                  <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                                  <p className="text-[11px] text-white font-medium truncate leading-tight px-0.5">
                                     {file.name}
                                   </p>
                                 </div>
@@ -1856,7 +1892,7 @@ export function ChatCard({
                             ) : (
                               <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
                                 <div className="flex items-center justify-between w-full">
-                                  <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
+                                  <span className="text-[11px] font-medium text-[#888888] dark:text-[#888888] tracking-wide uppercase font-sans">
                                     {ext}
                                   </span>
                                   <FileIcon filename={file.name} className="w-3.5 h-3.5 shrink-0" />
@@ -1865,7 +1901,7 @@ export function ChatCard({
                                   <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block" title={file.name}>
                                     {file.name}
                                   </span>
-                                  <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-sans tabular-nums mt-0.5 block truncate">
+                                  <span className="text-[11px] text-[#a9a9a9] dark:text-[#777777] font-sans tabular-nums mt-0.5 block truncate">
                                     {formatFileSize(file.size)}
                                   </span>
                                 </div>
@@ -1893,7 +1929,7 @@ export function ChatCard({
                           className="z-50 max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg shadow-2xl border border-black/10 dark:border-[#383838] select-none pointer-events-none break-all"
                         >
                           <div className="font-medium truncate max-w-[200px]">{file.name}</div>
-                          <div className="text-[9.5px] text-[#a0a0a0] font-sans tabular-nums mt-0.5">
+                          <div className="text-[11px] text-[#a0a0a0] font-sans tabular-nums mt-0.5">
                             {formatFileSize(file.size)}
                           </div>
                         </TooltipContent>
@@ -1921,6 +1957,7 @@ export function ChatCard({
               onMentionTokenChange={handleMentionTokenChange}
               onSlashTokenChange={(tok) => {
                 setSlashToken(tok);
+                setSlashNavOrigin("keyboard");
                 setSlashSkillIndex(0);
               }}
               onOpenFilePreview={onOpenFilePreview}
@@ -1943,11 +1980,13 @@ export function ChatCard({
                 if (slashToken && totalSlashItems > 0) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
+                    setSlashNavOrigin("keyboard");
                     setSlashSkillIndex((prev) => (prev + 1) % totalSlashItems);
                     return;
                   }
                   if (e.key === "ArrowUp") {
                     e.preventDefault();
+                    setSlashNavOrigin("keyboard");
                     setSlashSkillIndex((prev) => (prev - 1 + totalSlashItems) % totalSlashItems);
                     return;
                   }
@@ -1972,11 +2011,13 @@ export function ChatCard({
                 if (mentionToken && mentionCandidates.length > 0) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
+                    setMentionNavOrigin("keyboard");
                     setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
                     return;
                   }
                   if (e.key === "ArrowUp") {
                     e.preventDefault();
+                    setMentionNavOrigin("keyboard");
                     setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
                     return;
                   }
@@ -2075,7 +2116,7 @@ export function ChatCard({
 
                 {/* Add Context Popover Menu */}
                 {isPlusOpen && (
-                  <ComposerMenuContent data-composer-menu="add-context" align="start" className="w-44 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <ComposerMenuContent data-composer-menu="add-context" align="start" className="w-52 max-w-[calc(100vw-24px)] max-h-[var(--radix-popover-content-available-height)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     <ScrollArea className="min-h-0 max-h-[inherit]">
                     <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#777777]">
                       {t("workbench.addContext")}
@@ -2105,49 +2146,44 @@ export function ChatCard({
                         <span className="text-[13px]">{t("workbench.media")}</span>
                       </div>
                       {attachments.length > 0 && (
-                        <span className="text-[10px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
+                        <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
                           {attachments.length}/{MAX_ATTACHMENTS}
                         </span>
                       )}
                     </button>
 
-                    {/* 2. Mentions */}
+                    {/* 2. Mentions (@) */}
                     <button
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
                         editorRef.current?.insertAt();
                       }}
-                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
+                      className="w-full px-2.5 py-2 flex items-center justify-between rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >
-                      <AtSign className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
-                      <span className="text-[13px]">{t("workbench.mentions")}</span>
+                      <div className="flex items-center gap-2.5">
+                        <AtSign className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
+                        <span className="text-[13px]">{t("workbench.mentions")}</span>
+                      </div>
+                      <span className="text-[11px] text-[#a9a9a9] dark:text-[#777777] font-sans">@</span>
                     </button>
 
-                    {/* 2.5 Skills (/) */}
+                    {/* 3. Commands & Skills (/) */}
                     <button
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
                         editorRef.current?.insertSlash();
                       }}
-                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
+                      className="w-full px-2.5 py-2 flex items-center justify-between rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >
-                      <PencilSparkles className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-[13px]">Skills (/)</span>
-                    </button>
-
-                    {/* 3. Actions */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsPlusOpen(false);
-                        editorRef.current?.insertCommand(" /");
-                      }}
-                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
-                    >
-                      <SquarePen className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
-                      <span className="text-[13px]">{t("common.actions")}</span>
+                      <div className="flex items-center gap-2.5">
+                        <PencilSparkles className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
+                        <span className="text-[13px]">
+                          {language === "id" ? "Perintah & Skill" : "Commands & Skills"}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-[#a9a9a9] dark:text-[#777777] font-sans">/</span>
                     </button>
 
                     {/* 4. Browser */}
@@ -2300,16 +2336,17 @@ export function ChatCard({
                 </Popover>
               </div>
 
-              {/* Active Plan / Goal Mode inline toggle (ChatGPT / Codex style: `Full access | 💡 Plan`) */}
+              {/* Active Plan / Goal Mode pill (ListChecks / Goal icon + X reveal on hover) */}
               {!isolatedModel && (activeRunIntent === "plan" || activeRunIntent === "goal") && (
                 <div className="flex items-center shrink-0">
-                  <span className="h-3.5 w-px bg-black/15 dark:bg-white/15 mx-1 shrink-0" aria-hidden="true" />
                   <button
                     type="button"
                     onClick={() => onRunIntentChange?.("default")}
                     className={cn(
-                      "inline-flex items-center transition-colors cursor-pointer text-[#737373] dark:text-[#a3a3a3] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-md",
-                      isNarrow ? "w-7 h-7 justify-center" : "gap-1.5 px-1.5 py-1 text-[13px] font-normal"
+                      "group/intent inline-flex items-center transition-all duration-150 cursor-pointer rounded-lg",
+                      "bg-black/[0.04] hover:bg-black/[0.08] text-[#525252] hover:text-[#161616]",
+                      "dark:bg-white/[0.07] dark:hover:bg-white/[0.12] dark:text-[#d4d4d4] dark:hover:text-white",
+                      isNarrow ? "w-7 h-7 justify-center" : "gap-1.5 px-2.5 py-1 text-[13px] font-normal"
                     )}
                     title={
                       activeRunIntent === "plan"
@@ -2321,14 +2358,20 @@ export function ChatCard({
                   >
                     {activeRunIntent === "plan" ? (
                       <>
-                        <Lightbulb className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                        <ListChecks className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
                         {!isNarrow && <span>Plan</span>}
                       </>
                     ) : (
                       <>
-                        <Target className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                        <Goal className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
                         {!isNarrow && <span>Goal</span>}
                       </>
+                    )}
+                    {!isNarrow && (
+                      <X
+                        className="w-0 opacity-0 group-hover/intent:w-3 group-hover/intent:opacity-80 group-focus-visible/intent:w-3 group-focus-visible/intent:opacity-80 transition-all duration-150 shrink-0 stroke-[2]"
+                        aria-hidden="true"
+                      />
                     )}
                   </button>
                 </div>

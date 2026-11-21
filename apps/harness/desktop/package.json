@@ -13,7 +13,7 @@
     "test:skills": "tsx --test electron/skill-installer.test.ts",
     "test:mcp": "tsx --test --test-concurrency=1 electron/mcp/*.test.ts",
     "test:plugins:preview": "node scripts/copy-excalidraw-assets.cjs && vite --config tests/vite.config.ts --port 5190",
-    "test:models": "tsx --test src/lib/models.test.ts src/lib/voice-dictation.test.ts src/lib/workbench-activity.test.ts",
+    "test:models": "tsx --test src/lib/models.test.ts src/lib/voice-dictation.test.ts src/lib/workbench-activity.test.ts src/lib/conversation-store.test.ts",
     "test:markdown": "tsx --test src/components/workbench/*.test.ts",
     "test:remote": "tsx --test electron/remote*.test.ts src/lib/remote-desktop-transport.test.ts src/lib/remote-storage.test.ts",
     "test:remote:ui": "node scripts/test-remote-workspace.cjs",

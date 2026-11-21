@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import {
   PencilSparkles,
-  Lightbulb,
-  Target,
+  ListChecks,
+  Goal,
   MessageCircle,
   Minimize2,
 } from "lucide-react";
@@ -15,6 +15,7 @@ export interface SkillSlashPopoverProps {
   commands?: BuiltinSlashCommand[];
   skills: LocalSkill[];
   selectedIndex: number;
+  selectionOrigin?: "keyboard" | "pointer";
   query?: string;
   onSelectCommand?: (command: BuiltinSlashCommand) => void;
   onSelect: (skill: LocalSkill) => void;
@@ -38,8 +39,8 @@ function CommandIcon({
     "w-4 h-4 shrink-0 transition-colors",
     selected ? "text-foreground" : "text-muted-foreground",
   );
-  if (id === "plan") return <Lightbulb className={cls} strokeWidth={1.75} />;
-  if (id === "goal") return <Target className={cls} strokeWidth={1.75} />;
+  if (id === "plan") return <ListChecks className={cls} strokeWidth={1.75} />;
+  if (id === "goal") return <Goal className={cls} strokeWidth={1.75} />;
   if (id === "btw") return <MessageCircle className={cls} strokeWidth={1.75} />;
   return <Minimize2 className={cls} strokeWidth={1.75} />;
 }
@@ -48,6 +49,7 @@ export function SkillSlashPopover({
   commands = [],
   skills,
   selectedIndex,
+  selectionOrigin = "keyboard",
   query = "",
   onSelectCommand,
   onSelect,
@@ -72,31 +74,12 @@ export function SkillSlashPopover({
   };
 
   useEffect(() => {
+    if (selectionOrigin !== "keyboard") return;
     const viewport = viewportRef.current;
     if (!viewport) return;
-
-    if (selectedIndex === 0) {
-      viewport.scrollTop = 0;
-      return;
-    }
-
-    if (selectedIndex === totalCount - 1) {
-      viewport.scrollTop = viewport.scrollHeight;
-      return;
-    }
-
     const selectedEl = viewport.querySelector<HTMLElement>('[data-selected="true"]');
-    if (!selectedEl) return;
-
-    const vRect = viewport.getBoundingClientRect();
-    const elRect = selectedEl.getBoundingClientRect();
-
-    if (elRect.bottom > vRect.bottom) {
-      viewport.scrollTop += elRect.bottom - vRect.bottom + 24;
-    } else if (elRect.top < vRect.top) {
-      viewport.scrollTop -= vRect.top - elRect.top + 24;
-    }
-  }, [selectedIndex, totalCount]);
+    selectedEl?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex, selectionOrigin, totalCount]);
 
   return (
     <div

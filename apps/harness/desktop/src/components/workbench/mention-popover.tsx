@@ -14,6 +14,7 @@ import { PluginIcon } from "../settings/plugin-icon";
 export interface MentionPopoverProps {
   candidates: MentionCandidate[];
   selectedIndex: number;
+  selectionOrigin?: "keyboard" | "pointer";
   onSelect: (candidate: MentionCandidate) => void;
   onDrill?: (candidate: MentionCandidate) => void;
   onHover: (index: number) => void;
@@ -39,6 +40,7 @@ function CandidateIcon({ candidate }: { candidate: MentionCandidate }) {
 export function MentionPopover({
   candidates,
   selectedIndex,
+  selectionOrigin = "keyboard",
   onSelect,
   onDrill,
   onHover,
@@ -47,16 +49,29 @@ export function MentionPopover({
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
 
-  // Auto scroll active item into view as user navigates
+  const handleMouseMove = (e: React.MouseEvent, index: number) => {
+    if (
+      Math.abs(e.clientX - lastMousePosRef.current.x) > 2 ||
+      Math.abs(e.clientY - lastMousePosRef.current.y) > 2
+    ) {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      if (index !== selectedIndex) {
+        onHover(index);
+      }
+    }
+  };
+
+  // Auto-scroll active item ONLY when navigating via keyboard (never hijack pointer hovering)
   useEffect(() => {
+    if (selectionOrigin !== "keyboard") return;
     if (activeItemRef.current) {
       activeItemRef.current.scrollIntoView({
         block: "nearest",
-        behavior: "smooth",
       });
     }
-  }, [selectedIndex]);
+  }, [selectedIndex, selectionOrigin]);
 
   // Separate candidates into Files & folders vs Sessions
   const filesAndFolders = candidates.filter(
@@ -89,7 +104,7 @@ export function MentionPopover({
                 const index = candidates.indexOf(candidate);
                 const selected = index === selectedIndex;
                 return <button key={candidate.id} type="button" ref={selected ? activeItemRef : undefined}
-                  onMouseDown={(event) => { event.preventDefault(); onSelect(candidate); }} onMouseMove={() => onHover(index)}
+                  onMouseDown={(event) => { event.preventDefault(); onSelect(candidate); }} onMouseMove={(e) => handleMouseMove(e, index)}
                   className={cn("w-full h-10 px-3 flex items-center gap-2.5 rounded-xl text-left text-[13px] font-sans cursor-pointer", selected ? "bg-[#f0f0f2] dark:bg-[#303030] text-black dark:text-white" : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2c2c2c]")}>
                   <CandidateIcon candidate={candidate} /><span>{candidate.title}</span>
                 </button>;
@@ -116,11 +131,7 @@ export function MentionPopover({
                           e.preventDefault();
                           onSelect(candidate);
                         }}
-                        onMouseMove={() => {
-                          if (!isSelected) {
-                            onHover(globalIndex);
-                          }
-                        }}
+                        onMouseMove={(e) => handleMouseMove(e, globalIndex)}
                         className={cn(
                           "w-full h-9 px-3 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
                           isSelected
@@ -169,7 +180,7 @@ export function MentionPopover({
                             className="flex items-center gap-1.5 text-[11px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white shrink-0 font-sans cursor-pointer ml-auto"
                           >
                             {isSelected && (
-                              <kbd className="px-1.5 py-0.5 text-[9.5px] font-mono bg-black/5 dark:bg-white/10 rounded border border-black/10 dark:border-white/10 text-[#666666] dark:text-[#a0a0a0] leading-none">
+                              <kbd className="px-1.5 py-0.5 text-[11px] font-sans bg-black/5 dark:bg-white/10 rounded border border-black/10 dark:border-white/10 text-[#666666] dark:text-[#a0a0a0] leading-none">
                                 Tab
                               </kbd>
                             )}
@@ -203,11 +214,7 @@ export function MentionPopover({
                           e.preventDefault();
                           onSelect(candidate);
                         }}
-                        onMouseMove={() => {
-                          if (!isSelected) {
-                            onHover(globalIndex);
-                          }
-                        }}
+                        onMouseMove={(e) => handleMouseMove(e, globalIndex)}
                         className={cn(
                           "w-full h-9 px-3 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
                           isSelected

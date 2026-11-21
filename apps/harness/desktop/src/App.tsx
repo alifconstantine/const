@@ -4568,10 +4568,10 @@ export function AuthenticatedContent({
         aria-hidden={remote?.mobile && !isSidebarOpen ? true : undefined}
         inert={remote?.mobile && !isSidebarOpen ? true : undefined}
         className={`workspace-sidebar shrink-0 overflow-hidden transition-[width,opacity] duration-250 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] ${
-          isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0 pointer-events-none"
+          isSidebarOpen ? "w-[268px] opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
-        <div className="w-64 h-full">
+        <div className="w-[268px] h-full">
           <Sidebar
             user={effectiveUser}
             onSignOut={onSignOut}

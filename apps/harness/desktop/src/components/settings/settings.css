@@ -28,8 +28,6 @@
 .workspace-settings
   :is(
     button,
-    input,
-    textarea,
     [tabindex="0"],
     [role="combobox"]
   ):focus-visible {
@@ -40,12 +38,14 @@
   .workspace-settings
   :is(
     button,
-    input,
-    textarea,
     [tabindex="0"],
     [role="combobox"]
   ):focus-visible {
   outline-color: #969696;
+}
+.workspace-settings :is(input, textarea):focus,
+.workspace-settings :is(input, textarea):focus-visible {
+  outline: none;
 }
 .workspace-settings .settings-nav-item:focus-visible {
   outline-offset: -2px;

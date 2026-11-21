@@ -4,10 +4,10 @@ import {
   Copy,
   Check,
   Waypoints,
-  Code2,
+  Link2,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
-import { TrajectoryStepCard } from "../right-pane/trajectory-tab";
+import { buildTrajectoryJsonl, TrajectoryStepCard } from "../right-pane/trajectory-tab";
 import { useTranslation } from "../../lib/i18n";
 
 interface TrajectoryDialogProps {
@@ -31,7 +31,7 @@ export function TrajectoryDialog({
   onOpenFileDiff,
   onOpenTrajectory,
 }: TrajectoryDialogProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<"timeline" | "raw">("timeline");
   const [rawTranscript, setRawTranscript] = useState<string>("");
   const [copied, setCopied] = useState(false);
@@ -39,27 +39,9 @@ export function TrajectoryDialog({
   const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
 
-  const generateFullJsonl = (msgs: any[]) => {
-    return msgs
-      .map((m, idx) =>
-        JSON.stringify({
-          step_index: idx,
-          source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
-          type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
-          content: m.content || "",
-          thinking: m.thinking || undefined,
-          tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
-          tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
-          mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,
-          created_at: new Date(m.timestamp || m.createdAt || Date.now()).toISOString(),
-        })
-      )
-      .join("\n");
-  };
-
   useEffect(() => {
     if (open && conversationId) {
-      const generatedFromMessages = generateFullJsonl(messages);
+      const generatedFromMessages = buildTrajectoryJsonl(messages);
       if (window.electron?.getTranscript) {
         window.electron
           .getTranscript(conversationId)
@@ -73,9 +55,7 @@ export function TrajectoryDialog({
             }
             setRawTranscript(generatedFromMessages);
           })
-          .catch(() => {
-            setRawTranscript(generatedFromMessages);
-          });
+          .catch(() => setRawTranscript(generatedFromMessages));
       } else {
         setRawTranscript(generatedFromMessages);
       }
@@ -84,93 +64,70 @@ export function TrajectoryDialog({
 
   if (!open) return null;
 
+  const trajectoryLogPath = `~/.const/harness/brain/${conversationId}/.system_generated/logs/transcript.jsonl`;
+
   const handleCopyRaw = async () => {
     try {
       await navigator.clipboard.writeText(rawTranscript);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 1800);
     } catch {}
   };
-
-  const trajectoryLogPath = `~/.const/harness/brain/${conversationId}/.system_generated/logs/transcript.jsonl`;
 
   const handleCopyPath = async () => {
     try {
       await navigator.clipboard.writeText(trajectoryLogPath);
       setCopiedPath(true);
-      setTimeout(() => setCopiedPath(false), 2000);
+      setTimeout(() => setCopiedPath(false), 1800);
     } catch {}
   };
 
   const toggleThinking = (idx: number) => {
-    setExpandedThinking((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
+    setExpandedThinking((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   const toggleTool = (toolKey: string) => {
-    setExpandedTools((prev) => ({
-      ...prev,
-      [toolKey]: !prev[toolKey],
-    }));
+    setExpandedTools((prev) => ({ ...prev, [toolKey]: !prev[toolKey] }));
   };
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 outline-none ring-0"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/50 dark:bg-black/70 backdrop-blur-xs animate-in fade-in duration-150 outline-none ring-0"
     >
-      <div className="w-full max-w-4xl h-[85vh] flex flex-col bg-[#161616] border border-[#383838] rounded-2xl overflow-hidden select-none outline-none ring-0">
-        {/* Header Strip - Level 1 Elevation, Zero divider lines */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-[#222222] shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white shrink-0">
-              <Waypoints className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[14px] font-semibold text-white font-sans truncate">
-                  {t("workbench.modelTrajectory")}
-                </span>
-                {conversationTitle && (
-                  <span className="text-xs text-[#969696] font-sans truncate hidden sm:inline max-w-[240px]">
-                    • {conversationTitle}
-                  </span>
-                )}
-                <span className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] shrink-0">
-                  {messages.length} steps
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyPath}
-                title={`Click to copy: ${trajectoryLogPath}`}
-                className="flex items-center gap-1.5 font-mono text-[11px] text-[#969696] hover:text-[#d4d4d4] truncate text-left transition-colors cursor-pointer group"
-              >
-                <Code2 className="w-3 h-3 text-[#5d5d5d] group-hover:text-[#969696] shrink-0" />
-                <span className="truncate">{trajectoryLogPath}</span>
-                {copiedPath ? (
-                  <Check className="w-3 h-3 text-[#10b981] shrink-0" />
-                ) : (
-                  <Copy className="w-3 h-3 text-[#5d5d5d] group-hover:text-[#969696] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                )}
-              </button>
-            </div>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[min(960px,94vw)] h-[min(820px,86vh)] flex flex-col bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl overflow-hidden text-[#161616] dark:text-white font-sans select-none outline-none focus:outline-none focus-visible:outline-none ring-0"
+      >
+        {/* Clean Header Strip */}
+        <div className="flex items-center justify-between px-5 py-3.5 shrink-0 gap-3">
+          <div className="flex items-baseline gap-2.5 min-w-0">
+            <h2 className="text-sm font-semibold text-[#161616] dark:text-white truncate">
+              {t("workbench.modelTrajectory")}
+            </h2>
+            {conversationTitle && (
+              <span className="text-xs text-[#737373] dark:text-[#8e8e93] truncate hidden sm:inline max-w-[260px]">
+                {conversationTitle}
+              </span>
+            )}
+            <span className="text-[11px] tabular-nums text-[#888888] dark:text-[#73737a] shrink-0">
+              {messages.length}{" "}
+              {language === "id" ? "langkah" : messages.length === 1 ? "step" : "steps"}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Tab switchers */}
-            <div className="flex items-center rounded-lg bg-[#1b1b1b] p-0.5 border border-[#2e2e2e] text-xs font-sans">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="inline-flex items-center rounded-lg bg-black/[0.04] dark:bg-white/[0.06] p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setActiveTab("timeline")}
                 className={cn(
-                  "px-3 py-1 rounded-md transition-all cursor-pointer font-medium font-sans text-xs",
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
                   activeTab === "timeline"
-                    ? "bg-[#2b2b2b] text-white"
-                    : "text-[#969696] hover:text-white"
+                    ? "bg-white dark:bg-[#2b2b2b] text-[#161616] dark:text-white shadow-2xs"
+                    : "text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white",
                 )}
               >
                 {t("workbench.timeline")}
@@ -179,40 +136,51 @@ export function TrajectoryDialog({
                 type="button"
                 onClick={() => setActiveTab("raw")}
                 className={cn(
-                  "px-3 py-1 rounded-md transition-all cursor-pointer font-medium font-sans text-xs",
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
                   activeTab === "raw"
-                    ? "bg-[#2b2b2b] text-white"
-                    : "text-[#969696] hover:text-white"
+                    ? "bg-white dark:bg-[#2b2b2b] text-[#161616] dark:text-white shadow-2xs"
+                    : "text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white",
                 )}
               >
                 {t("workbench.rawJsonl")}
               </button>
             </div>
 
-            {/* Copy raw button */}
+            {conversationId && (
+              <button
+                type="button"
+                onClick={handleCopyPath}
+                title={copiedPath ? t("common.copied") : trajectoryLogPath}
+                aria-label="Copy transcript log path"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+              >
+                {copiedPath ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Link2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleCopyRaw}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2e2e2e] bg-[#1b1b1b] hover:bg-[#252528] text-xs font-medium text-[#d4d4d4] hover:text-white transition-colors cursor-pointer font-sans"
+              title={copied ? t("common.copied") : t("workbench.copyJsonl")}
+              aria-label={t("workbench.copyJsonl")}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
             >
               {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-[#10b981]" />
-                  <span className="font-sans">{t("common.copied")}</span>
-                </>
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span className="font-sans">{t("workbench.copyJsonl")}</span>
-                </>
+                <Copy className="w-3.5 h-3.5" />
               )}
             </button>
 
-            {/* Close button */}
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white transition-colors cursor-pointer ml-1"
+              aria-label={t("common.close")}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -220,19 +188,19 @@ export function TrajectoryDialog({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 min-h-0 overflow-hidden bg-[#161616]">
+        <div className="flex-1 min-h-0 overflow-hidden">
           {activeTab === "timeline" ? (
-            <ScrollArea className="h-full w-full p-4 sm:p-6">
-              <div className="max-w-3xl mx-auto flex flex-col gap-3.5">
+            <ScrollArea className="h-full w-full" scrollBarClassName="w-2">
+              <div className="max-w-3xl mx-auto px-5 pb-6 pt-2 flex flex-col pl-7">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center select-none">
-                    <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center mb-3">
-                      <Waypoints className="w-6 h-6 text-[#969696]" />
+                    <div className="w-10 h-10 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center mb-3">
+                      <Waypoints className="w-5 h-5 text-[#888888] dark:text-[#8e8e93]" />
                     </div>
-                    <h3 className="text-sm font-semibold text-white font-sans mb-1">
+                    <h3 className="text-[13px] font-medium text-[#161616] dark:text-white mb-1">
                       No Trajectory Recorded
                     </h3>
-                    <p className="text-xs text-[#969696] font-sans max-w-xs">
+                    <p className="text-xs text-[#737373] dark:text-[#8e8e93] max-w-xs leading-relaxed">
                       {t("workbench.noTrajectory")}
                     </p>
                   </div>
@@ -242,6 +210,7 @@ export function TrajectoryDialog({
                       key={msg.id || idx}
                       message={msg}
                       stepIndex={idx}
+                      isLast={idx === messages.length - 1}
                       isThinkingExpanded={Boolean(expandedThinking[idx])}
                       onToggleThinking={() => toggleThinking(idx)}
                       expandedTools={expandedTools}
@@ -255,10 +224,12 @@ export function TrajectoryDialog({
               </div>
             </ScrollArea>
           ) : (
-            <ScrollArea className="h-full w-full p-4 font-mono text-[12px] leading-relaxed text-[#d4d4d4] select-text">
-              <pre className="whitespace-pre-wrap break-all font-mono">
-                {rawTranscript || "Loading trajectory logs..."}
-              </pre>
+            <ScrollArea className="h-full w-full" scrollBarClassName="w-2">
+              <div className="p-5 font-mono text-xs leading-relaxed text-[#262626] dark:text-[#d4d4d4] select-text">
+                <pre className="whitespace-pre-wrap break-all font-mono">
+                  {rawTranscript || "Loading trajectory logs..."}
+                </pre>
+              </div>
             </ScrollArea>
           )}
         </div>

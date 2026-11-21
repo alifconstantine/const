@@ -79,6 +79,7 @@ import {
   isScheduledTaskConversation,
   isSideChatConversation,
   getCleanConversationTitle,
+  sortProjectFolderKeys,
 } from "../lib/conversation-store";
 import { useTheme, type Theme, useInterfaceZoom } from "../lib/theme";
 import { useTranslation, type SupportedLanguage } from "../lib/i18n";
@@ -408,25 +409,7 @@ export function Sidebar({
       pMap[key]?.sort(sortByRecent);
     }
 
-    const rawKeys = Object.keys(pMap);
-
-    // Apply projectOrder
-    const ordered: string[] = [];
-    for (const key of projectOrder) {
-      if (rawKeys.includes(key)) {
-        ordered.push(key);
-      }
-    }
-    for (const key of rawKeys) {
-      if (!ordered.includes(key)) {
-        ordered.push(key);
-      }
-    }
-
-    // Pinned projects always come first!
-    const pinned = ordered.filter((k) => pinnedProjects.includes(k));
-    const unpinned = ordered.filter((k) => !pinnedProjects.includes(k));
-    const finalOrdered = [...pinned, ...unpinned];
+    const finalOrdered = sortProjectFolderKeys(pMap, projectOrder, pinnedProjects);
 
     return {
       projectMap: pMap,
@@ -566,7 +549,7 @@ export function Sidebar({
         <div
           data-no-select="true"
           onPointerDown={(e) => e.stopPropagation()}
-          className="flex items-center justify-end shrink-0 select-none min-w-[46px]"
+          className="flex items-center justify-end shrink-0 select-none min-w-[28px]"
         >
           {/* Relative time or Loading Spinner or Approval Waiting */}
           {pendingApprovals?.has(convo.id) ? (
@@ -580,7 +563,7 @@ export function Sidebar({
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
           ) : (
             <div
-              className={`items-center justify-end gap-1 w-full ${
+              className={`items-center justify-end gap-1 ${
                 isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
               }`}
             >
@@ -599,25 +582,12 @@ export function Sidebar({
             </div>
           )}
 
-          {/* Actions on hover or when dropdown menu is open */}
+          {/* Single clean context trigger on hover (Archive, Rename, Delete live inside) */}
           <div
-            className={`items-center justify-end gap-0.5 ${
+            className={`items-center justify-end ${
               isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
             }`}
           >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onArchiveConversation?.(convo.id);
-              }}
-              className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
-              title={t("sidebar.archiveConvo")}
-              aria-label={t("sidebar.archiveConvo")}
-            >
-              <Archive className="w-3.5 h-3.5" />
-            </button>
-
             <DropdownMenu
               open={isMenuOpen}
               onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
@@ -626,7 +596,7 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={(e) => e.stopPropagation()}
-                  className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                  className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer outline-none ${
                     isMenuOpen
                       ? "bg-[#dedee2] dark:bg-[#484848] text-[#161616] dark:text-white"
                       : "hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
@@ -708,25 +678,25 @@ export function Sidebar({
     /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 
   return (
-    <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#666666] dark:text-[#999999] p-3">
+    <aside className="w-[268px] h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#666666] dark:text-[#999999] px-2.5 py-3">
       {/* Top Header & Navigation Actions (No dividing lines, following DESIGN.md) */}
       <div className="flex flex-col shrink-0">
         {/* Logo and Collapse Button */}
         <div
           data-sidebar-header
-          className="flex items-center justify-between h-9 mb-2"
+          className="flex items-center justify-between h-9 mb-2.5 px-1"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         >
           <div
-            className="flex items-center gap-2 px-0.5"
+            className="flex items-center gap-2"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
             <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-baseline gap-1.5">
               {remote ? <span className="flex items-center gap-2 text-xs max-w-40 truncate" title={t(remote.online ? "remoteControl.mobileConnected" : "remoteControl.mobileDisconnected")}><span className={`w-1.5 h-1.5 shrink-0 rounded-full ${remote.online ? "bg-green-500" : "bg-[#969696]"}`} /><span className="truncate">{remote.deviceName}</span></span> : <><span className="font-serif text-base font-normal tracking-tight text-foreground">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              <span className="text-[11px] font-sans font-medium tracking-wide text-muted-foreground">
                 Harness
               </span></>}
             </div>
@@ -753,12 +723,12 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Action: Create New Chat Button (Always crisp white as primary action) */}
-        <div className="mb-2">
+        {/* Action: Create New Chat Button */}
+        <div className="mb-1.5">
           <button
             type="button"
             onClick={() => onNewChat?.()}
-            className="w-full h-9 flex items-center justify-between px-2.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            className="w-full h-8 flex items-center justify-between px-2.5 rounded-lg bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.11] text-foreground font-medium text-xs transition-colors cursor-pointer group active:scale-[0.99]"
             title={`New chat (${isMac ? "⌘N" : "Ctrl+N"})`}
           >
             <div className="flex items-center gap-2.5">
@@ -767,14 +737,14 @@ export function Sidebar({
                 {t("sidebar.newChat")}
               </span>
             </div>
-            <span className="text-xs text-black/70 dark:text-white/70 group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none tracking-tight">
+            <span className="text-[11px] text-black/60 dark:text-white/60 group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none tracking-tight">
               {isMac ? "⌘N" : "Ctrl+N"}
             </span>
           </button>
         </div>
 
-        {/* Navigation Items (Gray by default, white on hover) */}
-        <div className="space-y-0.5 mb-3 text-xs font-medium">
+        {/* Navigation Items */}
+        <div className="space-y-0.5 mb-4 text-xs font-medium">
           {/* Search */}
           <button
             type="button"
@@ -809,7 +779,7 @@ export function Sidebar({
             <span>{t("sidebar.scheduledTasks")}</span>
           </button>
 
-          {/* Agent Skills (matching learn home sidebar) */}
+          {/* Agent Skills & Plugins Marketplace */}
           <button
             type="button"
             onClick={onOpenSkills}
@@ -821,15 +791,15 @@ export function Sidebar({
           >
             <Store className={`w-4 h-4 transition-colors ${
               isSkillsActive
-                ? "text-primary"
-                : "text-[#777777] dark:text-[#888888] group-hover:text-primary"
+                ? "text-black dark:text-white"
+                : "text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white"
             }`} />
             <span>{t("settings.marketplace") || "Marketplace"}</span>
           </button>
         </div>
 
         {/* Switcher Dropdown (Recent, Project, Conversation) & Action Icons */}
-        <div className="flex items-center justify-between pb-1.5 mb-1">
+        <div className="flex items-center justify-between pb-1.5 mb-0.5 pr-1">
           {/* Left: Dropdown Switcher */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -945,8 +915,12 @@ export function Sidebar({
 
       {/* Middle: Chat History (ScrollArea) */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col w-full max-w-full">
-        <ScrollArea className="flex-1 w-full [&>div>div[style]]:!block" viewportClassName="[&>div[style]]:!block">
-          <div className="flex flex-col gap-1.5 py-1 pr-1 w-full max-w-full">
+        <ScrollArea
+          className="flex-1 w-full [&>div>div[style]]:!block"
+          viewportClassName="[&>div[style]]:!block"
+          scrollBarClassName="w-2"
+        >
+          <div className="flex flex-col gap-1.5 pt-0.5 pb-2 pr-3 w-full max-w-full">
             {activeTab === "recent" ? (
               <TooltipProvider delayDuration={150}>
                 <div className="flex flex-col gap-0.5 w-full max-w-full">
@@ -1103,7 +1077,7 @@ export function Sidebar({
 
                               {/* Task / Conversation Items inside Project */}
                               {!isCollapsed && (
-                                <div className="flex flex-col gap-0.5 ml-3 pl-2.5 border-l border-[#dedee2]/60 dark:border-[#383838]/50 w-[calc(100%-12px)] max-w-[calc(100%-12px)]">
+                                <div className="flex flex-col gap-0.5 ml-2.5 pl-2 border-l border-[#dedee2]/60 dark:border-[#383838]/50 min-w-0">
                                   {(() => {
                                     const isExpanded = Boolean(expandedProjects[projectName]);
                                     const displayItems = isExpanded
@@ -1175,7 +1149,7 @@ export function Sidebar({
                     </div>
 
                     {!isConversationsCollapsed && (
-                      <div className="flex flex-col gap-0.5 ml-3 pl-2.5 border-l border-[#dedee2]/60 dark:border-[#383838]/50 w-[calc(100%-12px)] max-w-[calc(100%-12px)]">
+                      <div className="flex flex-col gap-0.5 ml-2.5 pl-2 border-l border-[#dedee2]/60 dark:border-[#383838]/50 min-w-0">
                         {(isOutsideExpanded
                           ? outsideConversations
                           : outsideConversations.slice(0, VISIBLE_CHATS_LIMIT)

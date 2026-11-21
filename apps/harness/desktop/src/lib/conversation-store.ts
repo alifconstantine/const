@@ -60,7 +60,48 @@ export function getDefaultAgentMode(): "request_review" | "ask_before_changes" |
 
 export function getCleanConversationTitle(title?: string): string {
   if (!title) return "Untitled task";
-  return title.replace(/^\[Scheduled\]\s*/i, "");
+  return title
+    .replace(/^\[Scheduled\]\s*/i, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim() || "Untitled task";
+}
+
+/**
+ * Orders project folder keys for the sidebar:
+ * 1. Pinned projects first (respecting new/recent order within pinned & existing order)
+ * 2. Brand-new projects (not yet in saved `projectOrder`) sorted by most-recent conversation activity DESC, placed ABOVE older manually ordered projects so newly opened/created projects always surface at the top.
+ * 3. Remaining manually ordered projects.
+ */
+export function sortProjectFolderKeys(
+  projectMap: Record<string, Array<{ updatedAt?: number; createdAt?: number }>>,
+  projectOrder: string[],
+  pinnedProjects: string[],
+): string[] {
+  const rawKeys = Object.keys(projectMap);
+  const latestActivity = (key: string): number => {
+    let maxTs = 0;
+    for (const item of projectMap[key] || []) {
+      const ts = item.updatedAt || item.createdAt || 0;
+      if (ts > maxTs) maxTs = ts;
+    }
+    return maxTs;
+  };
+
+  const orderedExisting: string[] = [];
+  for (const key of projectOrder) {
+    if (rawKeys.includes(key)) {
+      orderedExisting.push(key);
+    }
+  }
+
+  const newKeys = rawKeys
+    .filter((key) => !orderedExisting.includes(key))
+    .sort((a, b) => latestActivity(b) - latestActivity(a));
+
+  const combined = [...newKeys, ...orderedExisting];
+  const pinned = combined.filter((k) => pinnedProjects.includes(k));
+  const unpinned = combined.filter((k) => !pinnedProjects.includes(k));
+  return [...pinned, ...unpinned];
 }
 
 export function isScheduledTaskConversation(convo?: {

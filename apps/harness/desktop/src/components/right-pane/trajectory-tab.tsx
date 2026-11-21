@@ -5,13 +5,12 @@ import {
   Check,
   Terminal,
   Brain,
-  MessageSquare,
   Search,
   ChevronDown,
   ChevronRight,
   AlertCircle,
   X,
-  Code2,
+  Link2,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "../workbench/file-icon";
@@ -32,6 +31,67 @@ interface TrajectoryTabProps {
   onOpenBrowser?: (url: string) => void;
 }
 
+export function buildTrajectoryJsonl(msgs: any[]): string {
+  return msgs
+    .map((m, idx) =>
+      JSON.stringify({
+        step_index: idx,
+        source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
+        type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
+        content: m.content || "",
+        thinking: m.thinking || undefined,
+        tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
+        tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
+        mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,
+        created_at: new Date(m.timestamp || m.createdAt || Date.now()).toISOString(),
+      }),
+    )
+    .join("\n");
+}
+
+function summarizeToolArgs(args: unknown): string {
+  if (!args) return "";
+  if (typeof args === "string") {
+    return args.replace(/\s+/g, " ").trim().slice(0, 96);
+  }
+  if (typeof args === "object") {
+    const obj = args as Record<string, unknown>;
+    const priorityKeys = [
+      "CommandLine",
+      "command",
+      "Path",
+      "path",
+      "filePath",
+      "targetFile",
+      "url",
+      "query",
+      "Pattern",
+      "pattern",
+    ];
+    for (const key of priorityKeys) {
+      const val = obj[key];
+      if (typeof val === "string" && val.trim()) {
+        return val.replace(/\s+/g, " ").trim().slice(0, 96);
+      }
+    }
+    for (const val of Object.values(obj)) {
+      if (typeof val === "string" && val.trim()) {
+        return val.replace(/\s+/g, " ").trim().slice(0, 96);
+      }
+    }
+  }
+  return "";
+}
+
+function formatCodePayload(value: unknown): string {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value ?? "");
+  }
+}
+
 export function TrajectoryTab({
   tab,
   parentMessages = [],
@@ -43,7 +103,7 @@ export function TrajectoryTab({
   onOpenTrajectory,
   onOpenBrowser,
 }: TrajectoryTabProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [activeView, setActiveView] = useState<"timeline" | "raw">("timeline");
   const [rawTranscript, setRawTranscript] = useState<string>("");
   const [copiedRaw, setCopiedRaw] = useState(false);
@@ -52,7 +112,6 @@ export function TrajectoryTab({
   const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
 
-  // Resolve target conversation ID and messages
   const targetConversationId = tab.conversationId || parentConversationId || "";
   const isCurrentParent = targetConversationId === parentConversationId;
 
@@ -68,36 +127,12 @@ export function TrajectoryTab({
     t("workbench.modelTrajectory");
 
   const effectiveMessages = useMemo(() => {
-    if (isCurrentParent) {
-      return parentMessages;
-    }
-    return targetConversation?.messages || [];
+    return isCurrentParent ? parentMessages : (targetConversation?.messages || []);
   }, [isCurrentParent, parentMessages, targetConversation]);
 
-  // Generate fallback JSONL from messages
-  const generateFullJsonl = (msgs: any[]) => {
-    return msgs
-      .map((m, idx) =>
-        JSON.stringify({
-          step_index: idx,
-          source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
-          type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
-          content: m.content || "",
-          thinking: m.thinking || undefined,
-          tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
-          tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
-          mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,
-          created_at: new Date(m.timestamp || m.createdAt || Date.now()).toISOString(),
-        })
-      )
-      .join("\n");
-  };
-
-  // Fetch disk transcript if electron API is available
   useEffect(() => {
     if (!targetConversationId) return;
-
-    const generated = generateFullJsonl(effectiveMessages);
+    const generated = buildTrajectoryJsonl(effectiveMessages);
     if (window.electron?.getTranscript) {
       window.electron
         .getTranscript(targetConversationId)
@@ -111,9 +146,7 @@ export function TrajectoryTab({
           }
           setRawTranscript(generated);
         })
-        .catch(() => {
-          setRawTranscript(generated);
-        });
+        .catch(() => setRawTranscript(generated));
     } else {
       setRawTranscript(generated);
     }
@@ -125,7 +158,7 @@ export function TrajectoryTab({
     try {
       await navigator.clipboard.writeText(rawTranscript);
       setCopiedRaw(true);
-      setTimeout(() => setCopiedRaw(false), 2000);
+      setTimeout(() => setCopiedRaw(false), 1800);
     } catch {}
   };
 
@@ -133,37 +166,30 @@ export function TrajectoryTab({
     try {
       await navigator.clipboard.writeText(trajectoryLogPath);
       setCopiedPath(true);
-      setTimeout(() => setCopiedPath(false), 2000);
+      setTimeout(() => setCopiedPath(false), 1800);
     } catch {}
   };
 
   const toggleThinking = (idx: number) => {
-    setExpandedThinking((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
+    setExpandedThinking((prev) => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   const toggleTool = (toolKey: string) => {
-    setExpandedTools((prev) => ({
-      ...prev,
-      [toolKey]: !prev[toolKey],
-    }));
+    setExpandedTools((prev) => ({ ...prev, [toolKey]: !prev[toolKey] }));
   };
 
-  // Filter messages by search query
   const filteredMessages = useMemo(() => {
     if (!searchQuery.trim()) return effectiveMessages;
     const query = searchQuery.toLowerCase();
     return effectiveMessages.filter((msg) => {
-      if (msg.content && msg.content.toLowerCase().includes(query)) return true;
-      if (msg.thinking && msg.thinking.toLowerCase().includes(query)) return true;
+      if (msg.content && String(msg.content).toLowerCase().includes(query)) return true;
+      if (msg.thinking && String(msg.thinking).toLowerCase().includes(query)) return true;
       if (
-        msg.toolCalls &&
+        Array.isArray(msg.toolCalls) &&
         msg.toolCalls.some(
           (tc: any) =>
             tc.name?.toLowerCase().includes(query) ||
-            JSON.stringify(tc.args || "").toLowerCase().includes(query)
+            JSON.stringify(tc.args || "").toLowerCase().includes(query),
         )
       ) {
         return true;
@@ -173,44 +199,32 @@ export function TrajectoryTab({
   }, [effectiveMessages, searchQuery]);
 
   return (
-    <div className="flex-1 w-full h-full flex flex-col bg-[#161616] text-[#ffffff] overflow-hidden select-none">
-      {/* Header Bar - Level 1 Elevation, Zero divider line */}
-      <div className="px-4 py-3 bg-[#222222] shrink-0 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-3">
-          {/* Title and Waypoints icon */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-[#ffffff] shrink-0">
-              <Waypoints className="w-4 h-4 text-[#ffffff]" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[13.5px] font-semibold text-[#ffffff] font-sans truncate">
-                  {t("workbench.modelTrajectory")}
-                </span>
-                <span className="text-[11px] font-sans font-medium px-2 py-0.5 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] shrink-0">
-                  {effectiveMessages.length} {t("workbench.timeline").toLowerCase()}
-                </span>
-              </div>
-              {activeTitle && activeTitle !== t("workbench.modelTrajectory") && (
-                <span className="text-xs text-[#969696] font-sans truncate">
-                  {activeTitle}
-                </span>
-              )}
-            </div>
+    <div className="flex-1 w-full h-full flex flex-col bg-[#ffffff] dark:bg-[#141414] text-[#161616] dark:text-white overflow-hidden select-none font-sans">
+      {/* Compact borderless header */}
+      <div className="px-4 pt-3 pb-2.5 shrink-0 flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-[13px] font-medium text-[#161616] dark:text-white truncate">
+              {activeTitle !== t("workbench.modelTrajectory")
+                ? activeTitle
+                : t("workbench.modelTrajectory")}
+            </span>
+            <span className="text-[11px] tabular-nums text-[#737373] dark:text-[#7a7a80] shrink-0">
+              {effectiveMessages.length}{" "}
+              {language === "id" ? "langkah" : effectiveMessages.length === 1 ? "step" : "steps"}
+            </span>
           </div>
 
-          {/* Right Header Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* View Mode Toggle */}
-            <div className="flex items-center rounded-lg bg-[#1b1b1b] p-0.5 border border-[#2e2e2e] text-xs font-sans">
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="inline-flex items-center rounded-lg bg-black/[0.04] dark:bg-white/[0.06] p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setActiveView("timeline")}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer font-medium font-sans text-xs",
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
                   activeView === "timeline"
-                    ? "bg-[#2b2b2b] text-[#ffffff]"
-                    : "text-[#969696] hover:text-[#ffffff]"
+                    ? "bg-white dark:bg-[#2b2b2b] text-[#161616] dark:text-white shadow-2xs"
+                    : "text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white",
                 )}
               >
                 {t("workbench.timeline")}
@@ -219,126 +233,116 @@ export function TrajectoryTab({
                 type="button"
                 onClick={() => setActiveView("raw")}
                 className={cn(
-                  "px-2.5 py-1 rounded-md transition-all cursor-pointer font-medium font-sans text-xs",
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
                   activeView === "raw"
-                    ? "bg-[#2b2b2b] text-[#ffffff]"
-                    : "text-[#969696] hover:text-[#ffffff]"
+                    ? "bg-white dark:bg-[#2b2b2b] text-[#161616] dark:text-white shadow-2xs"
+                    : "text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white",
                 )}
               >
                 {t("workbench.rawJsonl")}
               </button>
             </div>
 
-            {/* Copy JSONL button */}
+            {targetConversationId && (
+              <button
+                type="button"
+                onClick={handleCopyPath}
+                title={copiedPath ? t("common.copied") : trajectoryLogPath}
+                aria-label="Copy transcript log path"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
+              >
+                {copiedPath ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Link2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleCopyRaw}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#2e2e2e] bg-[#1b1b1b] hover:bg-[#252528] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] transition-colors cursor-pointer font-sans"
-              title={t("workbench.copyJsonl")}
+              title={copiedRaw ? t("common.copied") : t("workbench.copyJsonl")}
+              aria-label={t("workbench.copyJsonl")}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] dark:text-[#8e8e93] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
             >
               {copiedRaw ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-[#10b981]" />
-                  <span className="text-[11px] font-sans">{t("common.copied")}</span>
-                </>
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-sans hidden sm:inline">{t("workbench.copyJsonl")}</span>
-                </>
+                <Copy className="w-3.5 h-3.5" />
               )}
             </button>
           </div>
         </div>
 
-        {/* Secondary Bar: Log Path Pill & Search */}
-        <div className="flex items-center gap-2">
-          {/* Path pill */}
-          <button
-            type="button"
-            onClick={handleCopyPath}
-            title={`Click to copy: ${trajectoryLogPath}`}
-            className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1b1b1b] hover:bg-[#252528] border border-[#2e2e2e] text-left transition-colors cursor-pointer group"
-          >
-            <Code2 className="w-3.5 h-3.5 text-[#969696] group-hover:text-[#ffffff] shrink-0" />
-            <span className="font-mono text-[11px] text-[#969696] group-hover:text-[#d4d4d4] truncate">
-              {trajectoryLogPath}
-            </span>
-            {copiedPath ? (
-              <Check className="w-3 h-3 text-[#10b981] ml-auto shrink-0" />
-            ) : (
-              <Copy className="w-3 h-3 text-[#5d5d5d] group-hover:text-[#969696] ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {activeView === "timeline" && effectiveMessages.length > 0 && (
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-[#888888] dark:text-[#6e6e73] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={language === "id" ? "Filter langkah, tool, atau teks..." : "Filter steps, tools, or text..."}
+              className="w-full h-8 pl-8 pr-7 text-xs font-sans bg-black/[0.04] dark:bg-white/[0.05] rounded-lg text-[#161616] dark:text-white placeholder:text-[#888888] dark:placeholder:text-[#6e6e73] focus:outline-none focus:bg-black/[0.06] dark:focus:bg-white/[0.08] transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#161616] dark:hover:text-white cursor-pointer"
+                aria-label="Clear filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             )}
-          </button>
-
-          {/* Search Input when in timeline view */}
-          {activeView === "timeline" && (
-            <div className="relative w-36 sm:w-44 shrink-0">
-              <Search className="w-3.5 h-3.5 text-[#5d5d5d] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter steps..."
-                className="w-full h-7 pl-8 pr-6 text-xs font-sans bg-[#1b1b1b] border border-[#2e2e2e] rounded-md text-[#ffffff] placeholder:text-[#5d5d5d] focus:outline-none focus:border-[#383838] transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#5d5d5d] hover:text-[#d4d4d4]"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0 relative overflow-hidden bg-[#161616]">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         {activeView === "timeline" ? (
-          <ScrollArea className="h-full w-full">
-            <div className="p-4 sm:p-5 flex flex-col gap-3.5 max-w-4xl mx-auto">
+          <ScrollArea className="h-full w-full" scrollBarClassName="w-2">
+            <div className="px-4 pb-6 pt-2 max-w-3xl mx-auto">
               {filteredMessages.length === 0 ? (
-                /* Empty state matching DESIGN.md */
                 <div className="flex flex-col items-center justify-center py-16 text-center select-none">
-                  <div className="w-12 h-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center mb-3">
-                    <Waypoints className="w-6 h-6 text-[#969696]" />
+                  <div className="w-10 h-10 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center mb-3">
+                    <Waypoints className="w-5 h-5 text-[#888888] dark:text-[#8e8e93]" />
                   </div>
-                  <h3 className="text-sm font-semibold text-[#ffffff] font-sans mb-1">
+                  <h3 className="text-[13px] font-medium text-[#161616] dark:text-white mb-1">
                     {searchQuery ? "No matching trajectory steps" : "No Trajectory Recorded"}
                   </h3>
-                  <p className="text-xs text-[#969696] font-sans max-w-xs">
+                  <p className="text-xs text-[#737373] dark:text-[#8e8e93] max-w-xs leading-relaxed">
                     {searchQuery
-                      ? `No steps match the filter "${searchQuery}".`
+                      ? `No steps match "${searchQuery}".`
                       : t("workbench.noTrajectory")}
                   </p>
                 </div>
               ) : (
-                filteredMessages.map((msg, idx) => (
-                  <TrajectoryStepCard
-                    key={msg.id || idx}
-                    message={msg}
-                    stepIndex={idx}
-                    isThinkingExpanded={Boolean(expandedThinking[idx])}
-                    onToggleThinking={() => toggleThinking(idx)}
-                    expandedTools={expandedTools}
-                    onToggleTool={toggleTool}
-                    onOpenFilePreview={onOpenFilePreview}
-                    onOpenFileDiff={onOpenFileDiff}
-                    onOpenTrajectory={onOpenTrajectory}
-                    onOpenBrowser={onOpenBrowser}
-                  />
-                ))
+                <div className="flex flex-col pl-2">
+                  {filteredMessages.map((msg, idx) => (
+                    <TrajectoryStepCard
+                      key={msg.id || idx}
+                      message={msg}
+                      stepIndex={idx}
+                      isLast={idx === filteredMessages.length - 1}
+                      isThinkingExpanded={Boolean(expandedThinking[idx])}
+                      onToggleThinking={() => toggleThinking(idx)}
+                      expandedTools={expandedTools}
+                      onToggleTool={toggleTool}
+                      onOpenFilePreview={onOpenFilePreview}
+                      onOpenFileDiff={onOpenFileDiff}
+                      onOpenTrajectory={onOpenTrajectory}
+                      onOpenBrowser={onOpenBrowser}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </ScrollArea>
         ) : (
-          /* Raw JSONL View */
-          <ScrollArea className="h-full w-full">
-            <div className="p-4 font-mono text-[12px] leading-relaxed text-[#d4d4d4] select-text">
+          <ScrollArea className="h-full w-full" scrollBarClassName="w-2">
+            <div className="p-4 pr-5 font-mono text-xs leading-relaxed text-[#262626] dark:text-[#d4d4d4] select-text">
               <pre className="whitespace-pre-wrap break-all font-mono">
                 {rawTranscript || "Loading trajectory logs..."}
               </pre>
@@ -351,11 +355,12 @@ export function TrajectoryTab({
 }
 
 // ---------------------------------------------------------------------------
-// TrajectoryStepCard: Clean Const Studio step item with Markdown formatting
+// TrajectoryStepCard: Calm editorial vertical thread (zero nested slop boxes)
 // ---------------------------------------------------------------------------
 interface TrajectoryStepCardProps {
   message: any;
   stepIndex: number;
+  isLast?: boolean;
   isThinkingExpanded: boolean;
   onToggleThinking: () => void;
   expandedTools: Record<string, boolean>;
@@ -368,21 +373,17 @@ interface TrajectoryStepCardProps {
 
 function TrajectoryThinkingView({ thinking }: { thinking: string }) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const isInitiallyLong = useMemo(
-    () => (thinking || "").length > 200 || (thinking || "").split("\n").length > 4,
-    [thinking]
+  const [canScrollDown, setCanScrollDown] = useState(
+    () => (thinking || "").length > 220 || (thinking || "").split("\n").length > 5,
   );
-  const [canScrollDown, setCanScrollDown] = useState(isInitiallyLong);
   const [canScrollUp, setCanScrollUp] = useState(false);
 
   const checkScroll = useCallback(() => {
     const el = viewportRef.current;
     if (!el) return;
     const hasOverflow = el.scrollHeight > el.clientHeight + 4;
-    const moreBelow = hasOverflow && el.scrollHeight - el.scrollTop - el.clientHeight > 6;
-    const moreAbove = hasOverflow && el.scrollTop > 6;
-    setCanScrollDown(moreBelow);
-    setCanScrollUp(moreAbove);
+    setCanScrollDown(hasOverflow && el.scrollHeight - el.scrollTop - el.clientHeight > 6);
+    setCanScrollUp(hasOverflow && el.scrollTop > 6);
   }, []);
 
   useEffect(() => {
@@ -401,16 +402,16 @@ function TrajectoryThinkingView({ thinking }: { thinking: string }) {
   const maskStyle = useMemo(() => {
     if (!canScrollDown && !canScrollUp) return undefined;
     if (canScrollDown && canScrollUp) {
-      return "linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 32px), transparent 100%)";
+      return "linear-gradient(to bottom, transparent 0%, black 18px, black calc(100% - 28px), transparent 100%)";
     }
     if (canScrollDown) {
-      return "linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)";
+      return "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)";
     }
-    return "linear-gradient(to bottom, transparent 0%, black 20px, black 100%)";
+    return "linear-gradient(to bottom, transparent 0%, black 18px, black 100%)";
   }, [canScrollDown, canScrollUp]);
 
   return (
-    <div className="relative px-3 pb-3 pt-1 border-t border-[#282828] select-text">
+    <div className="mt-1.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] px-3 py-2 select-text">
       <ScrollArea
         viewportRef={viewportRef}
         onScroll={checkScroll}
@@ -422,16 +423,10 @@ function TrajectoryThinkingView({ thinking }: { thinking: string }) {
               }
             : undefined
         }
-        className="max-h-56 w-full pr-1 text-xs text-[#d4d4d4] font-sans leading-relaxed whitespace-pre-wrap select-text [&>div>div[style]]:!block"
+        className="max-h-52 w-full pr-2 text-xs text-[#525252] dark:text-[#b4b4ba] font-sans leading-relaxed whitespace-pre-wrap select-text [&>div>div[style]]:!block"
       >
         {thinking}
       </ScrollArea>
-      {canScrollDown && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute bottom-3 left-3 right-3 h-8 bg-gradient-to-t from-[#1b1b1b] via-[#1b1b1b]/80 to-transparent transition-opacity duration-200"
-        />
-      )}
     </div>
   );
 }
@@ -439,6 +434,7 @@ function TrajectoryThinkingView({ thinking }: { thinking: string }) {
 export function TrajectoryStepCard({
   message,
   stepIndex,
+  isLast = false,
   isThinkingExpanded,
   onToggleThinking,
   expandedTools,
@@ -448,7 +444,7 @@ export function TrajectoryStepCard({
   onOpenTrajectory,
   onOpenBrowser,
 }: TrajectoryStepCardProps) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const isUser = message.role === "user";
 
   const formattedTime = useMemo(() => {
@@ -462,199 +458,199 @@ export function TrajectoryStepCard({
   }, [message.timestamp, message.createdAt]);
 
   return (
-    <div className="flex flex-col gap-3 p-4 rounded-xl bg-[#222222] border border-[#383838] transition-colors select-none">
-      {/* Card Header Strip - Seamless borderless */}
-      <div className="flex items-center justify-between text-xs font-sans">
+    <div
+      className={cn(
+        "relative pl-5 select-none",
+        isLast ? "pb-1" : "pb-5 border-l border-black/[0.09] dark:border-white/[0.09]",
+      )}
+    >
+      {/* Subtle spine anchor dot */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute -left-[4.5px] top-1.5 w-2 h-2 rounded-full",
+          isUser
+            ? "bg-[#161616] dark:bg-white"
+            : "bg-[#ffffff] dark:bg-[#141414] ring-1.5 ring-[#a3a3a3] dark:ring-[#5e5e66]",
+        )}
+      />
+
+      {/* Minimal step meta header */}
+      <div className="flex items-center justify-between gap-2 mb-1.5 text-xs">
         <div className="flex items-center gap-2">
-          {isUser ? (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e]">
-              <MessageSquare className="w-3.5 h-3.5 text-[#0066ff]" />
-              <span className="font-sans font-medium text-xs text-[#ffffff]">
-                {t("workbench.userTurn")} #{stepIndex + 1}
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#1b1b1b] border border-[#2e2e2e]">
-              <Waypoints className="w-3.5 h-3.5 text-[#ff7a00]" />
-              <span className="font-sans font-medium text-xs text-[#ffffff]">
-                {t("workbench.agentTurn")} #{stepIndex + 1}
-              </span>
-            </div>
-          )}
+          <span className="font-medium text-[#161616] dark:text-white">
+            {isUser ? t("workbench.userTurn") : t("workbench.agentTurn")}
+          </span>
+          <span className="text-[11px] tabular-nums text-[#888888] dark:text-[#73737a]">
+            #{stepIndex + 1}
+          </span>
         </div>
 
         {formattedTime && (
-          <span className="font-sans tabular-nums text-[11px] text-[#969696]">
+          <span className="tabular-nums text-[11px] text-[#888888] dark:text-[#73737a]">
             {formattedTime}
           </span>
         )}
       </div>
 
-      {/* User Turn Body */}
+      {/* User Turn */}
       {isUser && (
-        <div className="text-[13.5px] leading-relaxed text-[#ffffff] font-sans select-text">
+        <div className="rounded-xl bg-black/[0.04] dark:bg-white/[0.05] px-3.5 py-2.5 text-[13px] leading-relaxed text-[#161616] dark:text-white select-text">
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
       )}
 
-      {/* Assistant Turn Body */}
+      {/* Assistant Turn */}
       {!isUser && (
-        <div className="flex flex-col gap-3 font-sans">
-          {/* Thinking / Reasoning Section */}
+        <div className="flex flex-col gap-2.5">
+          {/* Thinking / Reasoning disclosure */}
           {message.thinking && (
-            <div className="rounded-lg bg-[#1b1b1b] border border-[#2e2e2e] overflow-hidden select-text">
+            <div>
               <button
                 type="button"
                 onClick={onToggleThinking}
-                className="w-full px-3 py-2 flex items-center justify-between hover:bg-[#252528] transition-colors text-left cursor-pointer"
+                className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs text-[#666666] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
               >
-                <div className="flex items-center gap-2">
-                  <Brain className="w-3.5 h-3.5 text-[#ff7a00]" />
-                  <span className="text-xs font-medium text-[#d4d4d4] font-sans">
-                    {t("workbench.modelThinking")}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[#969696]">
-                  <span className="text-[11px] font-sans">
-                    {isThinkingExpanded ? "Collapse" : "Show reasoning"}
-                  </span>
-                  {isThinkingExpanded ? (
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  )}
-                </div>
+                <Brain className="w-3.5 h-3.5 shrink-0" />
+                <span>{t("workbench.modelThinking")}</span>
+                {isThinkingExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                )}
               </button>
 
-              {isThinkingExpanded && (
-                <TrajectoryThinkingView thinking={message.thinking} />
-              )}
+              {isThinkingExpanded && <TrajectoryThinkingView thinking={message.thinking} />}
             </div>
           )}
 
-          {/* Tool Executions Section */}
+          {/* Compact Tool Executions List */}
           {message.toolCalls && message.toolCalls.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#969696] font-sans">
-                {t("workbench.toolExecutions")} ({message.toolCalls.length})
-              </span>
-              <div className="flex flex-col gap-2">
-                {message.toolCalls.map((tc: any, tcIdx: number) => {
-                  const toolKey = tc.id || `${stepIndex}_tc_${tcIdx}`;
-                  const isExpanded = expandedTools[toolKey] ?? false;
+            <div className="flex flex-col gap-1">
+              {message.toolCalls.map((tc: any, tcIdx: number) => {
+                const toolKey = tc.id || `${stepIndex}_tc_${tcIdx}`;
+                const isExpanded = expandedTools[toolKey] ?? false;
+                const argSummary = summarizeToolArgs(tc.args);
 
-                  return (
-                    <div
-                      key={toolKey}
-                      className="rounded-lg bg-[#1b1b1b] border border-[#2e2e2e] p-3 flex flex-col gap-2 select-text transition-colors"
+                return (
+                  <div
+                    key={toolKey}
+                    className="rounded-xl bg-black/[0.025] dark:bg-white/[0.03] overflow-hidden select-text"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onToggleTool(toolKey)}
+                      className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer"
                     >
-                      {/* Tool Call Header */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Terminal className="w-3.5 h-3.5 text-[#0066ff] shrink-0" />
-                          <span className="font-mono text-xs font-semibold text-[#ffffff] truncate">
-                            {tc.name}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {tc.isError ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-sans font-medium">
-                              <AlertCircle className="w-3 h-3" />
-                              {t("common.failed")}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-medium">
-                              <Check className="w-3 h-3" />
-                              Success
-                            </span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Terminal
+                          className={cn(
+                            "w-3.5 h-3.5 shrink-0",
+                            tc.isError
+                              ? "text-red-500 dark:text-red-400"
+                              : "text-[#737373] dark:text-[#8e8e93]",
                           )}
-
-                          <button
-                            type="button"
-                            onClick={() => onToggleTool(toolKey)}
-                            className="p-1 rounded text-[#969696] hover:text-[#ffffff] hover:bg-[#252528] transition-colors cursor-pointer"
-                            title={isExpanded ? "Collapse tool details" : "Expand tool details"}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
+                        />
+                        <span className="font-mono text-xs font-medium text-[#161616] dark:text-white shrink-0">
+                          {tc.name}
+                        </span>
+                        {argSummary && !isExpanded && (
+                          <span className="text-xs text-[#737373] dark:text-[#7a7a82] truncate min-w-0 font-sans">
+                            {argSummary}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Tool Arguments */}
-                      {tc.args && (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10.5px] font-medium text-[#969696] font-sans">
-                            Arguments
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {tc.isError && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">
+                            <AlertCircle className="w-3 h-3" />
+                            {t("common.failed")}
                           </span>
-                          <div className="bg-[#161616] p-2.5 rounded-md border border-[#282828] font-mono text-[11px] leading-relaxed text-[#d4d4d4] overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
-                            {typeof tc.args === "string"
-                              ? tc.args
-                              : JSON.stringify(tc.args, null, 2)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tool Result (collapsible or shown) */}
-                      {tc.result && isExpanded && (
-                        <div className="flex flex-col gap-1 pt-1 border-t border-[#282828]">
-                          <span className="text-[10.5px] font-medium text-[#969696] font-sans">
-                            Result
-                          </span>
-                          <div className="bg-[#161616] p-2.5 rounded-md border border-[#282828] font-mono text-[10.5px] leading-relaxed text-[#d4d4d4] max-h-52 overflow-y-auto whitespace-pre-wrap">
-                            {typeof tc.result === "string"
-                              ? tc.result
-                              : JSON.stringify(tc.result, null, 2)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Mutations / Modified Files Section */}
-          {message.mutations && message.mutations.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#969696] font-sans">
-                Files Modified ({message.mutations.length})
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {message.mutations.map((m: any, mIdx: number) => {
-                  const target = m.targetFile || m.path || "file";
-                  const fileName = target.split(/[\/\\]/).pop() || target;
-
-                  return (
-                    <button
-                      key={mIdx}
-                      type="button"
-                      onClick={() => {
-                        if (onOpenFileDiff) {
-                          onOpenFileDiff(m);
-                        } else if (onOpenFilePreview) {
-                          onOpenFilePreview(target);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1b1b1b] hover:bg-[#252528] border border-[#2e2e2e] font-sans text-xs text-[#d4d4d4] hover:text-[#ffffff] transition-colors cursor-pointer group"
-                    >
-                      <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate max-w-[200px]">{fileName}</span>
+                        )}
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 text-[#888888]" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 text-[#888888]" />
+                        )}
+                      </div>
                     </button>
-                  );
-                })}
-              </div>
+
+                    {isExpanded && (tc.args || tc.result) && (
+                      <div className="px-3 pb-3 pt-1 flex flex-col gap-2.5">
+                        {tc.args && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-medium text-[#737373] dark:text-[#8e8e93]">
+                              {language === "id" ? "Argumen" : "Arguments"}
+                            </span>
+                            <ScrollArea
+                              orientation="both"
+                              className="max-h-40 rounded-lg bg-black/[0.04] dark:bg-[#101012]"
+                              scrollBarClassName="w-1.5 h-1.5"
+                            >
+                              <pre className="p-2.5 font-mono text-xs leading-relaxed text-[#262626] dark:text-[#d4d4d4] whitespace-pre-wrap">
+                                {formatCodePayload(tc.args)}
+                              </pre>
+                            </ScrollArea>
+                          </div>
+                        )}
+
+                        {tc.result && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] font-medium text-[#737373] dark:text-[#8e8e93]">
+                              {language === "id" ? "Hasil" : "Result"}
+                            </span>
+                            <ScrollArea
+                              orientation="both"
+                              className="max-h-52 rounded-lg bg-black/[0.04] dark:bg-[#101012]"
+                              scrollBarClassName="w-1.5 h-1.5"
+                            >
+                              <pre className="p-2.5 font-mono text-xs leading-relaxed text-[#262626] dark:text-[#d4d4d4] whitespace-pre-wrap">
+                                {formatCodePayload(tc.result)}
+                              </pre>
+                            </ScrollArea>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* AI Response Output - Formatted in Markdown with crisp white ink */}
+          {/* Modified Files */}
+          {message.mutations && message.mutations.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {message.mutations.map((m: any, mIdx: number) => {
+                const target = m.targetFile || m.path || "file";
+                const fileName = target.split(/[\/\\]/).pop() || target;
+
+                return (
+                  <button
+                    key={mIdx}
+                    type="button"
+                    onClick={() => {
+                      if (onOpenFileDiff) {
+                        onOpenFileDiff(m);
+                      } else if (onOpenFilePreview) {
+                        onOpenFilePreview(target);
+                      }
+                    }}
+                    title={target}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.05] dark:hover:bg-white/[0.09] text-xs text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                  >
+                    <FileIcon filename={fileName} className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate max-w-[200px]">{fileName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* AI Response Output */}
           {message.content && (
-            <div className="pt-2 text-[13.5px] leading-relaxed text-[#ffffff] font-sans select-text">
+            <div className="pt-0.5 text-[13.5px] leading-relaxed text-[#161616] dark:text-white select-text">
               <MarkdownContent
                 content={message.content}
                 onOpenFilePreview={onOpenFilePreview}

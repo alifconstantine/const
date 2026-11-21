@@ -391,9 +391,11 @@ export function SettingsView({
           }
           if (cfg?.personalizationWorkRole !== undefined) {
             setWorkRole(cfg.personalizationWorkRole);
+            setSavedWorkRole(cfg.personalizationWorkRole);
           }
           if (cfg?.personalizationCustomInstructions !== undefined) {
             setCustomInstructions(cfg.personalizationCustomInstructions);
+            setSavedCustomInstructions(cfg.personalizationCustomInstructions);
           }
         })
         .catch(() => toast.error(t("settings.preferencesSaveFailed")));
@@ -412,21 +414,37 @@ export function SettingsView({
       localStorage.getItem("const_personalization_custom_instructions") || ""
     );
   });
+  const [savedWorkRole, setSavedWorkRole] = useState<string>(() => {
+    return localStorage.getItem("const_personalization_work_role") || "";
+  });
+  const [savedCustomInstructions, setSavedCustomInstructions] = useState<string>(() => {
+    return (
+      localStorage.getItem("const_personalization_custom_instructions") || ""
+    );
+  });
   const [isSavingPersonalization, setIsSavingPersonalization] = useState(false);
 
-  const handleSavePersonalization = async () => {
+  const isPersonalizationDirty =
+    workRole !== savedWorkRole || customInstructions !== savedCustomInstructions;
+
+  const handleSavePersonalization = async (
+    nextRole = workRole,
+    nextInstructions = customInstructions,
+  ) => {
     if (isSavingPersonalization) return;
     setIsSavingPersonalization(true);
     try {
-      localStorage.setItem("const_personalization_work_role", workRole);
+      localStorage.setItem("const_personalization_work_role", nextRole);
       localStorage.setItem(
         "const_personalization_custom_instructions",
-        customInstructions,
+        nextInstructions,
       );
       await window.electron?.saveConfig?.({
-        personalizationWorkRole: workRole,
-        personalizationCustomInstructions: customInstructions,
+        personalizationWorkRole: nextRole,
+        personalizationCustomInstructions: nextInstructions,
       });
+      setSavedWorkRole(nextRole);
+      setSavedCustomInstructions(nextInstructions);
       toast.success(t("settings.personalizationSaved"));
     } catch {
       toast.error(t("settings.preferencesSaveFailed"));
@@ -610,12 +628,12 @@ export function SettingsView({
     >
       <div
         ref={dialogRef}
-        className="workspace-settings w-[1040px] max-w-[96vw] h-[720px] max-h-[90vh] bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex overflow-hidden text-[#262626] dark:text-[#d4d4d4] font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 animate-in fade-in zoom-in-[0.985] duration-150"
+        className="workspace-settings w-[min(1260px,92vw)] h-[min(860px,88vh)] min-h-[540px] bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex overflow-hidden text-[#262626] dark:text-[#d4d4d4] font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 animate-in fade-in zoom-in-[0.985] duration-150"
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
       >
         {/* Left Sidebar inside Modal                                   */}
-        <aside className="w-[208px] h-full flex flex-col shrink-0 bg-[#f8f9fa] dark:bg-[#222222] p-3 select-none">
+        <aside className="w-[216px] h-full flex flex-col shrink-0 bg-[#f8f9fa] dark:bg-[#222222] p-3 select-none">
           {/* Top Heading */}
           <div className="px-2.5 pt-2 pb-2 shrink-0 mb-1">
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-white tracking-tight">
@@ -624,8 +642,8 @@ export function SettingsView({
           </div>
 
           {/* Navigation Categories using Radix ScrollArea */}
-          <ScrollArea className="flex-1 min-h-0 w-full pr-1">
-            <div className="flex flex-col gap-4 pt-1">
+          <ScrollArea className="flex-1 min-h-0 w-full" scrollBarClassName="w-2">
+            <div className="flex flex-col gap-4 pt-1 pr-2">
               {navCategories.map((cat) => (
                 <div key={cat.label} className="flex flex-col gap-1">
                   <span className="text-[11px] font-medium text-neutral-500 dark:text-[#969696] px-2.5 pt-1.5 pb-1">
@@ -671,7 +689,7 @@ export function SettingsView({
           {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' */}
           <div className="flex-none px-6 sm:px-10 pt-6 pb-4 flex items-start justify-between gap-4 select-none">
             <div>
-              <h1 className="text-[22px] font-normal tracking-tight text-neutral-900 dark:text-white">
+              <h1 className="text-xl sm:text-2xl font-normal tracking-tight text-neutral-900 dark:text-white">
                 {tabTitle}
               </h1>
             </div>
@@ -695,13 +713,15 @@ export function SettingsView({
             thumbClassName="bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30"
           >
             {activeTab === "profile" ? (
-              <ProfileSettings
-                user={user}
-                onSignOut={onSignOut}
-                onSwitchAccount={onSwitchAccount}
-              />
+              <div className="w-full max-w-3xl">
+                <ProfileSettings
+                  user={user}
+                  onSignOut={onSignOut}
+                  onSwitchAccount={onSwitchAccount}
+                />
+              </div>
             ) : activeTab === "general" ? (
-              <div className="w-full min-w-0 space-y-6 pb-6">
+              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
                 <SettingsSection title={t("settings.workspaceAndExecution")}>
                   <SettingsRow label={t("settings.defaultProjectLocation")}>
                     <div className="flex max-w-full items-center gap-2">
@@ -1005,7 +1025,7 @@ export function SettingsView({
                 </div>
               </div>
             ) : activeTab === "appearance" ? (
-              <div className="w-full min-w-0 space-y-6 pb-6">
+              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
                 <SettingsSection title={t("settings.themeAndLayout")}>
                   <SettingsRow label={t("settings.appTheme")}>
                     <SettingsChoice
@@ -1100,53 +1120,184 @@ export function SettingsView({
                 user={user}
               />
             ) : activeTab === "personalization" ? (
-              <div className="w-full min-w-0 space-y-5 pb-6">
-                <SettingsRow
-                  label={t("settings.workRole")}
-                  htmlFor="settings-work-role"
+              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
+                <SettingsSection
+                  title={
+                    language === "id" ? "Peran & Konteks" : "Role & Context"
+                  }
                 >
-                  <input
-                    id="settings-work-role"
-                    value={workRole}
-                    onChange={(event) => setWorkRole(event.target.value)}
-                    className={`${settingsInput} w-64 max-w-full`}
-                  />
-                </SettingsRow>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="settings-instructions"
-                    className="block text-[13px] text-neutral-900 dark:text-white"
-                  >
-                    {t("settings.customInstructions")}
-                  </label>
-                  <textarea
-                    id="settings-instructions"
-                    value={customInstructions}
-                    onChange={(event) =>
-                      setCustomInstructions(event.target.value)
+                  <SettingsRow
+                    label={t("settings.workRole")}
+                    hint={
+                      language === "id"
+                        ? "Membantu Const menyesuaikan kedalaman teknis, istilah, dan fokus jawaban."
+                        : "Helps Const calibrate technical depth, terminology, and examples."
                     }
-                    placeholder={t("settings.customInstructionsPlaceholder")}
-                    rows={4}
-                    className={`${settingsInput} block resize-y min-h-28 max-h-72 leading-relaxed`}
-                  />
-                  <p className="text-xs text-neutral-500 dark:text-[#969696]">
-                    {t("settings.instructionsHint")}
-                  </p>
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className={settingsPrimaryButton}
-                    disabled={isSavingPersonalization}
-                    onClick={handleSavePersonalization}
+                    htmlFor="settings-work-role"
                   >
-                    {t(
-                      isSavingPersonalization
-                        ? "settings.saving"
-                        : "common.save",
-                    )}
-                  </button>
-                </div>
+                    <input
+                      id="settings-work-role"
+                      value={workRole}
+                      onChange={(event) => setWorkRole(event.target.value)}
+                      placeholder={
+                        language === "id"
+                          ? "cth. Software Engineer, Desainer"
+                          : "e.g. Software Engineer, Designer"
+                      }
+                      className={`${settingsInput} w-64 max-w-full`}
+                    />
+                  </SettingsRow>
+                  <div className="flex flex-wrap items-center gap-1.5 pb-3 pt-0.5">
+                    {[
+                      "Full-stack Engineer",
+                      "Product Designer",
+                      "Data / AI Engineer",
+                      "Founder / PM",
+                    ].map((preset) => {
+                      const active = workRole.trim() === preset;
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setWorkRole(active ? "" : preset)}
+                          className={cn(
+                            "rounded-md px-2.5 py-1 text-xs transition-colors cursor-pointer",
+                            active
+                              ? "bg-neutral-200/80 font-medium text-neutral-900 dark:bg-[#383838] dark:text-white"
+                              : "bg-black/[0.04] text-neutral-600 hover:bg-black/[0.08] hover:text-neutral-900 dark:bg-white/[0.05] dark:text-[#a0a0a0] dark:hover:bg-white/[0.1] dark:hover:text-white",
+                          )}
+                        >
+                          {preset}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SettingsSection>
+
+                <SettingsSection title={t("settings.customInstructions")}>
+                  <div className="space-y-3 py-3">
+                    <p className="text-xs leading-relaxed text-neutral-500 dark:text-[#969696]">
+                      {t("settings.customInstructionsDesc")}
+                    </p>
+                    <textarea
+                      id="settings-instructions"
+                      value={customInstructions}
+                      onChange={(event) =>
+                        setCustomInstructions(event.target.value)
+                      }
+                      placeholder={t("settings.customInstructionsPlaceholder")}
+                      rows={5}
+                      className={`${settingsInput} block resize-y min-h-32 max-h-72 leading-relaxed font-sans`}
+                    />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {(language === "id"
+                        ? [
+                            {
+                              label: "Ringkas & langsung",
+                              line: "Jawab dengan ringkas, padat, dan langsung ke inti solusi.",
+                            },
+                            {
+                              label: "Jelaskan tradeoff",
+                              line: "Sebutkan tradeoff arsitektur dan potensi risiko sebelum mengubah kode.",
+                            },
+                            {
+                              label: "Bahasa Indonesia",
+                              line: "Gunakan Bahasa Indonesia secara default dengan istilah teknis seperlunya.",
+                            },
+                          ]
+                        : [
+                            {
+                              label: "Concise & direct",
+                              line: "Be concise, direct, and lead with the actionable answer.",
+                            },
+                            {
+                              label: "Explain tradeoffs",
+                              line: "Briefly note tradeoffs and edge cases before major changes.",
+                            },
+                            {
+                              label: "Verify before claiming",
+                              line: "Run relevant checks before concluding a task is done.",
+                            },
+                          ]
+                      ).map((preset) => {
+                        const alreadyIncluded = customInstructions.includes(
+                          preset.line,
+                        );
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              if (alreadyIncluded) {
+                                const cleaned = customInstructions
+                                  .split("\n")
+                                  .filter((l) => l.trim() !== preset.line)
+                                  .join("\n")
+                                  .trim();
+                                setCustomInstructions(cleaned);
+                              } else {
+                                setCustomInstructions((prev) =>
+                                  prev.trim()
+                                    ? `${prev.trimEnd()}\n${preset.line}`
+                                    : preset.line,
+                                );
+                              }
+                            }}
+                            className={cn(
+                              "rounded-md px-2.5 py-1 text-xs transition-colors cursor-pointer",
+                              alreadyIncluded
+                                ? "bg-neutral-200/80 font-medium text-neutral-900 dark:bg-[#383838] dark:text-white"
+                                : "bg-black/[0.04] text-neutral-600 hover:bg-black/[0.08] hover:text-neutral-900 dark:bg-white/[0.05] dark:text-[#a0a0a0] dark:hover:bg-white/[0.1] dark:hover:text-white",
+                            )}
+                          >
+                            {alreadyIncluded ? "− " : "+ "}
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <span className="text-xs text-neutral-500 dark:text-[#969696]">
+                        {isPersonalizationDirty
+                          ? language === "id"
+                            ? "Ada perubahan yang belum disimpan"
+                            : "Unsaved changes"
+                          : t("settings.instructionsHint")}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {(workRole || customInstructions) && (
+                          <button
+                            type="button"
+                            className={settingsButton}
+                            disabled={isSavingPersonalization}
+                            onClick={() => {
+                              setWorkRole("");
+                              setCustomInstructions("");
+                              void handleSavePersonalization("", "");
+                            }}
+                          >
+                            <RotateCcw className="size-3.5" />
+                            <span>
+                              {language === "id" ? "Reset" : "Reset"}
+                            </span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={settingsPrimaryButton}
+                          disabled={isSavingPersonalization || !isPersonalizationDirty}
+                          onClick={() => void handleSavePersonalization()}
+                        >
+                          {t(
+                            isSavingPersonalization
+                              ? "settings.saving"
+                              : "common.save",
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </SettingsSection>
               </div>
             ) : activeTab === "model-settings" ? (
               /* Model Settings View (LLM, Speech, Image, Video)          */

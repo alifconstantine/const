@@ -15,7 +15,7 @@ export const settingsButton =
 export const settingsPrimaryButton =
   "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[8px] bg-neutral-900 px-3 text-xs font-medium text-white transition-colors hover:bg-neutral-700 disabled:pointer-events-none disabled:opacity-40 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200";
 export const settingsInput =
-  "w-full rounded-[8px] border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none dark:border-[#383838] dark:bg-[#2b2b2b] dark:text-white dark:placeholder:text-[#969696] dark:focus:border-[#969696]";
+  "w-full rounded-[8px] border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none dark:border-[#383838] dark:bg-[#2b2b2b] dark:text-white dark:placeholder:text-[#969696] dark:focus:border-[#6e6e72]";
 
 export const settingsPanel =
   "settings-panel rounded-2xl border border-neutral-200/80 bg-neutral-50 px-4 py-1 dark:border-[#383838]/70 dark:bg-[#222222]";
