@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, toast } from "@const/ui";
+import { ScrollArea, cn, toast } from "@const/ui";
 import {
   Check,
   ChevronDown,
@@ -571,43 +571,45 @@ export function SubscriptionProvidersPanel({
                     No models loaded yet. Click Refresh to fetch from Const Router.
                   </div>
                 ) : (
-                  <div className="max-h-56 overflow-y-auto pr-0.5 space-y-1">
-                    {constLiveModels.map((m) => {
-                      const isActive = activeModelId === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => onSelectModel?.(m.id, constProvider.id)}
-                          className={cn(
-                            "w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
-                            isActive
-                              ? "bg-white dark:bg-[#2c2c2c] text-foreground ring-1 ring-black/10 dark:ring-white/15"
-                              : "hover:bg-white/70 dark:hover:bg-[#2a2a2a] text-foreground/90",
-                          )}
-                        >
-                          <div className="min-w-0 flex items-center gap-2">
-                            <span className="text-[12.5px] font-medium truncate">
-                              {m.name || m.id}
-                            </span>
-                            {m.name && m.name !== m.id && (
-                              <span className="text-[11px] font-mono text-muted-foreground truncate">
-                                {m.id}
-                              </span>
+                  <ScrollArea className="max-h-56 w-full" viewportClassName="max-h-56 pr-3">
+                    <div className="space-y-1">
+                      {constLiveModels.map((m) => {
+                        const isActive = activeModelId === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => onSelectModel?.(m.id, constProvider.id)}
+                            className={cn(
+                              "settings-model-option w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
+                              isActive
+                                ? "bg-black/10 dark:bg-white/10 text-foreground"
+                                : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-foreground/90",
                             )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {m.contextWindow && (
-                              <span className="text-[11px] text-muted-foreground">
-                                {m.contextWindow}
+                          >
+                            <div className="min-w-0 flex items-center gap-2">
+                              <span className="text-[12.5px] font-medium truncate">
+                                {m.name || m.id}
                               </span>
-                            )}
-                            {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                              {m.name && m.name !== m.id && (
+                                <span className="text-[11px] font-mono text-muted-foreground truncate">
+                                  {m.id}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {m.contextWindow && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {m.contextWindow}
+                                </span>
+                              )}
+                              {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
                 )}
               </div>
 
@@ -966,44 +968,46 @@ export function SubscriptionProvidersPanel({
                       No models returned yet. Click Fetch Models to load models from your account.
                     </div>
                   ) : (
-                    <div className="max-h-56 overflow-y-auto pr-0.5 space-y-1">
-                      {provider.models.map((m) => {
-                        const fullId = `sub:${provider.id}/${m.id}`;
-                        const isActive = activeModelId === fullId;
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => onSelectModel?.(fullId, provider.id)}
-                            className={cn(
-                              "w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
-                              isActive
-                                ? "bg-white dark:bg-[#2c2c2c] text-foreground ring-1 ring-black/10 dark:ring-white/15"
-                                : "hover:bg-white/70 dark:hover:bg-[#2a2a2a] text-foreground/90",
-                            )}
-                          >
-                            <div className="min-w-0 flex items-center gap-2">
-                              <span className="text-[12.5px] font-medium truncate">
-                                {m.name || m.id}
-                              </span>
-                              {m.name && m.name !== m.id && (
-                                <span className="text-[11px] font-mono text-muted-foreground truncate">
-                                  {m.id}
-                                </span>
+                    <ScrollArea className="max-h-56 w-full" viewportClassName="max-h-56 pr-3">
+                      <div className="space-y-1">
+                        {provider.models.map((m) => {
+                          const fullId = `sub:${provider.id}/${m.id}`;
+                          const isActive = activeModelId === fullId;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => onSelectModel?.(fullId, provider.id)}
+                              className={cn(
+                                "settings-model-option w-full px-3 py-2 rounded-lg text-left flex items-center justify-between gap-2 transition-colors cursor-pointer",
+                                isActive
+                                  ? "bg-black/10 dark:bg-white/10 text-foreground"
+                                  : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05] text-foreground/90",
                               )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {m.contextWindow && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  {m.contextWindow}
+                            >
+                              <div className="min-w-0 flex items-center gap-2">
+                                <span className="text-[12.5px] font-medium truncate">
+                                  {m.name || m.id}
                                 </span>
-                              )}
-                              {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                                {m.name && m.name !== m.id && (
+                                  <span className="text-[11px] font-mono text-muted-foreground truncate">
+                                    {m.id}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {m.contextWindow && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {m.contextWindow}
+                                  </span>
+                                )}
+                                {isActive && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
                   )}
                 </div>
               )}

@@ -18,5 +18,7 @@
     "**/.turbo/**": true,
     "**/dist/**": true,
     "**/release/**": true
-  }
+  },
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.import.gradle.wrapper.enabled": true
 }

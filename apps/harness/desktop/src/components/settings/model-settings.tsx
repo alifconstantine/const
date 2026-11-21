@@ -1313,7 +1313,7 @@ export function ModelSettings({
                                 className={cn(
                                   "p-3 rounded-xl border transition-colors flex items-center justify-between gap-3",
                                   isDefault
-                                    ? "bg-secondary/60 border-foreground/30"
+                                    ? "bg-secondary/70 border-transparent"
                                     : "bg-secondary/20 border-border",
                                 )}
                               >

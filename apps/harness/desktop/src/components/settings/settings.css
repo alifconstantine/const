@@ -53,6 +53,11 @@
 .workspace-settings .settings-nav-item:focus:not(:focus-visible) {
   outline: none;
 }
+.workspace-settings .settings-model-option,
+.workspace-settings .settings-model-option:focus,
+.workspace-settings .settings-model-option:focus-visible {
+  outline: none;
+}
 .workspace-settings textarea {
   scrollbar-width: thin;
   scrollbar-color: #969696 transparent;
