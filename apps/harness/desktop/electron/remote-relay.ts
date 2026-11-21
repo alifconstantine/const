@@ -25,6 +25,24 @@ export interface SavedRelaySession {
   expiresAt: number;
 }
 
+export function extractRemoteErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") {
+    const text = String(error || "");
+    const match = text.match(/\b(REMOTE_[A-Z_]+)\b/);
+    return match?.[1];
+  }
+  const dataCode = (error as { data?: { code?: unknown } }).data?.code;
+  if (typeof dataCode === "string" && dataCode) return dataCode;
+  const msg = String((error as { message?: unknown }).message || error || "");
+  const match = msg.match(/\b(REMOTE_[A-Z_]+)\b/);
+  return match?.[1];
+}
+
+function isTerminalRemoteError(error: unknown): boolean {
+  const code = extractRemoteErrorCode(error);
+  return Boolean(code && /^REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)$/.test(code));
+}
+
 export class RemoteRelay {
   private client: ConvexClient | null = null;
   private credentials: { sessionId: string; hostHash: string } | null = null;
@@ -84,12 +102,19 @@ export class RemoteRelay {
       if (resume) {
         if (resume.expiresAt <= Date.now()) throw new Error("REMOTE_SESSION_EXPIRED");
         // The backend verifies both the account and the host proof on resume.
-        await Promise.race([
-          this.client.mutation(broker.heartbeat, { sessionId: resume.sessionId, hostHash }),
-          new Promise<never>((_resolve, reject) => {
-            startupTimer = setTimeout(() => reject(new Error("REMOTE_TIMEOUT")), 20_000);
-          }),
-        ]);
+        try {
+          await Promise.race([
+            this.client.mutation(broker.heartbeat, { sessionId: resume.sessionId, hostHash }),
+            new Promise<never>((_resolve, reject) => {
+              startupTimer = setTimeout(() => reject(new Error("REMOTE_TIMEOUT")), 20_000);
+            }),
+          ]);
+        } catch (resumeError: any) {
+          if (startupTimer) clearTimeout(startupTimer);
+          const code = extractRemoteErrorCode(resumeError);
+          if (code) throw new Error(code);
+          throw resumeError;
+        }
         sessionId = resume.sessionId;
       } else {
         try {
@@ -110,10 +135,15 @@ export class RemoteRelay {
           ])) as string;
         } catch (mutationError: any) {
           if (startupTimer) clearTimeout(startupTimer);
-          const errMsg = String(mutationError?.data?.code || mutationError?.message || mutationError || "");
-          if (errMsg.includes("REMOTE_UNAUTHORIZED") || errMsg.includes("UNAUTHORIZED")) {
+          const code = extractRemoteErrorCode(mutationError);
+          const errMsg = String(code || mutationError?.message || mutationError || "");
+          if (code === "REMOTE_UNAUTHORIZED" || /UNAUTHORIZED/i.test(errMsg)) {
             console.error(`[RemoteRelay] Unauthorized on Convex relay (${convexUrl}):`, errMsg);
             throw new Error("REMOTE_UNAUTHORIZED");
+          }
+          if (code) {
+            console.error(`[RemoteRelay] Failed to create remote session (${convexUrl}):`, code);
+            throw new Error(code);
           }
           // Only a schema mismatch is safe to retry: a timeout may have already
           // created the session. Legacy relays cannot resolve a pairing code.
@@ -163,7 +193,7 @@ export class RemoteRelay {
           for (const command of inbox.commands) void this.handle(command);
         },
         (error) => {
-          if (!this.stopped && /REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
+          if (!this.stopped && isTerminalRemoteError(error)) void this.stop();
         },
       );
       this.timer = setInterval(() => {
@@ -177,7 +207,7 @@ export class RemoteRelay {
           })
           .catch((error) => {
             // Convex reconnects after temporary network loss. Keep the grant.
-            if (/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
+            if (isTerminalRemoteError(error)) void this.stop();
           });
       }, 15_000);
       this.notify(this.status);
@@ -318,7 +348,7 @@ export class RemoteRelay {
       }
     } catch (error) {
       if (!this.stopped) {
-        if (/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED|DEVICE_REVOKED)/.test(String(error))) void this.stop();
+        if (isTerminalRemoteError(error)) void this.stop();
         else {
           this.events = [{ type: "resync" }];
           if (!this.flushTimer) this.flushTimer = setTimeout(() => {

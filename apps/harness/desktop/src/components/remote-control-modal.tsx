@@ -25,6 +25,7 @@ import { useAppAuth } from "./convex-provider";
 import type { RemoteDaemonStatus } from "../lib/remote-control";
 import { useRemoteRuntime } from "../lib/remote-runtime";
 import { SettingsRow, SettingsSection, settingsButton, settingsPrimaryButton } from "./settings/settings-controls";
+import { isNetworkErrorText, useNetworkStatus } from "../lib/network-status";
 
 interface RemoteControlModalProps {
   isOpen: boolean;
@@ -154,12 +155,13 @@ export function RemoteControlModal(props: RemoteControlModalProps) {
 function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
   const { t } = useTranslation();
   const auth = useAppAuth();
+  const { isOnline } = useNetworkStatus();
   const [status, setStatus] = useState<RemoteDaemonStatus | null>(null);
   const [qr, setQr] = useState<{ url: string; image: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [error, setError] = useState<"startError" | "actionError" | "authError" | null>(null);
+  const [error, setError] = useState<"startError" | "actionError" | "authError" | "sessionLimitError" | "offlineError" | null>(null);
   const [now, setNow] = useState(Date.now());
   const generation = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -169,8 +171,13 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
   pairingUrl.current = status?.pairingUrl;
 
   const authToken =
-    auth?.token || localStorage.getItem("const_harness_auth_token") || "";
+    auth?.token ||
+    localStorage.getItem("const_harness_auth_token") ||
+    localStorage.getItem("const_sso_token") ||
+    "";
   const isLoggedIn = !!authToken;
+  const accountsUrl =
+    (import.meta.env.VITE_ACCOUNTS_URL as string) || "https://accounts.const.web.id";
 
   // Opening only observes status. Starting network access is an explicit action.
   useEffect(() => {
@@ -235,13 +242,15 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
   }, [isOpen, status?.pairingUrl]);
 
   const handleLogin = async () => {
+    if (!isOnline) {
+      setError("offlineError");
+      return;
+    }
     try {
       if (window.electron?.startAuth) {
-        await window.electron.startAuth({
-          accountsUrl: "https://accounts.const.web.id",
-        });
+        await window.electron.startAuth({ accountsUrl });
       } else {
-        window.open("https://accounts.const.web.id", "_blank");
+        window.open(accountsUrl, "_blank");
       }
     } catch {
       setError("startError");
@@ -253,6 +262,10 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
     if (!api || busy) return;
     if (action === "start" && !isLoggedIn) {
       void handleLogin();
+      return;
+    }
+    if ((action === "start" || action === "refresh") && !isOnline) {
+      setError("offlineError");
       return;
     }
     const current = generation.current;
@@ -270,14 +283,30 @@ function HostRemoteControlModal({ isOpen, onClose }: RemoteControlModalProps) {
       }
     } catch (err: any) {
       console.error("[RemoteModal] Failed to " + action + " session:", err);
-      const errMsg = String(err?.message || err?.data?.code || err || "");
+      const errMsg = String(err?.data?.code || err?.message || err || "");
       const isAuthIssue =
         errMsg.includes("UNAUTHORIZED") ||
         errMsg.includes("LOGIN_REQUIRED") ||
         errMsg.includes("unauthorized") ||
         errMsg.includes("auth");
-      if (generation.current === current)
-        setError(action === "start" ? (isAuthIssue ? "authError" : "startError") : "actionError");
+      const isSessionLimit = errMsg.includes("REMOTE_SESSION_LIMIT");
+      const isOfflineIssue =
+        errMsg.includes("REMOTE_TIMEOUT") || isNetworkErrorText(errMsg);
+      if (generation.current === current) {
+        setError(
+          action === "start"
+            ? isAuthIssue
+              ? "authError"
+              : isSessionLimit
+                ? "sessionLimitError"
+                : isOfflineIssue
+                  ? "offlineError"
+                  : "startError"
+            : isOfflineIssue
+              ? "offlineError"
+              : "actionError",
+        );
+      }
     } finally {
       if (generation.current === current) setBusy(false);
     }

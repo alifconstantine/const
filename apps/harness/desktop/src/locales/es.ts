@@ -47,6 +47,8 @@ export const es: TranslationDictionary = {
     scope: "Los dispositivos conectados pueden acceder a chats, archivos, terminales, tareas programadas, plugins y ajustes de Harness. Vincula solo dispositivos de confianza.",
     startError: "No se pudo iniciar el control remoto. Revisa tu sesión y la configuración del servicio remoto.",
     authError: "Su sesión ha caducado o requiere autenticación. Por favor inicie sesión de nuevo.",
+    sessionLimitError: "Se alcanzó el límite de sesiones remotas activas para esta cuenta. Cierra o elimina una sesión sin uso e inténtalo de nuevo.",
+    offlineError: "Estás sin conexión o no se puede alcanzar el servicio remoto. Revisa tu conexión a internet e inténtalo de nuevo.",
     actionError: "La acción falló. Vuelve a intentarlo.",
     expired: "La vinculación ha caducado. Crea un código o enlace nuevo para conectar otro dispositivo.",
     connectedDevicesTitle: "Dispositivos conectados",

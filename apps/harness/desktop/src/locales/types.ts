@@ -34,6 +34,8 @@ export interface TranslationDictionary {
     scope: string;
     startError: string;
     authError: string;
+    sessionLimitError: string;
+    offlineError: string;
     actionError: string;
     expired: string;
     connectedDevicesTitle: string;

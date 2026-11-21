@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getFunctionName } from "convex/server";
 import { digest, openWithCode } from "@const/remote/crypto";
-import { RemoteRelay } from "./remote-relay";
+import { extractRemoteErrorCode, RemoteRelay } from "./remote-relay";
 
 function fixture(create: (args: any) => Promise<string>) {
   const attempts: any[] = [];
@@ -83,4 +83,53 @@ test("resuming a legacy link-only session does not invent an unusable pairing co
     assert.equal(status.pairingCode, null);
     assert.ok(status.pairingUrl);
   } finally { await s.relay.stop(); }
+});
+
+test("extractRemoteErrorCode and RemoteRelay normalize ConvexError data.code across resume and create", async () => {
+  const wireExpired = Object.assign(
+    new Error("[CONVEX M(remote:heartbeat)] Server Error\n  Called by client"),
+    { data: { code: "REMOTE_SESSION_EXPIRED" } },
+  );
+  assert.equal(extractRemoteErrorCode(wireExpired), "REMOTE_SESSION_EXPIRED");
+
+  const resumeClient = {
+    setAuth() {},
+    async mutation(reference: any) {
+      if (getFunctionName(reference) === "remote:heartbeat") throw wireExpired;
+      throw new Error("unexpected mutation");
+    },
+    onUpdate: () => () => {},
+    async close() {},
+  };
+  const resumeRelay = new RemoteRelay("Test desktop", () => {}, () => {}, () => resumeClient as any);
+  await assert.rejects(
+    resumeRelay.start("token", "https://fixture.convex.cloud", "https://harness.example", {
+      sessionId: "stale", hostHash: "h".repeat(43), secret: "x".repeat(43), pairingCode: "ABC-123",
+      pairExpiresAt: Date.now() + 1000, expiresAt: Date.now() + 10_000,
+    }),
+    /^Error: REMOTE_SESSION_EXPIRED$|REMOTE_SESSION_EXPIRED/,
+  );
+
+  const wireLimit = Object.assign(
+    new Error("[CONVEX M(remote:create)] Server Error\n  Called by client"),
+    { data: { code: "REMOTE_SESSION_LIMIT" } },
+  );
+  let createAttempts = 0;
+  const limitClient = {
+    setAuth() {},
+    async mutation(reference: any) {
+      if (getFunctionName(reference) === "remote:create") {
+        createAttempts++;
+        throw wireLimit;
+      }
+    },
+    onUpdate: () => () => {},
+    async close() {},
+  };
+  const limitRelay = new RemoteRelay("Test desktop", () => {}, () => {}, () => limitClient as any);
+  await assert.rejects(
+    limitRelay.start("token", "https://fixture.convex.cloud", "https://harness.example"),
+    /REMOTE_SESSION_LIMIT/,
+  );
+  assert.equal(createAttempts, 1);
 });

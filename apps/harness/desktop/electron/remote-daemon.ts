@@ -76,11 +76,20 @@ export class RemoteDaemon {
     });
   }
   private async connectRelay(options: { authToken: string; convexUrl: string; webOrigin: string }, resume?: SavedRelaySession) {
-    this.relay = new RemoteRelay(this.deviceId, () => this.notify(), async (command, reply) => {
+    const relay = new RemoteRelay(this.deviceId, () => this.notify(), async (command, reply) => {
       if (!this.handler) throw new Error("NOT_READY");
       await this.handler(command, reply);
     });
-    return this.relay.start(options.authToken, options.convexUrl, options.webOrigin, resume);
+    this.relay = relay;
+    try {
+      return await relay.start(options.authToken, options.convexUrl, options.webOrigin, resume);
+    } catch (error) {
+      if (this.relay === relay) {
+        this.relay = null;
+        this.relayOptions = null;
+      }
+      throw error;
+    }
   }
 
   private notify(): void {

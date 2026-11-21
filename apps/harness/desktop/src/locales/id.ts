@@ -47,6 +47,8 @@ export const id: TranslationDictionary = {
     scope: "Perangkat terhubung dapat mengakses chat, file, terminal, jadwal, plugin, dan pengaturan Harness. Hubungkan hanya perangkat tepercaya.",
     startError: "Gagal memulai remote control. Periksa login dan konfigurasi layanan remote.",
     authError: "Sesi masuk Anda telah kedaluwarsa atau memerlukan autentikasi. Silakan masuk kembali.",
+    sessionLimitError: "Batas sesi remote aktif untuk akun ini tercapai. Tutup atau hapus sesi yang tidak terpakai lalu coba lagi.",
+    offlineError: "Anda sedang offline atau layanan remote tidak dapat dijangkau. Periksa koneksi internet Anda lalu coba lagi.",
     actionError: "Tindakan gagal. Coba lagi.",
     expired: "Pairing kedaluwarsa. Buat kode atau tautan baru untuk menghubungkan perangkat lain.",
     connectedDevicesTitle: "Perangkat terhubung",

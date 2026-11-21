@@ -47,6 +47,8 @@ export const en: TranslationDictionary = {
     scope: "Connected devices can access chats, files, terminals, scheduled tasks, plugins, and Harness settings. Pair only devices you trust.",
     startError: "Could not start remote control. Check your sign-in and remote service configuration.",
     authError: "Your session has expired or requires authentication. Please sign in again.",
+    sessionLimitError: "Too many active remote sessions for this account. Close or remove an unused session and try again.",
+    offlineError: "You're offline or the remote relay is unreachable. Check your internet connection and try again.",
     actionError: "The action failed. Try again.",
     expired: "Pairing expired. Create a new code or link to connect another device.",
     connectedDevicesTitle: "Connected devices",

@@ -713,7 +713,7 @@ export function SettingsView({
             thumbClassName="bg-black/15 dark:bg-white/20 hover:bg-black/25 dark:hover:bg-white/30"
           >
             {activeTab === "profile" ? (
-              <div className="w-full max-w-3xl">
+              <div className="w-full min-w-0 pb-6">
                 <ProfileSettings
                   user={user}
                   onSignOut={onSignOut}
@@ -721,7 +721,7 @@ export function SettingsView({
                 />
               </div>
             ) : activeTab === "general" ? (
-              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
+              <div className="w-full min-w-0 space-y-6 pb-6">
                 <SettingsSection title={t("settings.workspaceAndExecution")}>
                   <SettingsRow label={t("settings.defaultProjectLocation")}>
                     <div className="flex max-w-full items-center gap-2">
@@ -1025,7 +1025,7 @@ export function SettingsView({
                 </div>
               </div>
             ) : activeTab === "appearance" ? (
-              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
+              <div className="w-full min-w-0 space-y-6 pb-6">
                 <SettingsSection title={t("settings.themeAndLayout")}>
                   <SettingsRow label={t("settings.appTheme")}>
                     <SettingsChoice
@@ -1120,7 +1120,7 @@ export function SettingsView({
                 user={user}
               />
             ) : activeTab === "personalization" ? (
-              <div className="w-full max-w-3xl min-w-0 space-y-6 pb-6">
+              <div className="w-full min-w-0 space-y-6 pb-6">
                 <SettingsSection
                   title={
                     language === "id" ? "Peran & Konteks" : "Role & Context"

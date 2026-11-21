@@ -47,6 +47,8 @@ export const zh: TranslationDictionary = {
     scope: "连接的设备可以访问聊天、文件、终端、计划任务、插件和 Harness 设置。请仅连接可信设备。",
     startError: "无法启动远程控制，请检查登录状态和远程服务配置。",
     authError: "您的登录会话已过期或需要身份验证。请重新登录。",
+    sessionLimitError: "此账户的活跃远程会话数量已达上限。请关闭或移除未使用的会话后重试。",
+    offlineError: "您处于离线状态或无法连接到远程中继服务。请检查网络连接后重试。",
     actionError: "操作失败，请重试。",
     expired: "配对已过期。请生成新的配对码或链接以连接其他设备。",
     connectedDevicesTitle: "已连接设备",

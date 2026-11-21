@@ -97,6 +97,7 @@ import { AgentSessionRegistry } from "./agent-sessions";
 import { mergeCanonicalTodoState, selectAgentAutosaveMessages } from "./agent-history";
 import { SideSteeringReceipts } from "./side-steering-receipts";
 import { remoteDaemon } from "./remote-daemon";
+import { extractRemoteErrorCode } from "./remote-relay";
 import { handleDesktopIpc, invokeRemoteDesktop, sendDesktopEvent } from "./desktop-ipc";
 import { dispatchRemoteDesktop } from "./remote-desktop-controller";
 import { createRemoteSessionState, updateRemoteSessionState, type RemoteSessionState } from "./remote-session-state";
@@ -674,7 +675,10 @@ function restoreSavedRemoteSession() {
         lastAuthToken = saved.authToken;
         void remoteDaemon.startRelay({ authToken: saved.authToken, convexUrl, webOrigin }, saved.state)
           .catch((error) => {
-            if (/REMOTE_SESSION_EXPIRED/.test(String(error))) clearRemoteState();
+            const code = extractRemoteErrorCode(error);
+            if (code === "REMOTE_SESSION_EXPIRED" || code === "REMOTE_UNAUTHORIZED" || code === "REMOTE_DEVICE_REVOKED") {
+              clearRemoteState();
+            }
           });
       } else clearRemoteState();
     }
@@ -2485,7 +2489,17 @@ async function resolveLlmExecutionRoute(
     let status;
     try { status = await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin }, resume); }
     catch (error) {
-      if (!resume || !/REMOTE_(UNAUTHORIZED|SESSION_EXPIRED)/.test(String(error))) throw error;
+      const code = extractRemoteErrorCode(error);
+      const msg = String((error as any)?.message || error || "");
+      const isConnectivityError =
+        code === "REMOTE_TIMEOUT" ||
+        code === "REMOTE_HTTPS_REQUIRED" ||
+        /REMOTE_TIMEOUT|REMOTE_HTTPS_REQUIRED|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|fetch failed|network/i.test(msg);
+      if (!resume || isConnectivityError) {
+        console.error("[RemoteDaemon] Failed to start remote session:", code || msg);
+        throw error;
+      }
+      console.warn("[RemoteDaemon] Saved remote session could not resume, creating a fresh session:", code || msg);
       clearRemoteState();
       status = await remoteDaemon.startRelay({ authToken, convexUrl, webOrigin });
     }
