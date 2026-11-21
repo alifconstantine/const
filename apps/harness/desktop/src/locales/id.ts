@@ -694,6 +694,7 @@ export const id: TranslationDictionary = {
 
     // Model settings
     llm: "LLM",
+    stt: "STT",
     speech: "Suara",
     image: "Gambar",
     video: "Video",
@@ -840,10 +841,12 @@ export const id: TranslationDictionary = {
 
     chooseAdapterProvider: "Pilih Penyedia Adapter",
     noLlmProviders: "Belum ada penyedia model bahasa yang dikonfigurasi",
+    noSttProviders: "Belum ada penyedia speech-to-text yang dikonfigurasi",
     noSpeechProviders: "Belum ada penyedia suara yang dikonfigurasi",
     noImageProviders: "Belum ada penyedia gambar yang dikonfigurasi",
     noVideoProviders: "Belum ada penyedia video yang dikonfigurasi",
     connectLlmDesc: "Hubungkan adapter penyedia LLM atau endpoint kustom untuk memulai.",
+    connectSttDesc: "Gunakan Whisper Const Router bawaan atau tambahkan endpoint transkripsi kustom.",
     connectSpeechDesc: "Hubungkan adapter sintesis suara atau endpoint audio kustom untuk memulai.",
     connectImageDesc: "Hubungkan adapter pembuatan gambar atau endpoint kustom untuk memulai.",
     connectVideoDesc: "Hubungkan adapter pembuatan video atau endpoint kustom untuk memulai.",

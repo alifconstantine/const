@@ -38,6 +38,22 @@ export interface SubscriptionProviderMeta {
   models: SubscriptionModelPreset[];
 }
 
+export interface RateLimitWindow {
+  label: string;
+  usedPercent?: number;
+  remainingPercent?: number;
+  resetsAt?: number;
+  detail?: string;
+}
+
+export interface ProviderQuotaSnapshot {
+  provider: SubscriptionProviderId | string;
+  windows: RateLimitWindow[];
+  planType?: string;
+  source: "api" | "headers";
+  updatedAt: number;
+}
+
 export interface StoredOAuthCredential {
   provider: SubscriptionProviderId;
   accessToken: string;
@@ -58,6 +74,8 @@ export interface StoredOAuthCredential {
   discoveredModels?: SubscriptionModelPreset[];
   /** Epoch ms when discoveredModels was last fetched. */
   discoveredAt?: number;
+  /** Latest captured or fetched rate-limit / quota windows for this account. */
+  quota?: ProviderQuotaSnapshot;
   connectedAt: number;
   updatedAt: number;
 }
@@ -72,6 +90,7 @@ export interface PublicSubscriptionStatus {
   projectId?: string;
   expiresAt?: number;
   discoveredAt?: number;
+  quota?: ProviderQuotaSnapshot;
   connectedAt?: number;
 }
 
@@ -349,6 +368,7 @@ export class OAuthSubscriptionManager {
   private activeLogins = new Map<SubscriptionProviderId, PendingLogin>();
   private refreshLocks = new Map<SubscriptionProviderId, Promise<StoredOAuthCredential>>();
   private modelFetchLocks = new Map<SubscriptionProviderId, Promise<SubscriptionModelPreset[]>>();
+  private quotaFetchLocks = new Map<SubscriptionProviderId, Promise<ProviderQuotaSnapshot | null>>();
 
   constructor(options: OAuthManagerOptions = {}) {
     this.storePath =
@@ -437,6 +457,7 @@ export class OAuthSubscriptionManager {
       projectId: cred.projectId,
       expiresAt: cred.expiresAt,
       discoveredAt: cred.discoveredAt,
+      quota: cred.quota,
       connectedAt: cred.connectedAt,
     };
   }
@@ -1784,10 +1805,48 @@ export class OAuthSubscriptionManager {
     if (quotaRes.ok) {
       const quotaData: any = await quotaRes.json().catch(() => ({}));
       const buckets: any[] = Array.isArray(quotaData?.buckets) ? quotaData.buckets : [];
+      const parsedWindows: RateLimitWindow[] = [];
+      let minRemainingPct: number | undefined;
+      let earliestResetMs: number | undefined;
       for (const b of buckets) {
         const mid = typeof b?.modelId === "string" ? b.modelId.replace(/^models\//, "").trim() : "";
         if (mid && !/embedding/i.test(mid) && !quotaIds.includes(mid)) {
           quotaIds.push(mid);
+        }
+        const frac = typeof b?.remainingFraction === "number" ? b.remainingFraction : Number(b?.remainingFraction);
+        if (Number.isFinite(frac) && frac >= 0 && frac <= 1) {
+          const pctLeft = Math.round(frac * 100);
+          if (minRemainingPct === undefined || pctLeft < minRemainingPct) {
+            minRemainingPct = pctLeft;
+          }
+        }
+        if (typeof b?.resetTime === "string" && b.resetTime) {
+          const ms = Date.parse(b.resetTime);
+          if (Number.isFinite(ms) && (earliestResetMs === undefined || ms < earliestResetMs)) {
+            earliestResetMs = ms;
+          }
+        }
+      }
+      if (minRemainingPct !== undefined) {
+        parsedWindows.push({
+          label: "Daily Quota",
+          usedPercent: Math.max(0, Math.min(100, 100 - minRemainingPct)),
+          remainingPercent: minRemainingPct,
+          resetsAt: earliestResetMs,
+        });
+        const latestGoogle = this.cache["google-gemini-cli"];
+        if (latestGoogle) {
+          this.cache["google-gemini-cli"] = {
+            ...latestGoogle,
+            quota: {
+              provider: "google-gemini-cli",
+              windows: parsedWindows,
+              planType: latestGoogle.planType,
+              source: "api",
+              updatedAt: Date.now(),
+            },
+            updatedAt: Date.now(),
+          };
         }
       }
     } else if (metaMap.size === 0) {
@@ -1908,5 +1967,346 @@ export class OAuthSubscriptionManager {
           inputTypes: inputModalities.length > 0 ? inputModalities : ["text"],
         };
       });
+  }
+
+  private clampPercent(val: unknown): number | undefined {
+    const num = typeof val === "number" ? val : Number(val);
+    if (!Number.isFinite(num)) return undefined;
+    return Math.max(0, Math.min(100, Math.round(num)));
+  }
+
+  private parseResetEpochMs(raw: unknown): number | undefined {
+    if (raw === undefined || raw === null || raw === "") return undefined;
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      return raw > 1e12 ? raw : raw > 1e9 ? raw * 1000 : Date.now() + raw * 1000;
+    }
+    if (typeof raw === "string") {
+      const num = Number(raw);
+      if (Number.isFinite(num) && num > 0) {
+        return num > 1e12 ? num : num > 1e9 ? num * 1000 : Date.now() + num * 1000;
+      }
+      const parsed = Date.parse(raw);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+  }
+
+  private formatWindowMinutesLabel(minutes?: number): string {
+    if (!minutes || !Number.isFinite(minutes) || minutes <= 0) return "Rate Limit";
+    if (minutes <= 360) return `${Math.round(minutes / 60)}h Limit`;
+    if (minutes >= 9600) return "Weekly";
+    if (minutes >= 1440) return `${Math.round(minutes / 1440)}d Limit`;
+    return `${Math.round(minutes)}m Limit`;
+  }
+
+  /**
+   * Captures live rate-limit headers returned during an OAuth provider inference call
+   * (OMP pattern: x-codex-primary/secondary, anthropic-ratelimit-unified-5h/7d, etc.).
+   */
+  public recordRateLimitHeaders(
+    provider: SubscriptionProviderId,
+    rawHeaders: Record<string, string>,
+  ): ProviderQuotaSnapshot | null {
+    this.ensureLoaded();
+    const cred = this.cache[provider];
+    if (!cred) return null;
+
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawHeaders)) {
+      headers[k.toLowerCase()] = v;
+    }
+
+    const windows: RateLimitWindow[] = [];
+
+    if (provider === "openai-codex") {
+      const pUsed = this.clampPercent(headers["x-codex-primary-used-percent"]);
+      const pMins = Number(headers["x-codex-primary-window-minutes"]);
+      const pReset =
+        this.parseResetEpochMs(headers["x-codex-primary-reset-at"]) ??
+        this.parseResetEpochMs(headers["x-codex-primary-reset-after-seconds"]);
+      if (pUsed !== undefined) {
+        windows.push({
+          label: Number.isFinite(pMins) && pMins > 0 ? this.formatWindowMinutesLabel(pMins) : "5h Limit",
+          usedPercent: pUsed,
+          remainingPercent: 100 - pUsed,
+          resetsAt: pReset,
+        });
+      }
+
+      const sUsed = this.clampPercent(headers["x-codex-secondary-used-percent"]);
+      const sMins = Number(headers["x-codex-secondary-window-minutes"]);
+      const sReset =
+        this.parseResetEpochMs(headers["x-codex-secondary-reset-at"]) ??
+        this.parseResetEpochMs(headers["x-codex-secondary-reset-after-seconds"]);
+      if (sUsed !== undefined) {
+        windows.push({
+          label: Number.isFinite(sMins) && sMins > 0 ? this.formatWindowMinutesLabel(sMins) : "Weekly",
+          usedPercent: sUsed,
+          remainingPercent: 100 - sUsed,
+          resetsAt: sReset,
+        });
+      }
+    }
+
+    if (provider === "anthropic") {
+      const h5Frac = Number(headers["anthropic-ratelimit-unified-5h-utilization"]);
+      if (Number.isFinite(h5Frac) && h5Frac >= 0) {
+        const used = this.clampPercent(h5Frac <= 1.0 ? h5Frac * 100 : h5Frac)!;
+        windows.push({
+          label: "5h Limit",
+          usedPercent: used,
+          remainingPercent: 100 - used,
+          resetsAt: this.parseResetEpochMs(headers["anthropic-ratelimit-unified-5h-reset"]),
+        });
+      }
+      const d7Frac = Number(headers["anthropic-ratelimit-unified-7d-utilization"]);
+      if (Number.isFinite(d7Frac) && d7Frac >= 0) {
+        const used = this.clampPercent(d7Frac <= 1.0 ? d7Frac * 100 : d7Frac)!;
+        windows.push({
+          label: "Weekly",
+          usedPercent: used,
+          remainingPercent: 100 - used,
+          resetsAt: this.parseResetEpochMs(headers["anthropic-ratelimit-unified-7d-reset"]),
+        });
+      }
+    }
+
+    if (windows.length === 0) return null;
+    const snapshot: ProviderQuotaSnapshot = {
+      provider,
+      windows,
+      planType: cred.planType,
+      source: "headers",
+      updatedAt: Date.now(),
+    };
+    this.cache[provider] = { ...cred, quota: snapshot, updatedAt: Date.now() };
+    this.persist();
+    return snapshot;
+  }
+
+  /**
+   * Returns cached rate limits if fresh (< 2 min), otherwise queries the provider usage API
+   * (falling back to cached response-header windows when the endpoint is unavailable).
+   */
+  public async getRateLimits(
+    provider: SubscriptionProviderId,
+    forceRefresh = false,
+  ): Promise<ProviderQuotaSnapshot | null> {
+    this.ensureLoaded();
+    const cred = this.cache[provider];
+    if (!cred?.accessToken) return null;
+    const now = Date.now();
+    if (!forceRefresh && cred.quota && now - cred.quota.updatedAt < 2 * 60 * 1000) {
+      return cred.quota;
+    }
+
+    const existing = this.quotaFetchLocks.get(provider);
+    if (existing) return existing;
+
+    const task = this.fetchRateLimitsFromApi(provider)
+      .catch(() => cred.quota ?? null)
+      .finally(() => {
+        this.quotaFetchLocks.delete(provider);
+      });
+    this.quotaFetchLocks.set(provider, task);
+    return task;
+  }
+
+  private async fetchRateLimitsFromApi(
+    provider: SubscriptionProviderId,
+  ): Promise<ProviderQuotaSnapshot | null> {
+    const cred = await this.getValidCredential(provider);
+    if (!cred) return null;
+
+    let windows: RateLimitWindow[] = [];
+    let planType = cred.planType;
+
+    if (provider === "openai-codex") {
+      const res = await this.fetchImpl("https://chatgpt.com/backend-api/wham/usage", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cred.accessToken}`,
+          Accept: "application/json",
+          originator: "omp",
+          ...(cred.accountId ? { "chatgpt-account-id": cred.accountId } : {}),
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) {
+        return cred.quota ?? null;
+      }
+      const data: any = await res.json().catch(() => ({}));
+      if (typeof data?.plan_type === "string" && data.plan_type) {
+        planType = data.plan_type.toLowerCase();
+      }
+      const rl = data?.rate_limit;
+      if (rl?.primary_window) {
+        const used = this.clampPercent(rl.primary_window.used_percent);
+        if (used !== undefined) {
+          const mins = typeof rl.primary_window.limit_window_seconds === "number"
+            ? rl.primary_window.limit_window_seconds / 60
+            : 300;
+          windows.push({
+            label: this.formatWindowMinutesLabel(mins),
+            usedPercent: used,
+            remainingPercent: 100 - used,
+            resetsAt:
+              this.parseResetEpochMs(rl.primary_window.reset_at) ??
+              this.parseResetEpochMs(rl.primary_window.reset_after_seconds),
+          });
+        }
+      }
+      if (rl?.secondary_window) {
+        const used = this.clampPercent(rl.secondary_window.used_percent);
+        if (used !== undefined) {
+          const mins = typeof rl.secondary_window.limit_window_seconds === "number"
+            ? rl.secondary_window.limit_window_seconds / 60
+            : 10080;
+          windows.push({
+            label: this.formatWindowMinutesLabel(mins),
+            usedPercent: used,
+            remainingPercent: 100 - used,
+            resetsAt:
+              this.parseResetEpochMs(rl.secondary_window.reset_at) ??
+              this.parseResetEpochMs(rl.secondary_window.reset_after_seconds),
+          });
+        }
+      }
+      if (data?.credits?.has_credits && data.credits.balance !== undefined) {
+        const bal = Number(data.credits.balance);
+        if (Number.isFinite(bal)) {
+          windows.push({
+            label: "Credits",
+            detail: `$${bal.toFixed(2)} remaining`,
+          });
+        }
+      }
+    } else if (provider === "anthropic") {
+      const res = await this.fetchImpl("https://api.anthropic.com/api/oauth/usage", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cred.accessToken}`,
+          "anthropic-beta": "oauth-2025-04-20",
+          "User-Agent": "claude-code/2.1.76",
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) {
+        return cred.quota ?? null;
+      }
+      const data: any = await res.json().catch(() => ({}));
+      if (data?.five_hour) {
+        const used = this.clampPercent(data.five_hour.utilization);
+        if (used !== undefined) {
+          windows.push({
+            label: "5h Limit",
+            usedPercent: used,
+            remainingPercent: 100 - used,
+            resetsAt: this.parseResetEpochMs(data.five_hour.resets_at),
+          });
+        }
+      }
+      if (data?.seven_day) {
+        const used = this.clampPercent(data.seven_day.utilization);
+        if (used !== undefined) {
+          windows.push({
+            label: "Weekly",
+            usedPercent: used,
+            remainingPercent: 100 - used,
+            resetsAt: this.parseResetEpochMs(data.seven_day.resets_at),
+          });
+        }
+      }
+    } else if (provider === "google-gemini-cli") {
+      if (!cred.quota) {
+        await this.fetchGoogleGeminiModels(cred).catch(() => {});
+      }
+      return this.cache["google-gemini-cli"]?.quota ?? null;
+    } else if (provider === "github-copilot" && cred.githubToken) {
+      const res = await this.fetchImpl("https://api.github.com/copilot_internal/user", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cred.githubToken}`,
+          Accept: "application/json",
+          "Editor-Version": "vscode/1.100.0",
+          "Editor-Plugin-Version": "copilot-chat/0.26.7",
+          "User-Agent": "GitHubCopilotChat/0.26.7",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return cred.quota ?? null;
+      const data: any = await res.json().catch(() => ({}));
+      const resetMs = this.parseResetEpochMs(data?.quota_reset_date);
+      const premium = data?.quota_snapshots?.premium_interactions;
+      if (premium && typeof premium.percent_remaining === "number" && !premium.unlimited) {
+        const rem = this.clampPercent(premium.percent_remaining)!;
+        windows.push({
+          label: "Monthly Premium",
+          usedPercent: 100 - rem,
+          remainingPercent: rem,
+          resetsAt: resetMs,
+          detail: typeof premium.remaining === "number" && typeof premium.entitlement === "number"
+            ? `${premium.remaining} / ${premium.entitlement} left`
+            : undefined,
+        });
+      }
+      const chat = data?.quota_snapshots?.chat;
+      if (chat && typeof chat.percent_remaining === "number" && !chat.unlimited) {
+        const rem = this.clampPercent(chat.percent_remaining)!;
+        windows.push({
+          label: "Chat Quota",
+          usedPercent: 100 - rem,
+          remainingPercent: rem,
+          resetsAt: resetMs,
+        });
+      } else if (chat?.unlimited && windows.length === 0) {
+        windows.push({ label: "Chat Quota", remainingPercent: 100, usedPercent: 0, detail: "Unlimited" });
+      }
+    } else if (provider === "openrouter") {
+      const res = await this.fetchImpl("https://openrouter.ai/api/v1/auth/key", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${cred.accessToken}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return cred.quota ?? null;
+      const payload: any = await res.json().catch(() => ({}));
+      const d = payload?.data;
+      if (d && typeof d.limit === "number" && d.limit > 0) {
+        const remUsd = typeof d.limit_remaining === "number" ? d.limit_remaining : Math.max(0, d.limit - (d.usage || 0));
+        const usedPct = this.clampPercent(((d.limit - remUsd) / d.limit) * 100)!;
+        windows.push({
+          label: "Credit Limit",
+          usedPercent: usedPct,
+          remainingPercent: 100 - usedPct,
+          detail: `$${remUsd.toFixed(2)} / $${d.limit.toFixed(2)} left`,
+        });
+      } else if (d && typeof d.usage === "number") {
+        windows.push({
+          label: "Usage",
+          detail: `$${d.usage.toFixed(4)} used`,
+        });
+      }
+    }
+
+    if (windows.length === 0) return cred.quota ?? null;
+    const snapshot: ProviderQuotaSnapshot = {
+      provider,
+      windows,
+      planType,
+      source: "api",
+      updatedAt: Date.now(),
+    };
+    const latest = this.cache[provider];
+    if (latest) {
+      this.cache[provider] = {
+        ...latest,
+        planType: planType || latest.planType,
+        quota: snapshot,
+        updatedAt: Date.now(),
+      };
+      this.persist();
+    }
+    return snapshot;
   }
 }

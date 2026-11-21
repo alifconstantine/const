@@ -680,6 +680,7 @@ export interface TranslationDictionary {
 
     // Model settings
     llm: string;
+    stt: string;
     speech: string;
     image: string;
     video: string;
@@ -825,10 +826,12 @@ export interface TranslationDictionary {
     refreshSettings: string;
     chooseAdapterProvider: string;
     noLlmProviders: string;
+    noSttProviders: string;
     noSpeechProviders: string;
     noImageProviders: string;
     noVideoProviders: string;
     connectLlmDesc: string;
+    connectSttDesc: string;
     connectSpeechDesc: string;
     connectImageDesc: string;
     connectVideoDesc: string;

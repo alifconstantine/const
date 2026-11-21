@@ -694,6 +694,7 @@ export const en: TranslationDictionary = {
 
     // Model settings
     llm: "LLM",
+    stt: "STT",
     speech: "Speech",
     image: "Image",
     video: "Video",
@@ -840,10 +841,12 @@ export const en: TranslationDictionary = {
 
     chooseAdapterProvider: "Choose Adapter Provider",
     noLlmProviders: "No language model providers configured",
+    noSttProviders: "No speech-to-text providers configured",
     noSpeechProviders: "No speech providers configured",
     noImageProviders: "No image providers configured",
     noVideoProviders: "No video providers configured",
     connectLlmDesc: "Connect an LLM provider adapter or custom endpoint to get started.",
+    connectSttDesc: "Use built-in Const Router Whisper or add a custom OpenAI-compatible transcription endpoint.",
     connectSpeechDesc: "Connect a speech synthesis adapter or custom audio endpoint to get started.",
     connectImageDesc: "Connect an image generation adapter or custom endpoint to get started.",
     connectVideoDesc: "Connect a video generation adapter or custom endpoint to get started.",

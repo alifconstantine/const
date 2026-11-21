@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Play } from "lucide-react";
 import { FileIcon } from "./file-icon";
 import { formatFileSize, type AttachedFile } from "./chat-card";
+import { localMediaUrl } from "../../lib/workbench-activity";
 
 export interface MessageAttachmentItemProps {
   att: AttachedFile;
@@ -11,7 +12,7 @@ export interface MessageAttachmentItemProps {
 export function MessageAttachmentItem({ att, onPreview }: MessageAttachmentItemProps) {
   const getInitialSrc = (): string => {
     if (att.path) {
-      return `const-file://${att.path.replace(/\\/g, "/")}`;
+      return localMediaUrl(att.path);
     }
     if (att.url && !att.url.startsWith("blob:")) {
       return att.url;
@@ -68,7 +69,7 @@ export function MessageAttachmentItem({ att, onPreview }: MessageAttachmentItemP
   }
 
   if (att.type === "video" && (att.url || att.path)) {
-    const videoSrc = att.path ? `const-file://${att.path.replace(/\\/g, "/")}` : att.url;
+    const videoSrc = att.path ? localMediaUrl(att.path) : att.url;
     return (
       <div
         key={att.id}

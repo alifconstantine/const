@@ -37,6 +37,7 @@ export interface RichMentionEditorRef {
   insertSlashCommand: (command: { id: string; command: string; title: string }) => void;
   drillDirectory: (candidate: MentionCandidate) => void;
   insertText: (text: string) => void;
+  setDictationSegment: (text: string, commit?: boolean) => void;
   insertAt: () => void;
   insertSlash: () => void;
   insertCommand: (cmd: string) => void;
@@ -365,6 +366,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     const [isEmpty, setIsEmpty] = useState(true);
     const savedRangeRef = useRef<Range | null>(null);
     const isComposingRef = useRef(false);
+    const dictationSpanRef = useRef<HTMLSpanElement | null>(null);
     const lastEmittedValueRef = useRef<string>(initialValue || "");
     const lastPropValueRef = useRef<string>(initialValue || "");
 
@@ -578,6 +580,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           }
         },
         clear: () => {
+          dictationSpanRef.current = null;
           if (editorRef.current) {
             editorRef.current.innerHTML = "";
             lastEmittedValueRef.current = "";
@@ -697,6 +700,122 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           sel?.removeAllRanges();
           sel?.addRange(range);
           saveSelection();
+          syncContent();
+        },
+        setDictationSegment: (text: string, commit = false) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+
+          const trimmed = text.trim();
+          let span = dictationSpanRef.current;
+          if (span && !editor.contains(span)) {
+            span = null;
+            dictationSpanRef.current = null;
+          }
+
+          const computeNeedsLeadingSpace = (anchorRange: Range): boolean => {
+            try {
+              const preRange = document.createRange();
+              preRange.selectNodeContents(editor);
+              preRange.setEnd(anchorRange.startContainer, anchorRange.startOffset);
+              const temp = document.createElement("div");
+              temp.appendChild(preRange.cloneContents());
+              const before = serializeContainer(temp);
+              return before.length > 0 && !/\s$/.test(before);
+            } catch {
+              return false;
+            }
+          };
+
+          if (commit) {
+            if (span) {
+              const parent = span.parentNode;
+              if (trimmed) {
+                const rangeBefore = document.createRange();
+                rangeBefore.setStartBefore(span);
+                const needsSpace = computeNeedsLeadingSpace(rangeBefore);
+                const finalNode = document.createTextNode(`${needsSpace ? " " : ""}${trimmed} `);
+                parent?.replaceChild(finalNode, span);
+                const sel = window.getSelection();
+                const afterRange = document.createRange();
+                afterRange.setStartAfter(finalNode);
+                afterRange.collapse(true);
+                sel?.removeAllRanges();
+                sel?.addRange(afterRange);
+                savedRangeRef.current = afterRange.cloneRange();
+              } else {
+                span.remove();
+              }
+              dictationSpanRef.current = null;
+              saveSelection();
+              syncContent();
+            } else if (trimmed) {
+              const sel = window.getSelection();
+              let range: Range;
+              if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+                range = savedRangeRef.current;
+              } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+                range = sel.getRangeAt(0);
+              } else {
+                range = document.createRange();
+                range.selectNodeContents(editor);
+                range.collapse(false);
+              }
+              const needsSpace = computeNeedsLeadingSpace(range);
+              const finalNode = document.createTextNode(`${needsSpace ? " " : ""}${trimmed} `);
+              range.insertNode(finalNode);
+              range.setStartAfter(finalNode);
+              range.setEndAfter(finalNode);
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+              saveSelection();
+              syncContent();
+            }
+            return;
+          }
+
+          if (!trimmed) {
+            if (span) {
+              span.remove();
+              dictationSpanRef.current = null;
+              syncContent();
+            }
+            return;
+          }
+
+          if (!span) {
+            const sel = window.getSelection();
+            let range: Range;
+            if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+              range = savedRangeRef.current;
+            } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+              range = sel.getRangeAt(0);
+            } else {
+              range = document.createRange();
+              range.selectNodeContents(editor);
+              range.collapse(false);
+            }
+            const needsSpace = computeNeedsLeadingSpace(range);
+            span = document.createElement("span");
+            span.setAttribute("data-dictation-interim", "true");
+            span.className = "text-[#737373] dark:text-[#a0a0a0]";
+            span.textContent = `${needsSpace ? " " : ""}${trimmed}`;
+            range.insertNode(span);
+            dictationSpanRef.current = span;
+          } else {
+            const rangeBefore = document.createRange();
+            rangeBefore.setStartBefore(span);
+            const needsSpace = computeNeedsLeadingSpace(rangeBefore);
+            span.textContent = `${needsSpace ? " " : ""}${trimmed}`;
+          }
+
+          const sel = window.getSelection();
+          const afterRange = document.createRange();
+          afterRange.setStartAfter(span);
+          afterRange.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(afterRange);
+          savedRangeRef.current = afterRange.cloneRange();
           syncContent();
         },
         insertMention: (candidate: MentionCandidate) => {

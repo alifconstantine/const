@@ -344,7 +344,38 @@ declare global {
         submitCode: (provider: string, codeOrUrl: string) => Promise<{ success: boolean }>;
         disconnect: (provider: string) => Promise<{ success: boolean }>;
         fetchModels?: (provider?: string) => Promise<{ success: boolean; models?: any[]; error?: string }>;
+        getRateLimits?: (provider?: string, forceRefresh?: boolean) => Promise<{ success: boolean; quota?: any; quotas?: Record<string, any>; error?: string }>;
         onLoginProgress: (callback: (progress: any) => void) => () => void;
+        onRateLimitsUpdated?: (callback: (snapshot: any) => void) => () => void;
+      };
+      stt?: {
+        transcribe: (payload: {
+          audioBase64?: string;
+          filePath?: string;
+          mimeType?: string;
+          filename?: string;
+          language?: string;
+          prompt?: string;
+          providerId?: string;
+          model?: string;
+          authToken?: string;
+        }) => Promise<{ success: boolean; text?: string; model?: string; providerId?: string; error?: string }>;
+      };
+      models?: {
+        testConnection: (payload: {
+          baseUrl: string;
+          apiKey?: string;
+          protocol?: string;
+          providerId?: string;
+          category?: string;
+        }) => Promise<{ success: boolean; latencyMs?: number; error?: string }>;
+        fetchRemote: (payload: {
+          baseUrl: string;
+          apiKey?: string;
+          protocol?: string;
+          providerId?: string;
+          category?: string;
+        }) => Promise<{ success: boolean; models?: Array<{ id: string; name: string }>; error?: string }>;
       };
       sendMessage: (payload: {
         messages: any[];

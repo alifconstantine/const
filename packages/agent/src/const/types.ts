@@ -350,6 +350,7 @@ export interface AgentConfig {
   providerAccountId?: string;
   providerProjectId?: string;
   providerAuthType?: "api_key" | "oauth" | "router";
+  onResponseHeaders?: (headers: Record<string, string>) => void;
   sessionTimeoutMs?: number;
   tools?: NativeToolDefinition[];
   externalTools?: (signal?: AbortSignal) => Promise<NativeToolDefinition[]>;

@@ -694,6 +694,7 @@ export const ja: TranslationDictionary = {
 
     // Model settings
     llm: "LLM",
+    stt: "STT",
     speech: "音声",
     image: "画像",
     video: "動画",
@@ -840,10 +841,12 @@ export const ja: TranslationDictionary = {
 
     chooseAdapterProvider: "アダプタープロバイダーを選択",
     noLlmProviders: "言語モデルプロバイダーが設定されていません",
+    noSttProviders: "音声認識プロバイダーが設定されていません",
     noSpeechProviders: "音声プロバイダーが設定されていません",
     noImageProviders: "画像プロバイダーが設定されていません",
     noVideoProviders: "動画プロバイダーが設定されていません",
     connectLlmDesc: "開始するには、LLMプロバイダーアダプターまたはカスタムエンドポイントを接続してください。",
+    connectSttDesc: "組み込みのConst Router Whisperを使用するか、カスタム文字起こしエンドポイントを追加してください。",
     connectSpeechDesc: "開始するには、音声合成アダプターまたはカスタムオーディオエンドポイントを接続してください。",
     connectImageDesc: "開始するには、画像生成アダプターまたはカスタムエンドポイントを接続してください。",
     connectVideoDesc: "開始するには、動画生成アダプターまたはカスタムエンドポイントを接続してください。",

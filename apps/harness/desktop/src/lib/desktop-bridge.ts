@@ -141,11 +141,47 @@ export function createDesktopBridge(
         ipcRenderer.invoke("oauth:submit-code", provider, codeOrUrl),
       disconnect: (provider: string) => ipcRenderer.invoke("oauth:disconnect", provider),
       fetchModels: (provider?: string) => ipcRenderer.invoke("oauth:fetch-models", provider),
+      getRateLimits: (provider?: string, forceRefresh?: boolean) =>
+        ipcRenderer.invoke("oauth:get-rate-limits", provider, forceRefresh),
       onLoginProgress: (callback: (progress: any) => void) => {
         const handler = (_event: any, progress: any) => callback(progress);
         ipcRenderer.on("oauth:login-progress", handler);
         return () => ipcRenderer.removeListener("oauth:login-progress", handler);
       },
+      onRateLimitsUpdated: (callback: (snapshot: any) => void) => {
+        const handler = (_event: any, snapshot: any) => callback(snapshot);
+        ipcRenderer.on("oauth:rate-limits-updated", handler);
+        return () => ipcRenderer.removeListener("oauth:rate-limits-updated", handler);
+      },
+    },
+    stt: {
+      transcribe: (payload: {
+        audioBase64?: string;
+        filePath?: string;
+        mimeType?: string;
+        filename?: string;
+        language?: string;
+        prompt?: string;
+        providerId?: string;
+        model?: string;
+        authToken?: string;
+      }) => ipcRenderer.invoke("stt:transcribe", payload),
+    },
+    models: {
+      testConnection: (payload: {
+        baseUrl: string;
+        apiKey?: string;
+        protocol?: string;
+        providerId?: string;
+        category?: string;
+      }) => ipcRenderer.invoke("models:test-connection", payload),
+      fetchRemote: (payload: {
+        baseUrl: string;
+        apiKey?: string;
+        protocol?: string;
+        providerId?: string;
+        category?: string;
+      }) => ipcRenderer.invoke("models:fetch-remote", payload),
     },
     steerAgent: (payload: {
       conversationId: string;

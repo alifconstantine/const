@@ -73,7 +73,10 @@ import {
   OAuthSubscriptionManager,
   SUBSCRIPTION_PROVIDERS,
   type SubscriptionProviderId,
+  type ProviderQuotaSnapshot,
+  type RateLimitWindow,
 } from "./auth/oauth-subscription-manager";
+import { ByokSecretStore } from "./auth/byok-secrets";
 import {
   buildDialectRequest,
   consumeDialectStream,
@@ -189,6 +192,70 @@ const oauthSubscriptionManager = new OAuthSubscriptionManager({
   },
   openExternalUrl: (url) => shell.openExternal(url),
 });
+
+const byokSecretStore = new ByokSecretStore({
+  storePath: path.join(harnessHomeDir, "byok-secrets.enc"),
+  cipher: {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) {
+        throw new Error("storage");
+      }
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("storage");
+      return safeStorage.decryptString(value);
+    },
+  },
+});
+
+let constRouterQuotaSnapshot: ProviderQuotaSnapshot | null = null;
+
+function recordConstRouterRateLimitHeaders(rawHeaders: Record<string, string>): void {
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rawHeaders)) {
+    headers[k.toLowerCase()] = v;
+  }
+  const windows: RateLimitWindow[] = [];
+  const parsePct = (remStr?: string, limStr?: string) => {
+    const rem = Number(remStr);
+    const lim = Number(limStr);
+    if (!Number.isFinite(rem) || !Number.isFinite(lim) || lim <= 0) return undefined;
+    const remPct = Math.max(0, Math.min(100, Math.round((rem / lim) * 100)));
+    return { remPct, usedPct: 100 - remPct, rem, lim };
+  };
+  const reqWin = parsePct(headers["x-ratelimit-remaining-requests"], headers["x-ratelimit-limit-requests"]);
+  if (reqWin) {
+    windows.push({
+      label: "Requests Limit",
+      usedPercent: reqWin.usedPct,
+      remainingPercent: reqWin.remPct,
+      detail: `${reqWin.rem} / ${reqWin.lim} left`,
+    });
+  }
+  const tokWin = parsePct(headers["x-ratelimit-remaining-tokens"], headers["x-ratelimit-limit-tokens"]);
+  if (tokWin) {
+    windows.push({
+      label: "Token Limit",
+      usedPercent: tokWin.usedPct,
+      remainingPercent: tokWin.remPct,
+      detail: `${tokWin.rem.toLocaleString()} / ${tokWin.lim.toLocaleString()} left`,
+    });
+  }
+  if (windows.length > 0) {
+    constRouterQuotaSnapshot = {
+      provider: "const-router",
+      windows,
+      source: "headers",
+      updatedAt: Date.now(),
+    };
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) {
+        sendDesktopEvent(w.webContents, "oauth:rate-limits-updated", constRouterQuotaSnapshot);
+      }
+    }
+  }
+}
 let mcpShuttingDown = false;
 let mcpShutdownComplete = false;
 app.on("before-quit", (event) => {
@@ -221,6 +288,8 @@ export interface ProviderConfig {
   name: string;
   baseUrl: string;
   apiKey: string;
+  hasApiKey?: boolean;
+  apiKeyHint?: string;
   protocol?: ProviderDialect;
 }
 
@@ -229,7 +298,10 @@ export interface StoredLlmProvider {
   name: string;
   baseUrl: string;
   apiKey?: string;
+  hasApiKey?: boolean;
+  apiKeyHint?: string;
   protocol?: ProviderDialect;
+  language?: string;
   authType?: "router" | "oauth" | "api_key";
   subscriptionProviderId?: SubscriptionProviderId;
   isDefault?: boolean;
@@ -251,6 +323,19 @@ export interface UserConfig {
   activeProvider: string;
   providers: Record<string, ProviderConfig>;
   llmProviders?: StoredLlmProvider[];
+  sttProviders?: StoredLlmProvider[];
+  activeSttProvider?: string;
+  activeSttModel?: string;
+  activeSttLanguage?: string;
+  speechProviders?: StoredLlmProvider[];
+  activeSpeechModel?: string;
+  activeSpeechVoice?: string;
+  imageProviders?: StoredLlmProvider[];
+  activeImageModel?: string;
+  activeImageProvider?: string;
+  videoProviders?: StoredLlmProvider[];
+  activeVideoModel?: string;
+  activeVideoProvider?: string;
   customModels?: Array<{
     id: string;
     displayName: string;
@@ -380,8 +465,32 @@ function loadUserConfig(): UserConfig {
         merged.providers.const.baseUrl = process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1";
       }
 
+      // Scrub and migrate any legacy plaintext BYOK API keys into Electron safeStorage vault
+      const hadPlaintextKey = Boolean(
+        Object.values(merged.providers || {}).some((p) => p?.apiKey && p.apiKey.trim()) ||
+          [
+            ...(merged.llmProviders || []),
+            ...(merged.sttProviders || []),
+            ...(merged.speechProviders || []),
+            ...(merged.imageProviders || []),
+            ...(merged.videoProviders || []),
+          ].some((p) => p?.apiKey && p.apiKey.trim()),
+      );
+      merged.providers = (byokSecretStore.redactProviderRecord(merged.providers) || merged.providers) as Record<string, ProviderConfig>;
+      if (merged.llmProviders) merged.llmProviders = byokSecretStore.scrubProviderList(merged.llmProviders, "llm:");
+      if (merged.sttProviders) merged.sttProviders = byokSecretStore.scrubProviderList(merged.sttProviders, "stt:");
+      if (merged.speechProviders) merged.speechProviders = byokSecretStore.scrubProviderList(merged.speechProviders, "speech:");
+      if (merged.imageProviders) merged.imageProviders = byokSecretStore.scrubProviderList(merged.imageProviders, "image:");
+      if (merged.videoProviders) merged.videoProviders = byokSecretStore.scrubProviderList(merged.videoProviders, "video:");
+
+      if (hadPlaintextKey) {
+        try {
+          fs.writeFileSync(constConfigFile, JSON.stringify(merged, null, 2), "utf-8");
+        } catch {}
+      }
+
       computerController.setEnabled(NATIVE_COMPUTER_ENABLED && merged.enableComputerUse !== false);
-    return merged;
+      return merged;
     }
   } catch (err) {
     console.error("[Electron Main] Failed to read config.json, using default:", err);
@@ -394,13 +503,29 @@ function loadUserConfig(): UserConfig {
 
 function saveUserConfig(config: Partial<UserConfig>): UserConfig {
   const current = loadUserConfig();
+  const nextProviders = byokSecretStore.redactProviderRecord({
+    ...current.providers,
+    ...(config.providers || {}),
+  }) as Record<string, ProviderConfig>;
   const merged: UserConfig = {
     ...current,
     ...config,
-    providers: {
-      ...current.providers,
-      ...(config.providers || {}),
-    },
+    providers: nextProviders,
+    ...(config.llmProviders !== undefined
+      ? { llmProviders: byokSecretStore.scrubProviderList(config.llmProviders, "llm:") }
+      : {}),
+    ...(config.sttProviders !== undefined
+      ? { sttProviders: byokSecretStore.scrubProviderList(config.sttProviders, "stt:") }
+      : {}),
+    ...(config.speechProviders !== undefined
+      ? { speechProviders: byokSecretStore.scrubProviderList(config.speechProviders, "speech:") }
+      : {}),
+    ...(config.imageProviders !== undefined
+      ? { imageProviders: byokSecretStore.scrubProviderList(config.imageProviders, "image:") }
+      : {}),
+    ...(config.videoProviders !== undefined
+      ? { videoProviders: byokSecretStore.scrubProviderList(config.videoProviders, "video:") }
+      : {}),
   };
   if (config.enableComputerUse !== undefined) {
     computerController.setEnabled(NATIVE_COMPUTER_ENABLED && config.enableComputerUse);
@@ -1020,6 +1145,7 @@ interface ResolvedLlmRoute {
   protocol: ProviderDialect;
   authType: "router" | "oauth" | "api_key";
   providerId: string;
+  subscriptionProviderId?: SubscriptionProviderId;
   accountId?: string;
   projectId?: string;
   contextWindow?: number;
@@ -1062,6 +1188,7 @@ async function resolveLlmExecutionRoute(
       protocol: meta.protocol,
       authType: "oauth",
       providerId: subId,
+      subscriptionProviderId: subId,
       accountId: cred.accountId,
       projectId: cred.projectId,
       contextWindow: parseNumericTokenSpec(preset?.contextWindow),
@@ -1086,6 +1213,8 @@ async function resolveLlmExecutionRoute(
     if (matched || (byokPrefix && byokPrefix[1] === prov.id)) {
       const protocol = resolveProviderDialect(prov.protocol, prov.baseUrl, "api_key");
       const fallbackKey =
+        byokSecretStore.getKey(`llm:${prov.id}`) ||
+        byokSecretStore.getKey(`provider:${prov.id}`) ||
         prov.apiKey?.trim() ||
         config.providers[prov.id]?.apiKey?.trim() ||
         "";
@@ -1113,7 +1242,11 @@ async function resolveLlmExecutionRoute(
   const isConstRouter = providerKey === "const" || providerKey === "const-engine" || providerKey === "const-router";
 
   const baseUrl = (modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1").replace(/\/+$/, "");
-  let apiKey = providerCfg?.apiKey || "";
+  let apiKey =
+    byokSecretStore.getKey(`provider:${providerKey}`) ||
+    (isConstRouter ? byokSecretStore.getKey("llm:const-router") || byokSecretStore.getKey("provider:const") : "") ||
+    providerCfg?.apiKey ||
+    "";
   if (!apiKey && isConstRouter) {
     apiKey =
       opts.authToken ||
@@ -1193,6 +1326,257 @@ async function resolveLlmExecutionRoute(
       return { success: false, error: err?.message || String(err) };
     }
   });
+
+  handleDesktopIpc("oauth:get-rate-limits", async (_event, provider?: string, forceRefresh = false) => {
+    try {
+      if (provider === "const-router" || provider === "const") {
+        return { success: true, quota: constRouterQuotaSnapshot };
+      }
+      if (provider) {
+        const quota = await oauthSubscriptionManager.getRateLimits(provider as SubscriptionProviderId, Boolean(forceRefresh));
+        return { success: true, quota };
+      }
+      const quotas: Record<string, ProviderQuotaSnapshot | null> = {
+        "const-router": constRouterQuotaSnapshot,
+      };
+      for (const p of oauthSubscriptionManager.listProviders()) {
+        if (!p.status.connected) continue;
+        quotas[p.id] = await oauthSubscriptionManager.getRateLimits(p.id, Boolean(forceRefresh));
+      }
+      return { success: true, quotas };
+    } catch (err: any) {
+      return { success: false, error: err?.message || String(err) };
+    }
+  });
+
+  const resolveEndpointSecret = (providerId?: string, category?: string, rawApiKey?: string): string => {
+    if (rawApiKey && rawApiKey.trim()) return rawApiKey.trim();
+    const pid = (providerId || "").trim();
+    const cat = (category || "llm").trim();
+    const fromStore =
+      (pid ? byokSecretStore.getKey(`${cat}:${pid}`) : "") ||
+      (pid ? byokSecretStore.getKey(`llm:${pid}`) : "") ||
+      (pid ? byokSecretStore.getKey(`stt:${pid}`) : "") ||
+      (pid ? byokSecretStore.getKey(`provider:${pid}`) : "");
+    if (fromStore) return fromStore;
+    if (pid === "const-router" || pid === "const" || !pid) {
+      return (
+        lastAuthToken ||
+        process.env.CONST_ROUTER_API_KEY ||
+        process.env.CONST_ENGINE_API_KEY ||
+        ""
+      );
+    }
+    return "";
+  };
+
+  handleDesktopIpc(
+    "models:test-connection",
+    async (
+      _event,
+      payload: { baseUrl: string; apiKey?: string; protocol?: string; providerId?: string; category?: string },
+    ) => {
+      const cleanUrl = (payload.baseUrl || "").trim().replace(/\/+$/, "");
+      if (!cleanUrl) return { success: false, error: "Base URL is required." };
+      const resolvedKey = resolveEndpointSecret(payload.providerId, payload.category, payload.apiKey);
+      const startTime = performance.now();
+      try {
+        const probeUrl = cleanUrl.endsWith("/models") ? cleanUrl : `${cleanUrl}/models`;
+        const headers: Record<string, string> = {};
+        if (resolvedKey) {
+          if (payload.protocol === "anthropic-messages" || cleanUrl.includes("api.anthropic.com")) {
+            headers["x-api-key"] = resolvedKey;
+            headers["anthropic-version"] = "2023-06-01";
+          } else if (payload.protocol === "google-gemini" || cleanUrl.includes("generativelanguage.googleapis.com")) {
+            headers["x-goog-api-key"] = resolvedKey;
+          } else {
+            headers["Authorization"] = resolvedKey.startsWith("Bearer ") ? resolvedKey : `Bearer ${resolvedKey}`;
+          }
+        }
+        const res = await fetch(probeUrl, { method: "GET", headers, signal: AbortSignal.timeout(7000) });
+        const latencyMs = Math.round(performance.now() - startTime);
+        if (res.ok || res.status === 401 || res.status === 403 || res.status === 404) {
+          return { success: true, latencyMs };
+        }
+        return { success: false, error: `Server responded with HTTP ${res.status}` };
+      } catch (err: any) {
+        return { success: false, error: err?.message || "Connection failed." };
+      }
+    },
+  );
+
+  handleDesktopIpc(
+    "models:fetch-remote",
+    async (
+      _event,
+      payload: { baseUrl: string; apiKey?: string; protocol?: string; providerId?: string; category?: string },
+    ) => {
+      const cleanUrl = (payload.baseUrl || "").trim().replace(/\/+$/, "");
+      if (!cleanUrl) return { success: false, error: "Base URL is required." };
+      const resolvedKey = resolveEndpointSecret(payload.providerId, payload.category, payload.apiKey);
+      const isAnthropic = payload.protocol === "anthropic-messages" || cleanUrl.includes("api.anthropic.com");
+      const isGoogle = payload.protocol === "google-gemini" || cleanUrl.includes("generativelanguage.googleapis.com");
+      const modelsUrl = cleanUrl.endsWith("/models") ? cleanUrl : `${cleanUrl}/models`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (resolvedKey) {
+        if (isAnthropic) {
+          headers["x-api-key"] = resolvedKey;
+          headers["anthropic-version"] = "2023-06-01";
+        } else if (isGoogle) {
+          headers["x-goog-api-key"] = resolvedKey;
+        } else {
+          headers["Authorization"] = resolvedKey.startsWith("Bearer ") ? resolvedKey : `Bearer ${resolvedKey}`;
+        }
+      }
+      try {
+        const res = await fetch(modelsUrl, { method: "GET", headers, signal: AbortSignal.timeout(12000) });
+        if (!res.ok) {
+          return { success: false, error: `HTTP ${res.status}: Failed to fetch models.` };
+        }
+        const data: any = await res.json();
+        const rawList: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.models)
+              ? data.models
+              : [];
+        const isConstRouterUrl = /^https:\/\/router\.const\.web\.id(?:\/|$)/i.test(cleanUrl);
+        const models = rawList
+          .filter((m) => m && (m.id || m.name))
+          .filter((m) => {
+            const id = String(m.id || m.name);
+            if (isConstRouterUrl && id.endsWith(":free")) return false;
+            if (payload.category === "stt") {
+              return m.category === "stt" || /whisper|transcribe|stt/i.test(id);
+            }
+            return true;
+          })
+          .map((m) => {
+            const rawId = String(m.id || m.name).replace(/^models\//, "");
+            return {
+              id: rawId,
+              name: modelDisplayName(rawId, String(m.displayName || m.display_name || m.name || rawId)),
+            };
+          })
+          .slice(0, 80);
+        return { success: true, models };
+      } catch (err: any) {
+        return { success: false, error: err?.message || "Failed to fetch remote models." };
+      }
+    },
+  );
+
+  handleDesktopIpc(
+    "stt:transcribe",
+    async (
+      _event,
+      payload: {
+        audioBase64?: string;
+        filePath?: string;
+        mimeType?: string;
+        filename?: string;
+        language?: string;
+        prompt?: string;
+        providerId?: string;
+        model?: string;
+        authToken?: string;
+      },
+    ) => {
+      if (payload.authToken && isValidAuthToken(payload.authToken)) {
+        lastAuthToken = payload.authToken;
+      }
+      const config = loadUserConfig();
+      const activeProvId = payload.providerId || config.activeSttProvider || "const-router";
+      const sttProv =
+        (config.sttProviders || []).find((p) => p && p.id === activeProvId) ||
+        (config.sttProviders || []).find((p) => p && (p.id === "const-router" || p.id === "const"));
+      const baseUrl = (sttProv?.baseUrl || process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1")
+        .trim()
+        .replace(/\/+$/, "");
+      const modelId = payload.model || config.activeSttModel || sttProv?.models?.[0]?.id || "whisper-large-v3-turbo";
+      const language = (payload.language || config.activeSttLanguage || sttProv?.language || "").trim();
+
+      let audioBuffer: Buffer | null = null;
+      let resolvedName = payload.filename || "voice.wav";
+      if (payload.audioBase64) {
+        const cleaned = payload.audioBase64.replace(/^data:[^;]+;base64,/, "");
+        audioBuffer = Buffer.from(cleaned, "base64");
+      } else if (payload.filePath && fs.existsSync(payload.filePath)) {
+        audioBuffer = fs.readFileSync(payload.filePath);
+        resolvedName = path.basename(payload.filePath);
+      }
+      if (!audioBuffer || audioBuffer.length === 0) {
+        return { success: false, error: "Empty audio payload." };
+      }
+
+      const ext = path.extname(resolvedName).toLowerCase();
+      const inferredMime =
+        ext === ".mp3"
+          ? "audio/mpeg"
+          : ext === ".m4a"
+            ? "audio/mp4"
+            : ext === ".ogg"
+              ? "audio/ogg"
+              : ext === ".webm"
+                ? "audio/webm"
+                : ext === ".flac"
+                  ? "audio/flac"
+                  : "audio/wav";
+      const rawMime = (payload.mimeType || "").split(";")[0]!.trim();
+      const mimeType = rawMime.startsWith("audio/") || rawMime.startsWith("video/") ? rawMime : inferredMime;
+
+      const isConstStt = activeProvId === "const-router" || activeProvId === "const" || /router\.const\.web\.id/i.test(baseUrl);
+      let apiKey =
+        byokSecretStore.getKey(`stt:${activeProvId}`) ||
+        (isConstStt ? byokSecretStore.getKey("llm:const-router") || byokSecretStore.getKey("provider:const") : "") ||
+        sttProv?.apiKey?.trim() ||
+        "";
+      if (!apiKey && isConstStt) {
+        apiKey =
+          payload.authToken ||
+          lastAuthToken ||
+          process.env.CONST_ROUTER_API_KEY ||
+          process.env.CONST_ENGINE_API_KEY ||
+          "";
+      }
+
+      const endpoint = baseUrl.endsWith("/audio/transcriptions")
+        ? baseUrl
+        : baseUrl.endsWith("/v1")
+          ? `${baseUrl}/audio/transcriptions`
+          : `${baseUrl}/v1/audio/transcriptions`;
+
+      const form = new FormData();
+      form.append("file", new File([new Uint8Array(audioBuffer)], resolvedName, { type: mimeType }));
+      form.append("model", modelId);
+      form.append("response_format", "json");
+      if (language && language !== "auto") {
+        form.append("language", language);
+      }
+      if (payload.prompt && payload.prompt.trim()) {
+        form.append("prompt", payload.prompt.trim());
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: apiKey ? { Authorization: apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}` } : {},
+          body: form,
+          signal: AbortSignal.timeout(45_000),
+        });
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          return { success: false, error: errText.slice(0, 200) || `STT request failed (${res.status})` };
+        }
+        const json: any = await res.json().catch(async () => ({ text: await res.text() }));
+        const text = typeof json?.text === "string" ? json.text.trim() : "";
+        return { success: true, text, model: modelId, providerId: activeProvId };
+      } catch (err: any) {
+        return { success: false, error: err?.message || "Transcription failed." };
+      }
+    },
+  );
 
   // ---------------------------------------------------------------------------
   // Manual Conversation Compaction IPC (`/compact` — OMP-aligned algorithm)
@@ -1627,7 +2011,12 @@ async function resolveLlmExecutionRoute(
     const config = loadUserConfig();
     const provCfg = config.providers["const"] || config.providers["const-engine"];
     const routerBaseUrl = (provCfg?.baseUrl || "https://router.const.web.id/v1").replace(/\/+$/, "");
-    const apiKey = provCfg?.apiKey || "";
+    const apiKey =
+      byokSecretStore.getKey("llm:const-router") ||
+      byokSecretStore.getKey("provider:const") ||
+      provCfg?.apiKey ||
+      lastAuthToken ||
+      "";
 
     let remoteModels: any[] = [];
     try {
@@ -2263,6 +2652,18 @@ async function resolveLlmExecutionRoute(
         providerAccountId: route.accountId,
         providerProjectId: route.projectId,
         providerAuthType: route.authType,
+        onResponseHeaders: (headers) => {
+          if (route.authType === "oauth" && route.subscriptionProviderId) {
+            const snap = oauthSubscriptionManager.recordRateLimitHeaders(route.subscriptionProviderId, headers);
+            if (snap) {
+              for (const w of BrowserWindow.getAllWindows()) {
+                if (!w.isDestroyed()) sendDesktopEvent(w.webContents, "oauth:rate-limits-updated", snap);
+              }
+            }
+          } else if (route.authType === "router") {
+            recordConstRouterRateLimitHeaders(headers);
+          }
+        },
         workspacePath: targetWorkspace,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,

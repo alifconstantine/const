@@ -694,6 +694,7 @@ export const es: TranslationDictionary = {
 
     // Model settings
     llm: "LLM",
+    stt: "STT",
     speech: "Voz",
     image: "Imagen",
     video: "Vídeo",
@@ -840,10 +841,12 @@ export const es: TranslationDictionary = {
 
     chooseAdapterProvider: "Elegir proveedor de adaptador",
     noLlmProviders: "No hay proveedores de modelos de lenguaje configurados",
+    noSttProviders: "No hay proveedores de voz a texto configurados",
     noSpeechProviders: "No hay proveedores de voz configurados",
     noImageProviders: "No hay proveedores de imágenes configurados",
     noVideoProviders: "No hay proveedores de video configurados",
     connectLlmDesc: "Conecte un adaptador de proveedor LLM o un endpoint personalizado para comenzar.",
+    connectSttDesc: "Use el Whisper integrado de Const Router o añada un endpoint de transcripción personalizado.",
     connectSpeechDesc: "Conecte un adaptador de síntesis de voz o un endpoint de audio personalizado para comenzar.",
     connectImageDesc: "Conecte un adaptador de generación de imágenes o un endpoint personalizado para comenzar.",
     connectVideoDesc: "Conecte un adaptador de generación de video o un endpoint personalizado para comenzar.",

@@ -34,6 +34,8 @@ import {
   PencilSparkles,
   Lightbulb,
   Target,
+  Mic,
+  Loader2,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -71,6 +73,12 @@ import {
 import { extractSkillsAndAugmentPrompt } from "../../lib/skills/skills-service";
 import { useResolvedSkills } from "../../lib/skills/use-skills";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
+import { localMediaUrl } from "../../lib/workbench-activity";
+import {
+  startRealtimeVoiceDictation,
+  transcribeVoiceChunk,
+  type VoiceDictationController,
+} from "../../lib/voice-dictation";
 
 
 function ComposerMenuContent(props: React.ComponentProps<typeof PopoverContent>) {
@@ -132,7 +140,7 @@ export function cleanAttachmentsForPersistence(attachments?: AttachedFile[]): At
   if (!attachments || attachments.length === 0) return undefined;
   return attachments.map((att) => {
     const permanentUrl = att.path
-      ? `const-file://${att.path.replace(/\\/g, "/")}`
+      ? localMediaUrl(att.path)
       : att.url?.startsWith("blob:")
       ? undefined
       : att.url;
@@ -292,7 +300,7 @@ export async function parseUploadedFiles(files: FileList | File[], conversationI
       }
     }
 
-    const safeUrl = url || (finalPath ? `const-file://${finalPath.replace(/\\/g, "/")}` : base64);
+    const safeUrl = url || (finalPath ? localMediaUrl(finalPath) : base64);
 
     result.push({
       id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
@@ -491,6 +499,13 @@ export function ChatCard({
   const editorRef = useRef<RichMentionEditorRef>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
 
+  // Realtime Whisper Voice Dictation State
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isFinalizingVoice, setIsFinalizingVoice] = useState(false);
+  const [voiceLevels, setVoiceLevels] = useState<number[]>(() => new Array(10).fill(0));
+  const voiceControllerRef = useRef<VoiceDictationController | null>(null);
+  const isTogglingVoiceRef = useRef(false);
+
   // Attachments & Plus Menu State
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [previewItem, setPreviewItem] = useState<AttachedFile | null>(null);
@@ -499,6 +514,10 @@ export function ChatCard({
   useEffect(() => {
     if (!remote?.mobile) editorRef.current?.focus();
     return () => {
+      if (voiceControllerRef.current) {
+        void voiceControllerRef.current.stop();
+        voiceControllerRef.current = null;
+      }
       attachments.forEach((a) => {
         if (a.url && a.url.startsWith("blob:")) {
           try {
@@ -1324,7 +1343,64 @@ export function ChatCard({
     }
   };
 
-  const handleSend = () => {
+  const stopVoiceRecording = useCallback(async () => {
+    const controller = voiceControllerRef.current;
+    if (!controller || isTogglingVoiceRef.current) return;
+    isTogglingVoiceRef.current = true;
+    voiceControllerRef.current = null;
+    setIsRecordingVoice(false);
+    setIsFinalizingVoice(true);
+    try {
+      await controller.stop();
+    } finally {
+      setVoiceLevels(new Array(10).fill(0));
+      setIsFinalizingVoice(false);
+      isTogglingVoiceRef.current = false;
+    }
+  }, []);
+
+  const handleToggleVoiceInput = useCallback(async () => {
+    if (isTogglingVoiceRef.current) return;
+    if (voiceControllerRef.current) {
+      await stopVoiceRecording();
+      return;
+    }
+
+    isTogglingVoiceRef.current = true;
+    try {
+      editorRef.current?.focus();
+      const authToken = localStorage.getItem("const_harness_auth_token") || undefined;
+      let hasShownError = false;
+      const controller = await startRealtimeVoiceDictation({
+        transcribe: (audioBase64, mimeType) => transcribeVoiceChunk(audioBase64, mimeType, authToken),
+        onLevels: (levels) => setVoiceLevels(levels),
+        onInterim: (text) => {
+          editorRef.current?.setDictationSegment(text, false);
+        },
+        onCommit: (text) => {
+          editorRef.current?.setDictationSegment(text, true);
+        },
+        onError: (msg) => {
+          if (!hasShownError && msg) {
+            hasShownError = true;
+            toast.error(msg);
+          }
+        },
+      });
+      voiceControllerRef.current = controller;
+      setIsRecordingVoice(true);
+    } catch (err: any) {
+      setIsRecordingVoice(false);
+      toast.error(err?.message || "Failed to start voice input.");
+    } finally {
+      isTogglingVoiceRef.current = false;
+    }
+  }, [stopVoiceRecording]);
+
+  const handleSend = async () => {
+    if (voiceControllerRef.current) {
+      await stopVoiceRecording();
+    }
     let text = (editorRef.current?.getText() || prompt).trim();
     if (!text && attachments.length === 0) return;
 
@@ -2554,53 +2630,106 @@ export function ChatCard({
                 </Popover>
               </div>
 
-              {/* 3. Send or Stop Generation Button */}
-              {isExecuting ? (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Stop Generation Button (Circular Blue Button matching Screenshot) */}
+              {/* 3. Voice Dictation & Send / Stop Generation Controls */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isRecordingVoice ? (
+                  <div
+                    className="h-7 px-2.5 rounded-full bg-[#0c2d48] dark:bg-[#0d2840] border border-[#38bdf8]/25 flex items-center gap-2 shrink-0 select-none"
+                    title="Recording voice input — click stop to finish"
+                  >
+                    <div className="flex items-center gap-[3px] h-4" aria-hidden="true">
+                      {voiceLevels.map((lvl, idx) => (
+                        <span
+                          key={idx}
+                          className="w-[2px] rounded-full bg-[#7dd3fc] transition-[height] duration-75"
+                          style={{ height: `${Math.round(3 + Math.max(0, Math.min(1, lvl || 0)) * 12)}px` }}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void handleToggleVoiceInput();
+                      }}
+                      className="w-4 h-4 rounded-[4px] bg-[#7dd3fc] hover:bg-[#bae6fd] text-[#0c2d48] flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-95"
+                      title="Stop voice recording"
+                      aria-label="Stop voice recording"
+                    >
+                      <Square className="w-2 h-2 fill-current" />
+                    </button>
+                  </div>
+                ) : isFinalizingVoice ? (
+                  <div
+                    className="h-7 px-2.5 rounded-full bg-[#0c2d48] dark:bg-[#0d2840] border border-[#38bdf8]/25 flex items-center justify-center shrink-0"
+                    title="Finalizing transcription..."
+                  >
+                    <Loader2 className="w-3.5 h-3.5 text-[#7dd3fc] animate-spin" />
+                  </div>
+                ) : (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      onAbort?.();
+                      void handleToggleVoiceInput();
                     }}
-                    className="w-7 h-7 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center cursor-pointer select-none transition-all shrink-0 shadow-sm active:scale-95"
-                    title={t("workbench.stopExecution")}
-                    aria-label={t("workbench.stopExecution")}
+                    className="w-7 h-7 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#737373] dark:text-[#9a9a9a] hover:text-[#262626] dark:hover:text-white flex items-center justify-center cursor-pointer transition-colors shrink-0 active:scale-95"
+                    title="Voice input (Whisper)"
+                    aria-label="Voice input"
                   >
-                    <Square className="w-2.5 h-2.5 fill-current" />
+                    <Mic className="w-3.5 h-3.5" />
                   </button>
+                )}
 
-                  {/* Send/Queue Button when user has typed text or attached files during execution */}
-                  {(onQueueMessage || onSteerDraft) && (prompt.trim() || attachments.length > 0) && (
+                {isExecuting ? (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Stop Generation Button (Circular Blue Button matching Screenshot) */}
                     <button
                       type="button"
-                      onClick={handleSend}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
-                      title={t("workbench.steerMessage")}
-                      aria-label={t("workbench.steerMessage")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onAbort?.();
+                      }}
+                      className="w-7 h-7 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center cursor-pointer select-none transition-all shrink-0 shadow-sm active:scale-95"
+                      title={t("workbench.stopExecution")}
+                      aria-label={t("workbench.stopExecution")}
                     >
-                      <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <Square className="w-2.5 h-2.5 fill-current" />
                     </button>
-                  )}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={!prompt.trim() && attachments.length === 0}
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 ${
-                    prompt.trim() || attachments.length > 0
-                      ? "bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
-                      : "bg-[#f0f0f2] dark:bg-[#48484e]/60 text-[#a9a9a9] dark:text-[#888888] cursor-not-allowed"
-                  }`}
-                  title={t("workbench.sendMessage")}
-                  aria-label={t("workbench.sendMessage")}
-                >
-                  <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
-              )}
+
+                    {/* Send/Queue Button when user has typed text or attached files during execution */}
+                    {(onQueueMessage || onSteerDraft) && (prompt.trim() || attachments.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={handleSend}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
+                        title={t("workbench.steerMessage")}
+                        aria-label={t("workbench.steerMessage")}
+                      >
+                        <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={!prompt.trim() && attachments.length === 0 && !isRecordingVoice}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 ${
+                      prompt.trim() || attachments.length > 0 || isRecordingVoice
+                        ? "bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
+                        : "bg-[#f0f0f2] dark:bg-[#48484e]/60 text-[#a9a9a9] dark:text-[#888888] cursor-not-allowed"
+                    }`}
+                    title={t("workbench.sendMessage")}
+                    aria-label={t("workbench.sendMessage")}
+                  >
+                    <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2929,7 +3058,7 @@ export function ChatCard({
       {/* Media Lightbox Preview Modal */}
       {previewItem && (
         <ImageLightbox
-          src={previewItem.path ? `const-file://${previewItem.path.replace(/\\/g, "/")}` : (previewItem.url || previewItem.base64 || "")}
+          src={previewItem.path ? localMediaUrl(previewItem.path) : (previewItem.url || previewItem.base64 || "")}
           fallbackBase64={previewItem.base64}
           filePath={previewItem.path}
           alt={previewItem.name}

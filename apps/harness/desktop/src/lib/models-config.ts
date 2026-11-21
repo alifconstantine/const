@@ -14,7 +14,7 @@ import { formatContextWindow, formatTokenDisplay } from "@const/backend/router/m
  * Inworld TTS has been completely removed in favor of standard OpenAI-compatible audio speech.
  */
 
-export type ModelCategory = "llm" | "speech" | "image" | "video";
+export type ModelCategory = "llm" | "stt" | "speech" | "image" | "video";
 
 // =============================================================================
 // 1. LLM Types & Real Router Models
@@ -45,11 +45,59 @@ export interface LlmProvider {
   name: string;
   baseUrl: string;
   apiKey?: string;
+  hasApiKey?: boolean;
+  apiKeyHint?: string;
   protocol: LlmProtocol;
   isDefault?: boolean;
   isCustom?: boolean;
   models: LlmModel[];
 }
+
+// =============================================================================
+// 1b. Speech-to-Text (STT / Whisper) Types & Const Router Models
+// =============================================================================
+
+export interface SttModel {
+  id: string;
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+export type SttProtocol = "openai-transcriptions" | "custom";
+
+export interface SttProvider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey?: string;
+  hasApiKey?: boolean;
+  apiKeyHint?: string;
+  protocol: SttProtocol;
+  language?: string;
+  isDefault?: boolean;
+  isCustom?: boolean;
+  models: SttModel[];
+}
+
+export const CONST_STT_ROUTER_MODELS: SttModel[] = [
+  {
+    id: "whisper-large-v3-turbo",
+    name: "Whisper Large V3 Turbo",
+    description: "Fast multilingual speech-to-text via Const Router (/v1/audio/transcriptions)",
+  },
+];
+
+export const CONST_STT_PROVIDER: SttProvider = {
+  id: "const-router",
+  name: "Const Router",
+  baseUrl: "https://router.const.web.id/v1",
+  protocol: "openai-transcriptions",
+  language: "auto",
+  isDefault: true,
+  isCustom: false,
+  models: CONST_STT_ROUTER_MODELS,
+};
 
 /**
  * Authentic default models served by the Const Router gateway
@@ -351,6 +399,13 @@ export interface MultiModalLlmConfig {
   activeModelId: string;
 }
 
+export interface MultiModalSttConfig {
+  providers: SttProvider[];
+  activeProviderId: string;
+  activeModelId: string;
+  language?: string;
+}
+
 export interface MultiModalSpeechConfig {
   providers: SpeechProvider[];
   activeProviderId: string;
@@ -373,6 +428,7 @@ export interface MultiModalVideoConfig {
 
 export interface UnifiedMultiModalConfig {
   llm: MultiModalLlmConfig;
+  stt: MultiModalSttConfig;
   speech: MultiModalSpeechConfig;
   image: MultiModalImageConfig;
   video: MultiModalVideoConfig;
@@ -386,6 +442,10 @@ const STORAGE_KEYS = {
   LLM_PROVIDERS: "const_llm_providers",
   LLM_ACTIVE_PROVIDER: "const_llm_active_provider",
   LLM_ACTIVE_MODEL: "const_llm_active_model",
+  STT_PROVIDERS: "const_stt_providers",
+  STT_ACTIVE_PROVIDER: "const_stt_active_provider",
+  STT_ACTIVE_MODEL: "const_stt_active_model",
+  STT_LANGUAGE: "const_stt_language",
   SPEECH_PROVIDERS: "const_speech_providers",
   SPEECH_ACTIVE_PROVIDER: "const_speech_active_provider",
   SPEECH_ACTIVE_MODEL: "const_speech_active_model",
@@ -398,6 +458,24 @@ const STORAGE_KEYS = {
   VIDEO_ACTIVE_MODEL: "const_video_active_model",
 };
 
+export function sanitizeProvidersForLocalStorage<T extends { apiKey?: string; hasApiKey?: boolean; apiKeyHint?: string }>(
+  providers: T[],
+): T[] {
+  return providers.map((p) => {
+    const rawKey = typeof p.apiKey === "string" ? p.apiKey.trim() : "";
+    const hasKey = Boolean(rawKey || p.hasApiKey);
+    const hint = rawKey
+      ? `${rawKey.length <= 8 ? "••••" : `${/^[a-z]{2,6}-/i.exec(rawKey)?.[0] || ""}••••`}${rawKey.slice(-4)}`
+      : p.apiKeyHint;
+    return {
+      ...p,
+      apiKey: "",
+      hasApiKey: hasKey,
+      ...(hint ? { apiKeyHint: hint } : {}),
+    };
+  });
+}
+
 export function loadMultiModalConfig(): UnifiedMultiModalConfig {
   if (typeof window === "undefined" || typeof localStorage === "undefined") {
     return {
@@ -405,6 +483,12 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
         providers: [CONST_LLM_PROVIDER],
         activeProviderId: CONST_LLM_PROVIDER.id,
         activeModelId: CONST_ROUTER_LLM_MODELS[0]?.id || "",
+      },
+      stt: {
+        providers: [CONST_STT_PROVIDER],
+        activeProviderId: CONST_STT_PROVIDER.id,
+        activeModelId: CONST_STT_ROUTER_MODELS[0]?.id || "whisper-large-v3-turbo",
+        language: "auto",
       },
       speech: {
         providers: [],
@@ -455,6 +539,43 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
     "";
 
   if (llmActiveProvider === CONST_LLM_PROVIDER.id && llmActiveModel.endsWith(":free")) llmActiveModel = "";
+
+  // Load STT (Const Router Whisper Large V3 Turbo is default)
+  let sttProviders: SttProvider[] = [CONST_STT_PROVIDER];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STT_PROVIDERS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        sttProviders = parsed.filter((p: any) => p && p.id);
+      }
+    }
+  } catch {}
+  if (!sttProviders.some((p) => p.id === CONST_STT_PROVIDER.id)) {
+    sttProviders.unshift(CONST_STT_PROVIDER);
+  }
+  const sttManagedIds = new Set(CONST_STT_ROUTER_MODELS.map((m) => m.id));
+  sttProviders = sttProviders.map((provider) =>
+    provider.id === CONST_STT_PROVIDER.id
+      ? {
+          ...provider,
+          models: [
+            ...CONST_STT_ROUTER_MODELS,
+            ...(Array.isArray(provider.models) ? provider.models : []).filter(
+              (m) => m && typeof m.id === "string" && !sttManagedIds.has(m.id),
+            ),
+          ],
+        }
+      : provider,
+  );
+  const sttActiveProvider =
+    localStorage.getItem(STORAGE_KEYS.STT_ACTIVE_PROVIDER) || CONST_STT_PROVIDER.id;
+  const sttActiveModel =
+    localStorage.getItem(STORAGE_KEYS.STT_ACTIVE_MODEL) ||
+    sttProviders.find((p) => p.id === sttActiveProvider)?.models[0]?.id ||
+    CONST_STT_ROUTER_MODELS[0]?.id ||
+    "whisper-large-v3-turbo";
+  const sttLanguage = localStorage.getItem(STORAGE_KEYS.STT_LANGUAGE) || "auto";
 
   // Load Speech (Empty by default unless user adds one)
   let speechProviders: SpeechProvider[] = [];
@@ -548,6 +669,12 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
       activeProviderId: llmActiveProvider,
       activeModelId: llmActiveModel,
     },
+    stt: {
+      providers: sttProviders,
+      activeProviderId: sttActiveProvider,
+      activeModelId: sttActiveModel,
+      language: sttLanguage,
+    },
     speech: {
       providers: speechProviders,
       activeProviderId: speechActiveProvider,
@@ -570,7 +697,9 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
 
 export function saveLlmConfig(cfg: MultiModalLlmConfig): void {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.LLM_PROVIDERS, JSON.stringify(cfg.providers));
+  const hasElectron = typeof window !== "undefined" && Boolean(window.electron?.saveConfig);
+  const localProviders = hasElectron ? sanitizeProvidersForLocalStorage(cfg.providers) : cfg.providers;
+  localStorage.setItem(STORAGE_KEYS.LLM_PROVIDERS, JSON.stringify(localProviders));
   localStorage.setItem(STORAGE_KEYS.LLM_ACTIVE_PROVIDER, cfg.activeProviderId);
   localStorage.setItem(STORAGE_KEYS.LLM_ACTIVE_MODEL, cfg.activeModelId);
   localStorage.setItem("const_harness_active_model", cfg.activeModelId);
@@ -592,9 +721,30 @@ export function saveLlmConfig(cfg: MultiModalLlmConfig): void {
   window.dispatchEvent(new CustomEvent("const:models-updated"));
 }
 
+export function saveSttConfig(cfg: MultiModalSttConfig): void {
+  if (typeof localStorage === "undefined") return;
+  const hasElectron = typeof window !== "undefined" && Boolean(window.electron?.saveConfig);
+  const localProviders = hasElectron ? sanitizeProvidersForLocalStorage(cfg.providers) : cfg.providers;
+  localStorage.setItem(STORAGE_KEYS.STT_PROVIDERS, JSON.stringify(localProviders));
+  localStorage.setItem(STORAGE_KEYS.STT_ACTIVE_PROVIDER, cfg.activeProviderId);
+  localStorage.setItem(STORAGE_KEYS.STT_ACTIVE_MODEL, cfg.activeModelId);
+  if (cfg.language !== undefined) {
+    localStorage.setItem(STORAGE_KEYS.STT_LANGUAGE, cfg.language);
+  }
+
+  syncToElectron({
+    sttProviders: cfg.providers,
+    activeSttProvider: cfg.activeProviderId,
+    activeSttModel: cfg.activeModelId,
+    ...(cfg.language !== undefined ? { activeSttLanguage: cfg.language } : {}),
+  });
+}
+
 export function saveSpeechConfig(cfg: MultiModalSpeechConfig): void {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.SPEECH_PROVIDERS, JSON.stringify(cfg.providers));
+  const hasElectron = typeof window !== "undefined" && Boolean(window.electron?.saveConfig);
+  const localProviders = hasElectron ? sanitizeProvidersForLocalStorage(cfg.providers) : cfg.providers;
+  localStorage.setItem(STORAGE_KEYS.SPEECH_PROVIDERS, JSON.stringify(localProviders));
   localStorage.setItem(STORAGE_KEYS.SPEECH_ACTIVE_PROVIDER, cfg.activeProviderId);
   localStorage.setItem(STORAGE_KEYS.SPEECH_ACTIVE_MODEL, cfg.activeModelId);
   localStorage.setItem(STORAGE_KEYS.SPEECH_ACTIVE_VOICE, cfg.activeVoice);
@@ -608,7 +758,9 @@ export function saveSpeechConfig(cfg: MultiModalSpeechConfig): void {
 
 export function saveImageConfig(cfg: MultiModalImageConfig): void {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.IMAGE_PROVIDERS, JSON.stringify(cfg.providers));
+  const hasElectron = typeof window !== "undefined" && Boolean(window.electron?.saveConfig);
+  const localProviders = hasElectron ? sanitizeProvidersForLocalStorage(cfg.providers) : cfg.providers;
+  localStorage.setItem(STORAGE_KEYS.IMAGE_PROVIDERS, JSON.stringify(localProviders));
   localStorage.setItem(STORAGE_KEYS.IMAGE_ACTIVE_PROVIDER, cfg.activeProviderId);
   localStorage.setItem(STORAGE_KEYS.IMAGE_ACTIVE_MODEL, cfg.activeModelId);
 
@@ -621,7 +773,9 @@ export function saveImageConfig(cfg: MultiModalImageConfig): void {
 
 export function saveVideoConfig(cfg: MultiModalVideoConfig): void {
   if (typeof localStorage === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.VIDEO_PROVIDERS, JSON.stringify(cfg.providers));
+  const hasElectron = typeof window !== "undefined" && Boolean(window.electron?.saveConfig);
+  const localProviders = hasElectron ? sanitizeProvidersForLocalStorage(cfg.providers) : cfg.providers;
+  localStorage.setItem(STORAGE_KEYS.VIDEO_PROVIDERS, JSON.stringify(localProviders));
   localStorage.setItem(STORAGE_KEYS.VIDEO_ACTIVE_PROVIDER, cfg.activeProviderId);
   localStorage.setItem(STORAGE_KEYS.VIDEO_ACTIVE_MODEL, cfg.activeModelId);
 
@@ -656,11 +810,21 @@ export interface PingResult {
 export async function testEndpointPing(
   baseUrl: string,
   apiKey?: string,
-  protocol?: string
+  protocol?: string,
+  opts?: { providerId?: string; category?: string },
 ): Promise<PingResult> {
   const cleanUrl = (baseUrl || "").trim().replace(/\/+$/, "");
   if (!cleanUrl) {
     return { success: false, error: "Base URL is required." };
+  }
+  if (typeof window !== "undefined" && window.electron?.models?.testConnection) {
+    return await window.electron.models.testConnection({
+      baseUrl: cleanUrl,
+      apiKey,
+      protocol,
+      providerId: opts?.providerId,
+      category: opts?.category,
+    });
   }
 
   const startTime = performance.now();
@@ -726,10 +890,20 @@ export async function fetchRemoteModels(
   baseUrl: string,
   apiKey?: string,
   protocol?: string,
+  opts?: { providerId?: string; category?: string },
 ): Promise<{ success: boolean; models?: Array<{ id: string; name: string }>; error?: string }> {
   const cleanUrl = (baseUrl || "").trim().replace(/\/+$/, "");
   if (!cleanUrl) {
     return { success: false, error: "Base URL is required." };
+  }
+  if (typeof window !== "undefined" && window.electron?.models?.fetchRemote) {
+    return await window.electron.models.fetchRemote({
+      baseUrl: cleanUrl,
+      apiKey,
+      protocol,
+      providerId: opts?.providerId,
+      category: opts?.category,
+    });
   }
 
   const isAnthropic = protocol === "anthropic-messages" || cleanUrl.includes("api.anthropic.com");

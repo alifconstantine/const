@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText } from "lucide-react";
 import { useTranslation } from "../../lib/i18n";
+import { localMediaUrl } from "../../lib/workbench-activity";
 
 export interface ImageLightboxProps {
   src: string;
@@ -26,7 +27,7 @@ export function ImageLightbox({
 
   const getResolvedSrc = (): string => {
     if (filePath) {
-      return `const-file://${filePath.replace(/\\/g, "/")}`;
+      return localMediaUrl(filePath);
     }
     if (src && !src.startsWith("blob:")) {
       return src;

@@ -36,6 +36,22 @@ interface SubscriptionModelItem {
   inputTypes?: string[];
 }
 
+interface RateLimitWindowItem {
+  label: string;
+  usedPercent?: number;
+  remainingPercent?: number;
+  resetsAt?: number;
+  detail?: string;
+}
+
+interface ProviderQuotaSnapshotItem {
+  provider: string;
+  windows: RateLimitWindowItem[];
+  planType?: string;
+  source: "api" | "headers";
+  updatedAt: number;
+}
+
 interface SubscriptionProviderItem {
   id: string;
   name: string;
@@ -56,6 +72,7 @@ interface SubscriptionProviderItem {
     projectId?: string;
     expiresAt?: number;
     discoveredAt?: number;
+    quota?: ProviderQuotaSnapshotItem;
     connectedAt?: number;
   };
 }
@@ -80,8 +97,103 @@ interface LoginProgressState {
 export interface SubscriptionProvidersPanelProps {
   constProvider?: LlmProvider;
   activeModelId?: string;
+  constAvailableUsd?: number;
   onSelectModel?: (modelId: string, providerId: string) => void;
   onSaveConstProvider?: (updated: LlmProvider) => void;
+}
+
+function formatResetCountdown(resetsAt?: number): string | null {
+  if (!resetsAt || !Number.isFinite(resetsAt)) return null;
+  const diffMs = resetsAt - Date.now();
+  if (diffMs <= 0) return "resetting soon";
+  const totalMin = Math.floor(diffMs / 60_000);
+  if (totalMin < 60) return `resets in ${Math.max(1, totalMin)}m`;
+  const totalHours = Math.floor(totalMin / 60);
+  const remMin = totalMin % 60;
+  if (totalHours < 24) return `resets in ${totalHours}h ${remMin}m`;
+  const days = Math.floor(totalHours / 24);
+  const remHours = totalHours % 24;
+  return `resets in ${days}d ${remHours}h`;
+}
+
+function RateLimitSummaryBar({
+  windows,
+  isRefreshing,
+  onRefresh,
+}: {
+  windows: RateLimitWindowItem[];
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
+}) {
+  if (!windows || windows.length === 0) return null;
+  return (
+    <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] px-3 py-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-muted-foreground">
+          Rate Limits &amp; Quota
+        </span>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh rate limits"
+            className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={cn("w-3 h-3", isRefreshing && "animate-spin")} />
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+        {windows.map((w, idx) => {
+          const used =
+            typeof w.usedPercent === "number"
+              ? Math.max(0, Math.min(100, w.usedPercent))
+              : typeof w.remainingPercent === "number"
+                ? Math.max(0, Math.min(100, 100 - w.remainingPercent))
+                : undefined;
+          const remaining =
+            typeof w.remainingPercent === "number"
+              ? w.remainingPercent
+              : used !== undefined
+                ? 100 - used
+                : undefined;
+          const resetLabel = formatResetCountdown(w.resetsAt);
+          const barTone =
+            used !== undefined && used >= 90
+              ? "bg-red-500"
+              : used !== undefined && used >= 75
+                ? "bg-amber-500"
+                : "bg-foreground/75";
+          return (
+            <div key={`${w.label}-${idx}`} className="space-y-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="font-medium text-foreground truncate">{w.label}</span>
+                <span className="text-muted-foreground tabular-nums shrink-0">
+                  {remaining !== undefined ? `${remaining}% left` : w.detail || ""}
+                </span>
+              </div>
+              {used !== undefined && (
+                <div className="h-1 w-full rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all duration-300", barTone)}
+                    style={{ width: `${used}%` }}
+                  />
+                </div>
+              )}
+              {(resetLabel || (remaining !== undefined && w.detail)) && (
+                <div className="text-[10px] text-muted-foreground/80 truncate">
+                  {[remaining !== undefined ? w.detail : undefined, resetLabel]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function formatHostLabel(baseUrl?: string): string {
@@ -96,6 +208,7 @@ function formatHostLabel(baseUrl?: string): string {
 export function SubscriptionProvidersPanel({
   constProvider,
   activeModelId,
+  constAvailableUsd,
   onSelectModel,
   onSaveConstProvider,
 }: SubscriptionProvidersPanelProps) {
@@ -109,6 +222,8 @@ export function SubscriptionProvidersPanel({
   const [expandedOAuthId, setExpandedOAuthId] = useState<string | null>(null);
   const [fetchingOAuthIds, setFetchingOAuthIds] = useState<Record<string, boolean>>({});
   const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
+  const [rateLimitsByProvider, setRateLimitsByProvider] = useState<Record<string, ProviderQuotaSnapshotItem>>({});
+  const [fetchingQuotaIds, setFetchingQuotaIds] = useState<Record<string, boolean>>({});
   const autoFetchedOAuthRef = useRef<Set<string>>(new Set());
 
   // Expandable state + configuration for Const Router at top
@@ -139,8 +254,11 @@ export function SubscriptionProvidersPanel({
       const baseUrl = (target?.baseUrl || "https://router.const.web.id/v1").trim();
       setIsFetchingConstModels(true);
       try {
-        // Prefer direct live /models query from Const Router gateway
-        const res = await fetchRemoteModels(baseUrl, target?.apiKey, target?.protocol);
+        // Prefer direct live /models query from Const Router gateway (using encrypted secret if stored)
+        const res = await fetchRemoteModels(baseUrl, target?.apiKey, target?.protocol, {
+          providerId: target?.id || "const-router",
+          category: "llm",
+        });
         let nextModels: LlmModel[] = [];
 
         if (res.success && res.models && res.models.length > 0) {
@@ -216,6 +334,36 @@ export function SubscriptionProvidersPanel({
     void handleFetchConstModels({ silent: true });
   }, [handleFetchConstModels]);
 
+  const loadRateLimits = useCallback(async (providerId?: string, forceRefresh = false) => {
+    const api = (window as any).electron?.oauth;
+    if (!api?.getRateLimits) return;
+    if (providerId) {
+      setFetchingQuotaIds((prev) => ({ ...prev, [providerId]: true }));
+    }
+    try {
+      const res = await api.getRateLimits(providerId, forceRefresh);
+      if (res?.success) {
+        if (providerId && res.quota) {
+          setRateLimitsByProvider((prev) => ({ ...prev, [providerId]: res.quota }));
+        } else if (res.quotas && typeof res.quotas === "object") {
+          setRateLimitsByProvider((prev) => {
+            const next = { ...prev };
+            for (const [k, v] of Object.entries(res.quotas)) {
+              if (v) next[k] = v as ProviderQuotaSnapshotItem;
+            }
+            return next;
+          });
+        }
+      }
+    } catch {
+      // Ignore rate limit lookup failures gracefully
+    } finally {
+      if (providerId) {
+        setFetchingQuotaIds((prev) => ({ ...prev, [providerId]: false }));
+      }
+    }
+  }, []);
+
   const loadProviders = useCallback(async () => {
     const api = (window as any).electron?.oauth;
     if (!api?.listProviders) {
@@ -226,6 +374,13 @@ export function SubscriptionProvidersPanel({
       const list = await api.listProviders();
       if (Array.isArray(list)) {
         setProviders(list);
+        setRateLimitsByProvider((prev) => {
+          const next = { ...prev };
+          for (const p of list) {
+            if (p?.status?.quota) next[p.id] = p.status.quota;
+          }
+          return next;
+        });
       }
     } catch {
       // Ignore transient errors outside Electron
@@ -246,6 +401,7 @@ export function SubscriptionProvidersPanel({
       });
       try {
         const res = await api.fetchModels(providerId);
+        void loadRateLimits(providerId, true);
         if (res?.success) {
           await loadProviders();
           const count = Array.isArray(res.models) ? res.models.length : 0;
@@ -271,13 +427,25 @@ export function SubscriptionProvidersPanel({
         setFetchingOAuthIds((prev) => ({ ...prev, [providerId]: false }));
       }
     },
-    [loadProviders],
+    [loadProviders, loadRateLimits],
   );
 
   useEffect(() => {
     void loadProviders();
+    void loadRateLimits(undefined, false);
     const api = (window as any).electron?.oauth;
-    if (!api?.onLoginProgress) return;
+    const unsubQuota = api?.onRateLimitsUpdated?.((snapshot: ProviderQuotaSnapshotItem) => {
+      if (snapshot?.provider) {
+        setRateLimitsByProvider((prev) => ({ ...prev, [snapshot.provider]: snapshot }));
+      }
+    });
+    if (!api?.onLoginProgress) {
+      return () => {
+        try {
+          unsubQuota?.();
+        } catch {}
+      };
+    }
     const unsub = api.onLoginProgress((progress: LoginProgressState) => {
       setActiveLogin(progress);
       if (
@@ -300,9 +468,10 @@ export function SubscriptionProvidersPanel({
     return () => {
       try {
         unsub?.();
+        unsubQuota?.();
       } catch {}
     };
-  }, [loadProviders, handleFetchOAuthModels]);
+  }, [loadProviders, loadRateLimits, handleFetchOAuthModels]);
 
   // If a provider is already signed in on disk with no discoveredModels cached yet, fetch live once
   useEffect(() => {
@@ -386,7 +555,10 @@ export function SubscriptionProvidersPanel({
     const target = constDraft || constProvider;
     if (!target?.baseUrl?.trim()) return;
     setIsTestingConstPing(true);
-    const res = await testEndpointPing(target.baseUrl, target.apiKey, target.protocol);
+    const res = await testEndpointPing(target.baseUrl, target.apiKey, target.protocol, {
+      providerId: target.id || "const-router",
+      category: "llm",
+    });
     setIsTestingConstPing(false);
     if (res.success) {
       toast.success(`Connected to Const Router (${res.latencyMs ?? 0}ms)`);
@@ -507,6 +679,23 @@ export function SubscriptionProvidersPanel({
 
           {isConstExpanded && constDraft && (
             <div className="px-4 pb-4 pt-2 border-t border-border/50 space-y-4">
+              {/* Rate Limits & Credits Bar above Models List */}
+              {(() => {
+                const windows: RateLimitWindowItem[] = [
+                  ...(typeof constAvailableUsd === "number"
+                    ? [{ label: "Credit Balance", detail: `$${constAvailableUsd.toFixed(4)} remaining` }]
+                    : []),
+                  ...(rateLimitsByProvider["const-router"]?.windows || []),
+                ];
+                return (
+                  <RateLimitSummaryBar
+                    windows={windows}
+                    isRefreshing={Boolean(fetchingQuotaIds["const-router"])}
+                    onRefresh={() => void loadRateLimits("const-router", true)}
+                  />
+                );
+              })()}
+
               {/* Live-fetched Models List */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -641,7 +830,13 @@ export function SubscriptionProvidersPanel({
                         onChange={(e) =>
                           setConstDraft({ ...constDraft, apiKey: e.target.value })
                         }
-                        placeholder="Uses Const session when empty"
+                        placeholder={
+                          constDraft.hasApiKey && constDraft.apiKeyHint
+                            ? `Encrypted (${constDraft.apiKeyHint}) — enter to replace`
+                            : constDraft.hasApiKey
+                              ? "Encrypted key saved — enter to replace"
+                              : "Uses Const session when empty"
+                        }
                         className="w-full h-8 pl-2.5 pr-8 rounded-lg border border-border bg-background text-xs font-mono text-foreground outline-none focus:border-foreground/40"
                       />
                       <button
@@ -732,8 +927,11 @@ export function SubscriptionProvidersPanel({
                   if (!isConnected) return;
                   const nextExpanded = !isExpanded;
                   setExpandedOAuthId(nextExpanded ? provider.id : null);
-                  if (nextExpanded && provider.models.length === 0 && !isFetching) {
-                    void handleFetchOAuthModels(provider.id, { silent: true });
+                  if (nextExpanded) {
+                    void loadRateLimits(provider.id, false);
+                    if (provider.models.length === 0 && !isFetching) {
+                      void handleFetchOAuthModels(provider.id, { silent: true });
+                    }
                   }
                 }}
                 onKeyDown={(e) => {
@@ -742,8 +940,11 @@ export function SubscriptionProvidersPanel({
                     e.preventDefault();
                     const nextExpanded = !isExpanded;
                     setExpandedOAuthId(nextExpanded ? provider.id : null);
-                    if (nextExpanded && provider.models.length === 0 && !isFetching) {
-                      void handleFetchOAuthModels(provider.id, { silent: true });
+                    if (nextExpanded) {
+                      void loadRateLimits(provider.id, false);
+                      if (provider.models.length === 0 && !isFetching) {
+                        void handleFetchOAuthModels(provider.id, { silent: true });
+                      }
                     }
                   }
                 }}
@@ -932,6 +1133,11 @@ export function SubscriptionProvidersPanel({
               {/* Expanded Live-Fetched Models List for Connected Account */}
               {isExpanded && (
                 <div className="px-4 pb-4 pt-2 border-t border-border/50 space-y-2.5">
+                  <RateLimitSummaryBar
+                    windows={rateLimitsByProvider[provider.id]?.windows || provider.status.quota?.windows || []}
+                    isRefreshing={Boolean(fetchingQuotaIds[provider.id])}
+                    onRefresh={() => void loadRateLimits(provider.id, true)}
+                  />
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11.5px] font-medium text-muted-foreground">
                       Available Models ({provider.models.length})

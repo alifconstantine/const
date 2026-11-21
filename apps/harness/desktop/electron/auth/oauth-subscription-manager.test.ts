@@ -187,6 +187,80 @@ test("OAuthSubscriptionManager discovers live models from OpenAI Codex endpoint 
   }
 });
 
+test("OAuthSubscriptionManager parses 5h and weekly rate limits from OpenAI wham/usage and response headers", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "const-oauth-quota-"));
+  const storePath = path.join(tmpDir, "oauth.enc");
+  const resetPrimarySec = Math.floor(Date.now() / 1000) + 7200;
+  const resetWeeklySec = Math.floor(Date.now() / 1000) + 432000;
+
+  const mockFetch: typeof fetch = async (input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url.includes("/wham/usage")) {
+      return new Response(
+        JSON.stringify({
+          plan_type: "plus",
+          rate_limit: {
+            primary_window: { used_percent: 28, limit_window_seconds: 18000, reset_at: resetPrimarySec },
+            secondary_window: { used_percent: 12, limit_window_seconds: 604800, reset_at: resetWeeklySec },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response("not found", { status: 404 });
+  };
+
+  try {
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({
+        "openai-codex": {
+          provider: "openai-codex",
+          accessToken: "tok_live",
+          expiresAt: Date.now() + 3600_000,
+          accountId: "acct_1",
+          connectedAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        anthropic: {
+          provider: "anthropic",
+          accessToken: "ant_tok",
+          expiresAt: Date.now() + 3600_000,
+          connectedAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      }),
+    );
+
+    const manager = new OAuthSubscriptionManager({ storePath, fetchImpl: mockFetch });
+    const quota = await manager.getRateLimits("openai-codex");
+    assert.ok(quota);
+    assert.equal(quota.windows.length, 2);
+    assert.equal(quota.windows[0]!.label, "5h Limit");
+    assert.equal(quota.windows[0]!.usedPercent, 28);
+    assert.equal(quota.windows[0]!.remainingPercent, 72);
+    assert.equal(quota.windows[1]!.label, "Weekly");
+    assert.equal(quota.windows[1]!.usedPercent, 12);
+    assert.equal(quota.windows[1]!.remainingPercent, 88);
+
+    // Passive Anthropic response header recording (unified 5h / 7d utilization)
+    const antQuota = manager.recordRateLimitHeaders("anthropic", {
+      "anthropic-ratelimit-unified-5h-utilization": "0.35",
+      "anthropic-ratelimit-unified-5h-reset": String(resetPrimarySec),
+      "anthropic-ratelimit-unified-7d-utilization": "0.14",
+      "anthropic-ratelimit-unified-7d-reset": String(resetWeeklySec),
+    });
+    assert.ok(antQuota);
+    assert.equal(antQuota.windows.length, 2);
+    assert.equal(antQuota.windows[0]!.label, "5h Limit");
+    assert.equal(antQuota.windows[0]!.usedPercent, 35);
+    assert.equal(antQuota.windows[1]!.label, "Weekly");
+    assert.equal(antQuota.windows[1]!.usedPercent, 14);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test("parseBuiltinSlashCommand and filterBuiltinSlashCommands handle /plan, /goal, /btw, /compact", () => {
   assert.deepEqual(parseBuiltinSlashCommand("/plan redesign auth"), {
     id: "plan",

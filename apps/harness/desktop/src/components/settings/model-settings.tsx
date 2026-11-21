@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@const/backend/_generated/api";
 import { useTranslation } from "../../lib/i18n";
 import { modelDisplayName } from "../../lib/model-identity";
 import { SubscriptionProvidersPanel } from "./subscription-providers-panel";
@@ -14,6 +16,7 @@ import {
 } from "@const/ui";
 import {
   Box,
+  Mic,
   Volume2,
   Image as ImageIcon,
   Video as VideoIcon,
@@ -30,6 +33,8 @@ import {
   type ModelCategory,
   type LlmModel,
   type LlmProvider,
+  type SttModel,
+  type SttProvider,
   type SpeechModel,
   type SpeechProvider,
   type ImageModel,
@@ -39,10 +44,12 @@ import {
   type UnifiedMultiModalConfig,
   loadMultiModalConfig,
   saveLlmConfig,
+  saveSttConfig,
   saveSpeechConfig,
   saveImageConfig,
   saveVideoConfig,
   CONST_ROUTER_LLM_MODELS,
+  CONST_STT_ROUTER_MODELS,
   POPULAR_SPEECH_VOICES,
   testEndpointPing,
   fetchRemoteModels,
@@ -59,12 +66,14 @@ export function ModelSettings({
   onActiveModelChanged,
 }: ModelSettingsProps) {
   const { t } = useTranslation();
-  // 1. Modality category state: "llm" | "speech" | "image" | "video"
+  const wallet = useQuery(api.router.credits.getUserCredits, {});
+  // 1. Modality category state: "llm" | "stt" | "speech" | "image" | "video"
   const [activeCategory, setActiveCategory] =
     useState<ModelCategory>(initialCategory);
 
   // Tab indicator sliding animation refs
   const llmTabRef = useRef<HTMLButtonElement>(null);
+  const sttTabRef = useRef<HTMLButtonElement>(null);
   const speechTabRef = useRef<HTMLButtonElement>(null);
   const imageTabRef = useRef<HTMLButtonElement>(null);
   const videoTabRef = useRef<HTMLButtonElement>(null);
@@ -80,6 +89,7 @@ export function ModelSettings({
     const updateIndicator = () => {
       let activeEl: HTMLButtonElement | null = null;
       if (activeCategory === "llm") activeEl = llmTabRef.current;
+      else if (activeCategory === "stt") activeEl = sttTabRef.current;
       else if (activeCategory === "speech") activeEl = speechTabRef.current;
       else if (activeCategory === "image") activeEl = imageTabRef.current;
       else if (activeCategory === "video") activeEl = videoTabRef.current;
@@ -106,9 +116,45 @@ export function ModelSettings({
     loadMultiModalConfig(),
   );
 
-  // Reload config on category change or mount
+  // Reload config on category change or mount, hydrating encrypted secret hints from Electron main
   useEffect(() => {
-    setConfig(loadMultiModalConfig());
+    const localCfg = loadMultiModalConfig();
+    setConfig(localCfg);
+    const getCfgApi = (window as any).electron?.getConfig;
+    if (typeof getCfgApi !== "function") return;
+    let cancelled = false;
+    void getCfgApi()
+      .then((hostCfg: any) => {
+        if (cancelled || !hostCfg || typeof hostCfg !== "object") return;
+        const mergeHints = <T extends { id: string; hasApiKey?: boolean; apiKeyHint?: string }>(
+          localList: T[],
+          hostList?: any[],
+        ): T[] => {
+          if (!Array.isArray(hostList) || hostList.length === 0) return localList;
+          const byId = new Map(hostList.filter((h) => h?.id).map((h) => [h.id, h]));
+          return localList.map((item) => {
+            const h = byId.get(item.id);
+            if (!h) return item;
+            return {
+              ...item,
+              hasApiKey: h.hasApiKey ?? item.hasApiKey,
+              apiKeyHint: h.apiKeyHint ?? item.apiKeyHint,
+            };
+          });
+        };
+        setConfig((prev) => ({
+          ...prev,
+          llm: { ...prev.llm, providers: mergeHints(prev.llm.providers, hostCfg.llmProviders) },
+          stt: { ...prev.stt, providers: mergeHints(prev.stt.providers, hostCfg.sttProviders) },
+          speech: { ...prev.speech, providers: mergeHints(prev.speech.providers, hostCfg.speechProviders) },
+          image: { ...prev.image, providers: mergeHints(prev.image.providers, hostCfg.imageProviders) },
+          video: { ...prev.video, providers: mergeHints(prev.video.providers, hostCfg.videoProviders) },
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [activeCategory]);
 
   // 3. Provider Accordion Expansion State
@@ -169,6 +215,15 @@ export function ModelSettings({
       saveLlmConfig(updated);
       onActiveModelChanged?.(resolvedActiveId);
       toast.success(t("toast.activeModelSet"));
+    } else if (activeCategory === "stt") {
+      const updated = {
+        ...config.stt,
+        activeModelId: modelId,
+        activeProviderId: providerId,
+      };
+      setConfig((prev) => ({ ...prev, stt: updated }));
+      saveSttConfig(updated);
+      toast.success(t("toast.activeModelSet"));
     } else if (activeCategory === "speech") {
       const updated = {
         ...config.speech,
@@ -223,6 +278,23 @@ export function ModelSettings({
       };
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
+    } else if (activeCategory === "stt") {
+      const updatedProviders = config.stt.providers.filter(
+        (p) => p.id !== providerId,
+      );
+      const newActiveProvider = updatedProviders[0]?.id || "const-router";
+      const newActiveModel =
+        config.stt.activeProviderId === providerId
+          ? updatedProviders[0]?.models[0]?.id || "whisper-large-v3-turbo"
+          : config.stt.activeModelId;
+      const updated = {
+        ...config.stt,
+        providers: updatedProviders,
+        activeProviderId: newActiveProvider,
+        activeModelId: newActiveModel,
+      };
+      setConfig((prev) => ({ ...prev, stt: updated }));
+      saveSttConfig(updated);
     } else if (activeCategory === "speech") {
       const updatedProviders = config.speech.providers.filter(
         (p) => p.id !== providerId,
@@ -290,6 +362,22 @@ export function ModelSettings({
       const updated = { ...config.llm, providers: updatedProviders };
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
+    } else if (activeCategory === "stt") {
+      let updatedProviders = config.stt.providers.map((p) =>
+        p.id === editingProvider.id ? editingProvider : p,
+      );
+      if (!config.stt.providers.some((p) => p.id === editingProvider.id)) {
+        updatedProviders = [...config.stt.providers, editingProvider];
+      }
+      const updated = {
+        ...config.stt,
+        providers: updatedProviders,
+        ...(editingProvider.id === config.stt.activeProviderId && editingProvider.language
+          ? { language: editingProvider.language }
+          : {}),
+      };
+      setConfig((prev) => ({ ...prev, stt: updated }));
+      saveSttConfig(updated);
     } else if (activeCategory === "speech") {
       let updatedProviders = config.speech.providers.map((p) =>
         p.id === editingProvider.id ? editingProvider : p,
@@ -339,6 +427,7 @@ export function ModelSettings({
       editingProvider.baseUrl,
       editingProvider.apiKey,
       editingProvider.protocol,
+      { providerId: editingProvider.id, category: activeCategory },
     );
     setIsTestingPing(false);
 
@@ -359,6 +448,7 @@ export function ModelSettings({
       editingProvider.baseUrl,
       editingProvider.apiKey,
       editingProvider.protocol,
+      { providerId: editingProvider.id, category: activeCategory },
     );
     setIsFetchingModels(false);
 
@@ -398,8 +488,12 @@ export function ModelSettings({
       setEditingProvider({
         ...editingProvider,
         baseUrl: "https://router.const.web.id/v1",
-        protocol: "openai-completions",
-        models: CONST_ROUTER_LLM_MODELS,
+        protocol:
+          activeCategory === "stt" ? "openai-transcriptions" : "openai-completions",
+        models:
+          activeCategory === "stt"
+            ? CONST_STT_ROUTER_MODELS
+            : CONST_ROUTER_LLM_MODELS,
       });
       toast.success(t("settings.modelsRestored"));
     } else {
@@ -471,6 +565,25 @@ export function ModelSettings({
       };
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
+    } else if (activeCategory === "stt") {
+      newProvider = {
+        id,
+        name: "",
+        baseUrl: "",
+        apiKey: "",
+        protocol: "openai-transcriptions",
+        language: "auto",
+        isCustom: true,
+        models: [],
+      };
+      const activeProviderId = config.stt.activeProviderId || id;
+      const updated = {
+        ...config.stt,
+        activeProviderId,
+        providers: [...config.stt.providers, newProvider],
+      };
+      setConfig((prev) => ({ ...prev, stt: updated }));
+      saveSttConfig(updated);
     } else if (activeCategory === "speech") {
       newProvider = {
         id,
@@ -548,21 +661,25 @@ export function ModelSettings({
   const currentProviders =
     activeCategory === "llm"
       ? config.llm.providers
-      : activeCategory === "speech"
-        ? config.speech.providers
-        : activeCategory === "image"
-          ? config.image.providers
-          : config.video.providers;
+      : activeCategory === "stt"
+        ? config.stt.providers
+        : activeCategory === "speech"
+          ? config.speech.providers
+          : activeCategory === "image"
+            ? config.image.providers
+            : config.video.providers;
 
   // Current active model ID
   const currentActiveModelId =
     activeCategory === "llm"
       ? config.llm.activeModelId
-      : activeCategory === "speech"
-        ? config.speech.activeModelId
-        : activeCategory === "image"
-          ? config.image.activeModelId
-          : config.video.activeModelId;
+      : activeCategory === "stt"
+        ? config.stt.activeModelId
+        : activeCategory === "speech"
+          ? config.speech.activeModelId
+          : activeCategory === "image"
+            ? config.image.activeModelId
+            : config.video.activeModelId;
 
   const constRouterProvider =
     config.llm.providers.find(
@@ -617,6 +734,21 @@ export function ModelSettings({
           >
             <Box className="w-3.5 h-3.5" />
             <span>{t("settings.llm")}</span>
+          </button>
+
+          <button
+            ref={sttTabRef}
+            type="button"
+            onClick={() => setActiveCategory("stt")}
+            className={cn(
+              "relative z-10 px-3 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
+              activeCategory === "stt"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>{t("settings.stt")}</span>
           </button>
 
           <button
@@ -683,6 +815,7 @@ export function ModelSettings({
         <SubscriptionProvidersPanel
           constProvider={constRouterProvider}
           activeModelId={config.llm.activeModelId}
+          constAvailableUsd={wallet?.availableUsd}
           onSelectModel={(modelId, providerId) =>
             handleSetDefaultModel(modelId, providerId)
           }
@@ -705,7 +838,9 @@ export function ModelSettings({
           <div className="settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] py-12 px-6 flex flex-col items-center justify-center text-center select-none">
             {/* Category Icon */}
             <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white mb-3.5 ">
-              {activeCategory === "speech" ? (
+              {activeCategory === "stt" ? (
+                <Mic className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
+              ) : activeCategory === "speech" ? (
                 <Volume2 className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               ) : activeCategory === "image" ? (
                 <ImageIcon className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
@@ -718,18 +853,22 @@ export function ModelSettings({
 
             {/* Title & Description */}
             <h3 className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
-              {activeCategory === "speech"
-                ? t("settings.noSpeechProviders")
-                : activeCategory === "image"
-                  ? t("settings.noImageProviders")
-                  : t("settings.noVideoProviders")}
+              {activeCategory === "stt"
+                ? t("settings.noSttProviders")
+                : activeCategory === "speech"
+                  ? t("settings.noSpeechProviders")
+                  : activeCategory === "image"
+                    ? t("settings.noImageProviders")
+                    : t("settings.noVideoProviders")}
             </h3>
             <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1 leading-relaxed">
-              {activeCategory === "speech"
-                ? t("settings.connectSpeechDesc")
-                : activeCategory === "image"
-                  ? t("settings.connectImageDesc")
-                  : t("settings.connectVideoDesc")}
+              {activeCategory === "stt"
+                ? t("settings.connectSttDesc")
+                : activeCategory === "speech"
+                  ? t("settings.connectSpeechDesc")
+                  : activeCategory === "image"
+                    ? t("settings.connectImageDesc")
+                    : t("settings.connectVideoDesc")}
             </p>
 
             {/* Action Buttons */}
@@ -774,6 +913,12 @@ export function ModelSettings({
                     <span className="text-sm font-medium text-foreground truncate">
                       {provider.name}
                     </span>
+                    {(provider.id === "const-router" || provider.id === "const") && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-500 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Connected
+                      </span>
+                    )}
                     {provider.isCustom && (
                       <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
                         {t("settings.customBadge")}
@@ -904,6 +1049,36 @@ export function ModelSettings({
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                      ) : activeCategory === "stt" ? (
+                        <Select
+                          value={editingProvider.protocol || "openai-transcriptions"}
+                          onValueChange={(val) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              protocol: val,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue
+                              placeholder={t("settings.apiProtocol")}
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem
+                              value="openai-transcriptions"
+                              className="text-xs cursor-pointer"
+                            >
+                              OpenAI Whisper (/v1/audio/transcriptions)
+                            </SelectItem>
+                            <SelectItem
+                              value="custom"
+                              className="text-xs cursor-pointer"
+                            >
+                              {t("settings.customEndpoint")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       ) : activeCategory === "speech" ? (
                         <Select
                           value={editingProvider.protocol || "openai-speech"}
@@ -1019,9 +1194,13 @@ export function ModelSettings({
                             })
                           }
                           placeholder={
-                            editingProvider.isDefault
-                              ? t("settings.apiKeyConfigured")
-                              : t("settings.apiKey")
+                            editingProvider.hasApiKey && editingProvider.apiKeyHint
+                              ? `Encrypted (${editingProvider.apiKeyHint}) — enter to replace`
+                              : editingProvider.hasApiKey
+                                ? "Encrypted key saved — enter to replace"
+                                : editingProvider.isDefault
+                                  ? t("settings.apiKeyConfigured")
+                                  : t("settings.apiKey")
                           }
                           className="w-full px-3.5 py-2 pr-10 rounded-xl bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors font-sans"
                         />
@@ -1045,6 +1224,47 @@ export function ModelSettings({
                     </div>
 
                     {/* 5. Modality Specific Controls */}
+                    {activeCategory === "stt" && (
+                      <div className="space-y-2 pt-1">
+                        <label className="text-xs font-medium text-foreground block">
+                          Transcription Language
+                        </label>
+                        <Select
+                          value={editingProvider.language || "auto"}
+                          onValueChange={(val) =>
+                            setEditingProvider({
+                              ...editingProvider,
+                              language: val,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full sm:w-64 h-8 rounded-[8px] bg-neutral-100 dark:bg-[#2b2b2b] border border-transparent text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem value="auto" className="text-xs cursor-pointer">
+                              Auto-detect (Multilingual)
+                            </SelectItem>
+                            <SelectItem value="id" className="text-xs cursor-pointer">
+                              Indonesian (id)
+                            </SelectItem>
+                            <SelectItem value="en" className="text-xs cursor-pointer">
+                              English (en)
+                            </SelectItem>
+                            <SelectItem value="ja" className="text-xs cursor-pointer">
+                              Japanese (ja)
+                            </SelectItem>
+                            <SelectItem value="zh" className="text-xs cursor-pointer">
+                              Chinese (zh)
+                            </SelectItem>
+                            <SelectItem value="es" className="text-xs cursor-pointer">
+                              Spanish (es)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     {activeCategory === "speech" && (
                       <div className="space-y-4 pt-2 border-border/40">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

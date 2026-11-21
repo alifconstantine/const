@@ -39,6 +39,8 @@ import { DEFAULT_ROUTER_MODEL_ID } from "../../lib/router-models";
 import { useTranslation } from "../../lib/i18n";
 import { agentFailureText } from "../../lib/agent-outcomes";
 import { isAgentCancellation, shouldNotifyAgentFailure } from "../../lib/agent-errors";
+import { transcribeAudioAttachments } from "../../lib/voice-dictation";
+import { localMediaUrl } from "../../lib/workbench-activity";
 
 // A side run can outlive the tab component when the user changes conversations.
 const pendingSideSends = new Set<string>();
@@ -592,12 +594,15 @@ export function SideChatTab({
     pendingSideSends.add(sideChatId);
     reportedErrorRef.current = false;
 
+    const authToken = localStorage.getItem("const_harness_auth_token") || undefined;
+    const resolvedAttachments = await transcribeAudioAttachments(attachments, authToken);
+
     const userMsg: SideChatMessage = {
       id: `msg_user_${Date.now()}`,
       role: "user",
       content: prompt.trim(),
       timestamp: Date.now(),
-      attachments: cleanAttachmentsForPersistence(attachments),
+      attachments: cleanAttachmentsForPersistence(resolvedAttachments),
     };
 
     const assistantPlaceholder: SideChatMessage = {
@@ -701,11 +706,11 @@ export function SideChatTab({
 
     // Append current user message (with resolved session mentions context)
     let resolvedPrompt = resolveMentionedSessionsInPrompt(userMsg.content, effectiveConversations);
-    const documentParts = (attachments || []).filter((attachment) => attachment.textContent?.trim()).map((attachment) => `--- ${attachment.name} ---\n${attachment.textContent}\n--- END ---`);
-    const attachmentNames = (attachments || []).map((attachment) => attachment.name).join(", ");
+    const documentParts = (resolvedAttachments || []).filter((attachment) => attachment.textContent?.trim()).map((attachment) => `--- ${attachment.type === "audio" ? `AUDIO TRANSCRIPT: ${attachment.name}` : attachment.name} ---\n${attachment.textContent}\n--- END ---`);
+    const attachmentNames = (resolvedAttachments || []).map((attachment) => attachment.name).join(", ");
     if (attachmentNames) resolvedPrompt += `\n\nAttachments: ${attachmentNames}`;
     if (documentParts.length) resolvedPrompt += `\n\n${documentParts.join("\n\n")}`;
-    const images = (attachments || []).filter((attachment) => attachment.type === "image" && (attachment.base64 || attachment.url?.startsWith("https://"))).map((attachment) => ({ type: "image_url", image_url: { url: attachment.base64 || attachment.url } }));
+    const images = (resolvedAttachments || []).filter((attachment) => attachment.type === "image" && (attachment.base64 || attachment.url?.startsWith("https://"))).map((attachment) => ({ type: "image_url", image_url: { url: attachment.base64 || attachment.url } }));
     payloadMessages.push({
       role: "user",
       content: images.length ? [{ type: "text", text: resolvedPrompt }, ...images] : resolvedPrompt,
@@ -1179,7 +1184,7 @@ export function SideChatTab({
         <ImageLightbox
           src={
             previewMedia.path
-              ? `const-file://local/${previewMedia.path.replace(/\\/g, "/").replace(/^\/+/, "")}`
+              ? localMediaUrl(previewMedia.path)
               : (previewMedia.url || previewMedia.base64 || "")
           }
           fallbackBase64={previewMedia.base64}

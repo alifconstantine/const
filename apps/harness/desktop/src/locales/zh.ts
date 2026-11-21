@@ -694,6 +694,7 @@ export const zh: TranslationDictionary = {
 
     // Model settings
     llm: "LLM",
+    stt: "STT",
     speech: "语音",
     image: "图像",
     video: "视频",
@@ -840,10 +841,12 @@ export const zh: TranslationDictionary = {
 
     chooseAdapterProvider: "选择适配器提供商",
     noLlmProviders: "未配置语言模型提供商",
+    noSttProviders: "未配置语音转文字提供商",
     noSpeechProviders: "未配置语音提供商",
     noImageProviders: "未配置图像提供商",
     noVideoProviders: "未配置视频提供商",
     connectLlmDesc: "连接 LLM 提供商适配器或自定义端点以开始使用。",
+    connectSttDesc: "使用内置的 Const Router Whisper，或添加自定义转录端点。",
     connectSpeechDesc: "连接语音合成适配器或自定义音频端点以开始使用。",
     connectImageDesc: "连接图像生成适配器或自定义端点以开始使用。",
     connectVideoDesc: "连接视频生成适配器或自定义端点以开始使用。",

@@ -1125,6 +1125,13 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               },
             );
             request.updateDiagnostics({ httpStatus: response.status });
+            if (this.config.onResponseHeaders) {
+              const flatHeaders: Record<string, string> = {};
+              response.headers.forEach((value, key) => {
+                flatHeaders[key.toLowerCase()] = value;
+              });
+              this.config.onResponseHeaders(flatHeaders);
+            }
 
             if (!response.ok) {
               const rawErr = await response.text().catch(() => "Unknown error");

@@ -54,7 +54,8 @@ import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/exe
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
 import { ApprovalResponseGate, approvalResponseKey, removeMatchingApproval } from "./lib/approval-state";
 import { QuestionCard } from "./components/workbench/question-card";
-import { collectSessionSources, collectSessionChanges } from "./lib/workbench-activity";
+import { collectSessionSources, collectSessionChanges, localMediaUrl } from "./lib/workbench-activity";
+import { transcribeAudioAttachments } from "./lib/voice-dictation";
 import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
 import { ChatMessageItem } from "./components/workbench/chat-message-item";
 import { archiveAssistantCommentary, serializeAssistantTranscript } from "./lib/assistant-transcript";
@@ -274,11 +275,12 @@ function formatChatMessageForLlm(
     fullText = `${fullText}\n\n${mediaNotices.join("\n")}`;
   }
 
-  // Append extracted document/PDF text blocks if available and not already embedded
+  // Append extracted document/PDF text or Whisper audio transcript blocks if available and not already embedded
   const docTextBlocks: string[] = [];
   for (const att of m.attachments) {
     if (att.textContent && att.textContent.trim()) {
-      const headerTag = `--- DOCUMENT ATTACHMENT: "${att.name}"`;
+      const label = att.type === "audio" ? "AUDIO TRANSCRIPT" : "DOCUMENT ATTACHMENT";
+      const headerTag = `--- ${label}: "${att.name}"`;
       if (!fullText.includes(headerTag)) {
         const meta = [
           att.pages ? (att.type === "presentation" ? `${att.pages} slides` : `${att.pages} pages`) : null,
@@ -286,7 +288,7 @@ function formatChatMessageForLlm(
         ].filter(Boolean).join(", ");
         const metaStr = meta ? ` (${meta})` : "";
         docTextBlocks.push(
-          `--- DOCUMENT ATTACHMENT: "${att.name}"${metaStr} ---\n${att.textContent.trim()}\n--- END ATTACHMENT: "${att.name}" ---`
+          `--- ${label}: "${att.name}"${metaStr} ---\n${att.textContent.trim()}\n--- END ATTACHMENT: "${att.name}" ---`
         );
       }
     }
@@ -3558,12 +3560,14 @@ export function AuthenticatedContent({
       prompt.trim() ||
       (attachments && attachments.length > 0 ? "Please analyze the attached media/file(s)." : "");
 
+    const resolvedAttachments = await transcribeAudioAttachments(attachments, token || undefined);
+
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}_user`,
       role: "user",
       content: effectivePrompt,
       timestamp: Date.now(),
-      attachments: cleanAttachmentsForPersistence(attachments),
+      attachments: cleanAttachmentsForPersistence(resolvedAttachments),
     };
 
     const assistantPlaceholder: ChatMessage = {
@@ -5301,7 +5305,7 @@ export function AuthenticatedContent({
       {/* Media Lightbox Preview Modal */}
       {previewMedia && (
         <ImageLightbox
-          src={previewMedia.path ? `const-file://${previewMedia.path.replace(/\\/g, "/")}` : (previewMedia.url || previewMedia.base64 || "")}
+          src={previewMedia.path ? localMediaUrl(previewMedia.path) : (previewMedia.url || previewMedia.base64 || "")}
           fallbackBase64={previewMedia.base64}
           filePath={previewMedia.path}
           alt={previewMedia.name}
