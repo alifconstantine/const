@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, memo } from "react";
-import { Check, Copy, Pencil, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Check, Copy, Pencil, ThumbsUp, ThumbsDown, ChevronDown, ChevronRight } from "lucide-react";
 import { ScrollArea, UserMessageBubble, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { MarkdownContent } from "./markdown-content";
@@ -32,6 +32,16 @@ export interface ChatMessage {
   durationMs?: number;
   intelligenceUiState?: IntelligenceUiState;
   attachments?: any[];
+  /** Non-destructive OMP-style compaction boundary marker (keeps UI scrollback intact). */
+  isCompactionBoundary?: boolean;
+  compactionMeta?: {
+    beforeTokens: number;
+    afterTokens: number;
+    keptCount?: number;
+    summary: string;
+    readFiles?: string[];
+    modifiedFiles?: string[];
+  };
 }
 
 export interface ChatMessageItemProps {
@@ -122,12 +132,52 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const { t } = useTranslation();
   const [internalCopied, setInternalCopied] = useState(false);
   const [internalFeedback, setInternalFeedback] = useState<"good" | "bad" | null>(null);
+  const [compactExpanded, setCompactExpanded] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   const outputFiles = useMemo(() => message?.role === "assistant" && !isExecuting
     ? collectResponseOutputs(message.content || "", message.mutations) : [], [message?.role, message?.content, message?.mutations, isExecuting]);
 
   if (!message) return null;
+
+  // Non-destructive OMP-style Context Compaction boundary divider (monochrome, collapsible)
+  if (message.isCompactionBoundary && message.compactionMeta) {
+    const beforeK = Math.round((message.compactionMeta.beforeTokens || 0) / 100) / 10;
+    const afterK = Math.round((message.compactionMeta.afterTokens || 0) / 100) / 10;
+    return (
+      <div className="w-full py-2 select-none">
+        <button
+          type="button"
+          onClick={() => setCompactExpanded((prev) => !prev)}
+          className="w-full flex items-center gap-3 text-[11px] text-[#737373] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer group"
+        >
+          <span className="flex-1 h-px bg-black/10 dark:bg-white/10" />
+          <span className="inline-flex items-center gap-1 font-sans">
+            {compactExpanded ? (
+              <ChevronDown className="w-3 h-3 shrink-0" />
+            ) : (
+              <ChevronRight className="w-3 h-3 shrink-0" />
+            )}
+            <span>
+              Context compacted · {beforeK}k → {afterK}k tokens
+            </span>
+          </span>
+          <span className="flex-1 h-px bg-black/10 dark:bg-white/10" />
+        </button>
+        {compactExpanded && (
+          <div className="mt-2 px-3.5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] select-text">
+            <MarkdownContent
+              content={message.compactionMeta.summary || message.content || ""}
+              onOpenFilePreview={onOpenFilePreview}
+              onOpenTrajectory={onOpenTrajectory}
+              onOpenBrowser={onOpenBrowser}
+              variant="default"
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (message.role === "user") {
     if (isEditing) {

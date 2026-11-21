@@ -29,6 +29,14 @@ export class ToolAuthorization {
     return this.config.mode || "ask_before_changes";
   }
 
+  public get runIntent(): "default" | "plan" | "goal" {
+    return this.config.runIntent || "default";
+  }
+
+  public updateRunIntent(intent: "default" | "plan" | "goal"): void {
+    this.config.runIntent = intent;
+  }
+
   public updateMode(newMode: "request_review" | "ask_before_changes" | "full_access"): void {
     this.config.mode = newMode;
     if (newMode === "full_access") {
@@ -77,6 +85,91 @@ export class ToolAuthorization {
     const isPythonTool = actionKind === "python";
     const isFileMutationTool = actionKind === "file_mutation";
     const isExternalTool = tc.function.name.startsWith("mcp_");
+
+    // Plan Mode enforcement (ported from oh-my-pi plan-mode-guard):
+    // Working tree & system are strictly read-only. Writes/edits are allowed ONLY inside `.const/plans/`.
+    if (this.config.runIntent === "plan") {
+      const READ_ONLY_COMPUTER_TOOLS = new Set([
+        "computerlistapps",
+        "computerlistwindows",
+        "computersnapshot",
+        "computerfind",
+        "computergetappstate",
+        "computerscreenshot",
+        "computergetcapabilities",
+      ]);
+      const READ_ONLY_BROWSER_TOOLS = new Set([
+        "browsersnapshot",
+        "browserscreenshot",
+        "browsergettext",
+        "browsergeturl",
+        "browserlisttabs",
+        "browserconsolelogs",
+        "browsernetworklogs",
+      ]);
+
+      if (isFileMutationTool) {
+        const isDeleteOrMove =
+          toolLower === "delete" ||
+          toolLower === "deletefile" ||
+          toolLower === "removefile" ||
+          toolLower === "rename" ||
+          toolLower === "movefile" ||
+          parsedArgs.op === "delete" ||
+          Boolean(parsedArgs.move);
+        if (isDeleteOrMove) {
+          return {
+            allowOutsideWorkspace: false,
+            waitingMs: 0,
+            rejection: {
+              decision: "deny",
+              text: `[PLAN MODE ACTIVE]: Deleting or renaming files is blocked in Plan Mode. Update your plan under '.const/plans/<slug>-plan.md' instead.`,
+            },
+          };
+        }
+        const candidatePath = extractPathArg(parsedArgs) || "";
+        const resolvedCandidate = candidatePath ? resolveSafePath(candidatePath, workspacePath) : "";
+        const relNormalized = resolvedCandidate
+          ? path.relative(workspacePath, resolvedCandidate).replace(/\\/g, "/")
+          : "";
+        const isPlanMarkdownFile =
+          (relNormalized.startsWith(".const/plans/") || relNormalized === ".const/plans") &&
+          !relNormalized.includes("..") &&
+          !path.isAbsolute(relNormalized);
+        if (!isPlanMarkdownFile) {
+          return {
+            allowOutsideWorkspace: false,
+            waitingMs: 0,
+            rejection: {
+              decision: "deny",
+              text: `[PLAN MODE ACTIVE]: Working tree is read-only — editing '${candidatePath || "workspace files"}' is blocked. Write your canonical plan to '.const/plans/<slug>-plan.md', then call 'plan_exit' when ready for approval.`,
+            },
+          };
+        }
+      } else if (isTerminalTool || isPythonTool) {
+        return {
+          allowOutsideWorkspace: false,
+          waitingMs: 0,
+          rejection: {
+            decision: "deny",
+            text: `[PLAN MODE ACTIVE]: Running shell or Python execution ('${tc.function.name}') is blocked while in read-only Plan Mode. Use read-only inspection tools (read, grep, find, list, git_status, git_diff, git_log), write your plan to '.const/plans/<slug>-plan.md', and call 'plan_exit' for approval.`,
+          },
+        };
+      } else if (
+        (toolLower.startsWith("computer") && !READ_ONLY_COMPUTER_TOOLS.has(toolLower)) ||
+        (toolLower.startsWith("browser") && !READ_ONLY_BROWSER_TOOLS.has(toolLower)) ||
+        (isExternalTool && externalDefinition?.requiresApproval !== false)
+      ) {
+        return {
+          allowOutsideWorkspace: false,
+          waitingMs: 0,
+          rejection: {
+            decision: "deny",
+            text: `[PLAN MODE ACTIVE]: State-changing action '${tc.function.name}' is blocked in read-only Plan Mode. Complete planning and call 'plan_exit' first.`,
+          },
+        };
+      }
+    }
 
 
     let cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;

@@ -102,7 +102,7 @@ export function normalizeUiMessages(rawMessages: any[]): any[] {
     const msg = rawMessages[i];
     if (!msg) continue;
 
-    if (msg.role === "user") {
+    if (msg.role === "user" || msg.role === "system") {
       if (currentAssistant) {
         normalized.push(currentAssistant);
         currentAssistant = null;
@@ -387,9 +387,16 @@ export function saveConversation(conversation: ConversationItem): void {
     const list = loadConversations();
     const index = list.findIndex((c) => c.id === conversation.id);
     const existing = index >= 0 ? list[index] : null;
-    const updatedConvo = {
+    const updatedConvo: ConversationItem = {
       ...existing,
       ...conversation,
+      // Always preserve latest SideChat list from localStorage/store so a stale cache never overwrites SQLite.
+      sideConversations:
+        conversation.sideConversations !== undefined
+          ? conversation.sideConversations
+          : loadSideConversations(conversation.id).length > 0
+            ? loadSideConversations(conversation.id)
+            : existing?.sideConversations,
       telemetry: mergeTelemetry(existing?.telemetry, conversation.telemetry),
       updatedAt: conversation.updatedAt || existing?.updatedAt || Date.now(),
     };
@@ -421,6 +428,9 @@ export function deleteConversation(id: string): void {
     const list = loadConversations().filter((c) => c.id !== id);
     cachedConversations = list;
     persistConversationCache(list);
+    try {
+      localStorage.removeItem(`${SIDE_STORAGE_PREFIX}${id}`);
+    } catch {}
 
     // Delete from SQLite disk database
     if (typeof window !== "undefined" && window.electron?.deleteConversation) {
@@ -705,6 +715,10 @@ export function saveSideConversation(sideConvo: SideConversationItem): void {
       `${SIDE_STORAGE_PREFIX}${sideConvo.parentConversationId}`,
       JSON.stringify(list)
     );
+    if (cachedConversations) {
+      const parent = cachedConversations.find((c) => c.id === sideConvo.parentConversationId);
+      if (parent) parent.sideConversations = list;
+    }
 
     updateConversationUi(sideConvo.parentConversationId, { sideConversation: updated });
   } catch (err) {
@@ -720,6 +734,10 @@ export function deleteSideConversation(parentConversationId: string, sideId: str
       `${SIDE_STORAGE_PREFIX}${parentConversationId}`,
       JSON.stringify(list)
     );
+    if (cachedConversations) {
+      const parent = cachedConversations.find((c) => c.id === parentConversationId);
+      if (parent) parent.sideConversations = list;
+    }
 
     updateConversationUi(parentConversationId, { deleteSideConversationId: sideId });
   } catch {}

@@ -39,7 +39,16 @@ export {
   type ToolObservation,
 } from "./tool-observations.js";
 export {
+  buildGoalActivePrompt,
+  buildGoalBudgetLimitPrompt,
+  buildGoalContinuationPrompt,
+  buildPlanApprovedGuidance,
+  COMPACTION_SUMMARY_PROMPT,
+  COMPACTION_SYSTEM_PROMPT,
+  COMPACTION_UPDATE_SUMMARY_PROMPT,
+  GOAL_MODE_GUIDANCE,
   LANGUAGE_GUIDANCE,
+  PLAN_MODE_GUIDANCE,
   PROGRESS_REVIEW_GUIDANCE,
   REASONING_RECOVERY_GUIDANCE,
   REPEATED_FAILURE_GUIDANCE,

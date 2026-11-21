@@ -27,12 +27,26 @@ import {
   type ConversationItem,
 } from "../../lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
+import { DEFAULT_ROUTER_MODEL_ID } from "../../lib/router-models";
 import { useTranslation } from "../../lib/i18n";
 import { agentFailureText } from "../../lib/agent-outcomes";
 import { isAgentCancellation, shouldNotifyAgentFailure } from "../../lib/agent-errors";
 
 // A side run can outlive the tab component when the user changes conversations.
 const pendingSideSends = new Set<string>();
+// Pending /btw prompts queued for a SideChat tab that is mounting or already mounted.
+const pendingBtwPrompts = new Map<string, string>();
+
+export function enqueueSideChatBtwPrompt(sideChatId: string, prompt: string): void {
+  const clean = prompt.trim();
+  if (!sideChatId || !clean) return;
+  pendingBtwPrompts.set(sideChatId, clean);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("const:side-chat-btw", { detail: { sideChatId, prompt: clean } }),
+    );
+  }
+}
 
 export interface SideChatMessage {
   id: string;
@@ -128,7 +142,7 @@ export function SideChatTab({
     }));
     toast.success(type === "good" ? t("toast.responseHelpful") : t("toast.feedbackRecorded"));
   };
-  const [activeModel, setActiveModel] = useState<string>(() => tab.model || defaultModel || "gemini-3.8-flash");
+  const [activeModel, setActiveModel] = useState<string>(() => tab.model || defaultModel || DEFAULT_ROUTER_MODEL_ID);
   const [activeMode, setActiveMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => loadSideConversation(effectiveParentId, sideChatId)?.mode || "ask_before_changes");
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
 
@@ -696,6 +710,34 @@ export function SideChatTab({
     }
   };
 
+  const handleSendMessageRef = useRef(handleSendMessage);
+  handleSendMessageRef.current = handleSendMessage;
+
+  // Auto-dispatch /btw questions sent from the main chat composer into this SideChat tab
+  useEffect(() => {
+    const consumePendingBtw = () => {
+      const queued = pendingBtwPrompts.get(sideChatId);
+      if (!queued) return;
+      pendingBtwPrompts.delete(sideChatId);
+      void handleSendMessageRef.current({
+        prompt: queued,
+        project: tab.project || "Outside Project",
+        mode: activeMode,
+        model: activeModel,
+      });
+    };
+
+    consumePendingBtw();
+    const onBtw = (event: Event) => {
+      const detail = (event as CustomEvent<{ sideChatId?: string; prompt?: string }>).detail;
+      if (detail?.sideChatId === sideChatId) {
+        consumePendingBtw();
+      }
+    };
+    window.addEventListener("const:side-chat-btw", onBtw);
+    return () => window.removeEventListener("const:side-chat-btw", onBtw);
+  }, [sideChatId, tab.project, activeMode, activeModel]);
+
   const handleAbort = async () => {
     if (window.electron?.abortAgent) {
       await window.electron.abortAgent(sideChatId);
@@ -917,7 +959,11 @@ export function SideChatTab({
       {/* Media Lightbox Preview Modal */}
       {previewMedia && (
         <ImageLightbox
-          src={previewMedia.path ? `const-file://${previewMedia.path.replace(/\\/g, "/")}` : (previewMedia.url || previewMedia.base64 || "")}
+          src={
+            previewMedia.path
+              ? `const-file://local/${previewMedia.path.replace(/\\/g, "/").replace(/^\/+/, "")}`
+              : (previewMedia.url || previewMedia.base64 || "")
+          }
           fallbackBase64={previewMedia.base64}
           filePath={previewMedia.path}
           alt={previewMedia.name}

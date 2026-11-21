@@ -34,6 +34,7 @@ export interface RichMentionEditorRef {
   focus: () => void;
   insertMention: (candidate: MentionCandidate) => void;
   insertSkillMention: (skill: { id: string; name: string; slug: string; category?: string }) => void;
+  insertSlashCommand: (command: { id: string; command: string; title: string }) => void;
   drillDirectory: (candidate: MentionCandidate) => void;
   insertText: (text: string) => void;
   insertAt: () => void;
@@ -60,6 +61,13 @@ export interface RichMentionEditorProps {
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
 }
 
+const BUILTIN_COMMAND_TITLES: Record<string, string> = {
+  plan: "Plan mode",
+  goal: "Goal",
+  btw: "Side chat",
+  compact: "Compact",
+};
+
 /**
  * Returns crisp SVG or HTML for file icons matching VS Code / Antigravity aesthetics.
  */
@@ -68,12 +76,29 @@ export function getMentionIconMarkup({
   kind,
   fileType,
   pluginName,
+  commandId,
 }: {
   title: string;
   kind?: string;
   fileType?: string;
   pluginName?: string;
+  commandId?: string;
 }): string {
+  if (kind === "command") {
+    if (commandId === "plan") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`;
+    }
+    if (commandId === "goal") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`;
+    }
+    if (commandId === "btw") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`;
+    }
+    if (commandId === "compact") {
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" x2="21" y1="10" y2="3"/><line x1="3" x2="10" y1="21" y2="14"/></svg>`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="text-primary shrink-0 inline-block"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>`;
+  }
   if (kind === "plugin") {
     if (pluginName === "const-guide") {
       const base = typeof window !== "undefined" && window.location.protocol === "file:" ? "./" : "/";
@@ -115,9 +140,11 @@ export function renderMentionBadgeHtml({
   kind?: string;
   fileType?: string;
 }): string {
-  const isPlugin = kind === "plugin" || href.startsWith("plugin://");
-  const isSkill = kind === "skill" || href.startsWith("skill://");
+  const isCommand = kind === "command" || href.startsWith("command://");
+  const isPlugin = !isCommand && (kind === "plugin" || href.startsWith("plugin://"));
+  const isSkill = !isCommand && (kind === "skill" || href.startsWith("skill://"));
   const isSession =
+    !isCommand &&
     !isSkill &&
     (kind === "session" ||
       href.startsWith("trajectory://") ||
@@ -126,21 +153,28 @@ export function renderMentionBadgeHtml({
       href.includes("brain/"));
 
   const isDirectory =
+    !isCommand &&
     !isSkill &&
     !isSession &&
     (kind === "directory" || href.startsWith("folder://") || title.endsWith("/") || href.endsWith("/"));
 
-  const resolvedKind = isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : isDirectory ? "directory" : (kind || "file");
+  const resolvedKind = isCommand ? "command" : isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : isDirectory ? "directory" : (kind || "file");
   const cleanTitle = title.replace(/^[\s💬📁📄✨]+/, "").replace(/\/$/, "");
+  const commandId = isCommand ? href.replace(/^command:\/\//, "") : undefined;
 
   const iconHtml = getMentionIconMarkup({
     title: cleanTitle,
     kind: resolvedKind,
     fileType,
     pluginName: isPlugin ? href.replace("plugin://", "") : undefined,
+    commandId,
   });
 
-  const tooltip = isPlugin ? translate("marketplace.pluginMentionTooltip").replace("{name}", cleanTitle) : isSkill
+  const tooltip = isCommand
+    ? `/${commandId || cleanTitle}`
+    : isPlugin
+    ? translate("marketplace.pluginMentionTooltip").replace("{name}", cleanTitle)
+    : isSkill
     ? `Skill: ${cleanTitle}`
     : isSession
     ? `Trajectory: ${cleanTitle} • Click to view`
@@ -171,15 +205,18 @@ function createMentionBadgeElement(
   badge.setAttribute("data-mention-token", "true");
 
   const targetPath = candidate.fullPath || candidate.path || candidate.title;
-  const isPlugin = candidate.kind === "plugin" || targetPath.startsWith("plugin://");
-  const isSkill = candidate.kind === "skill" || targetPath.startsWith("skill://");
+  const isCommand = candidate.kind === "command" || targetPath.startsWith("command://");
+  const isPlugin = !isCommand && (candidate.kind === "plugin" || targetPath.startsWith("plugin://"));
+  const isSkill = !isCommand && (candidate.kind === "skill" || targetPath.startsWith("skill://"));
   const isSession =
+    !isCommand &&
     !isSkill &&
     (candidate.kind === "session" ||
       Boolean(candidate.conversationId) ||
       (candidate.path && candidate.path.includes("transcript.jsonl")));
 
-  const resolvedKind = isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : (candidate.kind || "file");
+  const resolvedKind = isCommand ? "command" : isPlugin ? "plugin" : isSkill ? "skill" : isSession ? "session" : (candidate.kind || "file");
+  const commandId = isCommand ? targetPath.replace(/^command:\/\//, "") : undefined;
   badge.setAttribute("data-mention-path", targetPath);
   badge.setAttribute("data-mention-kind", resolvedKind);
   badge.setAttribute("data-mention-title", candidate.title);
@@ -189,7 +226,11 @@ function createMentionBadgeElement(
 
   badge.className =
     "inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors group";
-  badge.title = isPlugin ? translate("marketplace.pluginMentionTooltip").replace("{name}", candidate.title) : isSkill
+  badge.title = isCommand
+    ? `/${commandId || candidate.title}`
+    : isPlugin
+    ? translate("marketplace.pluginMentionTooltip").replace("{name}", candidate.title)
+    : isSkill
     ? `Skill: ${candidate.title}`
     : isSession
     ? `Trajectory: ${candidate.title} • Click to view`
@@ -201,6 +242,7 @@ function createMentionBadgeElement(
     kind: resolvedKind,
     fileType: candidate.fileType,
     pluginName: isPlugin ? targetPath.replace("plugin://", "") : undefined,
+    commandId,
   });
 
   badge.innerHTML = iconHtml;
@@ -211,7 +253,7 @@ function createMentionBadgeElement(
 
   badge.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (isPlugin) return;
+    if (isPlugin || isCommand) return;
     if (isSession) {
       const convoId =
         candidate.conversationId ||
@@ -261,7 +303,10 @@ function serializeContainer(container: Node, forActiveToken = false): string {
           const kind = el.getAttribute("data-mention-kind") || "file";
           const title = el.getAttribute("data-mention-title") || "";
           const path = el.getAttribute("data-mention-path") || title;
-          if (kind === "skill") {
+          if (kind === "command") {
+            const cmdId = path.replace(/^command:\/\//, "").trim();
+            result += cmdId ? `/${cmdId}` : title;
+          } else if (kind === "skill") {
             const cleanPath = path.startsWith("skill://") ? path : `skill://${path}`;
             result += `/[${title}](${cleanPath})`;
           } else if (kind === "plugin") {
@@ -396,9 +441,28 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           return;
         }
 
+        // Hydrate leading built-in slash command (e.g. "/plan ...", "/goal ...", "/btw ...", "/compact")
+        let lastIndex = 0;
+        const leadingCmdMatch = /^\/(plan|goal|btw|compact)(?=\s|$)/i.exec(text);
+        if (leadingCmdMatch && leadingCmdMatch[1]) {
+          const cmdId = leadingCmdMatch[1].toLowerCase();
+          const cmdBadge = createMentionBadgeElement(
+            {
+              title: BUILTIN_COMMAND_TITLES[cmdId] || cmdId,
+              fullPath: `command://${cmdId}`,
+              path: `command://${cmdId}`,
+              kind: "command",
+            },
+            onOpenFilePreview,
+            onOpenTrajectory
+          );
+          editor.appendChild(cmdBadge);
+          lastIndex = leadingCmdMatch[0].length;
+        }
+
         // Match @[Title](path) or /[Title](path) or @[path] or /[path]
         const mentionRegex = /(?:@|\/)\[([^\]]+)\](?:\(([^)]+)\))?/g;
-        let lastIndex = 0;
+        mentionRegex.lastIndex = lastIndex;
         let match: RegExpExecArray | null;
 
         while ((match = mentionRegex.exec(text)) !== null) {
@@ -412,12 +476,14 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           const rawLink = match[2];
           if (!rawTitle) continue;
 
-          let kind: "file" | "directory" | "session" | "skill" | "plugin" = isSlashBadge ? "skill" : "file";
+          let kind: "file" | "directory" | "session" | "skill" | "plugin" | "command" = isSlashBadge ? "skill" : "file";
           let targetPath = rawLink || rawTitle;
           let displayTitle = rawTitle;
           let convoId: string | undefined = undefined;
 
-          if (rawLink?.startsWith("plugin://")) {
+          if (rawLink?.startsWith("command://")) {
+            kind = "command";
+          } else if (rawLink?.startsWith("plugin://")) {
             kind = "plugin";
           } else if (isSlashBadge || (rawLink && rawLink.startsWith("skill://")) || rawTitle.startsWith("skill:")) {
             kind = "skill";
@@ -519,6 +585,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             setIsEmpty(true);
             onSerializedChange?.("");
             onMentionTokenChange?.(null);
+            onSlashTokenChange?.(null);
             savedRangeRef.current = null;
           }
         },
@@ -748,6 +815,16 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             range.collapse(false);
           }
 
+          if (range.startContainer.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            let previous: Node | undefined = range.startContainer.childNodes[range.startOffset - 1];
+            while (previous?.lastChild && !(previous instanceof HTMLElement && previous.dataset.mentionToken === "true")) previous = previous.lastChild;
+            if (previous?.nodeType === Node.TEXT_NODE) {
+              const offset = previous.nodeValue?.length ?? 0;
+              range.setStart(previous, offset);
+              range.setEnd(previous, offset);
+            }
+          }
+
           // Find and replace active /slash token in text node
           if (range.startContainer.nodeType === Node.TEXT_NODE) {
             const node = range.startContainer;
@@ -773,6 +850,76 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
               fullPath: `skill://${skill.slug}`,
               path: `skill://${skill.slug}`,
               kind: "skill",
+            },
+            onOpenFilePreview,
+            onOpenTrajectory
+          );
+          range.insertNode(badge);
+
+          const spaceNode = document.createTextNode(" ");
+          badge.after(spaceNode);
+
+          range.setStartAfter(spaceNode);
+          range.setEndAfter(spaceNode);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+
+          saveSelection();
+          syncContent();
+          onSlashTokenChange?.(null);
+        },
+        insertSlashCommand: (command: { id: string; command: string; title: string }) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+
+          const sel = window.getSelection();
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
+
+          if (range.startContainer.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            let previous: Node | undefined = range.startContainer.childNodes[range.startOffset - 1];
+            while (previous?.lastChild && !(previous instanceof HTMLElement && previous.dataset.mentionToken === "true")) previous = previous.lastChild;
+            if (previous?.nodeType === Node.TEXT_NODE) {
+              const offset = previous.nodeValue?.length ?? 0;
+              range.setStart(previous, offset);
+              range.setEnd(previous, offset);
+            }
+          }
+
+          // Find and replace active /slash token in text node
+          if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            const node = range.startContainer;
+            const fullText = node.nodeValue || "";
+            const offset = range.startOffset;
+
+            const beforeText = fullText.slice(0, offset);
+            const tokenMatch = /(?:^|\s)\/([a-zA-Z0-9_-]*)$/.exec(beforeText);
+
+            if (tokenMatch) {
+              const matchLen = tokenMatch[1] ? tokenMatch[1].length + 1 : 1;
+              const tokenStart = offset - matchLen;
+              range.setStart(node, tokenStart);
+              range.setEnd(node, offset);
+              range.deleteContents();
+            }
+          }
+
+          // Create inline badge element matching skills chip styling
+          const badge = createMentionBadgeElement(
+            {
+              title: command.title,
+              fullPath: `command://${command.id}`,
+              path: `command://${command.id}`,
+              kind: "command",
             },
             onOpenFilePreview,
             onOpenTrajectory
@@ -838,7 +985,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           }
         },
       }),
-      [onOpenFilePreview, saveSelection, setEditorFromSerializedText, syncContent, onMentionTokenChange]
+      [onOpenFilePreview, onOpenTrajectory, saveSelection, setEditorFromSerializedText, syncContent, onMentionTokenChange, onSlashTokenChange]
     );
 
     const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {

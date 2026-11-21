@@ -1469,6 +1469,74 @@ export const NATIVE_COMPUTER_TOOLS: NativeToolDefinition[] = [
   COMPUTER_CLIPBOARD_TOOL,
 ];
 
+// ---------------------------------------------------------------------------
+// Plan Mode & Goal Mode Tools (adapted from OpenCode plan.ts & oh-my-pi goal-tool.ts)
+// ---------------------------------------------------------------------------
+
+export const PLAN_EXIT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "plan_exit",
+    description:
+      "Call this ONLY when your read-only research and decision-complete execution plan are ready. Presents review options (Approve & Execute, Approve & Compact Context, or Stay in Plan Mode) to the user.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short title for the implementation plan.",
+        },
+        summary: {
+          type: "string",
+          description: "Concise, concrete overview of the steps, target files, and verification strategy.",
+        },
+        planPath: {
+          type: "string",
+          description: "Path to the canonical plan markdown file under `.const/plans/<slug>-plan.md`.",
+        },
+      },
+      required: ["summary"],
+    },
+  },
+};
+
+export const GOAL_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "goal",
+    description:
+      "Tracks and updates the active autonomous Goal for `/goal` mode (OMP-compatible). Use `create`/`update`/`replace` to record objective & acceptance criteria, `get` to inspect remaining status and budget, `complete` ONLY after every deliverable is proven with direct current-state evidence, or `drop` if genuinely blocked.",
+    parameters: {
+      type: "object",
+      properties: {
+        op: {
+          type: "string",
+          enum: ["create", "get", "update", "replace", "complete", "drop"],
+          description: "Goal operation to execute.",
+        },
+        objective: {
+          type: "string",
+          description: "Goal objective (required for `create` or `replace`).",
+        },
+        criteria: {
+          type: "array",
+          items: { type: "string" },
+          description: "Explicit acceptance criteria checklist that must be verified before completion.",
+        },
+        summary: {
+          type: "string",
+          description: "Verification summary (for `complete`) or blocker reason (for `drop`).",
+        },
+        token_budget: {
+          type: "number",
+          description: "Optional positive integer token budget ceiling.",
+        },
+      },
+      required: ["op"],
+    },
+  },
+};
+
 
 // ---------------------------------------------------------------------------
 // Long-Term Memory Tool Definitions (retain, recall, reflect)

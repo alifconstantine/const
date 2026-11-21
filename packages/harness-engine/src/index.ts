@@ -16,6 +16,7 @@ import { createWorkspaceTools } from "./workspace-tools.js";
 export type { HarnessStopReason } from "./progress.js";
 export type { HarnessEngineEvent, HarnessPendingQuestion, HarnessPhase, HarnessRunEnd } from "./session.js";
 export { createPiHarnessAgent, PiHarnessAgent } from "./desktop-runtime.js";
+export { buildDialectRequest, consumeDialectStream, resolveProviderDialect } from "./dialect-transport.js";
 export {
   DEFERRED_SPECIALIST_TOOLS,
   RETIRED_REDUNDANT_TOOLS,

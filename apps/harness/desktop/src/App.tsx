@@ -69,7 +69,8 @@ import { SkillsSettings } from "./components/settings/skills-settings";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { type QueuedMessageItem } from "./components/workbench/queue-dock";
 import { resolveConversationHistory } from "./lib/conversation-routing";
-import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement, type BrowserScreenshotAttachment } from "./components/right-pane";
+import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement, type BrowserScreenshotAttachment, enqueueSideChatBtwPrompt } from "./components/right-pane";
+import type { BuiltinSlashCommandId } from "./lib/slash-commands";
 import { BottomPanel } from "./components/bottom-panel";
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
@@ -174,6 +175,15 @@ interface ChatMessage {
   sideInstruction?: string;
   sourceSideChatId?: string;
   todos?: TodoItem[];
+  isCompactionBoundary?: boolean;
+  compactionMeta?: {
+    beforeTokens: number;
+    afterTokens: number;
+    keptCount?: number;
+    summary: string;
+    readFiles?: string[];
+    modifiedFiles?: string[];
+  };
 }
 
 function formatChatMessageForLlm(
@@ -318,6 +328,48 @@ function formatChatMessageForLlm(
       role: "user",
       content: fullText,
     },
+  ];
+}
+
+/**
+ * OMP-aligned non-destructive compaction payload builder:
+ * If the chat contains one or more compaction boundaries, sends only the latest
+ * compaction handoff summary + kept recent tail + messages after the boundary,
+ * while keeping the entire full history intact in the UI scrollback.
+ */
+function buildLlmPayloadMessages(
+  messages: ChatMessage[],
+  allConvos: ConversationItem[],
+  targetModelId?: string
+) {
+  let lastBoundaryIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.isCompactionBoundary && messages[i]?.compactionMeta?.summary) {
+      lastBoundaryIdx = i;
+      break;
+    }
+  }
+  if (lastBoundaryIdx < 0) {
+    return messages.flatMap((m) => formatChatMessageForLlm(m, allConvos, targetModelId));
+  }
+  const boundary = messages[lastBoundaryIdx]!;
+  const keptCount = Math.max(0, Math.min(boundary.compactionMeta?.keptCount || 0, lastBoundaryIdx));
+  const keptTail = keptCount > 0 ? messages.slice(lastBoundaryIdx - keptCount, lastBoundaryIdx) : [];
+  const afterBoundary = messages.slice(lastBoundaryIdx + 1);
+  const summaryMessages = [
+    {
+      role: "user",
+      content: `The conversation history prior to this point was compacted into the following structured handoff summary. Continue seamlessly from this state:\n\n${boundary.compactionMeta!.summary}`,
+    },
+    {
+      role: "assistant",
+      content: "Understood. I have the compacted session context and will continue from here.",
+    },
+  ];
+  return [
+    ...summaryMessages,
+    ...keptTail.flatMap((m) => formatChatMessageForLlm(m, allConvos, targetModelId)),
+    ...afterBoundary.flatMap((m) => formatChatMessageForLlm(m, allConvos, targetModelId)),
   ];
 }
 
@@ -681,6 +733,32 @@ export function AuthenticatedContent({
   const [currentMode, setCurrentMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => {
     return getDefaultAgentMode();
   });
+  const [runIntentByConvo, setRunIntentByConvo] = useState<Map<string, "default" | "plan" | "goal">>(new Map());
+  const runIntentByConvoRef = useRef(runIntentByConvo);
+  runIntentByConvoRef.current = runIntentByConvo;
+  const [approvedPlanPathByConvo, setApprovedPlanPathByConvo] = useState<Map<string, string>>(new Map());
+  const approvedPlanPathByConvoRef = useRef(approvedPlanPathByConvo);
+  approvedPlanPathByConvoRef.current = approvedPlanPathByConvo;
+  const [goalByConvo, setGoalByConvo] = useState<
+    Map<
+      string,
+      {
+        id?: string;
+        objective: string;
+        criteria: string[];
+        status: "active" | "paused" | "budget-limited" | "complete" | "dropped";
+        summary?: string;
+        tokenBudget?: number;
+        tokensUsed?: number;
+        timeUsedSeconds?: number;
+        createdAt?: number;
+        updatedAt: number;
+      }
+    >
+  >(new Map());
+  const goalByConvoRef = useRef(goalByConvo);
+  goalByConvoRef.current = goalByConvo;
+  const [isCompacting, setIsCompacting] = useState(false);
 
   const handleModeChange = async (newMode: "request_review" | "ask_before_changes" | "full_access") => {
     setCurrentMode(newMode);
@@ -2170,7 +2248,7 @@ export function AuthenticatedContent({
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
         const effectiveModel = target?.model || activeModelItem?.id || activeModelItem?.name;
-        const payloadMessages = newStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, effectiveModel));
+        const payloadMessages = buildLlmPayloadMessages(newStreamMessages, allConvos, effectiveModel);
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
@@ -2178,6 +2256,9 @@ export function AuthenticatedContent({
           thinkingLevel: undefined,
           workspacePath: currentProject === "Outside Project" ? undefined : currentProject,
           mode: currentMode,
+          runIntent: runIntentByConvoRef.current.get(conversationId) || "default",
+          initialGoal: goalByConvoRef.current.get(conversationId),
+          approvedPlanPath: approvedPlanPathByConvoRef.current.get(conversationId),
           conversationId,
           authToken: token || undefined,
           contextWindow: activeModelItemRef.current?.contextWindow,
@@ -2836,6 +2917,38 @@ export function AuthenticatedContent({
         }
       } else if (event.type === "approval_resolved") {
         if (event.approvalId) setPendingApprovals((prev) => removeMatchingApproval(prev, targetConvoId, event.approvalId));
+      } else if (event.type === "plan_mode_changed") {
+        setRunIntentByConvo((prev) => {
+          const next = new Map(prev);
+          if (event.active) next.set(targetConvoId, "plan");
+          else if (next.get(targetConvoId) === "plan") next.delete(targetConvoId);
+          return next;
+        });
+        if (event.approved && event.planPath) {
+          setApprovedPlanPathByConvo((prev) => {
+            const next = new Map(prev);
+            next.set(targetConvoId, event.planPath);
+            return next;
+          });
+        }
+      } else if (event.type === "goal_update") {
+        setGoalByConvo((prev) => {
+          const next = new Map(prev);
+          if (event.goal) next.set(targetConvoId, event.goal);
+          else next.delete(targetConvoId);
+          return next;
+        });
+        if (
+          event.goal &&
+          (event.goal.status === "complete" || event.goal.status === "dropped" || event.goal.status === "paused")
+        ) {
+          setRunIntentByConvo((prev) => {
+            if (prev.get(targetConvoId) !== "goal") return prev;
+            const next = new Map(prev);
+            next.delete(targetConvoId);
+            return next;
+          });
+        }
       } else if (event.type === "todo_update") {
         const todos = parseTodoItems(event.todos);
         if (!todos) return;
@@ -3188,11 +3301,225 @@ export function AuthenticatedContent({
     };
   }, []);
 
+  const handleRunIntentChange = useCallback(
+    (nextIntent: "default" | "plan" | "goal") => {
+      const activeConvoId = conversationIdRef.current;
+      setRunIntentByConvo((prev) => {
+        const next = new Map(prev);
+        if (nextIntent === "default") next.delete(activeConvoId);
+        else next.set(activeConvoId, nextIntent);
+        return next;
+      });
+      if (nextIntent === "default") {
+        // Turning off Goal toggle pauses an active goal rather than destroying it (OMP semantics)
+        setGoalByConvo((prev) => {
+          const existing = prev.get(activeConvoId);
+          if (!existing || existing.status !== "active") return prev;
+          const next = new Map(prev);
+          next.set(activeConvoId, { ...existing, status: "paused", updatedAt: Date.now() });
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
+  const handleSlashCommand = async (command: BuiltinSlashCommandId, args: string) => {
+    const activeConvoId = conversationIdRef.current;
+
+    if (command === "btw") {
+      // Open/focus existing SideChat for this conversation, or create a new one cleanly
+      const existingSideTab = rightPaneTabs.find((tab) => tab.type === "side_conversation");
+      let targetTabId: string;
+      if (existingSideTab) {
+        targetTabId = existingSideTab.id;
+        setActiveRightPaneTabId(existingSideTab.id);
+        setIsOpeningNewTab(false);
+        setIsRightSidebarOpen(true);
+      } else {
+        targetTabId = `side_conversation_${crypto.randomUUID()}`;
+        const newTab: RightPaneTab = {
+          id: targetTabId,
+          type: "side_conversation",
+          title: "Side chat",
+          project: currentProject,
+          conversationId: activeConvoId,
+          parentConversationId: activeConvoId,
+          model:
+            activeModelItem?.id ||
+            activeModelItem?.name ||
+            conversations.find((c) => c.id === activeConvoId)?.model ||
+            undefined,
+        };
+        setRightPaneTabs((prev) => [...prev, newTab]);
+        setActiveRightPaneTabId(targetTabId);
+        setIsOpeningNewTab(false);
+        setIsRightSidebarOpen(true);
+      }
+      if (args.trim()) {
+        enqueueSideChatBtwPrompt(targetTabId, args.trim());
+      }
+      return;
+    }
+
+    if (command === "goal") {
+      const sub = args.trim().toLowerCase();
+      const existingGoal = goalByConvoRef.current.get(activeConvoId);
+      if (sub === "status") {
+        if (!existingGoal) {
+          toast.info("No active goal in this conversation.");
+        } else {
+          const budgetInfo = existingGoal.tokenBudget ? ` · ${existingGoal.tokensUsed ?? 0}/${existingGoal.tokenBudget} tok` : "";
+          toast.info(`Goal (${existingGoal.status}): ${existingGoal.objective}${budgetInfo}`);
+        }
+        return;
+      }
+      if (sub === "pause") {
+        if (existingGoal && (existingGoal.status === "active" || existingGoal.status === "budget-limited")) {
+          setGoalByConvo((prev) => {
+            const next = new Map(prev);
+            next.set(activeConvoId, { ...existingGoal, status: "paused", updatedAt: Date.now() });
+            return next;
+          });
+          handleRunIntentChange("default");
+          toast.info("Goal paused. Use /goal resume to continue.");
+        } else {
+          toast.info("No active goal to pause.");
+        }
+        return;
+      }
+      if (sub === "drop") {
+        if (existingGoal) {
+          setGoalByConvo((prev) => {
+            const next = new Map(prev);
+            next.delete(activeConvoId);
+            return next;
+          });
+          handleRunIntentChange("default");
+          toast.info("Goal dropped.");
+        } else {
+          toast.info("No active goal to drop.");
+        }
+        return;
+      }
+      if (sub === "resume") {
+        if (!existingGoal || existingGoal.status === "complete" || existingGoal.status === "dropped") {
+          toast.info("No paused goal to resume.");
+          return;
+        }
+        const resumed = { ...existingGoal, status: "active" as const, updatedAt: Date.now() };
+        setGoalByConvo((prev) => {
+          const next = new Map(prev);
+          next.set(activeConvoId, resumed);
+          return next;
+        });
+        handleRunIntentChange("goal");
+        void handleSendMessage({
+          prompt: `Resume active goal: ${resumed.objective}`,
+          project: currentProject,
+          mode: currentMode,
+          runIntent: "goal",
+          goalObjective: resumed.objective,
+          model: activeModelItem?.id || activeModelItem?.name || undefined,
+          providerId: activeModelItem?.provider,
+        });
+        return;
+      }
+      return;
+    }
+
+    if (command === "compact") {
+      if (isCompacting) return;
+      const currentMsgs = messagesRef.current;
+      if (currentMsgs.length < 2) {
+        toast.info("Percakapan masih terlalu singkat untuk di-compact.");
+        return;
+      }
+      if (!window.electron?.compactConversation) {
+        toast.error("Context compaction requires the desktop runtime.");
+        return;
+      }
+      setIsCompacting(true);
+      toast.info("Compacting conversation context...");
+      try {
+        const allConvos = conversations.length > 0 ? conversations : loadConversations();
+        const modelForCompact = activeModelItem?.id || activeModelItem?.name || undefined;
+        // Find previous compaction boundary (OMP iterative update)
+        let prevBoundaryIdx = -1;
+        for (let i = currentMsgs.length - 1; i >= 0; i--) {
+          if (currentMsgs[i]?.isCompactionBoundary && currentMsgs[i]?.compactionMeta?.summary) {
+            prevBoundaryIdx = i;
+            break;
+          }
+        }
+        const previousSummary =
+          prevBoundaryIdx >= 0 ? currentMsgs[prevBoundaryIdx]?.compactionMeta?.summary : undefined;
+        const deltaMsgs = prevBoundaryIdx >= 0 ? currentMsgs.slice(prevBoundaryIdx + 1) : currentMsgs;
+        if (deltaMsgs.length < 2 && previousSummary) {
+          toast.info("Belum ada pesan baru yang cukup sejak compact terakhir.");
+          return;
+        }
+        const payloadMessages = deltaMsgs.flatMap((m) => formatChatMessageForLlm(m, allConvos, modelForCompact));
+        const res = await window.electron.compactConversation({
+          conversationId: activeConvoId,
+          messages: payloadMessages,
+          model: modelForCompact,
+          providerId: activeModelItem?.provider,
+          authToken: token || undefined,
+          focus: args.trim() || undefined,
+          previousSummary,
+        });
+        if (!res?.success || !res.summary) {
+          toast.error(res?.error || "Failed to compact conversation.");
+          return;
+        }
+        // Non-destructive OMP compaction boundary: preserves all prior chat scrollback in UI!
+        const boundaryMsg: ChatMessage = {
+          id: `msg_${Date.now()}_compact`,
+          role: "system",
+          content: res.summary,
+          timestamp: Date.now(),
+          isCompactionBoundary: true,
+          compactionMeta: {
+            beforeTokens: res.beforeTokens || 0,
+            afterTokens: res.afterTokens || 0,
+            keptCount: res.keptCount || 0,
+            summary: res.summary,
+            readFiles: res.readFiles,
+            modifiedFiles: res.modifiedFiles,
+          },
+        };
+        const nextMsgs = [...currentMsgs, boundaryMsg];
+        messagesRef.current = nextMsgs;
+        setMessages(nextMsgs);
+        const existing = loadConversations().find((c) => c.id === activeConvoId);
+        if (existing) {
+          saveConversation({
+            ...existing,
+            messages: nextMsgs,
+            updatedAt: Date.now(),
+          });
+          setConversations(loadConversations());
+        }
+        toast.success(
+          `Context compacted (~${Math.round((res.beforeTokens || 0) / 100) / 10}k → ~${Math.round((res.afterTokens || 0) / 100) / 10}k tokens)`,
+        );
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to compact conversation.");
+      } finally {
+        setIsCompacting(false);
+      }
+    }
+  };
+
   const handleSendMessage = async ({
     prompt,
     project,
     mode,
+    runIntent,
+    goalObjective,
     model,
+    providerId,
     thinkingLevel,
     attachments,
     maxOutputTokens,
@@ -3201,7 +3528,10 @@ export function AuthenticatedContent({
     prompt: string;
     project: string;
     mode: "request_review" | "ask_before_changes" | "full_access";
+    runIntent?: "default" | "plan" | "goal";
+    goalObjective?: string;
     model?: string;
+    providerId?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
     maxOutputTokens?: number;
@@ -3313,14 +3643,25 @@ export function AuthenticatedContent({
     if (window.electron?.sendMessage) {
       try {
         const allConvos = conversations.length > 0 ? conversations : loadConversations();
-        const payloadMessages = currentStreamMessages.flatMap((m) => formatChatMessageForLlm(m, allConvos, model));
+        const payloadMessages = buildLlmPayloadMessages(currentStreamMessages, allConvos, model);
+        const effectiveRunIntent = runIntent || runIntentByConvoRef.current.get(targetConvoId) || "default";
+        const storedGoal = goalByConvoRef.current.get(targetConvoId);
+        const effectiveInitialGoal =
+          effectiveRunIntent === "goal" && storedGoal && storedGoal.status !== "complete" && storedGoal.status !== "dropped"
+            ? storedGoal
+            : undefined;
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
           model,
+          providerId,
           thinkingLevel,
           workspacePath: project,
           mode: effectiveMode,
+          runIntent: effectiveRunIntent,
+          goalObjective: goalObjective || effectiveInitialGoal?.objective,
+          initialGoal: effectiveInitialGoal,
+          approvedPlanPath: approvedPlanPathByConvoRef.current.get(targetConvoId),
           conversationId: targetConvoId,
           authToken: token || undefined,
           maxOutputTokens,
@@ -4424,6 +4765,10 @@ export function AuthenticatedContent({
                     activeModelItem?.id
                   }
                   onSendMessage={handleSendMessage}
+                  onSlashCommand={handleSlashCommand}
+                  activeRunIntent={runIntentByConvo.get(conversationId) || "default"}
+                  activeGoalObjective={goalByConvo.get(conversationId)?.objective}
+                  onRunIntentChange={handleRunIntentChange}
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
                   compact={remote?.mobile}
@@ -4634,8 +4979,8 @@ export function AuthenticatedContent({
                   ) : (
                     <ChatCard
                       key={conversationId}
-                  conversationId={conversationId}
-                  initialModel={
+                      conversationId={conversationId}
+                      initialModel={
                         conversations.find((c) => c.id === conversationId)?.model ||
                         (currentProject && currentProject !== "Outside Project" && currentProject !== "[object Object]"
                           ? localStorage.getItem(`const_harness_workspace_model_${currentProject}`) || undefined
@@ -4646,6 +4991,10 @@ export function AuthenticatedContent({
                       compact
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
+                      onSlashCommand={handleSlashCommand}
+                      activeRunIntent={runIntentByConvo.get(conversationId) || "default"}
+                      activeGoalObjective={goalByConvo.get(conversationId)?.objective}
+                      onRunIntentChange={handleRunIntentChange}
                       onAbort={() => handleAbort()}
                       showContextUsage={true}
                       contextUsage={contextUsage}

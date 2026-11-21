@@ -290,6 +290,33 @@ export interface AgentEventMap {
   source_created: { source: any };
   artifact_created: { artifact: any };
   steer_message: { conversationId?: string; message: AgentMessage };
+  goal_update: { goal: GoalState | null };
+  plan_mode_changed: { active: boolean; planPath?: string; approved?: boolean; compacted?: boolean };
+}
+
+export type AgentRunIntent = "default" | "plan" | "goal";
+
+export type ProviderDialect =
+  | "openai-completions"
+  | "openai-responses"
+  | "openai-codex"
+  | "anthropic-messages"
+  | "google-gemini"
+  | "google-gemini-cli"
+  | "github-copilot"
+  | "custom";
+
+export interface GoalState {
+  id?: string;
+  objective: string;
+  criteria: string[];
+  status: "active" | "paused" | "budget-limited" | "complete" | "dropped";
+  summary?: string;
+  tokenBudget?: number;
+  tokensUsed?: number;
+  timeUsedSeconds?: number;
+  createdAt?: number;
+  updatedAt: number;
 }
 
 export type AgentEvent = {
@@ -313,6 +340,16 @@ export interface AgentConfig {
   inputTypes?: string[];
   preset?: "harness" | "learn";
   sessionKind?: "main" | "companion";
+  runIntent?: AgentRunIntent;
+  goalObjective?: string;
+  goalTokenBudget?: number;
+  initialGoal?: GoalState;
+  approvedPlanPath?: string;
+  providerProtocol?: ProviderDialect;
+  providerHeaders?: Record<string, string>;
+  providerAccountId?: string;
+  providerProjectId?: string;
+  providerAuthType?: "api_key" | "oauth" | "router";
   sessionTimeoutMs?: number;
   tools?: NativeToolDefinition[];
   externalTools?: (signal?: AbortSignal) => Promise<NativeToolDefinition[]>;

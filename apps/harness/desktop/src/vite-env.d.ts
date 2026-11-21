@@ -318,12 +318,45 @@ declare global {
         error?: string;
       }>;
       cancelAuth?: () => Promise<{ success: boolean }>;
+      compactConversation?: (payload: {
+        conversationId: string;
+        messages: any[];
+        model?: string;
+        providerId?: string;
+        authToken?: string;
+        focus?: string;
+        previousSummary?: string;
+        keepRecentTokens?: number;
+      }) => Promise<{
+        success: boolean;
+        summary?: string;
+        beforeTokens?: number;
+        afterTokens?: number;
+        keptCount?: number;
+        readFiles?: string[];
+        modifiedFiles?: string[];
+        error?: string;
+      }>;
+      oauth?: {
+        listProviders: () => Promise<any[]>;
+        startLogin: (provider: string) => Promise<{ success: boolean; status?: any; error?: string }>;
+        cancelLogin: (provider: string) => Promise<{ success: boolean }>;
+        submitCode: (provider: string, codeOrUrl: string) => Promise<{ success: boolean }>;
+        disconnect: (provider: string) => Promise<{ success: boolean }>;
+        onLoginProgress: (callback: (progress: any) => void) => () => void;
+      };
       sendMessage: (payload: {
         messages: any[];
         model?: string;
+        providerId?: string;
         thinkingLevel?: string;
         workspacePath?: string;
         mode?: "request_review" | "ask_before_changes" | "full_access";
+        runIntent?: "default" | "plan" | "goal";
+        goalObjective?: string;
+        goalTokenBudget?: number;
+        initialGoal?: any;
+        approvedPlanPath?: string;
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;

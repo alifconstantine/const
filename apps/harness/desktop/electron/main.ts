@@ -43,6 +43,10 @@ import {
   type MemoryFileInfo,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
+  type GoalState,
+  COMPACTION_SYSTEM_PROMPT,
+  COMPACTION_SUMMARY_PROMPT,
+  COMPACTION_UPDATE_SUMMARY_PROMPT,
   extractPdfText,
   extractDocumentText,
 } from "@const/agent";
@@ -65,6 +69,17 @@ import {
   type ControlState,
 } from "./browser/agent-browser-controller";
 import { agentDesktopController as computerController } from "./computer/agent-desktop-controller";
+import {
+  OAuthSubscriptionManager,
+  SUBSCRIPTION_PROVIDERS,
+  type SubscriptionProviderId,
+} from "./auth/oauth-subscription-manager";
+import {
+  buildDialectRequest,
+  consumeDialectStream,
+  resolveProviderDialect,
+} from "@const/harness-engine";
+import { compactHistoryForContext, type ProviderDialect } from "@const/agent/const";
 import { marketplaceService } from "./marketplace-service";
 import { McpStore } from "./mcp/store";
 import { McpService } from "./mcp/service";
@@ -157,6 +172,23 @@ const mcpService = new McpService(new McpStore(harnessHomeDir, {
 }), () => {
   for (const window of BrowserWindow.getAllWindows()) sendDesktopEvent(window.webContents, "mcp:changed");
 }, (url) => shell.openExternal(url));
+
+const oauthSubscriptionManager = new OAuthSubscriptionManager({
+  storePath: path.join(harnessHomeDir, "oauth-subscriptions.enc"),
+  cipher: {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) {
+        throw new Error("storage");
+      }
+      return safeStorage.encryptString(value);
+    },
+    decrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error("storage");
+      return safeStorage.decryptString(value);
+    },
+  },
+  openExternalUrl: (url) => shell.openExternal(url),
+});
 let mcpShuttingDown = false;
 let mcpShutdownComplete = false;
 app.on("before-quit", (event) => {
@@ -189,12 +221,36 @@ export interface ProviderConfig {
   name: string;
   baseUrl: string;
   apiKey: string;
+  protocol?: ProviderDialect;
+}
+
+export interface StoredLlmProvider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey?: string;
+  protocol?: ProviderDialect;
+  authType?: "router" | "oauth" | "api_key";
+  subscriptionProviderId?: SubscriptionProviderId;
+  isDefault?: boolean;
+  isCustom?: boolean;
+  models: Array<{
+    id: string;
+    name: string;
+    contextWindow?: string | number;
+    maxOutput?: string | number;
+    maxOutputTokens?: string | number;
+    supportsThinking?: boolean;
+    thinkingLevels?: string[];
+    inputTypes?: string[];
+  }>;
 }
 
 export interface UserConfig {
   activeModel: string;
   activeProvider: string;
   providers: Record<string, ProviderConfig>;
+  llmProviders?: StoredLlmProvider[];
   customModels?: Array<{
     id: string;
     displayName: string;
@@ -942,9 +998,387 @@ app.whenReady().then(() => {
     return { success: true };
   });
 
+function parseNumericTokenSpec(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return Math.round(raw);
+  if (typeof raw !== "string") return undefined;
+  const clean = raw.trim().toUpperCase().replace(/,/g, "");
+  if (!clean) return undefined;
+  const m = clean.match(/^(\d+(?:\.\d+)?)\s*([KM])?$/);
+  if (!m) return undefined;
+  const num = Number(m[1]);
+  if (!Number.isFinite(num) || num <= 0) return undefined;
+  if (m[2] === "M") return Math.round(num * 1_000_000);
+  if (m[2] === "K") return Math.round(num * 1_000);
+  return Math.round(num);
+}
+
+interface ResolvedLlmRoute {
+  wireModel: string;
+  displayModelId: string;
+  baseUrl: string;
+  apiKey: string;
+  protocol: ProviderDialect;
+  authType: "router" | "oauth" | "api_key";
+  providerId: string;
+  accountId?: string;
+  projectId?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  inputTypes?: string[];
+}
+
+async function resolveLlmExecutionRoute(
+  config: UserConfig,
+  opts: { model?: string; providerId?: string; authToken?: string },
+): Promise<ResolvedLlmRoute> {
+  if (opts.authToken && isValidAuthToken(opts.authToken)) {
+    lastAuthToken = opts.authToken;
+  }
+
+  const rawRequested = (opts.model || config.activeModel || DEFAULT_ROUTER_MODEL_ID).trim();
+
+  // 1. Explicit Subscription OAuth prefix: `sub:<subscriptionProviderId>/<modelId>`
+  const subMatch = /^sub:([^/]+)\/(.+)$/.exec(rawRequested);
+  const directSubId = (subMatch?.[1] || opts.providerId || "") as SubscriptionProviderId;
+  if (
+    subMatch ||
+    (directSubId && directSubId in SUBSCRIPTION_PROVIDERS && (opts.providerId === directSubId || config.activeProvider === directSubId))
+  ) {
+    const subId = (subMatch ? subMatch[1] : directSubId) as SubscriptionProviderId;
+    const wireModel = subMatch ? subMatch[2]! : rawRequested;
+    const meta = SUBSCRIPTION_PROVIDERS[subId];
+    const cred = await oauthSubscriptionManager.getValidCredential(subId);
+    if (!cred) {
+      throw new Error(
+        `${meta.name} subscription is not signed in. Open Settings → Models and sign in with ${meta.shortName} first.`,
+      );
+    }
+    const preset = meta.models.find((m) => m.id === wireModel);
+    return {
+      wireModel,
+      displayModelId: `sub:${subId}/${wireModel}`,
+      baseUrl: cred.apiBaseUrl || meta.baseUrl,
+      apiKey: cred.accessToken,
+      protocol: meta.protocol,
+      authType: "oauth",
+      providerId: subId,
+      accountId: cred.accountId,
+      projectId: cred.projectId,
+      contextWindow: parseNumericTokenSpec(preset?.contextWindow),
+      maxOutputTokens: parseNumericTokenSpec(preset?.maxOutput),
+      inputTypes: preset?.inputTypes,
+    };
+  }
+
+  // 2. Configured BYOK / Custom API Key providers from Settings → Models (`config.llmProviders`)
+  const byokProviders = (config.llmProviders || []).filter(
+    (p) => p && p.id && p.id !== "const-router" && p.id !== "const",
+  );
+  // Support `byok:<providerId>/<modelId>` unambiguous prefix OR direct model ID match
+  const byokPrefix = /^byok:([^/]+)\/(.+)$/.exec(rawRequested);
+  for (const prov of byokProviders) {
+    if (byokPrefix && byokPrefix[1] !== prov.id) continue;
+    if (!byokPrefix && opts.providerId && opts.providerId !== prov.id && opts.providerId !== "const") continue;
+    const targetModelId = byokPrefix ? byokPrefix[2]! : rawRequested;
+    const matched = (prov.models || []).find(
+      (m) => m.id === targetModelId || m.name === targetModelId,
+    );
+    if (matched || (byokPrefix && byokPrefix[1] === prov.id)) {
+      const protocol = resolveProviderDialect(prov.protocol, prov.baseUrl, "api_key");
+      const fallbackKey =
+        prov.apiKey?.trim() ||
+        config.providers[prov.id]?.apiKey?.trim() ||
+        "";
+      return {
+        wireModel: matched?.id || targetModelId,
+        displayModelId: rawRequested,
+        baseUrl: (prov.baseUrl || config.providers[prov.id]?.baseUrl || "").replace(/\/+$/, ""),
+        apiKey: fallbackKey,
+        protocol,
+        authType: "api_key",
+        providerId: prov.id,
+        contextWindow: parseNumericTokenSpec(matched?.contextWindow),
+        maxOutputTokens: parseNumericTokenSpec(matched?.maxOutputTokens ?? matched?.maxOutput),
+        inputTypes: matched?.inputTypes,
+      };
+    }
+  }
+
+  // 3. Fallback: Native Const Router + legacy `config.customModels` / `config.providers`
+  const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
+  const resolvedId = resolveModelId(rawRequested, allModels);
+  const modelDef = allModels.find((m) => m.id === resolvedId || m.displayName === resolvedId);
+  const providerKey = modelDef?.provider || (opts.providerId && opts.providerId !== "const-router" ? opts.providerId : config.activeProvider) || "const";
+  const providerCfg = config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
+  const isConstRouter = providerKey === "const" || providerKey === "const-engine" || providerKey === "const-router";
+
+  const baseUrl = (modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1").replace(/\/+$/, "");
+  let apiKey = providerCfg?.apiKey || "";
+  if (!apiKey && isConstRouter) {
+    apiKey =
+      opts.authToken ||
+      lastAuthToken ||
+      process.env.CONST_ROUTER_API_KEY ||
+      process.env.CONST_ENGINE_API_KEY ||
+      "const-local-dev-key";
+  }
+  const protocol = resolveProviderDialect(providerCfg?.protocol, baseUrl, isConstRouter ? "router" : "api_key");
+  return {
+    wireModel: resolvedId,
+    displayModelId: resolvedId,
+    baseUrl,
+    apiKey,
+    protocol,
+    authType: isConstRouter ? "router" : "api_key",
+    providerId: isConstRouter ? "const" : providerKey,
+    contextWindow: modelDef?.contextWindow,
+    maxOutputTokens: (modelDef as any)?.maxOutputTokens,
+    inputTypes: modelDef?.inputTypes,
+  };
+}
+
   // ---------------------------------------------------------------------------
   // Config & Model Management IPC Handlers
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // OAuth Subscription Providers IPC Handlers (Phase 4)
+  // ---------------------------------------------------------------------------
+  handleDesktopIpc("oauth:list-providers", async () => {
+    return oauthSubscriptionManager.listProviders();
+  });
+
+  handleDesktopIpc("oauth:start-login", async (_event, provider: SubscriptionProviderId) => {
+    try {
+      const status = await oauthSubscriptionManager.startLogin(provider, (progress) => {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed()) {
+            sendDesktopEvent(w.webContents, "oauth:login-progress", progress);
+          }
+        }
+      });
+      return { success: true, status };
+    } catch (err: any) {
+      return { success: false, error: err?.message || String(err) };
+    }
+  });
+
+  handleDesktopIpc("oauth:cancel-login", async (_event, provider: SubscriptionProviderId) => {
+    oauthSubscriptionManager.cancelLogin(provider);
+    return { success: true };
+  });
+
+  handleDesktopIpc("oauth:submit-code", async (_event, provider: SubscriptionProviderId, codeOrUrl: string) => {
+    const accepted = oauthSubscriptionManager.submitManualCode(provider, codeOrUrl);
+    return { success: accepted };
+  });
+
+  handleDesktopIpc("oauth:disconnect", async (_event, provider: SubscriptionProviderId) => {
+    oauthSubscriptionManager.disconnect(provider);
+    return { success: true };
+  });
+
+  // ---------------------------------------------------------------------------
+  // Manual Conversation Compaction IPC (`/compact` — OMP-aligned algorithm)
+  // ---------------------------------------------------------------------------
+  handleDesktopIpc(
+    "agent:compact-conversation",
+    async (
+      _event,
+      payload: {
+        conversationId: string;
+        messages: AgentMessage[];
+        model?: string;
+        providerId?: string;
+        authToken?: string;
+        focus?: string;
+        previousSummary?: string;
+        keepRecentTokens?: number;
+      },
+    ) => {
+      try {
+        const config = loadUserConfig();
+        const msgs = Array.isArray(payload.messages) ? payload.messages : [];
+        if (msgs.length < 2) {
+          return { success: false, error: "Not enough messages in this conversation to compact." };
+        }
+        const estimateMsgTokens = (m: AgentMessage): number => {
+          const contentLen = typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length;
+          const tcLen = Array.isArray(m.tool_calls) ? JSON.stringify(m.tool_calls).length : 0;
+          return Math.max(1, Math.ceil((contentLen + tcLen) / 4));
+        };
+        const beforeTokens = msgs.reduce((sum, m) => sum + estimateMsgTokens(m), 0);
+
+        // 1. OMP-style cut-point selection: keep recent tail up to keepRecentTokens (when history is long enough)
+        const keepRecentTokens = typeof payload.keepRecentTokens === "number" && payload.keepRecentTokens >= 0
+          ? payload.keepRecentTokens
+          : 6000;
+        let cutIndex = msgs.length;
+        if (keepRecentTokens > 0 && msgs.length >= 6) {
+          let accTokens = 0;
+          for (let i = msgs.length - 1; i >= 2; i--) {
+            accTokens += estimateMsgTokens(msgs[i]!);
+            if (msgs[i]?.role === "user" && accTokens >= Math.min(keepRecentTokens, Math.floor(beforeTokens * 0.35))) {
+              cutIndex = i;
+              break;
+            }
+          }
+          if (cutIndex === msgs.length && msgs.length >= 6) {
+            // Keep at least the last user+assistant exchange if under token budget
+            for (let i = msgs.length - 2; i >= 2; i--) {
+              if (msgs[i]?.role === "user") {
+                cutIndex = i;
+                break;
+              }
+            }
+          }
+        }
+        const toSummarize = msgs.slice(0, cutIndex);
+        const keptMessages = msgs.slice(cutIndex);
+        const keptTokens = keptMessages.reduce((sum, m) => sum + estimateMsgTokens(m), 0);
+
+        // 2. Deterministic file-activity extraction from tool calls (OMP extractFileOpsFromMessage)
+        const readSet = new Set<string>();
+        const modifiedSet = new Set<string>();
+        const recordFileOp = (toolName: string, rawArgs: any) => {
+          let argsObj = rawArgs;
+          if (typeof rawArgs === "string") {
+            try { argsObj = JSON.parse(rawArgs); } catch { argsObj = {}; }
+          }
+          if (!argsObj || typeof argsObj !== "object") return;
+          const p =
+            (typeof argsObj.path === "string" && argsObj.path) ||
+            (typeof argsObj.filePath === "string" && argsObj.filePath) ||
+            (typeof argsObj.file_path === "string" && argsObj.file_path) ||
+            (typeof argsObj.TargetFile === "string" && argsObj.TargetFile) ||
+            "";
+          const clean = p.trim();
+          if (!clean || /^[a-z]+:\/\//i.test(clean)) return;
+          const norm = toolName.toLowerCase().replace(/[-_]/g, "");
+          if (norm === "read" || norm === "readfile") readSet.add(clean);
+          else if (norm === "write" || norm === "writefile" || norm === "edit" || norm === "editfile" || norm === "replaceinfile" || norm === "astedit") {
+            modifiedSet.add(clean);
+          }
+        };
+
+        const escapeBoundary = (s: string) =>
+          s.replace(/<\s*\/?\s*(?:conversation|previous-summary)\s*>/gi, (tag) => `&lt;${tag.slice(1)}`);
+
+        const transcriptLines: string[] = [];
+        for (const m of toSummarize.slice(-80)) {
+          if (Array.isArray(m.tool_calls)) {
+            for (const tc of m.tool_calls) {
+              recordFileOp(tc.function?.name || "", tc.function?.arguments);
+            }
+          }
+          const text =
+            typeof m.content === "string"
+              ? m.content
+              : Array.isArray(m.content)
+                ? m.content.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n")
+                : "";
+          const toolCallDesc = Array.isArray(m.tool_calls) && m.tool_calls.length > 0
+            ? m.tool_calls.map((tc) => `${tc.function?.name}(${String(tc.function?.arguments || "").slice(0, 160)})`).join(", ")
+            : "";
+          if (!text.trim() && !toolCallDesc) continue;
+          const limit = m.role === "tool" ? 2000 : 3000;
+          const clipped = text.length > limit
+            ? `${text.slice(0, limit)}\n[... ${text.length - limit} chars truncated]`
+            : text;
+          const label = m.role === "tool" ? `[Tool Result${m.name ? `: ${m.name}` : ""}]` : `[${m.role.toUpperCase()}]`;
+          transcriptLines.push(
+            `${label}: ${clipped}${toolCallDesc ? `\n[Tool Calls]: ${toolCallDesc}` : ""}`,
+          );
+        }
+        const transcript = escapeBoundary(transcriptLines.join("\n\n").slice(0, 72_000));
+        const previousSummary = payload.previousSummary?.trim() ? escapeBoundary(payload.previousSummary.trim()) : "";
+        const focusLine = payload.focus?.trim() ? `\nAdditional focus requested by user: ${payload.focus.trim()}` : "";
+
+        const userPrompt = previousSummary
+          ? `<conversation>\n${transcript}\n</conversation>\n\n<previous-summary>\n${previousSummary}\n</previous-summary>\n\n${COMPACTION_UPDATE_SUMMARY_PROMPT}${focusLine}`
+          : `<conversation>\n${transcript}\n</conversation>\n\n${COMPACTION_SUMMARY_PROMPT}${focusLine}`;
+
+        let summary = "";
+        try {
+          const route = await resolveLlmExecutionRoute(config, {
+            model: payload.model,
+            providerId: payload.providerId,
+            authToken: payload.authToken,
+          });
+          const dialectReq = buildDialectRequest({
+            dialect: route.protocol,
+            baseUrl: route.baseUrl,
+            apiKey: route.apiKey,
+            model: route.wireModel,
+            systemPrompt: COMPACTION_SYSTEM_PROMPT,
+            messages: [{ role: "user", content: userPrompt }],
+            tools: [],
+            maxTokens: 2500,
+            providerAccountId: route.accountId,
+            providerProjectId: route.projectId,
+            providerAuthType: route.authType,
+          });
+          const res = await fetch(dialectReq.url, {
+            method: "POST",
+            headers: dialectReq.headers,
+            body: JSON.stringify(dialectReq.bodyObj),
+            signal: AbortSignal.timeout(45_000),
+          });
+          if (res.ok && res.body) {
+            await consumeDialectStream(
+              route.protocol,
+              res.body,
+              (chunk) => {
+                const delta = chunk?.choices?.[0]?.delta?.content;
+                if (typeof delta === "string") summary += delta;
+              },
+              AbortSignal.timeout(45_000),
+            );
+          }
+        } catch (err) {
+          console.warn("[Compact] LLM compaction fell back to deterministic compaction:", err);
+        }
+
+        if (!summary.trim()) {
+          const compacted = compactHistoryForContext(toSummarize, 0, true);
+          summary =
+            "## Goal\nContinue the active engineering session.\n\n## Progress\n" +
+            compacted
+              .slice(-10)
+              .map((m) => `- **${m.role}**: ${String(typeof m.content === "string" ? m.content : "").slice(0, 400)}`)
+              .join("\n");
+        }
+
+        // Append deterministic OMP-style file activity summary (Read / Write / RW)
+        const allFiles = Array.from(new Set([...readSet, ...modifiedSet])).sort();
+        const readFiles = Array.from(readSet).filter((f) => !modifiedSet.has(f)).sort();
+        const modifiedFiles = Array.from(modifiedSet).sort();
+        let finalSummary = summary.trim().replace(/<(?:read-files|modified-files|files)>[\s\S]*?<\/(?:read-files|modified-files|files)>/gi, "").trim();
+        if (allFiles.length > 0) {
+          const fileLines = allFiles.slice(0, 60).map((f) => {
+            const r = readSet.has(f);
+            const w = modifiedSet.has(f);
+            const tag = r && w ? "(RW)" : w ? "(Write)" : "(Read)";
+            return `- \`${f}\` ${tag}`;
+          });
+          finalSummary += `\n\n## Tracked Files\n${fileLines.join("\n")}`;
+        }
+
+        const afterTokens = Math.max(1, Math.round(finalSummary.length / 4) + keptTokens);
+        return {
+          success: true,
+          summary: finalSummary,
+          beforeTokens,
+          afterTokens,
+          keptCount: keptMessages.length,
+          readFiles,
+          modifiedFiles,
+        };
+      } catch (err: any) {
+        return { success: false, error: err?.message || String(err) };
+      }
+    },
+  );
+
   handleDesktopIpc("computer:get-capabilities", async () => {
     try {
       return await computerController.getCapabilities();
@@ -1218,7 +1652,64 @@ app.whenReady().then(() => {
       console.warn("[Electron Main] Could not fetch remote models from router, using fallback:", err);
     }
 
-    const baseModels = remoteModels.length > 0 ? remoteModels : DEFAULT_MODELS;
+    const baseModels = (remoteModels.length > 0 ? remoteModels : DEFAULT_MODELS).map((m: any) => ({
+      ...m,
+      provider: "const",
+      providerName: "Const Router",
+      authType: "router" as const,
+      protocol: "openai-completions" as const,
+    }));
+
+    // Connected OAuth Subscription provider models (OpenAI Codex, Claude Pro/Max, Google Gemini CLI, GitHub Copilot)
+    const subscriptionModels: any[] = [];
+    for (const sub of oauthSubscriptionManager.listProviders()) {
+      if (!sub.status.connected) continue;
+      for (const preset of sub.models) {
+        subscriptionModels.push({
+          id: `sub:${sub.id}/${preset.id}`,
+          rawModelId: preset.id,
+          displayName: preset.name,
+          provider: sub.id,
+          providerName: sub.shortName,
+          authType: "oauth" as const,
+          protocol: sub.protocol,
+          baseUrl: sub.baseUrl,
+          supportsThinking: Boolean(preset.supportsThinking),
+          supportsTools: true,
+          thinkingLevels: preset.thinkingLevels,
+          defaultThinkingLevel: "medium",
+          maxOutputTokens: parseNumericTokenSpec(preset.maxOutput) || 65536,
+          contextWindow: parseNumericTokenSpec(preset.contextWindow) || 200000,
+          inputTypes: preset.inputTypes || ["text", "image"],
+        });
+      }
+    }
+
+    // Configured BYOK Provider / Custom API Key models from Settings → Models (`config.llmProviders`)
+    const byokModels: any[] = [];
+    for (const prov of config.llmProviders || []) {
+      if (!prov || !prov.id || prov.id === "const-router" || prov.id === "const") continue;
+      for (const m of prov.models || []) {
+        if (!m?.id) continue;
+        byokModels.push({
+          id: `byok:${prov.id}/${m.id}`,
+          rawModelId: m.id,
+          displayName: m.name || m.id,
+          provider: prov.id,
+          providerName: prov.name || "Custom",
+          authType: "api_key" as const,
+          protocol: prov.protocol || "openai-completions",
+          baseUrl: prov.baseUrl,
+          supportsThinking: Boolean(m.supportsThinking),
+          supportsTools: true,
+          thinkingLevels: m.thinkingLevels || (m.supportsThinking ? ["low", "medium", "high"] : undefined),
+          defaultThinkingLevel: "medium",
+          maxOutputTokens: parseNumericTokenSpec(m.maxOutputTokens ?? m.maxOutput) || 65536,
+          contextWindow: parseNumericTokenSpec(m.contextWindow) || getModelContextLimit(m.id, 128000),
+          inputTypes: m.inputTypes || ["text", "image"],
+        });
+      }
+    }
 
     const custom = (config.customModels || []).map((m) => {
       const supportsThinking = Boolean(m.supportsThinking);
@@ -1227,6 +1718,7 @@ app.whenReady().then(() => {
         displayName: m.displayName || m.id,
         provider: m.provider || "custom",
         providerName: config.providers[m.provider]?.name || "Custom",
+        authType: "api_key" as const,
         baseUrl: m.baseUrl || config.providers[m.provider]?.baseUrl,
         supportsThinking,
         supportsTools: m.supportsTools ?? true,
@@ -1238,7 +1730,7 @@ app.whenReady().then(() => {
     });
 
     const combined: any[] = [];
-    for (const m of [...baseModels, ...custom]) {
+    for (const m of [...baseModels, ...subscriptionModels, ...byokModels, ...custom]) {
       const rawId = m.id || "";
       let displayName = modelDisplayName(rawId, m.displayName || m.name);
 
@@ -1282,54 +1774,38 @@ app.whenReady().then(() => {
     async (_event, prompt: string, authToken?: string, model?: string) => {
       try {
         const config = loadUserConfig();
-        const targetModel = model || config.activeModel || "gemini-3.8-flash";
-
-        // Match model to provider (matching agent:send-message architecture)
-        const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
-        const modelDef = allModels.find((m) => m.id === targetModel || m.displayName === targetModel);
-        const providerKey = modelDef?.provider || config.activeProvider || "const";
-        const providerCfg =
-          config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
-
-        const baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1";
-        let apiKey = providerCfg?.apiKey || "";
-
-        if (authToken && isValidAuthToken(authToken)) {
-          lastAuthToken = authToken;
-        }
-        if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
-          apiKey =
-            authToken ||
-            lastAuthToken ||
-            process.env.CONST_ROUTER_API_KEY ||
-            process.env.CONST_ENGINE_API_KEY ||
-            "const-local-dev-key";
-        }
-
-        const endpoint = baseUrl.endsWith("/chat/completions")
-          ? baseUrl
-          : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+        const route = await resolveLlmExecutionRoute(config, {
+          model: model || config.activeModel || DEFAULT_ROUTER_MODEL_ID,
+          authToken,
+        });
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-        const res = await fetch(endpoint, {
+        const dialectReq = buildDialectRequest({
+          dialect: route.protocol,
+          baseUrl: route.baseUrl,
+          apiKey: route.apiKey,
+          model: route.wireModel,
+          systemPrompt: "You generate ultra-concise 3 to 5 word conversation titles.",
+          messages: [
+            {
+              role: "user",
+              content: `Summarize this user request into a concise 3 to 5 word title. Return ONLY the title text with no punctuation, no quotes, no extra words:\n\n${prompt.slice(0, 300)}`,
+            },
+          ],
+          tools: [],
+          maxTokens: 128,
+          providerAccountId: route.accountId,
+          providerProjectId: route.projectId,
+          providerAuthType: route.authType,
+        });
+
+        const res = await fetch(dialectReq.url, {
           method: "POST",
           signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          body: JSON.stringify({
-            model: targetModel,
-            messages: [
-              {
-                role: "user",
-                content: `Summarize this user request into a concise 3 to 5 word title. Return ONLY the title text with no punctuation, no quotes, no extra words:\n\n${prompt.slice(0, 300)}`,
-              },
-            ],
-            stream: false,
-          }),
+          headers: dialectReq.headers,
+          body: JSON.stringify(dialectReq.bodyObj),
         });
         clearTimeout(timeoutId);
 
@@ -1339,30 +1815,17 @@ app.whenReady().then(() => {
           return null;
         }
 
-        const responseText = await res.text();
         let rawTitle = "";
-
-        if (responseText.includes("data:") || responseText.includes(": keep-alive")) {
-          // Handle SSE streams (e.g. combo models like combo/coding)
-          const lines = responseText.split("\n");
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(dataStr);
-              const delta = parsed.choices?.[0]?.delta?.content || "";
-              if (delta) rawTitle += delta;
-            } catch {}
-          }
-        } else {
-          try {
-            const json = JSON.parse(responseText);
-            rawTitle = json.choices?.[0]?.message?.content || "";
-          } catch (parseErr) {
-            console.warn("[Electron Main] Failed to parse title JSON:", parseErr);
-          }
+        if (res.body) {
+          await consumeDialectStream(
+            route.protocol,
+            res.body,
+            (chunk) => {
+              const delta = chunk?.choices?.[0]?.delta?.content;
+              if (typeof delta === "string") rawTitle += delta;
+            },
+            AbortSignal.timeout(15_000),
+          );
         }
 
         if (rawTitle) {
@@ -1691,9 +2154,15 @@ app.whenReady().then(() => {
       payload: {
         messages: AgentMessage[];
         model?: string;
+        providerId?: string;
         thinkingLevel?: string;
         workspacePath?: string;
         mode?: "request_review" | "ask_before_changes" | "full_access";
+        runIntent?: "default" | "plan" | "goal";
+        goalObjective?: string;
+        goalTokenBudget?: number;
+        initialGoal?: GoalState;
+        approvedPlanPath?: string;
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;
@@ -1704,23 +2173,25 @@ app.whenReady().then(() => {
       }
     ) => {
       const config = loadUserConfig();
-      // Match model to provider
-      const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
-      const model = resolveModelId(payload.model || config.activeModel || DEFAULT_ROUTER_MODEL_ID, allModels);
-      const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
-      const providerKey = modelDef?.provider || config.activeProvider || "const";
-      const providerCfg = config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
-
-      let baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1";
-      let apiKey = providerCfg?.apiKey || "";
-
-      // Fallback for Const Router: use user's SSO authToken if available
-      if (payload.authToken && isValidAuthToken(payload.authToken)) {
-        lastAuthToken = payload.authToken;
+      let route: ResolvedLlmRoute;
+      try {
+        route = await resolveLlmExecutionRoute(config, {
+          model: payload.model,
+          providerId: payload.providerId,
+          authToken: payload.authToken,
+        });
+      } catch (err: any) {
+        return { success: false, error: err?.message || String(err) };
       }
-      if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
-        apiKey = payload.authToken || lastAuthToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
-      }
+
+      const model = route.wireModel;
+      const baseUrl = route.baseUrl;
+      const apiKey = route.apiKey;
+      const modelDef = {
+        inputTypes: route.inputTypes,
+        maxOutputTokens: route.maxOutputTokens,
+        contextWindow: route.contextWindow,
+      };
 
       const convoId = requireConversationId(payload.conversationId || `session_${Date.now()}`);
       if (payload.sessionKind === "companion") {
@@ -1760,11 +2231,20 @@ app.whenReady().then(() => {
       const agent = createPiHarnessAgent({
         preset: "harness",
         sessionKind: payload.sessionKind === "companion" ? "companion" : "main",
+        runIntent: payload.sessionKind === "companion" ? "default" : (payload.runIntent || "default"),
+        goalObjective: payload.goalObjective,
+        goalTokenBudget: payload.goalTokenBudget,
+        initialGoal: payload.sessionKind === "companion" ? undefined : payload.initialGoal,
+        approvedPlanPath: payload.sessionKind === "companion" ? undefined : payload.approvedPlanPath,
         runId,
         normalizeImage: normalizeModelImage,
         baseUrl,
         apiKey,
         model,
+        providerProtocol: route.protocol,
+        providerAccountId: route.accountId,
+        providerProjectId: route.projectId,
+        providerAuthType: route.authType,
         workspacePath: targetWorkspace,
         externalTools: (signal) => mcpService.tools(targetWorkspace, signal, 0),
         deferNativeTools: true,

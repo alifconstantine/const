@@ -37,6 +37,7 @@ export type LlmProtocol =
   | "openai-completions"
   | "anthropic-messages"
   | "openai-responses"
+  | "google-gemini"
   | "custom";
 
 export interface LlmProvider {
@@ -94,9 +95,16 @@ export const PRESET_LLM_PROVIDERS: Array<{
   },
   {
     id: "anthropic",
-    name: "Anthropic",
+    name: "Anthropic (API Key)",
     baseUrl: "https://api.anthropic.com/v1",
     protocol: "anthropic-messages",
+    defaultModels: [],
+  },
+  {
+    id: "google-gemini",
+    name: "Google AI Studio (Gemini API Key)",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    protocol: "google-gemini",
     defaultModels: [],
   },
   {
@@ -567,12 +575,21 @@ export function saveLlmConfig(cfg: MultiModalLlmConfig): void {
   localStorage.setItem(STORAGE_KEYS.LLM_ACTIVE_MODEL, cfg.activeModelId);
   localStorage.setItem("const_harness_active_model", cfg.activeModelId);
 
-  syncToElectron({
+  const payload = {
     llmProviders: cfg.providers,
     activeModel: cfg.activeModelId,
     activeProvider: cfg.activeProviderId === "const-router" ? "const" : cfg.activeProviderId,
-  });
+  };
+  if (typeof window !== "undefined" && window.electron?.saveConfig) {
+    window.electron
+      .saveConfig(payload)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent("const:models-updated"));
+      })
+      .catch(() => {});
+  }
   window.dispatchEvent(new CustomEvent("const:active-model-changed", { detail: { modelId: cfg.activeModelId } }));
+  window.dispatchEvent(new CustomEvent("const:models-updated"));
 }
 
 export function saveSpeechConfig(cfg: MultiModalSpeechConfig): void {
@@ -707,18 +724,28 @@ export async function testEndpointPing(
  */
 export async function fetchRemoteModels(
   baseUrl: string,
-  apiKey?: string
+  apiKey?: string,
+  protocol?: string,
 ): Promise<{ success: boolean; models?: Array<{ id: string; name: string }>; error?: string }> {
   const cleanUrl = (baseUrl || "").trim().replace(/\/+$/, "");
   if (!cleanUrl) {
     return { success: false, error: "Base URL is required." };
   }
 
+  const isAnthropic = protocol === "anthropic-messages" || cleanUrl.includes("api.anthropic.com");
+  const isGoogle = protocol === "google-gemini" || cleanUrl.includes("generativelanguage.googleapis.com");
   const modelsUrl = cleanUrl.endsWith("/models") ? cleanUrl : `${cleanUrl}/models`;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey && apiKey.trim()) {
     const key = apiKey.trim();
-    headers["Authorization"] = key.startsWith("Bearer ") ? key : `Bearer ${key}`;
+    if (isAnthropic) {
+      headers["x-api-key"] = key;
+      headers["anthropic-version"] = "2023-06-01";
+    } else if (isGoogle) {
+      headers["x-goog-api-key"] = key;
+    } else {
+      headers["Authorization"] = key.startsWith("Bearer ") ? key : `Bearer ${key}`;
+    }
   }
 
   try {
@@ -735,11 +762,14 @@ export async function fetchRemoteModels(
     const models = rawList
       .filter((m) => m && (m.id || m.name))
       .filter((m) => !/^https:\/\/router\.const\.web\.id(?:\/|$)/i.test(cleanUrl) || !String(m.id || m.name).endsWith(":free"))
-      .map((m) => ({
-        id: String(m.id || m.name),
-        name: modelDisplayName(String(m.id || m.name), String(m.name || m.id)),
-      }))
-      .slice(0, 50);
+      .map((m) => {
+        const rawId = String(m.id || m.name).replace(/^models\//, "");
+        return {
+          id: rawId,
+          name: modelDisplayName(rawId, String(m.displayName || m.display_name || m.name || rawId)),
+        };
+      })
+      .slice(0, 80);
 
     return { success: true, models };
   } catch (err: any) {

@@ -111,9 +111,13 @@ export function createDesktopBridge(
     sendMessage: (payload: {
       messages: any[];
       model?: string;
+      providerId?: string;
       thinkingLevel?: string;
       workspacePath?: string;
       mode?: string;
+      runIntent?: "default" | "plan" | "goal";
+      goalObjective?: string;
+      goalTokenBudget?: number;
       conversationId?: string;
       authToken?: string;
       maxOutputTokens?: number;
@@ -121,6 +125,27 @@ export function createDesktopBridge(
       sessionKind?: "main" | "companion";
       parentConversationId?: string;
     }) => ipcRenderer.invoke("agent:send-message", payload),
+    compactConversation: (payload: {
+      conversationId: string;
+      messages: any[];
+      model?: string;
+      providerId?: string;
+      authToken?: string;
+      focus?: string;
+    }) => ipcRenderer.invoke("agent:compact-conversation", payload),
+    oauth: {
+      listProviders: () => ipcRenderer.invoke("oauth:list-providers"),
+      startLogin: (provider: string) => ipcRenderer.invoke("oauth:start-login", provider),
+      cancelLogin: (provider: string) => ipcRenderer.invoke("oauth:cancel-login", provider),
+      submitCode: (provider: string, codeOrUrl: string) =>
+        ipcRenderer.invoke("oauth:submit-code", provider, codeOrUrl),
+      disconnect: (provider: string) => ipcRenderer.invoke("oauth:disconnect", provider),
+      onLoginProgress: (callback: (progress: any) => void) => {
+        const handler = (_event: any, progress: any) => callback(progress);
+        ipcRenderer.on("oauth:login-progress", handler);
+        return () => ipcRenderer.removeListener("oauth:login-progress", handler);
+      },
+    },
     steerAgent: (payload: {
       conversationId: string;
       prompt: string;

@@ -38,6 +38,7 @@ export function resolveMarkdownLink(rawHref: string): ResolvedMarkdownLink {
       !href.startsWith("conversation:") &&
       !href.startsWith("plugin:") &&
       !href.startsWith("skill:") &&
+      !href.startsWith("command:") &&
       !/^[a-zA-Z]:[\\/]/.test(href) &&
       !/\.(?:html?|md|txt|json|ya?ml|[cm]?[jt]sx?|py|css|svg|png|jpe?g|gif|webp|pdf|docx?|xlsx?|pptx?|csv|mp[34]|wav|webm|zip)$/i.test(href) &&
       /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?::\d+)?(?:\/.*)?$/i.test(href));

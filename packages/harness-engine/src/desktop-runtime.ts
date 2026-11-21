@@ -1,9 +1,14 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import {
   abortableDelay,
   AgentRequestError,
   appendToolObservations,
   buildConstSystemPrompt,
+  buildGoalActivePrompt,
+  buildGoalBudgetLimitPrompt,
+  buildGoalContinuationPrompt,
+  buildPlanApprovedGuidance,
   calculateContextBreakdown,
   calculateContextOccupancy,
   compactHistoryForContext,
@@ -20,6 +25,7 @@ import {
   fitRequestHistory,
   formatTaskResultEnvelope,
   globalSubAgentManager,
+  GOAL_TOOL,
   imageContentForModel,
   isContextWindowError,
   isNonRetryableModelError,
@@ -31,6 +37,7 @@ import {
   normalizeToolName,
   parseToolArguments,
   PAYLOAD_ERROR_MESSAGE,
+  PLAN_EXIT_TOOL,
   pluginInvocationInstructions,
   PROGRESS_REVIEW_GUIDANCE,
   REASONING_RECOVERY_GUIDANCE,
@@ -54,6 +61,7 @@ import {
   type AgentOutcome,
   type ApprovalResponseData,
   type CodingAgentRuntime,
+  type GoalState,
   type NativeCapability,
   type NativeToolDefinition,
   type RequestDiagnostics,
@@ -68,6 +76,7 @@ import {
   type ToolCall as PiToolCall,
 } from "@earendil-works/pi-ai";
 import { executeToolSearch, resolveHarnessToolDefinitions } from "./tool-registry.js";
+import { buildDialectRequest, consumeDialectStream, resolveProviderDialect } from "./dialect-transport.js";
 
 const EMPTY_USAGE = {
   input: 0,
@@ -382,9 +391,55 @@ export class PiHarnessAgent implements CodingAgentRuntime {
 
     const MAX_EMPTY_RETRIES = isCompanion ? 1 : 2;
     const maxTurns = this.maxTurns;
+    const activeDialect = resolveProviderDialect(
+      this.config.providerProtocol,
+      this.config.baseUrl,
+      this.config.providerAuthType,
+    );
     const endpoint = this.config.baseUrl.endsWith("/chat/completions")
       ? this.config.baseUrl
       : `${this.config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+    // Plan Mode & Goal Mode runtime state (OMP-aligned)
+    const nowTs = Date.now();
+    let activeGoal: GoalState | null = !isCompanion
+      ? this.config.initialGoal
+        ? {
+            ...this.config.initialGoal,
+            status: this.config.runIntent === "goal" && this.config.initialGoal.status === "paused"
+              ? "active"
+              : this.config.initialGoal.status,
+            tokensUsed: this.config.initialGoal.tokensUsed ?? 0,
+            timeUsedSeconds: this.config.initialGoal.timeUsedSeconds ?? 0,
+            createdAt: this.config.initialGoal.createdAt ?? nowTs,
+            updatedAt: nowTs,
+          }
+        : this.config.runIntent === "goal"
+          ? {
+              id: `goal_${nowTs}_${Math.random().toString(36).slice(2, 8)}`,
+              objective: this.config.goalObjective?.trim() || "Complete the requested goal thoroughly",
+              criteria: [],
+              status: "active",
+              tokenBudget: this.config.goalTokenBudget,
+              tokensUsed: 0,
+              timeUsedSeconds: 0,
+              createdAt: nowTs,
+              updatedAt: nowTs,
+            }
+          : null
+      : null;
+    let activeApprovedPlanPath: string | undefined = this.config.approvedPlanPath;
+    let goalWallLastAccountedMs = nowTs;
+    let goalBudgetSteerSent = false;
+    let goalContinuationReminders = 0;
+    let lastContinuationActivityDigest: string | null = null;
+    let turnActivityTokens: string[] = [];
+    if (activeGoal) {
+      emitEvent({ type: "goal_update", goal: activeGoal });
+    }
+    if (!isCompanion && this.config.runIntent === "plan") {
+      emitEvent({ type: "plan_mode_changed", active: true });
+    }
 
     const activeModelInfo = DEFAULT_MODELS.find((m) => m.id === this.config.model);
     const resolvedContextWindow = this.config.contextWindow ?? activeModelInfo?.contextWindow ?? 1_000_000;
@@ -486,7 +541,7 @@ export class PiHarnessAgent implements CodingAgentRuntime {
     }> => {
       if (isCompanion) return { definitions: [], enabledNativePlugins: [], hasBrowserOrComputerTools: false };
       const externalTools = await this.config.externalTools?.(signal) ?? [];
-      return resolveHarnessToolDefinitions({
+      const resolved = resolveHarnessToolDefinitions({
         isCompanion,
         explicitTools: this.config.tools,
         externalTools,
@@ -496,6 +551,17 @@ export class PiHarnessAgent implements CodingAgentRuntime {
         activatedDeferredTools,
         conversationId: this.config.conversationId,
       });
+      const extraIntentTools: NativeToolDefinition[] = [];
+      if (this.authorization.runIntent === "plan" && !resolved.definitions.some((t) => t.function.name === "plan_exit")) {
+        extraIntentTools.push(PLAN_EXIT_TOOL);
+      }
+      if ((this.authorization.runIntent === "goal" || activeGoal) && !resolved.definitions.some((t) => t.function.name === "goal")) {
+        extraIntentTools.push(GOAL_TOOL);
+      }
+      if (extraIntentTools.length > 0) {
+        return { ...resolved, definitions: [...resolved.definitions, ...extraIntentTools] };
+      }
+      return resolved;
     };
 
     const buildPiTools = (
@@ -521,6 +587,190 @@ export class PiHarnessAgent implements CodingAgentRuntime {
 
             const toolStartedAt = Date.now();
             let questionWaitingMs = 0;
+
+            // Handle Plan Mode exit (OMP-aligned 3-option review + plan artifact inlining)
+            if (name === "plan_exit") {
+              const title = typeof args.title === "string" && args.title.trim() ? args.title.trim() : "Implementation Plan";
+              const summary = typeof args.summary === "string" ? args.summary.trim() : "";
+              const planPath = typeof args.planPath === "string" && args.planPath.trim() ? args.planPath.trim() : undefined;
+              let decision: "execute" | "compact" | "stay" = "execute";
+              let feedback = "";
+              if (agentConfig.onAskQuestion) {
+                const askStart = Date.now();
+                try {
+                  const ans = await agentConfig.onAskQuestion(toolCallId, [
+                    {
+                      question: `${title}${planPath ? ` (${planPath})` : ""}\n\n${summary || "Plan is ready."}\n\nHow would you like to proceed?`,
+                      options: [
+                        { label: "Approve & Execute Plan", description: "Exit Plan Mode and execute with current context", recommended: true },
+                        { label: "Approve & Compact Context", description: "Compact exploration history, preserve the plan, and execute" },
+                        { label: "Stay in Plan Mode", description: "Keep refining the plan without editing files" },
+                      ],
+                    },
+                  ]);
+                  const raw = typeof ans === "string" ? ans : JSON.stringify(ans ?? "");
+                  if (/stay in plan|no\b|reject|cancel|refine/i.test(raw)) {
+                    decision = "stay";
+                    feedback = raw;
+                  } else if (/compact/i.test(raw)) {
+                    decision = "compact";
+                  } else {
+                    decision = "execute";
+                  }
+                } finally {
+                  questionWaitingMs += Date.now() - askStart;
+                }
+              }
+
+              let planContent = summary;
+              if (planPath) {
+                try {
+                  const absPlanPath = path.resolve(workspacePath, planPath);
+                  const diskPlan = await fs.readFile(absPlanPath, "utf-8");
+                  if (diskPlan.trim()) planContent = diskPlan.trim();
+                } catch {}
+              }
+
+              let result: string;
+              if (decision === "stay") {
+                result = `User chose to stay in Plan Mode.${feedback ? ` Feedback: ${feedback}` : ""} Refine the plan without editing workspace files.`;
+              } else {
+                this.authorization.updateRunIntent("default");
+                activeApprovedPlanPath = planPath;
+                if (decision === "compact" && conversationHistory.length > 4) {
+                  const firstUser = conversationHistory.find((m) => m.role === "user");
+                  const tail = conversationHistory.slice(-2);
+                  conversationHistory.length = 0;
+                  if (firstUser && !tail.includes(firstUser)) conversationHistory.push(firstUser);
+                  conversationHistory.push({
+                    role: "assistant",
+                    content: `[Exploration history compacted on plan approval${planPath ? ` — plan preserved at ${planPath}` : ""}]`,
+                    timestamp: Date.now(),
+                  });
+                  conversationHistory.push(...tail);
+                }
+                emitEvent({
+                  type: "plan_mode_changed",
+                  active: false,
+                  planPath,
+                  approved: true,
+                  compacted: decision === "compact",
+                });
+                const hasTodoTool = activeToolDefinitions.some((t) => isTodoTool(t.function.name));
+                result = buildPlanApprovedGuidance({
+                  planPath,
+                  planContent,
+                  contextPreserved: decision !== "compact",
+                  hasTodoTool,
+                });
+              }
+              toolMetaByCallId.set(toolCallId, {
+                rawResult: result,
+                durationMs: Math.max(0, Date.now() - toolStartedAt - questionWaitingMs),
+                waitingMs: perm.waitingMs + questionWaitingMs,
+                isError: false,
+              });
+              return { content: [{ type: "text", text: result }], details: result, isError: false };
+            }
+
+            // Handle autonomous Goal state management (`/goal` — OMP-aligned)
+            if (name === "goal") {
+              const op = String(args.op || "get").toLowerCase();
+              let resultText = "";
+              let isError = false;
+              const now = Date.now();
+              const parsedBudget =
+                typeof args.token_budget === "number" && Number.isInteger(args.token_budget) && args.token_budget > 0
+                  ? args.token_budget
+                  : undefined;
+              if (args.token_budget !== undefined && parsedBudget === undefined) {
+                isError = true;
+                resultText = "goal token_budget must be a positive integer when provided.";
+              } else if (op === "create" || op === "update" || op === "replace") {
+                const objective = typeof args.objective === "string" && args.objective.trim()
+                  ? args.objective.trim()
+                  : activeGoal?.objective || "Complete the user's goal";
+                const criteria = Array.isArray(args.criteria)
+                  ? args.criteria.map((c) => String(c).trim()).filter(Boolean)
+                  : op === "replace"
+                    ? []
+                    : (activeGoal?.criteria ?? []);
+                const tokenBudget = parsedBudget ?? (op === "replace" ? undefined : activeGoal?.tokenBudget);
+                const tokensUsed = op === "replace" ? 0 : (activeGoal?.tokensUsed ?? 0);
+                const timeUsedSeconds = op === "replace" ? 0 : (activeGoal?.timeUsedSeconds ?? 0);
+                const nextStatus =
+                  tokenBudget !== undefined && tokensUsed >= tokenBudget ? "budget-limited" : "active";
+                activeGoal = {
+                  id: op === "replace" || !activeGoal?.id
+                    ? `goal_${now}_${Math.random().toString(36).slice(2, 8)}`
+                    : activeGoal.id,
+                  objective,
+                  criteria,
+                  status: nextStatus,
+                  summary: typeof args.summary === "string" ? args.summary : activeGoal?.summary,
+                  tokenBudget,
+                  tokensUsed,
+                  timeUsedSeconds,
+                  createdAt: op === "replace" ? now : (activeGoal?.createdAt ?? now),
+                  updatedAt: now,
+                };
+                if (op === "replace") {
+                  goalWallLastAccountedMs = now;
+                  goalBudgetSteerSent = false;
+                }
+                emitEvent({ type: "goal_update", goal: activeGoal });
+                resultText = JSON.stringify({ ok: true, goal: activeGoal }, null, 2);
+              } else if (op === "get") {
+                resultText = JSON.stringify({ goal: activeGoal }, null, 2);
+              } else if (op === "complete") {
+                if (activeGoal) {
+                  activeGoal = {
+                    ...activeGoal,
+                    status: "complete",
+                    summary: typeof args.summary === "string" ? args.summary : activeGoal.summary,
+                    updatedAt: now,
+                  };
+                  emitEvent({ type: "goal_update", goal: activeGoal });
+                }
+                const budgetParts: string[] = [];
+                if (activeGoal?.tokenBudget !== undefined) {
+                  budgetParts.push(`tokens used: ${activeGoal.tokensUsed ?? 0} of ${activeGoal.tokenBudget}`);
+                }
+                if ((activeGoal?.timeUsedSeconds ?? 0) > 0) {
+                  budgetParts.push(`time used: ${activeGoal?.timeUsedSeconds} seconds`);
+                }
+                resultText = JSON.stringify(
+                  {
+                    ok: true,
+                    goal: activeGoal,
+                    ...(budgetParts.length > 0 ? { report: `Goal achieved (${budgetParts.join("; ")}).` } : {}),
+                  },
+                  null,
+                  2,
+                );
+              } else if (op === "drop") {
+                if (activeGoal) {
+                  activeGoal = {
+                    ...activeGoal,
+                    status: "dropped",
+                    summary: typeof args.summary === "string" ? args.summary : "Dropped",
+                    updatedAt: now,
+                  };
+                  emitEvent({ type: "goal_update", goal: activeGoal });
+                }
+                resultText = JSON.stringify({ ok: true, goal: activeGoal }, null, 2);
+              } else {
+                isError = true;
+                resultText = `Unknown goal op '${op}'. Use create, get, update, replace, complete, or drop.`;
+              }
+              toolMetaByCallId.set(toolCallId, {
+                rawResult: resultText,
+                durationMs: Date.now() - toolStartedAt,
+                waitingMs: perm.waitingMs,
+                isError,
+              });
+              return { content: [{ type: "text", text: resultText }], details: resultText, isError };
+            }
 
             // Handle deferred specialist tool discovery/activation
             if (name === "tool_search") {
@@ -720,6 +970,14 @@ export class PiHarnessAgent implements CodingAgentRuntime {
                 : "";
             const pluginInstructions = isCompanion ? "" : pluginInvocationInstructions(latestUserText, resolveSkillRegistry(workspacePath).plugins);
             if (pluginInstructions) turnInstructions.push(pluginInstructions);
+            if (!isCompanion && activeGoal?.status === "active") {
+              turnInstructions.push(buildGoalActivePrompt(activeGoal));
+            }
+            if (!isCompanion && activeApprovedPlanPath && this.authorization.runIntent !== "plan" && contextRecoveryAttempted) {
+              turnInstructions.push(
+                `[PLAN REFERENCE]: An approved implementation plan is saved at \`${activeApprovedPlanPath}\`. If earlier plan details were compressed during context recovery, read \`${activeApprovedPlanPath}\` and continue executing it faithfully.`,
+              );
+            }
             if (recoveryInstruction) {
               turnInstructions.push(recoveryInstruction);
               recoveryInstruction = "";
@@ -739,29 +997,26 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               ...(turnInstructions.length ? [{ role: "system" as const, content: turnInstructions.join("\n\n") }] : []),
             ];
 
-            const formattedMessages = [
-              { role: "system", content: systemPrompt },
-              ...requestHistory.map((m, mIdx) => {
-                const item: { role: string; [key: string]: any } = {
-                  role: m.role,
-                  content: imageContentForModel(m.content ?? "", modelSupportsImages && !toolVisionUnavailable),
-                };
-                if (m.role === "assistant" && m.thinking) {
-                  item.reasoning_content = m.thinking;
-                }
-                if (m.name) item.name = m.name;
-                if (m.role === "tool") {
-                  item.tool_call_id = m.tool_call_id || `call_tool_${mIdx}`;
-                } else if (m.tool_call_id) {
-                  item.tool_call_id = m.tool_call_id;
-                }
-                if (m.tool_calls && m.tool_calls.length > 0) {
-                  item.tool_calls = m.tool_calls;
-                  if (!m.content) item.content = null;
-                }
-                return item;
-              }),
-            ];
+            const nonSystemFormatted = requestHistory.map((m, mIdx) => {
+              const item: { role: string; [key: string]: any } = {
+                role: m.role,
+                content: imageContentForModel(m.content ?? "", modelSupportsImages && !toolVisionUnavailable),
+              };
+              if (m.role === "assistant" && m.thinking) {
+                item.reasoning_content = m.thinking;
+              }
+              if (m.name) item.name = m.name;
+              if (m.role === "tool") {
+                item.tool_call_id = m.tool_call_id || `call_tool_${mIdx}`;
+              } else if (m.tool_call_id) {
+                item.tool_call_id = m.tool_call_id;
+              }
+              if (m.tool_calls && m.tool_calls.length > 0) {
+                item.tool_calls = m.tool_calls;
+                if (!m.content) item.content = null;
+              }
+              return item;
+            });
 
             const breakdown = calculateContextBreakdown({
               systemPrompt,
@@ -797,29 +1052,31 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             const cappedMaxTokens = modelMaxOutputCap ? Math.min(requestedMaxTokens, modelMaxOutputCap) : requestedMaxTokens;
             const remainingOutputTokens = Math.max(1, resolvedContextWindow - Math.ceil(breakdown.totalHeuristicTokens * 1.2) - 1024);
             const resolvedMaxTokens = Math.min(cappedMaxTokens, remainingOutputTokens, contextRecoveryAttempted ? 8192 : Infinity);
-            const useMaxCompletionTokensOnly = endpoint.includes("api.openai.com");
 
-            const configuredBodyLimit = requestBodyBudget(endpoint, this.config.requestBodyLimitBytes);
-            const payload = {
+            const dialectReq = buildDialectRequest({
+              dialect: activeDialect,
+              baseUrl: this.config.baseUrl,
+              apiKey: this.config.apiKey,
               model: this.config.model,
-              messages: formattedMessages,
-              ...(requestTools.length ? { tools: requestTools } : {}),
-              ...(hasBrowserOrComputerTools ? { parallel_tool_calls: false } : {}),
-              stream: true,
-              stream_options: { include_usage: true },
-              ...(useMaxCompletionTokensOnly
-                ? { max_completion_tokens: resolvedMaxTokens }
-                : { max_tokens: resolvedMaxTokens }),
-              ...(effectiveThinkingLevel && effectiveThinkingLevel !== "off"
-                ? { reasoning: effectiveThinkingLevel, reasoning_effort: effectiveThinkingLevel }
-                : {}),
-            };
+              systemPrompt,
+              messages: nonSystemFormatted,
+              tools: requestTools,
+              maxTokens: resolvedMaxTokens,
+              thinkingLevel: effectiveThinkingLevel,
+              hasBrowserOrComputerTools,
+              providerHeaders: this.config.providerHeaders,
+              providerAccountId: this.config.providerAccountId,
+              providerProjectId: this.config.providerProjectId,
+              providerAuthType: this.config.providerAuthType,
+            });
+            const activeEndpoint = dialectReq.url;
+            const configuredBodyLimit = requestBodyBudget(activeEndpoint, this.config.requestBodyLimitBytes);
 
             let prepared: Awaited<ReturnType<typeof prepareRequest>>;
             try {
               const bodyLimit = Math.min(configuredBodyLimit ?? Infinity, payloadRecoveryLimit ?? Infinity);
-              prepared = await prepareRequest(payload, {
-                endpoint,
+              prepared = await prepareRequest(dialectReq.bodyObj as any, {
+                endpoint: activeEndpoint,
                 runId,
                 signal: callSignal,
                 limitBytes: Number.isFinite(bodyLimit) ? bodyLimit : undefined,
@@ -848,13 +1105,10 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             activeRequest = request;
 
             const response = await fetchWithRetry(
-              endpoint,
+              activeEndpoint,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
-                },
+                headers: dialectReq.headers,
                 body: prepared.body,
               },
               {
@@ -950,14 +1204,25 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             let turnContent = "";
             let turnThinking = "";
             let turnFinishReason: string | null = null;
+            let turnUsageInput = 0;
+            let turnUsageOutput = 0;
+            let turnUsageCacheWrite = 0;
             const streamFilter = new ThinkingStreamFilter();
             const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>();
 
             try {
-              await consumeChatStream(
+              await consumeDialectStream(
+                activeDialect,
                 response.body,
                 (json) => {
-                  if (json?.usage) request.observeUsage(json.usage);
+                  if (json?.usage) {
+                    request.observeUsage(json.usage);
+                    if (typeof json.usage.prompt_tokens === "number") turnUsageInput = Math.max(turnUsageInput, json.usage.prompt_tokens);
+                    if (typeof json.usage.completion_tokens === "number") turnUsageOutput = Math.max(turnUsageOutput, json.usage.completion_tokens);
+                    if (typeof json.usage.cache_creation_input_tokens === "number") {
+                      turnUsageCacheWrite = Math.max(turnUsageCacheWrite, json.usage.cache_creation_input_tokens);
+                    }
+                  }
                   const choice = json.choices?.[0];
                   if (choice?.finish_reason) turnFinishReason = choice.finish_reason;
                   const delta = choice?.delta || choice?.message;
@@ -1111,6 +1376,34 @@ export class PiHarnessAgent implements CodingAgentRuntime {
             payloadRecoveryLimit = undefined;
             rejectedPayloadBytes = undefined;
 
+            // OMP-aligned Goal token & wall-clock accounting + budget-limit enforcement
+            if (!isCompanion && activeGoal && (activeGoal.status === "active" || activeGoal.status === "budget-limited")) {
+              const nowAcc = Date.now();
+              const wallDeltaSec = Math.max(0, Math.floor((nowAcc - goalWallLastAccountedMs) / 1000));
+              const tokenDelta = turnUsageInput + turnUsageCacheWrite + turnUsageOutput;
+              if (wallDeltaSec > 0) goalWallLastAccountedMs += wallDeltaSec * 1000;
+              if (tokenDelta > 0 || wallDeltaSec > 0) {
+                activeGoal = {
+                  ...activeGoal,
+                  tokensUsed: (activeGoal.tokensUsed ?? 0) + tokenDelta,
+                  timeUsedSeconds: (activeGoal.timeUsedSeconds ?? 0) + wallDeltaSec,
+                  updatedAt: nowAcc,
+                };
+                if (
+                  activeGoal.tokenBudget !== undefined &&
+                  (activeGoal.tokensUsed ?? 0) >= activeGoal.tokenBudget &&
+                  activeGoal.status === "active"
+                ) {
+                  activeGoal = { ...activeGoal, status: "budget-limited", updatedAt: nowAcc };
+                }
+                emitEvent({ type: "goal_update", goal: activeGoal });
+              }
+              if (activeGoal.status === "budget-limited" && !goalBudgetSteerSent) {
+                goalBudgetSteerSent = true;
+                recoveryInstruction = buildGoalBudgetLimitPrompt(activeGoal);
+              }
+            }
+
             if (turnFinishReason === "length" && toolCallsMap.size > 0) {
               toolCallsMap.clear();
               turnContent = "";
@@ -1174,6 +1467,9 @@ export class PiHarnessAgent implements CodingAgentRuntime {
 
             // Sync Harness conversationHistory + emit commentary / tool status
             if (rawToolCalls.length > 0) {
+              for (const tc of rawToolCalls) {
+                turnActivityTokens.push(`call:${tc.function.name}:${tc.function.arguments.slice(0, 120)}`);
+              }
               emitEvent({ type: "commentary", content: turnContent });
               emitEvent({ type: "status", status: "calling_tool", message: `Executing ${rawToolCalls.length} tool(s)...` });
               currentTurnToolObservations = [];
@@ -1188,6 +1484,49 @@ export class PiHarnessAgent implements CodingAgentRuntime {
               };
               conversationHistory.push(currentTurnAssistantMsg);
             } else {
+              // OMP-aligned Goal Mode continuation guard:
+              // - Stops automatically if goal is budget-limited / paused / complete / dropped.
+              // - Computes tool activity digest since the last continuation; if two consecutive
+              //   continuation turns produce identical/empty tool activity (no progress), stops cleanly.
+              // - Feeds remaining incomplete TodoTracker items into the continuation audit prompt.
+              if (
+                !isCompanion &&
+                activeGoal &&
+                activeGoal.status === "active" &&
+                goalContinuationReminders < 3 &&
+                currentTurn < maxTurns
+              ) {
+                const activityDigest = turnActivityTokens.join("|");
+                turnActivityTokens = [];
+                const stalledWithoutProgress =
+                  lastContinuationActivityDigest !== null &&
+                  (activityDigest === "" || activityDigest === lastContinuationActivityDigest);
+
+                if (!stalledWithoutProgress) {
+                  lastContinuationActivityDigest = activityDigest;
+                  goalContinuationReminders++;
+                  if (turnContent || turnThinking) {
+                    conversationHistory.push({
+                      role: "assistant",
+                      content: turnContent,
+                      thinking: turnThinking || undefined,
+                      timestamp: Date.now(),
+                    });
+                  }
+                  const incompleteTodos = (todos.snapshot() || [])
+                    .filter((item) => item.status !== "completed")
+                    .map((item) => item.content || item.title || item.task || "")
+                    .filter(Boolean);
+                  recoveryInstruction = buildGoalContinuationPrompt(activeGoal, incompleteTodos);
+                  emitEvent({
+                    type: "status",
+                    status: "thinking",
+                    message: `Continuing goal verification (${goalContinuationReminders}/3)...`,
+                  });
+                  continue;
+                }
+              }
+
               currentTurnAssistantMsg = undefined;
               finalAssistantText = turnContent;
               if (turnContent || turnThinking) {
@@ -1534,6 +1873,11 @@ export class PiHarnessAgent implements CodingAgentRuntime {
       if (isAborted) {
         outcome = "cancelled";
         this._isCancelled = true;
+        // OMP-aligned: interrupting an active goal pauses it so the user can `/goal resume`
+        if (!isCompanion && activeGoal && (activeGoal.status === "active" || activeGoal.status === "budget-limited")) {
+          activeGoal = { ...activeGoal, status: "paused", updatedAt: Date.now() };
+          emitEvent({ type: "goal_update", goal: activeGoal });
+        }
         emitEvent({ type: "error", error: "User cancelled agent execution.", category: errorCategory });
         emitEvent({ type: "status", status: "idle", message: "User cancelled agent execution." });
       } else {

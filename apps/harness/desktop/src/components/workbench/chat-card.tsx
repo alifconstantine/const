@@ -32,6 +32,8 @@ import {
   Box,
   Eye,
   PencilSparkles,
+  Lightbulb,
+  Target,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -60,6 +62,12 @@ import { RichMentionEditor, type RichMentionEditorRef, type ActiveSlashToken } f
 import { QueueDock, type QueuedMessageItem } from "./queue-dock";
 import type { LocalSkill } from "../../lib/db";
 import { SkillSlashPopover } from "./skill-slash-popover";
+import {
+  filterBuiltinSlashCommands,
+  parseBuiltinSlashCommand,
+  type BuiltinSlashCommand,
+  type BuiltinSlashCommandId,
+} from "../../lib/slash-commands";
 import { extractSkillsAndAugmentPrompt } from "../../lib/skills/skills-service";
 import { useResolvedSkills } from "../../lib/skills/use-skills";
 import { usePluginInventory } from "../../lib/plugins/plugins-service";
@@ -339,6 +347,7 @@ export interface ModelItem {
   desc?: string;
   provider: string;
   providerName: string;
+  authType?: "router" | "oauth" | "api_key";
   supportsThinking?: boolean;
   thinkingLevels?: string[];
   defaultThinkingLevel?: string;
@@ -348,7 +357,11 @@ export interface ModelItem {
 
 export { getModelContextLimit } from "../../lib/model-context";
 
-export const INITIAL_DEFAULT_MODELS: ModelItem[] = ROUTER_DEFAULT_MODELS.map((model) => ({ ...model, name: model.displayName }));
+export const INITIAL_DEFAULT_MODELS: ModelItem[] = ROUTER_DEFAULT_MODELS.map((model) => ({
+  ...model,
+  name: model.displayName,
+  authType: "router",
+}));
 
 let globalCachedModels: ModelItem[] | null = null;
 
@@ -358,11 +371,18 @@ interface ChatCardProps {
     prompt: string;
     project: string;
     mode: "request_review" | "ask_before_changes" | "full_access";
+    runIntent?: "default" | "plan" | "goal";
+    goalObjective?: string;
     model?: string;
+    providerId?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
     maxOutputTokens?: number;
   }) => void;
+  onSlashCommand?: (command: BuiltinSlashCommandId, args: string) => void;
+  activeRunIntent?: "default" | "plan" | "goal";
+  activeGoalObjective?: string;
+  onRunIntentChange?: (intent: "default" | "plan" | "goal") => void;
   isExecuting?: boolean;
   onAbort?: () => void;
   compact?: boolean;
@@ -410,6 +430,10 @@ export interface MentionedItem {
 export function ChatCard({
   conversationId,
   onSendMessage,
+  onSlashCommand,
+  activeRunIntent = "default",
+  activeGoalObjective,
+  onRunIntentChange,
   isExecuting = false,
   onAbort,
   compact = false,
@@ -444,7 +468,7 @@ export function ChatCard({
   const remote = useRemoteRuntime();
   const [telemetryTarget, setTelemetryTarget] = useState<HTMLElement | null>(null);
   useEffect(() => { setTelemetryTarget(remote?.mobile ? document.getElementById("remote-header-telemetry") : null); }, [remote?.mobile, conversationId]);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const [containerNarrow, setContainerNarrow] = useState(false);
 
@@ -715,9 +739,16 @@ export function ChatCard({
     return resolvedSkills.filter((s) => s.isEnabled && !s.pluginId);
   }, [resolvedSkills]);
 
-  // Slash token state for SkillSlashPopover
+  // Slash token state for SkillSlashPopover (Built-in Commands + Skills)
   const [slashToken, setSlashToken] = useState<ActiveSlashToken | null>(null);
   const [slashSkillIndex, setSlashSkillIndex] = useState(0);
+
+  const filteredCommands = useMemo(() => {
+    if (!slashToken) return [];
+    // Only show built-in commands when typing from the start of the composer (and not inside SideChat)
+    if (isolatedModel || slashToken.range[0] > 0) return [];
+    return filterBuiltinSlashCommands(slashToken.query);
+  }, [slashToken, isolatedModel]);
 
   const filteredSkills = useMemo(() => {
     if (!slashToken) return [];
@@ -733,6 +764,22 @@ export function ChatCard({
     });
     return matches;
   }, [slashToken, availableSkills]);
+
+  const handleSelectCommand = (cmd: BuiltinSlashCommand) => {
+    if (!cmd) return;
+    setSlashToken(null);
+    setSlashSkillIndex(0);
+    // ChatGPT / Codex style: /plan and /goal toggle the session mode right in the composer toolbar
+    if ((cmd.id === "plan" || cmd.id === "goal") && onRunIntentChange) {
+      setPrompt("");
+      editorRef.current?.clear();
+      onRunIntentChange(activeRunIntent === cmd.id ? "default" : cmd.id);
+      editorRef.current?.focus();
+      return;
+    }
+    // /btw and /compact insert inline monochrome command pills just like skills
+    editorRef.current?.insertSlashCommand(cmd);
+  };
 
   const handleSelectSkill = (skill: LocalSkill) => {
     if (!skill) return;
@@ -789,17 +836,24 @@ export function ChatCard({
   const [searchModelQuery, setSearchModelQuery] = useState("");
 
   const groupedModels = useMemo(() => {
-    const map = new Map<string, { providerId: string; providerName: string; items: ModelItem[] }>();
+    const map = new Map<
+      string,
+      { providerId: string; providerName: string; authType: "router" | "oauth" | "api_key"; items: ModelItem[] }
+    >();
     for (const m of models) {
       const isConst = isConstProvider(m.provider);
       const pid = isConst ? "const" : (m.provider || "custom");
-      const pname = isConst ? "ConstRouter" : (m.providerName || "Custom");
+      const pname = isConst ? "Const Router" : (m.providerName || "Custom");
+      const authType: "router" | "oauth" | "api_key" =
+        m.authType || (isConst ? "router" : m.id.startsWith("sub:") ? "oauth" : "api_key");
       if (!map.has(pid)) {
-        map.set(pid, { providerId: pid, providerName: pname, items: [] });
+        map.set(pid, { providerId: pid, providerName: pname, authType, items: [] });
       }
       map.get(pid)!.items.push(m);
     }
-    return Array.from(map.values());
+    // Order: Native Const Router first, then OAuth Subscriptions, then BYOK / Custom API Key providers
+    const rank = { router: 0, oauth: 1, api_key: 2 } as const;
+    return Array.from(map.values()).sort((a, b) => rank[a.authType] - rank[b.authType]);
   }, [models]);
 
   const filteredGroupedModels = useMemo(() => {
@@ -1133,12 +1187,15 @@ export function ChatCard({
     };
   }, [isThinkingSupported, supportedThinkingLevels]);
 
-  // Fetch available models and user config from engine
+  // Fetch available models and user config from engine (refreshes when OAuth or Settings → Models changes)
   useEffect(() => {
-    if (window.electron?.getModels) {
+    let cancelled = false;
+    const refreshModels = () => {
+      if (!window.electron?.getModels) return;
       window.electron
         .getModels()
         .then((items: any[]) => {
+          if (cancelled) return;
           if (items && items.length > 0) {
             const mapped = items.map((m: any) => {
               const isConst = isConstProvider(m.provider);
@@ -1173,7 +1230,8 @@ export function ChatCard({
                   ? "Supports tools"
                   : undefined,
                 provider: isConst ? "const" : (m.provider || "custom"),
-                providerName: isConst ? "Const" : (m.providerName || "Custom"),
+                providerName: isConst ? "Const Router" : (m.providerName || "Custom"),
+                authType: m.authType || (isConst ? "router" : m.id?.startsWith("sub:") ? "oauth" : "api_key"),
                 supportsThinking,
                 thinkingLevels: supportsThinking
                   ? m.thinkingLevels || m.thinking_levels || ["low", "medium", "high", "xhigh", "max"]
@@ -1199,7 +1257,18 @@ export function ChatCard({
           }
         })
         .catch(() => {});
-    }
+    };
+
+    refreshModels();
+    const onModelsUpdated = () => refreshModels();
+    window.addEventListener("const:models-updated", onModelsUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("const:models-updated", onModelsUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
 
     // Only query electron config on first launch if there is no initialModel AND no saved model in localStorage
     if (
@@ -1258,6 +1327,18 @@ export function ChatCard({
   const handleSend = () => {
     let text = (editorRef.current?.getText() || prompt).trim();
     if (!text && attachments.length === 0) return;
+
+    const parsedCmd = !isolatedModel ? parseBuiltinSlashCommand(text) : null;
+
+    // `/btw <question>` ALWAYS opens SideChat and sends immediately — even while the main agent is running!
+    if (parsedCmd?.id === "btw" && onSlashCommand) {
+      setPrompt("");
+      editorRef.current?.clear();
+      setAttachments([]);
+      onSlashCommand("btw", parsedCmd.args);
+      return;
+    }
+
     if (isExecuting && !onQueueMessage && !onSteerDraft) return;
 
     if (!text && attachments.length > 0) {
@@ -1265,12 +1346,68 @@ export function ChatCard({
     }
 
     const currentAttachments = [...attachments];
+
+    // `/compact [focus]` runs context compaction directly
+    if (parsedCmd?.id === "compact" && onSlashCommand) {
+      if (isExecuting) {
+        toast.info("Wait for the current response to finish before running /compact.");
+        return;
+      }
+      setPrompt("");
+      editorRef.current?.clear();
+      setAttachments([]);
+      onSlashCommand("compact", parsedCmd.args);
+      return;
+    }
+
+    // `/plan` without args toggles Plan Mode cleanly (ChatGPT / OMP style)
+    if (parsedCmd?.id === "plan" && !parsedCmd.args) {
+      setPrompt("");
+      editorRef.current?.clear();
+      onRunIntentChange?.(activeRunIntent === "plan" ? "default" : "plan");
+      return;
+    }
+
+    // `/goal` without args toggles Goal Mode; `/goal resume|drop|status` delegates to App handler
+    if (parsedCmd?.id === "goal") {
+      const sub = parsedCmd.args.trim().toLowerCase();
+      if (!sub) {
+        setPrompt("");
+        editorRef.current?.clear();
+        onRunIntentChange?.(activeRunIntent === "goal" ? "default" : "goal");
+        return;
+      }
+      if ((sub === "resume" || sub === "drop" || sub === "status" || sub === "pause") && onSlashCommand) {
+        setPrompt("");
+        editorRef.current?.clear();
+        onSlashCommand("goal", sub);
+        return;
+      }
+    }
+
     setPrompt("");
     editorRef.current?.clear();
     setAttachments([]);
 
+    let effectiveText = text;
+    let runIntent: "default" | "plan" | "goal" | undefined =
+      activeRunIntent !== "default" ? activeRunIntent : undefined;
+    let goalObjective: string | undefined;
+    if (parsedCmd?.id === "plan") {
+      runIntent = "plan";
+      onRunIntentChange?.("plan");
+      effectiveText = parsedCmd.args;
+    } else if (parsedCmd?.id === "goal") {
+      runIntent = "goal";
+      onRunIntentChange?.("goal");
+      goalObjective = parsedCmd.args;
+      effectiveText = parsedCmd.args;
+    } else if (runIntent === "goal") {
+      goalObjective = activeGoalObjective || effectiveText;
+    }
+
     // Augment prompt if skills are referenced (/slug or inline mention badges)
-    const { augmentedPrompt } = extractSkillsAndAugmentPrompt(text, availableSkills);
+    const { augmentedPrompt } = extractSkillsAndAugmentPrompt(effectiveText, availableSkills);
     const finalPrompt = augmentedPrompt;
 
     if (isExecuting) {
@@ -1297,7 +1434,10 @@ export function ChatCard({
       prompt: finalPrompt,
       project: currentProject,
       mode,
+      runIntent,
+      goalObjective,
       model: matchedModel?.id || currentModelItem?.id || models[0]?.id || "",
+      providerId: matchedModel?.provider || currentModelItem?.provider,
       thinkingLevel: isThinkingSupported ? thinkingLevel : undefined,
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
       maxOutputTokens: matchedModel?.maxOutputTokens || currentModelItem?.maxOutputTokens,
@@ -1568,12 +1708,14 @@ export function ChatCard({
               />
             )}
 
-            {/* Skill Slash Popover (/) */}
+            {/* Built-in Slash Commands & Skills Popover (/) */}
             {slashToken && (
               <SkillSlashPopover
+                commands={filteredCommands}
                 skills={filteredSkills}
                 selectedIndex={slashSkillIndex}
                 query={slashToken.query}
+                onSelectCommand={handleSelectCommand}
                 onSelect={handleSelectSkill}
                 onHover={(idx) => setSlashSkillIndex(idx)}
                 onOpenSettings={() => onOpenSettings?.("skills")}
@@ -1712,27 +1854,35 @@ export function ChatCard({
               placeholder={
                 isExecuting && queuedMessages && queuedMessages.length > 0 && !prompt.trim()
                   ? t("workbench.steerQueuePlaceholder")
-                  : t("workbench.askPlaceholder")
+                  : activeRunIntent === "plan"
+                    ? (language === "id" ? "Jelaskan tugas untuk menyusun rencana..." : "Describe your task to generate a plan...")
+                    : activeRunIntent === "goal"
+                      ? (language === "id" ? "Jelaskan target yang ingin terus dikejar..." : "Describe a goal to keep pursuing...")
+                      : t("workbench.askPlaceholder")
               }
               disabled={false}
               onKeyDown={(e) => {
-                // Skills Slash Popover Keyboard Navigation
-                if (slashToken && filteredSkills.length > 0) {
+                // Built-in Slash Commands & Skills Popover Keyboard Navigation
+                const totalSlashItems = filteredCommands.length + filteredSkills.length;
+                if (slashToken && totalSlashItems > 0) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setSlashSkillIndex((prev) => (prev + 1) % filteredSkills.length);
+                    setSlashSkillIndex((prev) => (prev + 1) % totalSlashItems);
                     return;
                   }
                   if (e.key === "ArrowUp") {
                     e.preventDefault();
-                    setSlashSkillIndex((prev) => (prev - 1 + filteredSkills.length) % filteredSkills.length);
+                    setSlashSkillIndex((prev) => (prev - 1 + totalSlashItems) % totalSlashItems);
                     return;
                   }
                   if (e.key === "Tab" || e.key === "Enter") {
                     e.preventDefault();
-                    const skill = filteredSkills[slashSkillIndex];
-                    if (skill) {
-                      handleSelectSkill(skill);
+                    if (slashSkillIndex < filteredCommands.length) {
+                      const cmd = filteredCommands[slashSkillIndex];
+                      if (cmd) handleSelectCommand(cmd);
+                    } else {
+                      const skill = filteredSkills[slashSkillIndex - filteredCommands.length];
+                      if (skill) handleSelectSkill(skill);
                     }
                     return;
                   }
@@ -2073,6 +2223,40 @@ export function ChatCard({
                 )}
                 </Popover>
               </div>
+
+              {/* Active Plan / Goal Mode inline toggle (ChatGPT / Codex style: `Full access | 💡 Plan`) */}
+              {!isolatedModel && (activeRunIntent === "plan" || activeRunIntent === "goal") && (
+                <div className="flex items-center shrink-0">
+                  <span className="h-3.5 w-px bg-black/15 dark:bg-white/15 mx-1 shrink-0" aria-hidden="true" />
+                  <button
+                    type="button"
+                    onClick={() => onRunIntentChange?.("default")}
+                    className={cn(
+                      "inline-flex items-center transition-colors cursor-pointer text-[#737373] dark:text-[#a3a3a3] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-md",
+                      isNarrow ? "w-7 h-7 justify-center" : "gap-1.5 px-1.5 py-1 text-[13px] font-normal"
+                    )}
+                    title={
+                      activeRunIntent === "plan"
+                        ? (language === "id" ? "Mode Plan aktif — klik untuk menonaktifkan" : "Plan mode active — click to turn off")
+                        : activeGoalObjective
+                          ? `Goal: ${activeGoalObjective} — ${language === "id" ? "klik untuk menonaktifkan" : "click to turn off"}`
+                          : (language === "id" ? "Mode Goal aktif — klik untuk menonaktifkan" : "Goal mode active — click to turn off")
+                    }
+                  >
+                    {activeRunIntent === "plan" ? (
+                      <>
+                        <Lightbulb className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                        {!isNarrow && <span>Plan</span>}
+                      </>
+                    ) : (
+                      <>
+                        <Target className="w-3.5 h-3.5 stroke-[1.75] shrink-0" />
+                        {!isNarrow && <span>Goal</span>}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Right Actions: Model Selector, Send Button */}
@@ -2241,8 +2425,24 @@ export function ChatCard({
                                   {filteredGroupedModels.map((group) => (
                                     <div key={group.providerId} className="flex flex-col">
                                       {/* Category Header */}
-                                      <div className="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold text-[#71717a] uppercase tracking-wider select-none">
-                                        {group.providerName}
+                                      <div className="px-2.5 pt-2 pb-1 flex items-center justify-between gap-2 text-[10.5px] font-semibold text-[#71717a] uppercase tracking-wider select-none">
+                                        <span className="truncate">{group.providerName}</span>
+                                        <span
+                                          className={cn(
+                                            "px-1.5 py-0.5 rounded text-[9px] font-medium normal-case tracking-normal shrink-0",
+                                            group.authType === "router"
+                                              ? "bg-blue-500/10 text-blue-400"
+                                              : group.authType === "oauth"
+                                                ? "bg-emerald-500/10 text-emerald-400"
+                                                : "bg-neutral-500/15 text-neutral-400",
+                                          )}
+                                        >
+                                          {group.authType === "router"
+                                            ? "Native"
+                                            : group.authType === "oauth"
+                                              ? "Subscription"
+                                              : "API Key"}
+                                        </span>
                                       </div>
 
                                       {/* Model Items */}

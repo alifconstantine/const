@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "../../lib/i18n";
 import { modelDisplayName } from "../../lib/model-identity";
+import { SubscriptionProvidersPanel } from "./subscription-providers-panel";
 import {
   toast,
   cn,
@@ -171,14 +172,18 @@ export function ModelSettings({
   // Set default / active model directly
   const handleSetDefaultModel = (modelId: string, providerId: string) => {
     if (activeCategory === "llm") {
+      const isConst = providerId === "const-router" || providerId === "const";
+      const isSub = modelId.startsWith("sub:");
+      const resolvedActiveId =
+        isConst || isSub || modelId.startsWith("byok:") ? modelId : `byok:${providerId}/${modelId}`;
       const updated = {
         ...config.llm,
-        activeModelId: modelId,
+        activeModelId: resolvedActiveId,
         activeProviderId: providerId,
       };
       setConfig((prev) => ({ ...prev, llm: updated }));
       saveLlmConfig(updated);
-      onActiveModelChanged?.(modelId);
+      onActiveModelChanged?.(resolvedActiveId);
       toast.success(t("toast.activeModelSet"));
     } else if (activeCategory === "speech") {
       const updated = {
@@ -369,6 +374,7 @@ export function ModelSettings({
     const res = await fetchRemoteModels(
       editingProvider.baseUrl,
       editingProvider.apiKey,
+      editingProvider.protocol,
     );
     setIsFetchingModels(false);
 
@@ -768,9 +774,31 @@ export function ModelSettings({
       </div>
 
       {/* ===================================================================== */}
+      {/* ACCOUNT SUBSCRIPTIONS (OAUTH — CHATGPT, CLAUDE, GOOGLE, COPILOT)      */}
+      {/* ===================================================================== */}
+      {activeCategory === "llm" && (
+        <SubscriptionProvidersPanel
+          activeModelId={config.llm.activeModelId}
+          onSelectSubscriptionModel={(fullModelId, providerId) =>
+            handleSetDefaultModel(fullModelId, providerId)
+          }
+        />
+      )}
+
+      {/* ===================================================================== */}
       {/* PROVIDERS & MODELS ACCORDION LIST                                     */}
       {/* ===================================================================== */}
       <div className="space-y-3">
+        {activeCategory === "llm" && currentProviders.length > 0 && (
+          <div className="px-1 pt-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Native Router &amp; API Key Providers (BYOK)
+            </h3>
+            <p className="text-[11.5px] text-muted-foreground mt-0.5">
+              Use built-in Const Router models, or connect OpenAI, Anthropic, Google AI Studio, DeepSeek, OpenRouter, Ollama, or any custom OpenAI-compatible API key.
+            </p>
+          </div>
+        )}
         {currentProviders.length === 0 ? (
           <div className="settings-surface rounded-2xl bg-neutral-50 dark:bg-[#222222] py-12 px-6 flex flex-col items-center justify-center text-center select-none">
             {/* Category Icon */}
@@ -971,6 +999,12 @@ export function ModelSettings({
                               className="text-xs cursor-pointer"
                             >
                               {t("settings.apiResponses")}
+                            </SelectItem>
+                            <SelectItem
+                              value="google-gemini"
+                              className="text-xs cursor-pointer"
+                            >
+                              Google Gemini API (/v1beta)
                             </SelectItem>
                           </SelectContent>
                         </Select>
@@ -1373,7 +1407,9 @@ export function ModelSettings({
                           </div>
                         ) : (
                           editingProvider.models.map((model: any) => {
-                            const isDefault = currentActiveModelId === model.id;
+                            const isDefault =
+                              currentActiveModelId === model.id ||
+                              currentActiveModelId === `byok:${editingProvider.id}/${model.id}`;
 
                             return (
                               <div
